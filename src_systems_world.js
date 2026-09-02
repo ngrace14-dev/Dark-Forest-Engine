@@ -76,6 +76,8 @@ window.currentNoise2D = createNoise2D(window.currentPrng);
 window.WorldGenerator = class {
     static getNoise(x, z) { return window.currentNoise2D(x * window.WorldGenConfig.noiseScale, z * window.WorldGenConfig.noiseScale); }
     static getBiome(x, z) {
+        if (x >= 286000 && x < 287000) return 'sierra';
+        if (x >= 287000) return 'desert';
         const val = this.getNoise(x, z);
         if (val > 0.45) return 'alpine'; if (val < -0.3) return 'coastal'; if (val > -0.3 && val < 0.1) return 'valley'; return 'redwoods';
     }

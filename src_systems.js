@@ -1,16 +1,16 @@
 // Core Setup
-import './core/state.js';
+import './src_core_state.js';
 
 // Game Systems
-import './systems/inventory.js';
-import './systems/ui.js';
-import './systems/input.js';
-import './systems/audio.js';
-import './systems/ai.js';
-import './systems/dev-tools.js';
-import './systems/vfx.js';
-import './systems/world.js';
-import './systems/assets.js';
+import './src_systems_inventory.js';
+import './src_systems_ui.js';
+import './src_systems_input.js';
+import './src_systems_audio.js';
+import './src_systems_ai.js';
+import './src_systems_dev_tools.js';
+import './src_systems_vfx.js';
+import './src_systems_world.js';
+import './src_systems_assets.js';
 
 // Engine Boot and Render Loop (Runs Last)
-import './engine.js';
+import './src_engine.js';

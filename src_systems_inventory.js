@@ -76,6 +76,10 @@ window.EventBus.on('INV_USE', (packIndex) => {
     const item = window.ItemDatabase[itemId];
     if(item.type === 'consumable') {
         if(item.id === 'food') {
+            if(window.GameState.inventory.food <= 0) {
+                window.EventBus.emit('UI_LOG', 'No food remaining.');
+                return;
+            }
             window.GameState.pStats.hp = Math.min(window.GameState.pStats.hp + item.stats.heal, window.GameState.pStats.maxHp);
             window.GameState.inventory.food -= 1; window.GameState.inventory.backpack.splice(packIndex, 1);
             window.EventBus.emit('UI_LOG', `Ate ${item.name}. Recovered ${item.stats.heal} HP.`);

@@ -4,29 +4,29 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/12.1.0/firebase
 
  
 
-import './core/state.js';
+import './src_core_state.js';
 
  
 
-import './systems/inventory.js';
+import './src_systems_inventory.js';
 
-import './systems/ui.js';
+import './src_systems_ui.js';
 
-import './systems/input.js';
+import './src_systems_input.js';
 
-import './systems/audio.js';
+import './src_systems_audio.js';
 
-import './systems/ai.js';
+import './src_systems_ai.js';
 
-import './systems/dev-tools.js';
+import './src_systems_dev_tools.js';
 
-import './systems/vfx.js';
+import './src_systems_vfx.js';
 
-import './systems/world.js';
+import './src_systems_world.js';
 
-import './systems/assets.js';
+import './src_systems_assets.js';
 
-import './engine.js';
+import './src_engine.js';
 
  
 

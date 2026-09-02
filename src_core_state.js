@@ -60,4 +60,35 @@ window.GameCore = {
         window.EventBus.emit('UI_UPDATE_STATS');
     }
 };
+
+window.EventBus.on('GAME_SAVE', () => {
+    try {
+        localStorage.setItem('dark-forest-save', JSON.stringify({ gameState: window.GameState, engineParams: window.EngineParams }));
+        window.EventBus.emit('UI_LOG', 'Game saved locally.');
+    } catch (error) {
+        console.error('GAME_SAVE failed', error);
+        window.EventBus.emit('UI_LOG', 'Unable to save the game.');
+    }
+});
+
+window.EventBus.on('GAME_LOAD', () => {
+    try {
+        const rawSave = localStorage.getItem('dark-forest-save');
+        if (!rawSave) {
+            window.EventBus.emit('UI_LOG', 'No local save found.');
+            return;
+        }
+        const save = JSON.parse(rawSave);
+        if (save.gameState) Object.assign(window.GameState, save.gameState);
+        if (save.engineParams) Object.assign(window.EngineParams, save.engineParams);
+        window.EventBus.emit('UI_UPDATE_HUD');
+        window.EventBus.emit('UI_UPDATE_STATS');
+        window.EventBus.emit('RENDER_INVENTORY');
+        window.EventBus.emit('WORLD_REGENERATE');
+        window.EventBus.emit('UI_LOG', 'Game loaded from local storage.');
+    } catch (error) {
+        console.error('GAME_LOAD failed', error);
+        window.EventBus.emit('UI_LOG', 'Unable to load the game save.');
+    }
+});
 console.log("%c🟢 Core Hub: State & EventBus Restored", "color: #4ade80; font-weight: bold; font-size: 11px;");
