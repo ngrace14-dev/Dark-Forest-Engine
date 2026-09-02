@@ -1,0 +1,25 @@
+body { margin: 0; overflow: hidden; background-color: #040608; font-family: 'Inter', sans-serif; }
+canvas { display: block; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; z-index: 1; }
+
+@keyframes hitFlash { 0% { background-color: rgba(255, 0, 0, 0.5); } 100% { background-color: transparent; } }
+.hit-flash { animation: hitFlash 0.3s ease-out; }
+
+.floating-dmg {
+    position: absolute; font-weight: 900; font-size: 1.5rem;
+    pointer-events: none; user-select: none;
+    text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    z-index: 100; transform: translate(-50%, -50%);
+    will-change: transform, opacity, left, top;
+}
+
+.lil-gui { --background-color: #111827; --text-color: #d1d5db; --title-background-color: #1f2937; --widget-color: #374151; font-family: 'Inter', sans-serif; z-index: 200 !important; }
+
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
+.title-card { font-family: 'Georgia', serif; letter-spacing: 0.1em; text-shadow: 0 0 20px rgba(153, 27, 27, 0.8), 2px 2px 0px #000; }
+
+.loading-container { width: 300px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; margin-bottom: 2rem; }
+.loading-bar { height: 100%; width: 0%; background: #dc2626; box-shadow: 0 0 10px #dc2626; transition: width 0.3s ease; }
