@@ -448,5 +448,3 @@ window.addEventListener('resize', () => {
 });
 
 bootEngine();
-
-```eof
