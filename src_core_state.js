@@ -42,7 +42,8 @@ window.Input = {
 window.EngineParams = {
     playMode: true, brushActive: false, selectedPrefab: 'Village Hub', isPlayerHidden: false,
     bloom: 0.8, vignette: 1.1, filterColor: '#2b4461', filterIntensity: 0.65,
-    timeOfDay: 14.0, fogDensity: 0.03, timeScale: 1.0, godMode: false,
+    timeOfDay: 14.0, worldDay: 0, dayLengthSeconds: 120, offPathCaptureCooldown: 0,
+    fogDensity: 0.03, timeScale: 1.0, godMode: false,
     globalBrightness: 1.2, worldSeed: 'dark_forests_1337', isPlayerSafe: false
 };
 

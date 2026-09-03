@@ -339,6 +339,7 @@ window.renderAssetManager = function() {
 window.EventBus.on('RENDER_ASSETS', window.renderAssetManager);
 
 const gltfLoader = new GLTFLoader();
+function normalizeAssetName(value) { return value.toLowerCase().replace(/\.(glb|gltf)$/i, '').replace(/[^a-z0-9]/g, ''); }
 document.getElementById('btn-upload-file').addEventListener('click', () => { document.getElementById('asset-file-input').click(); });
 document.getElementById('asset-file-input').addEventListener('change', (e) => {
     for (const file of e.target.files) {
@@ -349,6 +350,13 @@ document.getElementById('asset-file-input').addEventListener('change', (e) => {
                 let rigged = false;
                 gltf.scene.traverse(child => { if (child.isSkinnedMesh && child.skeleton) rigged = true; });
                 window.AssetManager.modelMeta[file.name] = { rigged: rigged, hasAnimations: Boolean(gltf.animations && gltf.animations.length > 0), animationCount: gltf.animations ? gltf.animations.length : 0 };
+                const matchingPrefab = Object.entries(window.AssetManager.prefabs).find(([name, def]) => def.category === 'terrain' && normalizeAssetName(name) === normalizeAssetName(file.name));
+                if (matchingPrefab) {
+                    const [prefabName, prefabDef] = matchingPrefab;
+                    prefabDef.customModel = file.name;
+                    window.EventBus.emit('UI_LOG', `Terrain model auto-assigned: ${file.name} -> ${prefabName}`);
+                    window.EventBus.emit('WORLD_REGENERATE');
+                }
                 
                 if (gltf.animations && gltf.animations.length > 0) {
                     window.AssetManager.animations[file.name] = gltf.animations; 
