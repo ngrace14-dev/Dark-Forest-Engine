@@ -55,6 +55,11 @@ window.RoadManager = {
     },
     isVillageProtected: function(pos) {
         return window.GameCore.activeEntities.some(entity => entity.name === 'Floating Power Stone' && entity.def.active !== false && entity.visual.position.distanceTo(pos) <= (entity.def.barrierRadius || 22));
+    },
+    getRandomPathPoint: function() {
+        const points = Array.from(this.roadChunks.values()).flat();
+        if (points.length === 0) return null;
+        return points[Math.floor(Math.random() * points.length)];
     }
 };
 
@@ -69,14 +74,32 @@ window.VillageManager = {
                 x = Math.cos(currentAngle) * currentRadius; z = Math.sin(currentAngle) * currentRadius;
             }
             let connections = []; if (i > 0) connections.push(i - 1); if (i < 19) connections.push(i + 1); 
-            this.villages.push({ id: i, name: this.names[i], x: Math.round(x), z: Math.round(z), connections: connections, stats: { ap: 50 + Math.floor(Math.random()*50), wood: 200, stone: 100 }, assignedModel: null, layout: [] });
+            this.villages.push({ id: i, name: this.names[i], x: Math.round(x), z: Math.round(z), connections: connections, stats: { ap: 50 + Math.floor(Math.random()*50), wood: 200, stone: 100 }, assignedModel: null, layout: [], residents: [] });
         }
         window.RoadManager.generateRoads(this.villages);
         window.EventBus.emit('UI_LOG', "🌲 20 Settlements generated. Road Network integrated.");
         if(window.EngineState.currentAssetTab === 'villages' || window.EngineState.currentAssetTab === 'world') window.EventBus.emit('RENDER_ASSETS');
+    },
+    shiftLocations: function() {
+        let currentAngle = Math.random() * Math.PI * 2;
+        let currentRadius = 0;
+        this.villages.forEach((v, index) => {
+            if (!v.residents) v.residents = [];
+            if (index > 0) {
+                currentRadius += 10000 + Math.random() * 10000;
+                currentAngle += (Math.random() - 0.5) * (Math.PI / 1.5);
+                v.x = Math.round(Math.cos(currentAngle) * currentRadius);
+                v.z = Math.round(Math.sin(currentAngle) * currentRadius);
+            } else {
+                v.x = 0;
+                v.z = 0;
+            }
+        });
+        window.RoadManager.generateRoads(this.villages);
     }
 };
 
+window.createNoise2D = createNoise2D;
 window.currentPrng = alea(window.EngineParams.worldSeed);
 window.currentNoise2D = createNoise2D(window.currentPrng);
 

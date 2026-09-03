@@ -64,7 +64,7 @@ window.GameCore = {
 
 window.EventBus.on('GAME_SAVE', () => {
     try {
-        localStorage.setItem('dark-forest-save', JSON.stringify({ gameState: window.GameState, engineParams: window.EngineParams }));
+        localStorage.setItem('dark-forest-save', JSON.stringify({ gameState: window.GameState, engineParams: window.EngineParams, villages: window.VillageManager ? window.VillageManager.villages : [] }));
         window.EventBus.emit('UI_LOG', 'Game saved locally.');
     } catch (error) {
         console.error('GAME_SAVE failed', error);
@@ -82,6 +82,10 @@ window.EventBus.on('GAME_LOAD', () => {
         const save = JSON.parse(rawSave);
         if (save.gameState) Object.assign(window.GameState, save.gameState);
         if (save.engineParams) Object.assign(window.EngineParams, save.engineParams);
+        if (Array.isArray(save.villages) && window.VillageManager) {
+            window.VillageManager.villages = save.villages;
+            window.RoadManager.generateRoads(window.VillageManager.villages);
+        }
         window.EventBus.emit('UI_UPDATE_HUD');
         window.EventBus.emit('UI_UPDATE_STATS');
         window.EventBus.emit('RENDER_INVENTORY');

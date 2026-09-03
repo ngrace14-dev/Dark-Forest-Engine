@@ -69,7 +69,13 @@ const ChunkManager = {
                     const hy = window.WorldGenerator.getTerrainHeight(v.x, v.z); const hub = instantiatePrefab('Village Hub', v.x, hy, v.z, key);
                     if(hub) { hub.villageId = v.id; window.EventBus.emit('UI_LOG', `*** Discovered Major Settlement: ${v.name} ***`); window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: v.name, pos: new THREE.Vector3(v.x, hy + 8, v.z), color: '#ffd700'}); }
                     if (v.layout && v.layout.length > 0) { v.layout.forEach(l => { instantiatePrefab(l.prefab, v.x + l.ox, window.WorldGenerator.getTerrainHeight(v.x + l.ox, v.z + l.oz), v.z + l.oz, key); }); }
-                    instantiatePrefab('Guard', v.x + 4, window.WorldGenerator.getTerrainHeight(v.x + 4, v.z + 4), v.z + 4, key);
+                    if (!v.residents) v.residents = [];
+                    if (v.residents.length === 0) v.residents.push({ prefab: 'Guard', ox: 4, oz: 4 });
+                    v.residents.forEach(resident => {
+                        const residentX = v.x + (resident.ox || 0); const residentZ = v.z + (resident.oz || 0);
+                        const residentEntity = instantiatePrefab(resident.prefab || 'Guard', residentX, window.WorldGenerator.getTerrainHeight(residentX, residentZ), residentZ, key);
+                        if (residentEntity) residentEntity.villageId = v.id;
+                    });
                     window.AssetManager.prefabs['Village Hub'].customModel = originalModel;
                 }
             });
@@ -296,6 +302,12 @@ window.EventBus.on('WORLD_REGENERATE', () => {
     if (window.GameCore.playerObj) { const vy = window.WorldGenerator.getTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 15; window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); ChunkManager.update(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, vy, window.GameCore.playerObj.visual.position.z)); }
     window.EventBus.emit('UI_LOG', `World Math Regenerated with Seed: ${window.EngineParams.worldSeed}`);
 });
+function regenerateWorldCycle() {
+    if (window.VillageManager.villages.length > 0) window.VillageManager.shiftLocations();
+    window.EngineParams.worldSeed = `${window.EngineParams.worldSeed.split('_cycle_')[0]}_cycle_${window.EngineParams.worldDay}`;
+    window.EventBus.emit('WORLD_REGENERATE');
+    window.EventBus.emit('UI_LOG', `Day ${window.EngineParams.worldDay}: settlements shifted and the world regenerated at midnight.`);
+}
 window.EventBus.on('CMD_TELEPORT', (pos) => { const vy = window.WorldGenerator.getTerrainHeight(pos.x, pos.z) + 15; window.GameCore.playerObj.body.setTranslation({x:pos.x, y:vy, z:pos.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); ChunkManager.update(new THREE.Vector3(pos.x, vy, pos.z)); });
 window.EventBus.on('PLAYER_RESPAWN', () => { const respawnY = window.WorldGenerator.getTerrainHeight(0,0) + 15; window.GameCore.playerObj.body.setTranslation({x:0, y:respawnY, z:0}, true); window.GameState.pStats.hp = window.GameState.pStats.maxHp; window.GameState.inventory.gold = Math.floor(window.GameState.inventory.gold / 2); playEntityAnimation(window.GameCore.playerObj, 'idle'); window.EventBus.emit('UI_UPDATE_HUD'); });
 
@@ -340,14 +352,32 @@ async function bootEngine() {
 
 function fixedUpdateLogic(delta) {
     if (window.GameCore.playerObj) ChunkManager.update(window.GameCore.playerObj.visual.position);
+    if (window.EngineParams.offPathCaptureCooldown > 0) window.EngineParams.offPathCaptureCooldown = Math.max(0, window.EngineParams.offPathCaptureCooldown - delta);
     window.GameCore.worldTimer += delta;
+
+    const hoursPerSecond = 24 / window.EngineParams.dayLengthSeconds;
+    window.EngineParams.timeOfDay += delta * hoursPerSecond;
+    if (window.EngineParams.timeOfDay >= 24) {
+        const elapsedDays = Math.floor(window.EngineParams.timeOfDay / 24);
+        window.EngineParams.timeOfDay %= 24;
+        window.EngineParams.worldDay += elapsedDays;
+        if (window.EngineParams.worldDay > 0 && window.EngineParams.worldDay % 14 === 0) regenerateWorldCycle();
+        window.EventBus.emit('ENV_UPDATE');
+    }
     
     if(window.GameCore.worldTimer > 5) { 
         let activeHubs = window.GameCore.activeEntities.filter(e => e.def.type === 'hub');
         activeHubs.forEach(hub => {
             hub.ap += 10; hub.food -= 5;
             if(hub.food <= 20 && !window.GameState.questBoard.find(q => q.issuer === hub.id)) { window.GameState.questBoard.push({ type: 'fetch', item: 'food', reward: 50, issuer: hub.id }); window.EventBus.emit('UI_LOG', `[TRADE] Village posts contract: Food for Gold.`); }
-            if(hub.ap >= 50 && hub.food > 20) { hub.ap -= 50; instantiatePrefab('Guard', hub.visual.position.x + 3, window.WorldGenerator.getTerrainHeight(hub.visual.position.x + 3, hub.visual.position.z + 3), hub.visual.position.z + 3); window.EventBus.emit('UI_LOG', `Economy: Village trained a new Guard.`); }
+            if(hub.ap >= 50 && hub.food > 20) {
+                hub.ap -= 50;
+                const residentX = hub.visual.position.x + 3; const residentZ = hub.visual.position.z + 3;
+                const residentEntity = instantiatePrefab('Guard', residentX, window.WorldGenerator.getTerrainHeight(residentX, residentZ), residentZ);
+                const village = window.VillageManager.villages.find(candidate => candidate.id === hub.villageId);
+                if (village && residentEntity) village.residents.push({ prefab: 'Guard', ox: 3, oz: 3 });
+                window.EventBus.emit('UI_LOG', `Economy: Village trained a new Guard.`);
+            }
         });
         if(window.GameState.questBoard.length > 0 && window.GameCore.activeEntities.filter(e => e.def.faction === 'adventurer').length > 0) {
             window.EventBus.emit('UI_LOG', `Adventurer accepted fetch contract...`); setTimeout(() => { if(window.GameState.questBoard.length > 0) { let q = window.GameState.questBoard.shift(); let hub = window.GameCore.activeEntities.find(e => e.id === q.issuer); if(hub) { hub.food += 30; window.EventBus.emit('UI_LOG', `Adventurer fulfilled contract. Village fed.`); } } }, 10000); 
@@ -384,6 +414,18 @@ function fixedUpdateLogic(delta) {
 
     if (window.GameCore.playerObj && window.GameState.pStats.hp > 0) {
         const p = window.GameCore.playerObj.body.translation(); window.EngineParams.isPlayerSafe = window.RoadManager.isSafeZone(p);
+        const hostileNearby = window.GameCore.activeEntities.some(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && entity.visual.position.distanceTo(window.GameCore.playerObj.visual.position) < 15);
+        if (!window.EngineParams.isPlayerSafe && !window.EngineParams.isPlayerHidden && hostileNearby && !window.EngineParams.godMode && window.EngineParams.offPathCaptureCooldown <= 0) {
+            const pathPoint = window.RoadManager.getRandomPathPoint();
+            if (pathPoint) {
+                const safeY = window.WorldGenerator.getTerrainHeight(pathPoint.x, pathPoint.z) + 15;
+                window.GameCore.playerObj.body.setTranslation({ x: pathPoint.x, y: safeY, z: pathPoint.z }, true);
+                window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                window.EngineParams.offPathCaptureCooldown = 10;
+                window.EventBus.emit('UI_LOG', 'The forest caught you off the safe path and dragged you back to the road.');
+                return;
+            }
+        }
         
         const moveDir = new THREE.Vector3(0, 0, 0); 
         if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') {
