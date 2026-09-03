@@ -3,14 +3,21 @@ window.ItemDatabase = {
     'iron_sword': { id: 'iron_sword', name: 'Iron Sword', type: 'weapon', slot: 'weapon', stats: { damage: 15 }, icon: '⚔️', color: 'text-blue-400' },
     'rags': { id: 'rags', name: 'Rags', type: 'armor', slot: 'chest', stats: { defense: 1 }, icon: '👕', color: 'text-gray-500' },
     'leather_armor': { id: 'leather_armor', name: 'Leather Armor', type: 'armor', slot: 'chest', stats: { defense: 8 }, icon: '🦺', color: 'text-green-400' },
+    'dark_steel_waist': { id: 'dark_steel_waist', name: 'Dark Steel Waist Armor', type: 'armor', slot: 'waist', stats: { defense: 10 }, icon: '🛡️', color: 'text-gray-300' },
+    'dark_steel_boots': { id: 'dark_steel_boots', name: 'Female Dark Steel Boots', type: 'armor', slot: 'legs', stats: { defense: 12 }, icon: '🥾', color: 'text-gray-300' },
+    'dark_steel_gloves': { id: 'dark_steel_gloves', name: 'Female Dark Steel Gloves', type: 'armor', slot: 'hands', stats: { defense: 6 }, icon: '🧤', color: 'text-gray-300' },
+    'dark_steel_helm_cloak': { id: 'dark_steel_helm_cloak', name: 'Female Dark Steel Helm Cloak', type: 'armor', slot: 'head', stats: { defense: 12 }, icon: '🧙', color: 'text-gray-300' },
+    'dark_steel_torso': { id: 'dark_steel_torso', name: 'Female Dark Steel Torso', type: 'armor', slot: 'chest', stats: { defense: 18 }, icon: '🛡️', color: 'text-gray-300' },
     'pants': { id: 'pants', name: 'Pants', type: 'armor', slot: 'legs', stats: { defense: 2 }, icon: '👖', color: 'text-gray-500' },
-    'food': { id: 'food', name: 'Rations', type: 'consumable', slot: 'backpack', stats: { heal: 30 }, icon: '🍖', color: 'text-yellow-500' }
+    'food': { id: 'food', name: 'Rations', type: 'consumable', slot: 'backpack', stats: { heal: 30 }, icon: '🍖', color: 'text-yellow-500' },
+    'mushrooms': { id: 'mushrooms', name: 'Forest Mushrooms', type: 'consumable', slot: 'backpack', stats: { heal: 10 }, icon: '🍄', color: 'text-red-300' },
+    'flesh_pods': { id: 'flesh_pods', name: 'Flesh Pods', type: 'consumable', slot: 'backpack', stats: { heal: 5 }, icon: '🫀', color: 'text-purple-300' }
 };
 
 function recalculateStats() {
     let totalArmor = 0; let totalDamage = 0;
     const eq = window.GameState.inventory.equipment;
-    ['head', 'chest', 'legs'].forEach(slot => { if (eq[slot] && window.ItemDatabase[eq[slot]]) totalArmor += window.ItemDatabase[eq[slot]].stats.defense; });
+    ['head', 'chest', 'waist', 'hands', 'legs'].forEach(slot => { if (eq[slot] && window.ItemDatabase[eq[slot]]) totalArmor += window.ItemDatabase[eq[slot]].stats.defense; });
     if (eq.weapon && window.ItemDatabase[eq.weapon]) totalDamage += window.ItemDatabase[eq.weapon].stats.damage; else totalDamage += 2; 
     
     window.GameState.derivedStats.armor = totalArmor;
@@ -38,7 +45,7 @@ function renderInventory() {
             </div>
         </div>
         <div class="grid grid-cols-2 gap-4 mb-6">
-            <div class="space-y-3">${getSlotHtml('head', 'HEAD', '16')} ${getSlotHtml('chest', 'CHEST', '24')} ${getSlotHtml('legs', 'LEGS', '24')}</div>
+            <div class="space-y-3">${getSlotHtml('head', 'HEAD', '16')} ${getSlotHtml('chest', 'CHEST', '24')} ${getSlotHtml('waist', 'WAIST', '16')} ${getSlotHtml('hands', 'HANDS', '16')} ${getSlotHtml('legs', 'LEGS', '24')}</div>
             <div class="space-y-3">${getSlotHtml('weapon', 'WEAPON', '40')} <div class="border border-gray-700 bg-gray-800 p-2 text-center text-xs h-24 flex flex-col items-center justify-center rounded text-gray-600">BACKPACK<br>(No Mod)</div></div>
         </div>
         <h3 class="text-xs font-bold text-gray-400 border-b border-gray-700 pb-1 mb-2 flex justify-between">
@@ -85,6 +92,11 @@ window.EventBus.on('INV_USE', (packIndex) => {
             window.EventBus.emit('UI_LOG', `Ate ${item.name}. Recovered ${item.stats.heal} HP.`);
             window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/tom-analog.mp3', pos: window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : {x:0,y:0,z:0}, vol: -5});
             window.EventBus.emit('UI_UPDATE_HUD');
+        } else if (item.stats.heal) {
+            window.GameState.pStats.hp = Math.min(window.GameState.pStats.hp + item.stats.heal, window.GameState.pStats.maxHp);
+            window.GameState.inventory.backpack.splice(packIndex, 1);
+            window.EventBus.emit('UI_LOG', `Ate ${item.name}. Recovered ${item.stats.heal} HP.`);
+            window.EventBus.emit('UI_UPDATE_HUD');
         }
     } else if(item.type === 'weapon' || item.type === 'armor') {
         const currentEquipped = window.GameState.inventory.equipment[item.slot];
@@ -94,6 +106,31 @@ window.EventBus.on('INV_USE', (packIndex) => {
         recalculateStats();
     }
     renderInventory();
+});
+
+window.EventBus.on('GATHER_NEARBY', () => {
+    if (!window.GameCore.playerObj) return;
+    const playerPosition = window.GameCore.playerObj.visual.position;
+    const spot = window.GameCore.activeEntities.find(entity => entity.def.gatherable && entity.visual.position.distanceTo(playerPosition) <= entity.def.radius + 2.5);
+    if (!spot) {
+        window.EventBus.emit('UI_LOG', 'No flesh pods nearby.');
+        return;
+    }
+    const now = performance.now() / 1000;
+    if (spot.gatherAvailableAt && now < spot.gatherAvailableAt) {
+        window.EventBus.emit('UI_LOG', `The flesh pods will regrow in ${Math.ceil(spot.gatherAvailableAt - now)}s.`);
+        return;
+    }
+    const amount = spot.def.gatherAmount || 1;
+    if (window.GameState.inventory.backpack.length + amount > 25) {
+        window.EventBus.emit('UI_LOG', 'Backpack is full.');
+        return;
+    }
+    for (let i = 0; i < amount; i++) window.GameState.inventory.backpack.push(spot.def.gatherable);
+    spot.gatherAvailableAt = now + (spot.def.gatherCooldown || 15);
+    window.EventBus.emit('UI_LOG', `Gathered ${amount} flesh pod${amount === 1 ? '' : 's'}.`);
+    window.EventBus.emit('PLAY_SOUND', { url: 'https://tonejs.github.io/audio/drum-samples/tom-analog.mp3', pos: playerPosition, vol: -8 });
+    window.EventBus.emit('RENDER_INVENTORY');
 });
 
 window.EventBus.on('RENDER_INVENTORY', renderInventory);

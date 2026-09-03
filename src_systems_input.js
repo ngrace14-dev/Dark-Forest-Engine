@@ -4,6 +4,7 @@ document.addEventListener('keydown', e => {
     if (k === 'c') { const p = document.getElementById('stats-panel'); if(p) p.classList.toggle('hidden'); }
     if (k === 'i') { const p = document.getElementById('inventory-panel'); if(p) { p.classList.toggle('hidden'); if(!p.classList.contains('hidden')) window.EventBus.emit('RENDER_INVENTORY'); } }
     if (k === 'u') window.EventBus.emit('DEV_TOOLS_TOGGLE_ASSETS');
+    if (k === 'e' && window.GameCore.engineState === 'running') window.EventBus.emit('GATHER_NEARBY');
     if (k === 'f5') { e.preventDefault(); window.EventBus.emit('GAME_SAVE'); }
     if (k === 'f9') { e.preventDefault(); window.EventBus.emit('GAME_LOAD'); }
 });

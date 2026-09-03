@@ -48,6 +48,13 @@ window.RoadManager = {
         const cx = Math.floor(pos.x / 60); const cz = Math.floor(pos.z / 60); const pts = this.getRoadPointsNear(cx, cz);
         for (let i = 0; i < pts.length; i++) { if (Math.sqrt(Math.pow(pos.x - pts[i].x, 2) + Math.pow(pos.z - pts[i].z, 2)) < 7.0) return true; }
         return false;
+    },
+    isRuneProtected: function(pos) {
+        if (!this.isSafeZone(pos)) return false;
+        return window.GameCore.activeEntities.some(entity => entity.name === 'Rune Tower' && entity.def.active !== false && entity.visual.position.distanceTo(pos) <= (entity.def.protectionRadius || 18));
+    },
+    isVillageProtected: function(pos) {
+        return window.GameCore.activeEntities.some(entity => entity.name === 'Floating Power Stone' && entity.def.active !== false && entity.visual.position.distanceTo(pos) <= (entity.def.barrierRadius || 22));
     }
 };
 

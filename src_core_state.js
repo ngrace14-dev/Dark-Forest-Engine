@@ -13,7 +13,7 @@ window.GameState = {
     },
     inventory: { 
         food: 100, gold: 0, 
-        equipment: { head: null, chest: 'leather_armor', legs: 'pants', weapon: 'iron_sword' },
+        equipment: { head: null, chest: 'leather_armor', waist: null, hands: null, legs: 'pants', weapon: 'iron_sword' },
         backpack: ['rusty_sword', 'food', 'food', 'food']
     },
     derivedStats: { armor: 0, weaponDamage: 0 },
@@ -40,7 +40,7 @@ window.Input = {
 };
 
 window.EngineParams = {
-    playMode: true, brushActive: false, selectedPrefab: 'Village Hub',
+    playMode: true, brushActive: false, selectedPrefab: 'Village Hub', isPlayerHidden: false,
     bloom: 0.8, vignette: 1.1, filterColor: '#2b4461', filterIntensity: 0.65,
     timeOfDay: 14.0, fogDensity: 0.03, timeScale: 1.0, godMode: false,
     globalBrightness: 1.2, worldSeed: 'dark_forests_1337', isPlayerSafe: false

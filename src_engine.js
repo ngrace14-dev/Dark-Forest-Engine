@@ -53,6 +53,15 @@ const ChunkManager = {
         this.activeChunks.set(key, { mesh, body: groundBody, collider });
         
         const rng = alea(`${window.EngineParams.worldSeed}_${cx}_${cz}`);
+        const placedLightCells = new Set();
+        localRoadPoints.forEach(point => {
+            if (point.x < chunkX - 30 || point.x >= chunkX + 30 || point.z < chunkZ - 30 || point.z >= chunkZ + 30) return;
+            const cell = `${Math.floor(point.x / 30)},${Math.floor(point.z / 30)}`;
+            if (placedLightCells.has(cell)) return;
+            placedLightCells.add(cell);
+            const lightY = window.WorldGenerator.getTerrainHeight(point.x, point.z);
+            instantiatePrefab('Floating Street Light', point.x, lightY, point.z, key);
+        });
         if (window.VillageManager.villages.length > 0) {
             window.VillageManager.villages.forEach(v => {
                 if (v.x >= chunkX - 30 && v.x < chunkX + 30 && v.z >= chunkZ - 30 && v.z < chunkZ + 30) {
@@ -166,9 +175,9 @@ function setupEntityAnimations(entity, isPlayer = false) {
 function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     const def = window.AssetManager.prefabs[name]; if(!def) return;
     let mesh = getVisualMesh(def); mesh.position.set(x, y + def.height/2, z); window.GameCore.scene.add(mesh);
-    let rigidBodyDesc = (def.type === 'structure' || def.type === 'hub' || def.type === 'mountain') ? RAPIER.RigidBodyDesc.fixed() : RAPIER.RigidBodyDesc.dynamic().lockRotations();
+    let rigidBodyDesc = (def.type === 'structure' || def.type === 'hub' || def.type === 'mountain' || def.type === 'runeTower' || def.type === 'powerStone' || def.type === 'firePit' || def.type === 'streetLight' || def.type === 'merchantChest') ? RAPIER.RigidBodyDesc.fixed() : RAPIER.RigidBodyDesc.dynamic().lockRotations();
     
-    if(def.type !== 'structure' && def.type !== 'hub' && def.type !== 'mountain') {
+    if(def.type !== 'structure' && def.type !== 'hub' && def.type !== 'mountain' && def.type !== 'runeTower' && def.type !== 'powerStone' && def.type !== 'firePit' && def.type !== 'streetLight' && def.type !== 'merchantChest') {
         rigidBodyDesc.setLinearDamping(4.0);
     }
     
@@ -176,15 +185,18 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     
     let collider = null;
     if (def.isObstacle !== false) {
-        let colliderDesc; if (def.type === 'structure' || def.type === 'hub') colliderDesc = RAPIER.ColliderDesc.cuboid(def.radius, def.height/2, def.radius); else if (def.type === 'mountain') colliderDesc = RAPIER.ColliderDesc.cone(def.height/2, def.radius); else colliderDesc = RAPIER.ColliderDesc.capsule(Math.max(0.1, def.height/2 - def.radius), def.radius);
+        let colliderDesc; if (def.type === 'structure' || def.type === 'hub' || def.type === 'runeTower' || def.type === 'powerStone' || def.type === 'firePit' || def.type === 'streetLight' || def.type === 'merchantChest') colliderDesc = RAPIER.ColliderDesc.cuboid(def.radius, def.height/2, def.radius); else if (def.type === 'mountain') colliderDesc = RAPIER.ColliderDesc.cone(def.height/2, def.radius); else colliderDesc = RAPIER.ColliderDesc.capsule(Math.max(0.1, def.height/2 - def.radius), def.radius);
         collider = window.GameCore.world.createCollider(colliderDesc, body);
     }
 
-    const entity = { id: Math.random().toString(36).substr(2, 9), name: name, def: def, visual: mesh, body: body, collider: collider, hp: 50, chunkKey: chunkKey };
+    const entity = { id: Math.random().toString(36).substr(2, 9), name: name, def: def, visual: mesh, body: body, collider: collider, hp: def.hp || 50, chunkKey: chunkKey };
     if(collider) collider.handle = Math.floor(Math.random() * 1000000); 
     body.userData = { entityId: entity.id };
     
     if(def.type === 'hub') { const light = new THREE.PointLight(def.color, 2, 15); light.position.y = def.height/2; mesh.add(light); entity.ap = 0; entity.food = 100; }
+    if(def.type === 'powerStone') { const light = new THREE.PointLight(0x7dd3fc, def.active === false ? 0.2 : 3, 25); light.position.y = def.height / 2; mesh.add(light); }
+    if(def.type === 'firePit') { const light = new THREE.PointLight(0xff8a32, def.active === false ? 0 : 2.5, 12); light.position.y = def.height; mesh.add(light); }
+    if(def.type === 'streetLight') { const light = new THREE.PointLight(0x9bdcff, def.active === false ? 0 : 2.5, 18); light.position.y = def.height; mesh.add(light); }
     setupEntityAnimations(entity); window.VFXManager.applyAura(entity, def); window.GameCore.activeEntities.push(entity); return entity;
 }
 
@@ -340,10 +352,35 @@ function fixedUpdateLogic(delta) {
         if(window.GameState.questBoard.length > 0 && window.GameCore.activeEntities.filter(e => e.def.faction === 'adventurer').length > 0) {
             window.EventBus.emit('UI_LOG', `Adventurer accepted fetch contract...`); setTimeout(() => { if(window.GameState.questBoard.length > 0) { let q = window.GameState.questBoard.shift(); let hub = window.GameCore.activeEntities.find(e => e.id === q.issuer); if(hub) { hub.food += 30; window.EventBus.emit('UI_LOG', `Adventurer fulfilled contract. Village fed.`); } } }, 10000); 
         }
+        if (window.GameCore.playerObj && !window.GameCore.activeEntities.some(entity => entity.name === 'Dark Forest Boss') && Math.random() < 0.05) {
+            const playerPosition = window.GameCore.playerObj.visual.position;
+            const encounterX = playerPosition.x + (Math.random() - 0.5) * 30;
+            const encounterZ = playerPosition.z + (Math.random() - 0.5) * 30;
+            const boss = instantiatePrefab('Dark Forest Boss', encounterX, window.WorldGenerator.getTerrainHeight(encounterX, encounterZ), encounterZ);
+            if (boss) window.EventBus.emit('UI_LOG', 'A Dark Forest boss has emerged nearby!');
+        }
         window.GameCore.worldTimer = 0; 
     }
 
     window.EngineParams.isPlayerSafe = false; 
+    window.EngineParams.isPlayerHidden = false;
+
+    if (window.GameCore.playerObj && window.GameState.pStats.hp > 0) {
+        const playerPosition = window.GameCore.playerObj.visual.position;
+        window.EngineParams.isPlayerHidden = window.GameCore.activeEntities.some(entity => entity.def.concealment && entity.visual.position.distanceTo(playerPosition) <= (entity.def.hideRadius || entity.def.radius));
+        window.GameCore.activeEntities.forEach(entity => {
+            if (!entity.def.touchEffect || entity.def.active === false) return;
+            const touchRadius = entity.def.touchRadius || entity.def.radius + 1;
+            if (entity.visual.position.distanceTo(playerPosition) <= touchRadius) {
+                const now = performance.now() / 1000;
+                if (!entity.touchEffectAvailableAt || now >= entity.touchEffectAvailableAt) {
+                    entity.touchEffectAvailableAt = now + (entity.def.touchCooldown || 4);
+                    window.EventBus.emit('SPAWN_HIT_VFX', { type: entity.def.touchEffect, pos: entity.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
+                    window.EventBus.emit('UI_LOG', 'Poison cloud released by the flesh pods.');
+                }
+            }
+        });
+    }
 
     if (window.GameCore.playerObj && window.GameState.pStats.hp > 0) {
         const p = window.GameCore.playerObj.body.translation(); window.EngineParams.isPlayerSafe = window.RoadManager.isSafeZone(p);

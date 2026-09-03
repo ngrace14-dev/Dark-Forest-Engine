@@ -6,7 +6,8 @@ window.VFXManager = {
         'Holy': { type: 'aura', color: '#ffffaa', size: 0.15, blend: THREE.AdditiveBlending, sprite: null },
         'Blood': { type: 'onHit', color: '#ff0000', size: 0.20, blend: THREE.NormalBlending, sprite: null },
         'Sparks': { type: 'onHit', color: '#ffff00', size: 0.20, blend: THREE.AdditiveBlending, sprite: null },
-        'Dust': { type: 'onHit', color: '#887755', size: 0.20, blend: THREE.NormalBlending, sprite: null }
+        'Dust': { type: 'onHit', color: '#887755', size: 0.20, blend: THREE.NormalBlending, sprite: null },
+        'Poison': { type: 'onHit', color: '#7cff3b', size: 0.35, blend: THREE.AdditiveBlending, sprite: null }
     },
     get auras() { return ['None', ...Object.keys(this.defs).filter(k => this.defs[k].type === 'aura')]; },
     get onHits() { return ['None', ...Object.keys(this.defs).filter(k => this.defs[k].type === 'onHit')]; },

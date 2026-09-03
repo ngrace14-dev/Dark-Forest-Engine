@@ -7,9 +7,61 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         if(en.body && en.body.isDynamic && en.body.isDynamic()) { const p = en.body.translation(); en.visual.position.set(p.x, p.y, p.z); }
         if (en.def.type !== 'npc') return;
 
+        if (en.def.lureTargets === 'male') {
+            window.GameCore.activeEntities.forEach(targetEntity => {
+                if (targetEntity === en || targetEntity.def.type !== 'npc' || targetEntity.def.gender !== 'male' || targetEntity.currentAnimState === 'die') return;
+                const distanceToSiren = targetEntity.visual.position.distanceTo(en.visual.position);
+                if (distanceToSiren > (en.def.lureRadius || 24)) return;
+                if (distanceToSiren < 1.8 && Math.random() < 0.05) {
+                    targetEntity.hp -= 15;
+                    window.EventBus.emit('UI_LOG', `${targetEntity.name} was claimed by the Swamp Siren.`);
+                    if (targetEntity.hp <= 0) {
+                        if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(targetEntity, 'die');
+                        setTimeout(() => {
+                            window.GameCore.scene.remove(targetEntity.visual);
+                            window.GameCore.world.removeRigidBody(targetEntity.body);
+                            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => entity.id !== targetEntity.id);
+                        }, 2000);
+                    }
+                    return;
+                }
+                const lureDirection = new window.THREE.Vector3().subVectors(en.visual.position, targetEntity.visual.position);
+                if (lureDirection.lengthSq() > 0.001) {
+                    lureDirection.normalize();
+                    targetEntity.body.setLinvel({ x: lureDirection.x * targetEntity.def.speed, y: targetEntity.body.linvel().y, z: lureDirection.z * targetEntity.def.speed }, true);
+                    if (targetEntity.visual && targetEntity.currentAnimState !== 'hit' && targetEntity.currentAnimState !== 'die') {
+                        targetEntity.visual.lookAt(targetEntity.visual.position.clone().add(lureDirection));
+                        if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(targetEntity, 'walk');
+                    }
+                }
+            });
+            return;
+        }
+
+        const hostile = en.def.faction === 'monster' || en.def.faction === 'forest' || window.GameState.reputation[en.def.faction] <= -50;
+        const onProtectedPath = hostile && window.RoadManager.isRuneProtected(en.visual.position);
+        const inVillageBarrier = hostile && window.RoadManager.isVillageProtected(en.visual.position);
         let target = null;
-        if (en.def.faction === 'monster' || window.GameState.reputation[en.def.faction] <= -50) {
-            if (en.visual.position.distanceTo(pPos) < 15 && !isPlayerSafe) target = pPos;
+        if (hostile && !onProtectedPath && !inVillageBarrier) {
+            if (en.visual.position.distanceTo(pPos) < 15 && !isPlayerSafe && !window.EngineParams.isPlayerHidden) target = pPos;
+        }
+
+        if (onProtectedPath || inVillageBarrier) {
+            const nearestTower = window.GameCore.activeEntities
+                .filter(entity => (onProtectedPath ? entity.name === 'Rune Tower' : entity.name === 'Floating Power Stone') && entity.def.active !== false)
+                .sort((a, b) => a.visual.position.distanceTo(en.visual.position) - b.visual.position.distanceTo(en.visual.position))[0];
+            if (nearestTower) {
+                const repel = new window.THREE.Vector3().subVectors(en.visual.position, nearestTower.visual.position);
+                if (repel.lengthSq() > 0.001) {
+                    repel.normalize();
+                    en.body.setLinvel({ x: repel.x * en.def.speed, y: en.body.linvel().y, z: repel.z * en.def.speed }, true);
+                    if (en.visual && en.currentAnimState !== 'hit' && en.currentAnimState !== 'die') {
+                        en.visual.lookAt(en.visual.position.clone().add(repel));
+                        if(window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(en, 'walk');
+                    }
+                }
+            }
+            return;
         }
 
         if (target) {
