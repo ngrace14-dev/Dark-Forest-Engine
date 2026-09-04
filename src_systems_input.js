@@ -5,6 +5,7 @@ document.addEventListener('keydown', e => {
     if (k === 'i') { const p = document.getElementById('inventory-panel'); if(p) { p.classList.toggle('hidden'); if(!p.classList.contains('hidden')) window.EventBus.emit('RENDER_INVENTORY'); } }
     if (k === 'u') window.EventBus.emit('DEV_TOOLS_TOGGLE_ASSETS');
     if (k === 'e' && window.GameCore.engineState === 'running') window.EventBus.emit('GATHER_NEARBY');
+    if (window.GameCore.engineState === 'running' && ['1', '2', '3', '4', '5'].includes(k)) window.EventBus.emit('PARTY_COMMAND', ({ '1': 'follow', '2': 'hold', '3': 'guard', '4': 'attack', '5': 'retreat' })[k]);
     if (k === 'f5') { e.preventDefault(); window.EventBus.emit('GAME_SAVE'); }
     if (k === 'f9') { e.preventDefault(); window.EventBus.emit('GAME_LOAD'); }
 });

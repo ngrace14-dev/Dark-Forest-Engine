@@ -18,6 +18,8 @@ window.GameState = {
     },
     derivedStats: { armor: 0, weaponDamage: 0 },
     reputation: { village: 0, adventurer: 0, monster: -100 },
+    activeBuffs: {},
+    party: { command: 'follow', members: [{ id: 'lyra-scout', name: 'Lyra', prefab: 'Female Adventurer', role: 'scout', hp: 100, recruited: true }] },
     questBoard: []
 };
 
@@ -43,6 +45,7 @@ window.EngineParams = {
     playMode: true, brushActive: false, selectedPrefab: 'Village Hub', isPlayerHidden: false,
     bloom: 0.8, vignette: 1.1, filterColor: '#2b4461', filterIntensity: 0.65,
     timeOfDay: 14.0, worldDay: 0, dayLengthSeconds: 120, offPathCaptureCooldown: 0,
+    mapTileSizeMeters: 8046.72, visitedMapTiles: [], currentMapTile: null, sandReaverEncountered: false,
     fogDensity: 0.03, timeScale: 1.0, godMode: false,
     globalBrightness: 1.2, worldSeed: 'dark_forests_1337', isPlayerSafe: false
 };
@@ -59,11 +62,28 @@ window.GameCore = {
             if(statName === 'toughness') { window.GameState.pStats.maxHp += 10; window.GameState.pStats.hp = window.GameState.pStats.maxHp; window.EventBus.emit('UI_UPDATE_HUD'); }
         }
         window.EventBus.emit('UI_UPDATE_STATS');
+    },
+    applyBuff: function(statName, amount, duration, name) {
+        window.GameState.activeBuffs[statName] = { amount, expiresAt: performance.now() + duration * 1000, name };
+        window.EventBus.emit('UI_UPDATE_STATS');
+    },
+    getBuffBonus: function(statName) {
+        const buff = window.GameState.activeBuffs[statName];
+        if (!buff) return 0;
+        if (performance.now() >= buff.expiresAt) {
+            delete window.GameState.activeBuffs[statName];
+            return 0;
+        }
+        return buff.amount;
     }
 };
 
 window.EventBus.on('GAME_SAVE', () => {
     try {
+        window.GameCore.activeEntities.filter(entity => entity.companionId).forEach(entity => {
+            const member = window.GameState.party.members.find(candidate => candidate.id === entity.companionId);
+            if (member) member.hp = entity.hp;
+        });
         localStorage.setItem('dark-forest-save', JSON.stringify({ gameState: window.GameState, engineParams: window.EngineParams, villages: window.VillageManager ? window.VillageManager.villages : [] }));
         window.EventBus.emit('UI_LOG', 'Game saved locally.');
     } catch (error) {

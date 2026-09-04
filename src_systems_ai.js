@@ -1,3 +1,24 @@
+window.EventBus.on('PARTY_COMMAND', command => {
+    window.GameState.party.command = command;
+    window.GameCore.activeEntities.filter(entity => entity.companionId).forEach(entity => {
+        entity.holdPosition = command === 'hold' ? entity.visual.position.clone() : null;
+    });
+    window.EventBus.emit('UI_LOG', `Party command: ${command.toUpperCase()}.`);
+});
+
+function moveCompanion(companion, destination, speedMultiplier = 1) {
+    const direction = new window.THREE.Vector3().subVectors(destination, companion.visual.position);
+    if (direction.lengthSq() < 1) {
+        companion.body.setLinvel({ x: 0, y: companion.body.linvel().y, z: 0 }, true);
+        if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(companion, 'idle');
+        return;
+    }
+    direction.normalize();
+    companion.body.setLinvel({ x: direction.x * companion.def.speed * speedMultiplier, y: companion.body.linvel().y, z: direction.z * companion.def.speed * speedMultiplier }, true);
+    companion.visual.lookAt(companion.visual.position.clone().add(direction));
+    if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(companion, 'walk');
+}
+
 window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
     if(!window.GameCore || !window.GameCore.playerObj) return;
     const pPos = window.GameCore.playerObj.visual.position;
@@ -6,6 +27,41 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
     window.GameCore.activeEntities.forEach(en => {
         if(en.body && en.body.isDynamic && en.body.isDynamic()) { const p = en.body.translation(); en.visual.position.set(p.x, p.y, p.z); }
         if (en.def.type !== 'npc') return;
+
+        if (en.companionId) {
+            const command = window.GameState.party.command;
+            const hostileEntities = window.GameCore.activeEntities.filter(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && entity.hp > 0);
+            const nearestHostile = hostileEntities.sort((a, b) => en.visual.position.distanceTo(a.visual.position) - en.visual.position.distanceTo(b.visual.position))[0];
+            if (command === 'hold') {
+                if (en.holdPosition) moveCompanion(en, en.holdPosition);
+                return;
+            }
+            if (command === 'attack' && nearestHostile && en.visual.position.distanceTo(nearestHostile.visual.position) < 20) {
+                const distance = en.visual.position.distanceTo(nearestHostile.visual.position);
+                if (distance > 1.8) {
+                    moveCompanion(en, nearestHostile.visual.position, 1.1);
+                } else if ((!en.companionAttackReadyAt || performance.now() >= en.companionAttackReadyAt) && window.GameCore.playEntityAnimation) {
+                    en.companionAttackReadyAt = performance.now() + 900;
+                    const damage = 10 + window.GameState.pStats.strength.level;
+                    nearestHostile.hp -= damage;
+                    window.GameCore.playEntityAnimation(en, 'attack');
+                    window.EventBus.emit('ENTITY_DAMAGED', { damage, position: nearestHostile.visual.position, isPlayer: false });
+                    if (nearestHostile.hp <= 0) {
+                        window.GameCore.playEntityAnimation(nearestHostile, 'die');
+                        setTimeout(() => {
+                            window.GameCore.scene.remove(nearestHostile.visual);
+                            window.GameCore.world.removeRigidBody(nearestHostile.body);
+                            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => entity.id !== nearestHostile.id);
+                        }, 2000);
+                    }
+                }
+                return;
+            }
+            const offset = new window.THREE.Vector3(en.companionId.length % 2 ? 2 : -2, 0, command === 'retreat' ? -5 : 3);
+            if (command === 'guard' && nearestHostile && nearestHostile.visual.position.distanceTo(pPos) < 10) offset.copy(nearestHostile.visual.position).sub(pPos).multiplyScalar(0.5);
+            moveCompanion(en, pPos.clone().add(offset), command === 'retreat' ? 1.3 : 1);
+            return;
+        }
 
         if (en.def.lureTargets === 'male') {
             window.GameCore.activeEntities.forEach(targetEntity => {
@@ -95,7 +151,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                         window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "BLOCKED!", pos: pPos, color: '#4ade80'}); 
                         window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/tom-analog.mp3', pos: pPos, vol: -5});
                     } else {
-                        const rawDmg = 15; const armorDef = window.GameState.derivedStats.armor; const actualDmg = Math.max(1, rawDmg - armorDef);
+                        const rawDmg = en.def.attackDamage || 15; const armorDef = window.GameState.derivedStats.armor + window.GameCore.getBuffBonus('meleeDef') + window.GameCore.getBuffBonus('toughness'); const actualDmg = Math.max(1, rawDmg - armorDef);
                         window.GameState.pStats.hp -= actualDmg; 
                         window.EventBus.emit('ENTITY_DAMAGED', { damage: actualDmg, position: pPos, isPlayer: true }); 
                         window.EventBus.emit('UI_UPDATE_HUD');

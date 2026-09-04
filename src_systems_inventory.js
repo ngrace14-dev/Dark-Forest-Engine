@@ -95,7 +95,9 @@ window.EventBus.on('INV_USE', (packIndex) => {
         } else if (item.stats.heal) {
             window.GameState.pStats.hp = Math.min(window.GameState.pStats.hp + item.stats.heal, window.GameState.pStats.maxHp);
             window.GameState.inventory.backpack.splice(packIndex, 1);
+            if (item.stats.buff) window.GameCore.applyBuff(item.stats.buff, item.stats.amount, item.stats.duration, item.name);
             window.EventBus.emit('UI_LOG', `Ate ${item.name}. Recovered ${item.stats.heal} HP.`);
+            if (item.stats.buff) window.EventBus.emit('UI_LOG', `${item.name} grants +${item.stats.amount} ${item.stats.buff} for ${item.stats.duration}s.`);
             window.EventBus.emit('UI_UPDATE_HUD');
         }
     } else if(item.type === 'weapon' || item.type === 'armor') {
@@ -134,4 +136,9 @@ window.EventBus.on('GATHER_NEARBY', () => {
 });
 
 window.EventBus.on('RENDER_INVENTORY', renderInventory);
-window.EventBus.on('ENGINE_READY', () => { recalculateStats(); });
+window.EventBus.on('ENGINE_READY', () => {
+    window.VillageManager.provisionProfiles.forEach(provision => {
+        window.ItemDatabase[provision.itemId] = { id: provision.itemId, name: provision.name, type: 'consumable', slot: 'backpack', stats: { heal: provision.heal, buff: provision.buff, amount: provision.amount, duration: provision.duration }, icon: '🍲', color: 'text-amber-300' };
+    });
+    recalculateStats();
+});
