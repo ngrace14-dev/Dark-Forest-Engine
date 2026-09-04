@@ -74,7 +74,7 @@ const ChunkManager = {
                     v.residents.forEach(resident => {
                         const residentX = v.x + (resident.ox || 0); const residentZ = v.z + (resident.oz || 0);
                         const residentEntity = instantiatePrefab(resident.prefab || 'Guard', residentX, window.WorldGenerator.getTerrainHeight(residentX, residentZ), residentZ, key);
-                        if (residentEntity) residentEntity.villageId = v.id;
+                        if (residentEntity) { residentEntity.villageId = v.id; residentEntity.squadId = resident.squadId || null; }
                     });
                     window.AssetManager.prefabs['Village Hub'].customModel = originalModel;
                 }
@@ -200,6 +200,7 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     body.userData = { entityId: entity.id };
     
     if(def.type === 'hub') { const light = new THREE.PointLight(def.color, 2, 15); light.position.y = def.height/2; mesh.add(light); entity.ap = 0; entity.food = 100; }
+    if(def.type === 'merchantChest') entity.merchantInventory = def.merchantInventory.map(item => ({ ...item }));
     if(def.type === 'powerStone') { const light = new THREE.PointLight(0x7dd3fc, def.active === false ? 0.2 : 3, 25); light.position.y = def.height / 2; mesh.add(light); }
     if(def.type === 'firePit') { const light = new THREE.PointLight(0xff8a32, def.active === false ? 0 : 2.5, 12); light.position.y = def.height; mesh.add(light); }
     if(def.type === 'streetLight') { const light = new THREE.PointLight(0x9bdcff, def.active === false ? 0 : 2.5, 18); light.position.y = def.height; mesh.add(light); }
@@ -218,6 +219,15 @@ function spawnPlayer(x, y, z) {
     setupEntityAnimations(window.GameCore.playerObj, true); window.VFXManager.applyAura(window.GameCore.playerObj, def);
 }
 
+function spawnGroundLoot(itemId, position) {
+    if (!window.ItemDatabase[itemId]) return;
+    const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.25), new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0x8a5a00, emissiveIntensity: 1 }));
+    mesh.position.copy(position).add(new THREE.Vector3(0, 0.4, 0));
+    window.GameCore.scene.add(mesh);
+    window.GameCore.groundLoot.push({ id: Math.random().toString(36).slice(2), itemId, visual: mesh });
+}
+window.GameCore.spawnGroundLoot = spawnGroundLoot;
+
 function spawnPartyMembers() {
     if (!window.GameCore.playerObj) return;
     const playerPosition = window.GameCore.playerObj.body.translation();
@@ -234,6 +244,18 @@ function spawnPartyMembers() {
     });
 }
 window.GameCore.spawnPartyMembers = spawnPartyMembers;
+
+function syncCaravanAgents() {
+    window.VillageManager.villages.forEach(village => {
+        village.caravans?.filter(caravan => caravan.status === 'traveling').forEach(caravan => {
+            if (window.GameCore.activeEntities.some(entity => entity.caravanId === caravan.id)) return;
+            const position = caravan.position || { x: village.x + 3, z: village.z };
+            const agent = instantiatePrefab('Merchant Caravan', position.x, window.WorldGenerator.getTerrainHeight(position.x, position.z), position.z, 'persistent');
+            if (agent) { agent.caravanId = caravan.id; agent.villageId = village.id; }
+        });
+    });
+}
+window.GameCore.syncCaravanAgents = syncCaravanAgents;
 
 window.GameCore.swapPlayerModel = function() {
     if (!window.GameCore.playerObj || !window.GameCore.scene) return;
@@ -293,6 +315,7 @@ function performAttack() {
 
             if(en.hp <= 0) {
                 playEntityAnimation(en, 'die');
+                if (en.def.type === 'npc') spawnGroundLoot(en.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', en.visual.position);
                 setTimeout(() => {
                     window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e.id !== en.id);
                 }, 2000);
@@ -317,7 +340,7 @@ window.EventBus.on('CLEAR_MAP', () => { window.GameCore.activeEntities.forEach(e
 window.EventBus.on('WORLD_REGENERATE', () => {
     window.EventBus.emit('CLEAR_MAP'); const keys = Array.from(ChunkManager.activeChunks.keys()); keys.forEach(k => ChunkManager.unloadChunk(k)); ChunkManager.currentChunkX = null; 
     window.currentPrng = alea(window.EngineParams.worldSeed); window.currentNoise2D = window.createNoise2D(window.currentPrng);
-    if (window.GameCore.playerObj) { const vy = window.WorldGenerator.getTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 15; window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); spawnPartyMembers(); ChunkManager.update(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, vy, window.GameCore.playerObj.visual.position.z)); }
+    if (window.GameCore.playerObj) { const vy = window.WorldGenerator.getTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 15; window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); spawnPartyMembers(); syncCaravanAgents(); ChunkManager.update(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, vy, window.GameCore.playerObj.visual.position.z)); }
     window.EventBus.emit('UI_LOG', `World Math Regenerated with Seed: ${window.EngineParams.worldSeed}`);
 });
 function regenerateWorldCycle() {
@@ -391,7 +414,7 @@ function spendVillageResources(village, cost) {
 
 function processVillageCaravans(village) {
     village.caravans.forEach(caravan => {
-        if (caravan.status !== 'trading' || caravan.lastArrivalDay === window.EngineParams.worldDay) return;
+        if (caravan.status !== 'arrived') return;
         const destination = window.VillageManager.villages.find(candidate => candidate.id === caravan.targetVillageId);
         if (!destination) return;
         destination.stats = { ap: 0, food: 0, wood: 0, stone: 0, gold: 0, prosperity: 0, ...destination.stats };
@@ -407,6 +430,7 @@ function processVillageCaravans(village) {
             village.provisionStock[village.provision.itemId] -= provisionAmount;
         }
         caravan.lastArrivalDay = window.EngineParams.worldDay;
+        caravan.status = 'complete';
         window.EventBus.emit('UI_LOG', `[TRADE] ${village.name} delivered ${amount} ${cargo} to ${destination.name}.`);
     });
 }
@@ -432,9 +456,10 @@ function simulateVillage(village) {
     village.industry.imports.forEach(resource => {
         if ((village.stats[resource] || 0) < importGoal) postVillageNeed(village, resource, importGoal - (village.stats[resource] || 0), `supporting ${village.industry.industry}`);
     });
-    const connectedTrade = village.caravans.some(caravan => caravan.status === 'trading') || window.VillageManager.villages.some(candidate => candidate.caravans && candidate.caravans.some(caravan => caravan.status === 'trading' && caravan.targetVillageId === village.id));
+    const connectedTrade = village.caravans.some(caravan => caravan.status === 'traveling' || caravan.status === 'arrived') || window.VillageManager.villages.some(candidate => candidate.caravans && candidate.caravans.some(caravan => (caravan.status === 'traveling' || caravan.status === 'arrived') && caravan.targetVillageId === village.id));
     const foodSecurity = Math.min(25, Math.floor((village.stats.food / Math.max(1, village.population.current * 5)) * 25));
-    village.stats.prosperity = Math.max(0, Math.min(100, 20 + foodSecurity + suppliedImports.length * 15 + (connectedTrade ? 25 : 0)));
+    const tradeDisruption = village.tradeDisruptionUntil > window.EngineParams.worldDay ? 30 : 0;
+    village.stats.prosperity = Math.max(0, Math.min(100, 20 + foodSecurity + suppliedImports.length * 15 + (connectedTrade ? 25 : 0) - tradeDisruption));
 
     if (village.lastGrowthDay !== window.EngineParams.worldDay && village.population.current < village.population.capacity && village.stats.prosperity >= 70 && village.stats.food >= village.population.current * 8) {
         const growth = Math.min(village.population.capacity - village.population.current, Math.max(1, Math.floor(village.population.current * village.stats.prosperity / 10000)));
@@ -477,10 +502,14 @@ function simulateVillage(village) {
     }
 
     const caravanCost = { ap: 35, food: 15, gold: 20 };
-    if (village.caravans.length < 1 && freePopulation >= 1 && canFundVillageAction(village, caravanCost, 'sending a merchant caravan')) {
+    if (!village.caravans.some(caravan => caravan.status === 'traveling' || caravan.status === 'arrived') && freePopulation >= 1 && canFundVillageAction(village, caravanCost, 'sending a merchant caravan')) {
         spendVillageResources(village, caravanCost);
         const destination = window.VillageManager.villages.find(candidate => village.connections.includes(candidate.id) && candidate.industry && candidate.industry.imports.includes(village.industry.produces));
-        village.caravans.push({ id: `${village.id}-caravan-1`, status: 'trading', targetVillageId: (destination || window.VillageManager.villages.find(candidate => village.connections.includes(candidate.id))).id, cargo: village.industry.produces, amount: Math.max(1, Math.floor(village.population.current / 1000)), launchedOnDay: window.EngineParams.worldDay });
+        const targetVillage = destination || window.VillageManager.villages.find(candidate => village.connections.includes(candidate.id));
+        const caravan = { id: `${village.id}-caravan-${window.EngineParams.worldDay}-${village.caravans.length + 1}`, status: 'traveling', targetVillageId: targetVillage.id, cargo: village.industry.produces, amount: Math.max(1, Math.floor(village.population.current / 1000)), launchedOnDay: window.EngineParams.worldDay };
+        village.caravans.push(caravan);
+        const caravanEntity = instantiatePrefab('Merchant Caravan', village.x + 3, window.WorldGenerator.getTerrainHeight(village.x + 3, village.z), village.z, 'persistent');
+        if (caravanEntity) { caravanEntity.caravanId = caravan.id; caravanEntity.villageId = village.id; }
         window.EventBus.emit('UI_LOG', `[TRADE] ${village.name} dispatched a merchant caravan.`);
     }
 }

@@ -8,17 +8,84 @@ window.EventBus.on('PARTY_COMMAND', command => {
     window.EventBus.emit('UI_LOG', `Party command: ${command.toUpperCase()}.`);
 });
 
-function moveCompanion(companion, destination, speedMultiplier = 1) {
+function moveCompanion(companion, destination, speedMultiplier = 1, delta = 0) {
     const direction = new window.THREE.Vector3().subVectors(destination, companion.visual.position);
+    direction.y = 0;
     if (direction.lengthSq() < 1) {
         companion.body.setLinvel({ x: 0, y: companion.body.linvel().y, z: 0 }, true);
         if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(companion, 'idle');
         return;
     }
     direction.normalize();
+    const obstacles = window.GameCore.activeEntities.filter(entity => entity !== companion && entity.def.isObstacle);
+    obstacles.forEach(obstacle => {
+        const offset = new window.THREE.Vector3().subVectors(companion.visual.position, obstacle.visual.position);
+        offset.y = 0;
+        const clearance = (obstacle.def.radius || 1) + (companion.def.radius || 0.5) + 0.8;
+        if (offset.lengthSq() > 0.001 && offset.length() < clearance) direction.add(offset.normalize().multiplyScalar((clearance - offset.length()) * 1.5));
+    });
+    window.GameCore.activeEntities.filter(entity => entity !== companion && entity.companionId).forEach(other => {
+        const offset = new window.THREE.Vector3().subVectors(companion.visual.position, other.visual.position);
+        offset.y = 0;
+        if (offset.lengthSq() > 0.001 && offset.length() < 1.5) direction.add(offset.normalize().multiplyScalar(1.5 - offset.length()));
+    });
+    direction.normalize();
+    const velocity = companion.body.linvel();
+    if (delta > 0 && new window.THREE.Vector2(velocity.x, velocity.z).length() < 0.1) companion.stuckSeconds = (companion.stuckSeconds || 0) + delta; else companion.stuckSeconds = 0;
+    if (companion.stuckSeconds > 3 && companion.visual.position.distanceTo(destination) > 6) {
+        const recoveryY = window.WorldGenerator.getTerrainHeight(destination.x, destination.z) + companion.def.height / 2;
+        companion.body.setTranslation({ x: destination.x, y: recoveryY, z: destination.z }, true);
+        companion.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        companion.stuckSeconds = 0;
+        return;
+    }
     companion.body.setLinvel({ x: direction.x * companion.def.speed * speedMultiplier, y: companion.body.linvel().y, z: direction.z * companion.def.speed * speedMultiplier }, true);
     companion.visual.lookAt(companion.visual.position.clone().add(direction));
     if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(companion, 'walk');
+}
+
+function isHostileFaction(faction) {
+    return faction === 'monster' || faction === 'forest';
+}
+
+function defeatNpc(entity) {
+    if (entity.caravanId) {
+        const village = window.VillageManager.villages.find(candidate => candidate.id === entity.villageId);
+        const caravan = village?.caravans.find(candidate => candidate.id === entity.caravanId);
+        if (caravan) caravan.status = 'lost';
+        if (village) village.tradeDisruptionUntil = Math.max(village.tradeDisruptionUntil || 0, window.EngineParams.worldDay + 2);
+        if (window.GameState.party.escortCaravanId === entity.caravanId) window.GameState.party.escortCaravanId = null;
+        window.EventBus.emit('UI_LOG', 'A merchant caravan was lost on the road.');
+    }
+    if (entity.companionId) {
+        const member = window.GameState.party.members.find(candidate => candidate.id === entity.companionId);
+        if (member) {
+            member.hp = 0;
+            member.downed = true;
+            member.injuries.push('downed in combat');
+        }
+        entity.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(entity, 'die');
+        window.EventBus.emit('UI_LOG', `${entity.name} is downed and needs revival.`);
+        return;
+    }
+    if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(entity, 'die');
+    if (window.GameCore.spawnGroundLoot) window.GameCore.spawnGroundLoot(entity.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', entity.visual.position);
+    setTimeout(() => {
+        window.GameCore.scene.remove(entity.visual);
+        window.GameCore.world.removeRigidBody(entity.body);
+        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(candidate => candidate.id !== entity.id);
+    }, 2000);
+}
+
+function attackNpc(attacker, target) {
+    if (attacker.npcAttackReadyAt && performance.now() < attacker.npcAttackReadyAt) return;
+    attacker.npcAttackReadyAt = performance.now() + 1000;
+    const damage = Math.max(1, (attacker.def.attackDamage || 15) - (target.def.armor || 0));
+    target.hp -= damage;
+    if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(attacker, 'attack');
+    window.EventBus.emit('ENTITY_DAMAGED', { damage, position: target.visual.position, isPlayer: false });
+    if (target.hp <= 0) defeatNpc(target);
 }
 
 window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
@@ -30,18 +97,40 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         if(en.body && en.body.isDynamic && en.body.isDynamic()) { const p = en.body.translation(); en.visual.position.set(p.x, p.y, p.z); }
         if (en.def.type !== 'npc') return;
 
+        if (en.caravanId) {
+            const village = window.VillageManager.villages.find(candidate => candidate.id === en.villageId);
+            const caravan = village?.caravans.find(candidate => candidate.id === en.caravanId);
+            const destination = caravan && window.VillageManager.villages.find(candidate => candidate.id === caravan.targetVillageId);
+            if (!caravan || caravan.status !== 'traveling' || !destination) return;
+            caravan.position = { x: en.visual.position.x, z: en.visual.position.z };
+            const destinationPosition = new window.THREE.Vector3(destination.x, en.visual.position.y, destination.z);
+            if (en.visual.position.distanceTo(destinationPosition) <= 8) {
+                caravan.status = 'arrived';
+                if (window.GameState.party.escortCaravanId === caravan.id) window.GameState.party.escortCaravanId = null;
+                en.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                window.EventBus.emit('UI_LOG', `Merchant caravan reached ${destination.name}.`);
+            } else {
+                moveCompanion(en, destinationPosition, 1.2, delta);
+            }
+            return;
+        }
+
         if (en.companionId) {
+            const member = window.GameState.party.members.find(candidate => candidate.id === en.companionId);
+            if (member?.downed) return;
             const command = en.groupCommand || 'follow';
+            const escortedCaravan = window.GameCore.activeEntities.find(entity => entity.caravanId === window.GameState.party.escortCaravanId);
+            const formationAnchor = escortedCaravan ? escortedCaravan.visual.position : pPos;
             const hostileEntities = window.GameCore.activeEntities.filter(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && entity.hp > 0);
             const nearestHostile = hostileEntities.sort((a, b) => en.visual.position.distanceTo(a.visual.position) - en.visual.position.distanceTo(b.visual.position))[0];
             if (command === 'hold') {
-                if (en.holdPosition) moveCompanion(en, en.holdPosition);
+                if (en.holdPosition) moveCompanion(en, en.holdPosition, 1, delta);
                 return;
             }
             if (command === 'attack' && nearestHostile && en.visual.position.distanceTo(nearestHostile.visual.position) < 20) {
                 const distance = en.visual.position.distanceTo(nearestHostile.visual.position);
                 if (distance > 1.8) {
-                    moveCompanion(en, nearestHostile.visual.position, 1.1);
+                    moveCompanion(en, nearestHostile.visual.position, 1.1, delta);
                 } else if ((!en.companionAttackReadyAt || performance.now() >= en.companionAttackReadyAt) && window.GameCore.playEntityAnimation) {
                     en.companionAttackReadyAt = performance.now() + 900;
                     const damage = 10 + window.GameState.pStats.strength.level;
@@ -61,7 +150,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             }
             const offset = new window.THREE.Vector3(en.companionId.length % 2 ? 2 : -2, 0, command === 'retreat' ? -5 : 3);
             if (command === 'guard' && nearestHostile && nearestHostile.visual.position.distanceTo(pPos) < 10) offset.copy(nearestHostile.visual.position).sub(pPos).multiplyScalar(0.5);
-            moveCompanion(en, pPos.clone().add(offset), command === 'retreat' ? 1.3 : 1);
+            moveCompanion(en, formationAnchor.clone().add(offset), command === 'retreat' ? 1.3 : 1, delta);
             return;
         }
 
@@ -119,6 +208,16 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                     }
                 }
             }
+            return;
+        }
+
+        const npcTarget = window.GameCore.activeEntities
+            .filter(candidate => candidate !== en && candidate.def.type === 'npc' && candidate.hp > 0 && isHostileFaction(candidate.def.faction) !== isHostileFaction(en.def.faction))
+            .sort((a, b) => en.visual.position.distanceTo(a.visual.position) - en.visual.position.distanceTo(b.visual.position))[0];
+        if (npcTarget && en.visual.position.distanceTo(npcTarget.visual.position) < 12) {
+            const npcDistance = en.visual.position.distanceTo(npcTarget.visual.position);
+            if (npcDistance > 1.8) moveCompanion(en, npcTarget.visual.position, 1, delta);
+            else attackNpc(en, npcTarget);
             return;
         }
 

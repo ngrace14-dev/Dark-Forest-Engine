@@ -4,6 +4,26 @@ window.EventBus = {
     emit: function(event, data) { if(this.events[event]) this.events[event].forEach(cb => cb(data)); }
 };
 
+const runPotentialTiers = [
+    { name: 'Common', chance: 55, bonus: 1, color: '#9ca3af' },
+    { name: 'Uncommon', chance: 23, bonus: 2, color: '#4ade80' },
+    { name: 'Rare', chance: 12, bonus: 3, color: '#60a5fa' },
+    { name: 'Epic', chance: 6, bonus: 5, color: '#c084fc' },
+    { name: 'Legendary', chance: 2.5, bonus: 8, color: '#fbbf24' },
+    { name: 'S', chance: 1, bonus: 12, color: '#fb7185' },
+    { name: 'SS', chance: 0.35, bonus: 18, color: '#f97316' },
+    { name: 'SSS', chance: 0.12, bonus: 28, color: '#ef4444' },
+    { name: 'God Tier', chance: 0.03, bonus: 45, color: '#f5f3ff' }
+];
+
+function rollRunPotential() {
+    const roll = Math.random() * 100;
+    let threshold = 0;
+    const tier = runPotentialTiers.find(candidate => (threshold += candidate.chance) >= roll) || runPotentialTiers[0];
+    const skills = ['strength', 'toughness', 'athletics', 'dodge', 'meleeAtt', 'meleeDef'];
+    return { ...tier, skill: skills[Math.floor(Math.random() * skills.length)] };
+}
+
 window.GameState = {
     pStats: {
         hp: 100, maxHp: 100,
@@ -14,12 +34,14 @@ window.GameState = {
     inventory: { 
         food: 100, gold: 0, 
         equipment: { head: null, chest: 'leather_armor', waist: null, hands: null, legs: 'pants', weapon: 'iron_sword' },
-        backpack: ['rusty_sword', 'food', 'food', 'food']
+        runes: { head: null, chest: null, waist: null, hands: null, legs: null, weapon: null },
+        backpack: ['rusty_sword', 'food', 'food', 'food', 'ember_rune']
     },
     derivedStats: { armor: 0, weaponDamage: 0 },
     reputation: { village: 0, adventurer: 0, monster: -100 },
     activeBuffs: {},
-    party: { command: 'follow', selectedMembers: ['lyra-scout'], members: [
+    runPotential: null,
+    party: { command: 'follow', selectedMembers: ['lyra-scout'], escortCaravanId: null, members: [
         { id: 'lyra-scout', name: 'Lyra', prefab: 'Female Adventurer', role: 'scout', hp: 100, maxHp: 100, recruited: true, inventory: ['mushrooms', 'food'], equipment: {}, skills: { scouting: 1, athletics: 1 }, personality: 'cautious', knowledge: [], loyalty: 65, hunger: 0, injuries: [], downed: false },
         { id: 'maris-guard', name: 'Maris', prefab: 'Female Guard', role: 'guardian', hp: 130, maxHp: 130, recruited: false, inventory: ['food'], equipment: { weapon: 'iron_sword' }, skills: { guarding: 2, meleeDef: 1 }, personality: 'steadfast', knowledge: [], loyalty: 50, hunger: 0, injuries: [], downed: false },
         { id: 'corvin-runic', name: 'Corvin', prefab: 'Tech Adventurer', role: 'runic adept', hp: 85, maxHp: 85, recruited: false, inventory: ['mushrooms'], equipment: {}, skills: { runecraft: 2, meleeAtt: 1 }, personality: 'curious', knowledge: [], loyalty: 45, hunger: 0, injuries: [], downed: false }
@@ -55,7 +77,7 @@ window.EngineParams = {
 };
 
 window.GameCore = {
-    playerObj: null, activeEntities: [], engineState: 'menu', worldTimer: 0,
+    playerObj: null, activeEntities: [], groundLoot: [], engineState: 'menu', worldTimer: 0,
     scene: null, world: null, camera: null, passes: {}, playEntityAnimation: null, swapPlayerModel: null,
     addXP: function(statName, amount) {
         let stat = window.GameState.pStats[statName]; if(!stat) return;
@@ -81,6 +103,17 @@ window.GameCore = {
         return buff.amount;
     }
 };
+
+window.GameCore.initializeFreshRunPotential = function() {
+    const potential = rollRunPotential();
+    window.GameState.runPotential = potential;
+    window.GameState.pStats[potential.skill].level += potential.bonus;
+    if (potential.skill === 'toughness') {
+        window.GameState.pStats.maxHp += potential.bonus * 10;
+        window.GameState.pStats.hp = window.GameState.pStats.maxHp;
+    }
+};
+window.GameCore.initializeFreshRunPotential();
 
 window.EventBus.on('GAME_SAVE', () => {
     try {

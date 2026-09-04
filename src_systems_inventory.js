@@ -10,8 +10,15 @@ window.ItemDatabase = {
     'dark_steel_torso': { id: 'dark_steel_torso', name: 'Female Dark Steel Torso', type: 'armor', slot: 'chest', stats: { defense: 18 }, icon: '🛡️', color: 'text-gray-300' },
     'pants': { id: 'pants', name: 'Pants', type: 'armor', slot: 'legs', stats: { defense: 2 }, icon: '👖', color: 'text-gray-500' },
     'food': { id: 'food', name: 'Rations', type: 'consumable', slot: 'backpack', stats: { heal: 30 }, icon: '🍖', color: 'text-yellow-500' },
+    'wood': { id: 'wood', name: 'Timber Bundle', type: 'resource', slot: 'backpack', stats: {}, icon: '🪵', color: 'text-amber-500' },
+    'stone': { id: 'stone', name: 'Stone Bundle', type: 'resource', slot: 'backpack', stats: {}, icon: '🪨', color: 'text-gray-400' },
+    'beast_bones': { id: 'beast_bones', name: 'Beast Bones', type: 'resource', slot: 'backpack', stats: {}, icon: '🦴', color: 'text-stone-300' },
+    'corrupted_resin': { id: 'corrupted_resin', name: 'Corrupted Resin', type: 'resource', slot: 'backpack', stats: {}, icon: '🧪', color: 'text-violet-300' },
     'mushrooms': { id: 'mushrooms', name: 'Forest Mushrooms', type: 'consumable', slot: 'backpack', stats: { heal: 10 }, icon: '🍄', color: 'text-red-300' },
     'flesh_pods': { id: 'flesh_pods', name: 'Flesh Pods', type: 'consumable', slot: 'backpack', stats: { heal: 5 }, icon: '🫀', color: 'text-purple-300' }
+    ,'ember_rune': { id: 'ember_rune', name: 'Ember Rune', type: 'rune', slot: 'socket', stats: { damage: 4 }, icon: 'ᛟ', color: 'text-orange-300' }
+    ,'ward_rune': { id: 'ward_rune', name: 'Ward Rune', type: 'rune', slot: 'socket', stats: { defense: 4 }, icon: 'ᛉ', color: 'text-cyan-300' }
+    ,'swift_rune': { id: 'swift_rune', name: 'Swift Rune', type: 'rune', slot: 'socket', stats: { athletics: 2 }, icon: 'ᛊ', color: 'text-green-300' }
 };
 
 function recalculateStats() {
@@ -19,6 +26,12 @@ function recalculateStats() {
     const eq = window.GameState.inventory.equipment;
     ['head', 'chest', 'waist', 'hands', 'legs'].forEach(slot => { if (eq[slot] && window.ItemDatabase[eq[slot]]) totalArmor += window.ItemDatabase[eq[slot]].stats.defense; });
     if (eq.weapon && window.ItemDatabase[eq.weapon]) totalDamage += window.ItemDatabase[eq.weapon].stats.damage; else totalDamage += 2; 
+    Object.values(window.GameState.inventory.runes || {}).forEach(runeId => {
+        const rune = window.ItemDatabase[runeId];
+        if (!rune) return;
+        totalArmor += rune.stats.defense || 0;
+        totalDamage += rune.stats.damage || 0;
+    });
     
     window.GameState.derivedStats.armor = totalArmor;
     window.GameState.derivedStats.weaponDamage = totalDamage;
@@ -106,6 +119,9 @@ window.EventBus.on('INV_USE', (packIndex) => {
         if(currentEquipped) window.GameState.inventory.backpack.push(currentEquipped);
         window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : {x:0,y:0,z:0}, vol: -10});
         recalculateStats();
+    } else if (item.type === 'rune') {
+        window.EventBus.emit('OPEN_RUNE_SOCKET', packIndex);
+        return;
     }
     renderInventory();
 });
@@ -136,6 +152,7 @@ window.EventBus.on('GATHER_NEARBY', () => {
 });
 
 window.EventBus.on('RENDER_INVENTORY', renderInventory);
+window.EventBus.on('RECALCULATE_STATS', recalculateStats);
 window.EventBus.on('ENGINE_READY', () => {
     window.VillageManager.provisionProfiles.forEach(provision => {
         window.ItemDatabase[provision.itemId] = { id: provision.itemId, name: provision.name, type: 'consumable', slot: 'backpack', stats: { heal: provision.heal, buff: provision.buff, amount: provision.amount, duration: provision.duration }, icon: '🍲', color: 'text-amber-300' };
