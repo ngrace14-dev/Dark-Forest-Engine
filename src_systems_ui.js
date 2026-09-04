@@ -7,12 +7,18 @@ window.EventBus.on('UI_LOG', (msg) => {
 
 window.EventBus.on('UI_UPDATE_HUD', () => {
     document.getElementById('hp-bar').style.width = `${(window.GameState.pStats.hp / window.GameState.pStats.maxHp) * 100}%`;
+    document.getElementById('stamina-bar').style.width = `${(window.GameState.pStats.stamina / window.GameState.pStats.maxStamina) * 100}%`;
+    document.getElementById('poise-bar').style.width = `${(window.GameState.pStats.poise / window.GameState.pStats.maxPoise) * 100}%`;
     document.getElementById('hud-food').innerText = window.GameState.inventory.food; 
     document.getElementById('hud-gold').innerText = window.GameState.inventory.gold;
     document.getElementById('rep-village').innerText = window.GameState.reputation.village; 
     document.getElementById('rep-adventurer').innerText = window.GameState.reputation.adventurer;
     document.getElementById('rep-monster').innerText = window.GameState.reputation.monster;
     document.getElementById('rep-village').className = window.GameState.reputation.village <= -50 ? 'text-red-500 font-bold' : 'text-blue-400';
+    const statusText = window.GameState.statusEffects.map(effect => `${effect.type.toUpperCase()} ${Math.ceil(effect.remaining)}s`).join(' | ');
+    let statusLine = document.getElementById('status-effects');
+    if (!statusLine) { statusLine = document.createElement('div'); statusLine.id = 'status-effects'; statusLine.className = 'mt-2 text-[10px] font-mono text-green-300'; document.getElementById('hp-bar').parentElement.parentElement.appendChild(statusLine); }
+    statusLine.textContent = statusText;
 });
 
 window.EventBus.on('UI_UPDATE_STATS', () => {
@@ -48,6 +54,7 @@ window.EventBus.on('SPAWN_FLOATING_TEXT', ({ text, pos, color }) => {
 });
 
 window.EventBus.on('UI_TICK', ({ delta, camera }) => {
+    window.EventBus.emit('UI_UPDATE_HUD');
     if(!camera) return;
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
         let ft = floatingTexts[i]; ft.life -= delta * 1.5;
@@ -90,10 +97,13 @@ function openPlayerCamp() {
     const base = window.GameState.base;
     const stored = base.storage.length ? base.storage.map((itemId, index) => `<button class="withdraw-base-item border border-amber-700 bg-gray-900 p-2 text-left hover:border-amber-300" data-index="${index}">Withdraw ${window.ItemDatabase[itemId]?.name || itemId}</button>`).join('') : '<div class="text-gray-500">Storage is empty.</div>';
     const carried = window.GameState.inventory.backpack.map((itemId, index) => `<button class="deposit-base-item border border-gray-700 bg-gray-900 p-2 text-left hover:border-amber-300" data-index="${index}">Store ${window.ItemDatabase[itemId]?.name || itemId}</button>`).join('') || '<div class="text-gray-500">Nothing to store.</div>';
-    dialogue.innerHTML = `<div class="mb-4 border-b border-amber-700 pb-3"><div class="text-amber-300 font-bold tracking-widest">${base.name.toUpperCase()}</div><div class="text-xs text-gray-500 mt-1">Storage | Structures ${base.structures.length}</div></div><div class="grid grid-cols-2 gap-3"><div><div class="text-xs text-amber-200 mb-2">CAMP STORAGE</div><div class="grid gap-2">${stored}</div></div><div><div class="text-xs text-gray-300 mb-2">YOUR PACK</div><div class="grid gap-2">${carried}</div></div></div><button id="btn-close-base" class="mt-4 border border-gray-600 px-3 py-2 text-xs hover:border-amber-400">Leave</button>`;
+    const selectedNames = window.GameState.party.members.filter(member => member.recruited && window.GameState.party.selectedMembers.includes(member.id)).map(member => member.name).join(', ') || 'No companions selected';
+    dialogue.innerHTML = `<div class="mb-4 border-b border-amber-700 pb-3"><div class="text-amber-300 font-bold tracking-widest">${base.name.toUpperCase()}</div><div class="text-xs text-gray-500 mt-1">Storage | Structures ${base.structures.length} | Farms ${base.farms.length} | Research ${base.researchPoints || 0}${base.wardRadius ? ` | Ward ${base.wardRadius}m` : ''}</div></div><div class="grid grid-cols-2 gap-3"><div><div class="text-xs text-amber-200 mb-2">CAMP STORAGE</div><div class="grid gap-2">${stored}</div></div><div><div class="text-xs text-gray-300 mb-2">YOUR PACK</div><div class="grid gap-2">${carried}</div></div></div><div class="mt-4 border-t border-gray-700 pt-3"><div class="text-xs text-amber-200 mb-2">CONSTRUCTION</div><div class="grid grid-cols-2 gap-2"><button class="build-base-item border border-amber-700 px-2 py-2 text-xs hover:border-amber-300" data-prefab="Camp Storage Cache">Storage: 5 Wood, 2 Stone</button><button class="build-base-item border border-amber-700 px-2 py-2 text-xs hover:border-amber-300" data-prefab="Camp Farm Plot">Farm: 4 Wood, 1 Stone</button><button class="build-base-item col-span-2 border border-cyan-700 px-2 py-2 text-xs hover:border-cyan-300" data-prefab="Rune Tower">Rune Tower: 12 Wood, 10 Stone, 5 Research</button></div></div><div class="mt-4 border-t border-gray-700 pt-3"><div class="text-xs text-cyan-200 mb-1">SELECTED WORKERS</div><div class="text-[10px] text-gray-500 mb-2">${selectedNames}</div><div class="grid grid-cols-2 gap-2"><button class="assign-base-job border border-cyan-800 px-2 py-2 text-xs hover:border-cyan-300" data-job="farm">Farm</button><button class="assign-base-job border border-cyan-800 px-2 py-2 text-xs hover:border-cyan-300" data-job="research">Research</button><button class="assign-base-job border border-cyan-800 px-2 py-2 text-xs hover:border-cyan-300" data-job="guard">Guard</button><button class="assign-base-job border border-gray-600 px-2 py-2 text-xs hover:border-gray-300" data-job="idle">Idle</button></div></div><button id="btn-close-base" class="mt-4 border border-gray-600 px-3 py-2 text-xs hover:border-amber-400">Leave</button>`;
     dialogue.classList.remove('hidden');
     dialogue.querySelectorAll('.withdraw-base-item').forEach(button => button.addEventListener('click', () => window.EventBus.emit('WITHDRAW_BASE_ITEM', Number(button.dataset.index))));
     dialogue.querySelectorAll('.deposit-base-item').forEach(button => button.addEventListener('click', () => window.EventBus.emit('DEPOSIT_BASE_ITEM', Number(button.dataset.index))));
+    dialogue.querySelectorAll('.build-base-item').forEach(button => button.addEventListener('click', () => { window.EventBus.emit('BUILD_BASE_STRUCTURE', button.dataset.prefab); openPlayerCamp(); }));
+    dialogue.querySelectorAll('.assign-base-job').forEach(button => button.addEventListener('click', () => window.EventBus.emit('ASSIGN_BASE_JOB', button.dataset.job)));
     dialogue.querySelector('#btn-close-base').addEventListener('click', closeCompanionDialogue);
 }
 
@@ -395,7 +405,22 @@ window.EventBus.on('DELIVER_FETCH_QUEST', questIndex => {
     });
     if (quest.resource === 'food') window.GameState.inventory.food = Math.max(0, window.GameState.inventory.food - quest.amount);
     const village = window.VillageManager.villages.find(candidate => candidate.id === quest.issuer);
-    if (village) village.stats[quest.resource] = (village.stats[quest.resource] || 0) + quest.amount;
+    if (village) {
+        village.stats[quest.resource] = (village.stats[quest.resource] || 0) + quest.amount;
+        if (quest.purpose === 'reclaiming occupied territory' && village.territory?.reclamation?.[quest.resource] !== undefined) {
+            village.territory.reclamation[quest.resource] += quest.amount;
+            const reclaim = village.territory.reclamation;
+            const activeRaiders = window.GameCore.activeEntities.some(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && Math.hypot(entity.visual.position.x - village.x, entity.visual.position.z - village.z) <= village.territory.radius);
+            if (!activeRaiders && reclaim.wood >= reclaim.requiredWood && reclaim.stone >= reclaim.requiredStone) {
+                village.territory.faction = 'kingdom';
+                village.territory.control = 50;
+                village.territory.underRaid = false;
+                village.territory.reclamation = null;
+                village.stats.prosperity = Math.min(100, (village.stats.prosperity || 0) + 20);
+                window.EventBus.emit('UI_LOG', `[RECLAIMED] ${village.name} returned to Kingdom control.`);
+            }
+        }
+    }
     window.GameState.inventory.gold += quest.reward;
     window.GameState.reputation.village += 5;
     window.GameState.questBoard.splice(questIndex, 1);
@@ -434,6 +459,17 @@ window.EventBus.on('WITHDRAW_BASE_ITEM', storageIndex => {
     window.GameState.inventory.backpack.push(itemId);
     openPlayerCamp();
     window.EventBus.emit('RENDER_INVENTORY');
+});
+
+window.EventBus.on('ASSIGN_BASE_JOB', job => {
+    const selectedMembers = window.GameState.party.members.filter(member => member.recruited && window.GameState.party.selectedMembers.includes(member.id));
+    if (!selectedMembers.length) {
+        window.EventBus.emit('UI_LOG', 'Select companions through their dialogue before assigning camp work.');
+        return;
+    }
+    selectedMembers.forEach(member => { member.job = job; });
+    window.EventBus.emit('UI_LOG', `${selectedMembers.map(member => member.name).join(', ')} assigned to ${job} duty.`);
+    openPlayerCamp();
 });
 window.EventBus.on('DEV_TOOLS_TOGGLE_ASSETS', () => {
     const panel = document.getElementById('asset-manager-panel');

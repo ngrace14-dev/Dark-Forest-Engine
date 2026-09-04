@@ -65,6 +65,43 @@ window.RoadManager = {
     }
 };
 
+window.Navigation = {
+    cellSize: 3,
+    routeRange: 36,
+    findRoute: function(start, goal, agentRadius = 0.5) {
+        const direct = new THREE.Vector3().subVectors(goal, start); direct.y = 0;
+        if (direct.lengthSq() === 0) return [];
+        const localGoal = direct.length() > this.routeRange ? start.clone().add(direct.normalize().multiplyScalar(this.routeRange)) : goal.clone();
+        const toCell = point => ({ x: Math.round(point.x / this.cellSize), z: Math.round(point.z / this.cellSize) });
+        const startCell = toCell(start); const goalCell = toCell(localGoal);
+        const key = cell => `${cell.x},${cell.z}`;
+        const obstacles = window.GameCore.activeEntities.filter(entity => entity.def.isObstacle && entity.def.type !== 'npc');
+        const blocked = cell => {
+            const worldX = cell.x * this.cellSize; const worldZ = cell.z * this.cellSize;
+            return obstacles.some(entity => Math.hypot(worldX - entity.visual.position.x, worldZ - entity.visual.position.z) < (entity.def.radius || 1) + agentRadius + 0.5);
+        };
+        const open = [{ cell: startCell, g: 0, f: Math.abs(startCell.x - goalCell.x) + Math.abs(startCell.z - goalCell.z) }];
+        const cameFrom = new Map(); const costs = new Map([[key(startCell), 0]]); let found = null;
+        const maxSteps = 500;
+        for (let step = 0; open.length && step < maxSteps; step++) {
+            open.sort((a, b) => a.f - b.f);
+            const current = open.shift();
+            if (current.cell.x === goalCell.x && current.cell.z === goalCell.z) { found = current.cell; break; }
+            [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([x, z]) => {
+                const next = { x: current.cell.x + x, z: current.cell.z + z };
+                const nextKey = key(next); const nextCost = current.g + 1;
+                if (blocked(next) || (costs.has(nextKey) && costs.get(nextKey) <= nextCost)) return;
+                costs.set(nextKey, nextCost); cameFrom.set(nextKey, current.cell);
+                open.push({ cell: next, g: nextCost, f: nextCost + Math.abs(next.x - goalCell.x) + Math.abs(next.z - goalCell.z) });
+            });
+        }
+        if (!found) return [localGoal];
+        const route = [];
+        for (let current = found; key(current) !== key(startCell); current = cameFrom.get(key(current))) route.unshift(new THREE.Vector3(current.x * this.cellSize, localGoal.y, current.z * this.cellSize));
+        return route;
+    }
+};
+
 window.VillageManager = {
     villages: [], kingdomPopulation: 250000, capitalPopulationShare: 0.25, names: ["Oakhaven", "Gallows Hill", "Mire's Edge", "Blackwood", "Hollow Creek", "Ashen Hold", "Dire Rest", "Crow's Perch", "Widow's Peak", "Thornbury", "Gloomhaven", "Duskendale", "Grimsby", "Shadowfen", "Blighted Watch", "Bleakmire", "Wraith's End", "Cullfield", "Terminus"],
     settlementProfiles: [
@@ -127,7 +164,7 @@ window.VillageManager = {
             if (i > 0) remainingPopulation -= population;
             const profile = this.settlementProfiles[i];
             const provision = this.provisionProfiles[i];
-            this.villages.push({ id: i, name: i === 0 ? 'The Capital' : this.names[i - 1], x: Math.round(x), z: Math.round(z), connections: connections, capital: i === 0, nobleHouse: profile.house, nobleTitle: profile.title, industry: profile, provision, provisionStock: { [provision.itemId]: Math.max(10, Math.floor(population / 100)) }, territory: { faction: 'kingdom', radius: i === 0 ? 140 : 90, control: 100, underRaid: false }, stats: { ap: 50 + Math.floor(Math.random() * 50), food: population * 20, wood: population * 8, stone: population * 5, gold: population * 4, prosperity: 55 }, population: { current: population, capacity: Math.ceil(population * 1.2) }, expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [] });
+            this.villages.push({ id: i, name: i === 0 ? 'The Capital' : this.names[i - 1], x: Math.round(x), z: Math.round(z), connections: connections, capital: i === 0, nobleHouse: profile.house, nobleTitle: profile.title, industry: profile, provision, provisionStock: { [provision.itemId]: Math.max(10, Math.floor(population / 100)) }, territory: { faction: 'kingdom', radius: i === 0 ? 140 : 90, control: 100, underRaid: false }, expeditions: [], stats: { ap: 50 + Math.floor(Math.random() * 50), food: population * 20, wood: population * 8, stone: population * 5, gold: population * 4, prosperity: 55 }, population: { current: population, capacity: Math.ceil(population * 1.2) }, expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [] });
         }
         window.RoadManager.generateRoads(this.villages);
         window.EventBus.emit('UI_LOG', "🌲 20 Settlements generated. Road Network integrated.");
@@ -141,6 +178,7 @@ window.VillageManager = {
             if (!v.population) v.population = { current: 8, capacity: 12 };
             if (!v.squads) v.squads = [];
             if (!v.caravans) v.caravans = [];
+            if (!v.expeditions) v.expeditions = [];
             if (!v.territory) v.territory = { faction: 'kingdom', radius: v.capital ? 140 : 90, control: 100, underRaid: false };
             if (!v.capital) {
                 currentRadius += 10000 + Math.random() * 10000;

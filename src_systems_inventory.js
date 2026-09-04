@@ -19,6 +19,9 @@ window.ItemDatabase = {
     ,'ember_rune': { id: 'ember_rune', name: 'Ember Rune', type: 'rune', slot: 'socket', stats: { damage: 4 }, icon: 'ᛟ', color: 'text-orange-300' }
     ,'ward_rune': { id: 'ward_rune', name: 'Ward Rune', type: 'rune', slot: 'socket', stats: { defense: 4 }, icon: 'ᛉ', color: 'text-cyan-300' }
     ,'swift_rune': { id: 'swift_rune', name: 'Swift Rune', type: 'rune', slot: 'socket', stats: { athletics: 2 }, icon: 'ᛊ', color: 'text-green-300' }
+    ,'fireward_rune': { id: 'fireward_rune', name: 'Fireward Rune', type: 'rune', slot: 'socket', stats: { resistances: { fire: 8 } }, icon: 'ᛞ', color: 'text-orange-300' }
+    ,'voidward_rune': { id: 'voidward_rune', name: 'Voidward Rune', type: 'rune', slot: 'socket', stats: { resistances: { void: 8 } }, icon: 'ᛇ', color: 'text-violet-300' }
+    ,'poisonward_rune': { id: 'poisonward_rune', name: 'Poisonward Rune', type: 'rune', slot: 'socket', stats: { resistances: { poison: 8 } }, icon: 'ᛜ', color: 'text-lime-300' }
 };
 
 function recalculateStats() {
@@ -124,6 +127,17 @@ window.EventBus.on('INV_USE', (packIndex) => {
         return;
     }
     renderInventory();
+});
+
+window.EventBus.on('EMERGENCY_RATION', () => {
+    if (window.Input.rationCooldown > 0) return;
+    const rationIndex = window.GameState.inventory.backpack.indexOf('food');
+    if (rationIndex < 0 || window.GameState.inventory.food <= 0) {
+        window.EventBus.emit('UI_LOG', 'No ration ready.');
+        return;
+    }
+    window.Input.rationCooldown = 4;
+    window.EventBus.emit('INV_USE', rationIndex);
 });
 
 window.EventBus.on('GATHER_NEARBY', () => {

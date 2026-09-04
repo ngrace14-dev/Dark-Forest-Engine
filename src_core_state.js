@@ -26,7 +26,7 @@ function rollRunPotential() {
 
 window.GameState = {
     pStats: {
-        hp: 100, maxHp: 100, stamina: 100, maxStamina: 100,
+        hp: 100, maxHp: 100, stamina: 100, maxStamina: 100, poise: 60, maxPoise: 60, guardBrokenUntil: 0,
         strength: { level: 1, xp: 0, next: 100 }, toughness: { level: 1, xp: 0, next: 100 },
         athletics: { level: 1, xp: 0, next: 100 }, dodge: { level: 1, xp: 0, next: 100 },
         meleeAtt: { level: 1, xp: 0, next: 100 }, meleeDef: { level: 1, xp: 0, next: 100 }
@@ -39,7 +39,16 @@ window.GameState = {
     },
     derivedStats: { armor: 0, weaponDamage: 0 },
     reputation: { village: 0, adventurer: 0, monster: -100 },
+    factionRelations: {
+        kingdom: { kingdom: 100, adventurer: 30, forest: -100, monster: -100 },
+        adventurer: { kingdom: 30, adventurer: 100, forest: -75, monster: -75 },
+        forest: { kingdom: -100, adventurer: -75, forest: 100, monster: 20 },
+        monster: { kingdom: -100, adventurer: -75, forest: 20, monster: 100 },
+        player: { kingdom: 0, adventurer: 0, forest: -100, monster: -100 }
+    },
+    bounties: { kingdom: 0, adventurer: 0 },
     activeBuffs: {},
+    statusEffects: [],
     runPotential: null,
     base: { owned: false, name: 'Wayfarer Camp', position: null, storage: [], structures: [], farms: [], research: [] },
     party: { command: 'follow', selectedMembers: ['lyra-scout'], escortCaravanId: null, members: [
@@ -64,7 +73,7 @@ window.EngineState = {
 window.Input = {
     keys: { w: false, a: false, s: false, d: false, ' ': false, shift: false },
     isMoving: false, isDashing: false, isBlocking: false, isAttacking: false,
-    attackCooldown: 0, dashTimer: 0, camAngle: Math.PI / 4, camPitch: Math.PI / 4, camDistance: 15,
+    attackCooldown: 0, guardbreakerCooldown: 0, rationCooldown: 0, runeShotCooldown: 0, fireShotCooldown: 0, dashTimer: 0, camAngle: Math.PI / 4, camPitch: Math.PI / 4, camDistance: 15,
     isDraggingCam: false, lastMouseX: 0, lastMouseY: 0
 };
 
@@ -102,6 +111,32 @@ window.GameCore = {
             return 0;
         }
         return buff.amount;
+    },
+    applyStatusEffect: function(type, duration, tickDamage = 0) {
+        const active = window.GameState.statusEffects.find(effect => effect.type === type);
+        if (active) {
+            active.remaining = Math.max(active.remaining, duration);
+            return;
+        }
+        window.GameState.statusEffects.push({ type, remaining: duration, tickDamage, tickTimer: 1 });
+        window.EventBus.emit('UI_LOG', `${type.toUpperCase()} applied.`);
+    },
+    getResistance: function(type) {
+        return Object.values(window.GameState.inventory.runes || {}).reduce((total, runeId) => total + (window.ItemDatabase[runeId]?.stats.resistances?.[type] || 0), 0);
+    },
+    adjustFactionStanding: function(faction, amount, reason) {
+        const politicalFaction = faction === 'village' ? 'kingdom' : faction;
+        const current = window.GameState.factionRelations.player[politicalFaction] || 0;
+        const next = Math.max(-100, Math.min(100, current + amount));
+        window.GameState.factionRelations.player[politicalFaction] = next;
+        const reputationKey = politicalFaction === 'kingdom' ? 'village' : (politicalFaction === 'forest' ? 'monster' : politicalFaction);
+        if (window.GameState.reputation[reputationKey] !== undefined) window.GameState.reputation[reputationKey] = next;
+        if (current > -50 && next <= -50 && window.GameState.bounties[politicalFaction] !== undefined) {
+            window.GameState.bounties[politicalFaction] += 50;
+            window.EventBus.emit('UI_LOG', `[BOUNTY] ${politicalFaction.toUpperCase()} placed a bounty on you.`);
+        }
+        if (reason) window.EventBus.emit('UI_LOG', `[STANDING] ${politicalFaction}: ${amount >= 0 ? '+' : ''}${amount} (${reason})`);
+        window.EventBus.emit('UI_UPDATE_HUD');
     }
 };
 

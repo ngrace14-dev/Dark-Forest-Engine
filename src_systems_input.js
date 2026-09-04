@@ -4,6 +4,10 @@ document.addEventListener('keydown', e => {
     if (k === 'c') { const p = document.getElementById('stats-panel'); if(p) p.classList.toggle('hidden'); }
     if (k === 'i') { const p = document.getElementById('inventory-panel'); if(p) { p.classList.toggle('hidden'); if(!p.classList.contains('hidden')) window.EventBus.emit('RENDER_INVENTORY'); } }
     if (k === 'u') window.EventBus.emit('DEV_TOOLS_TOGGLE_ASSETS');
+    if (k === 'q' && window.GameCore.engineState === 'running') window.EventBus.emit('GUARDBREAKER');
+    if (k === 'r' && window.GameCore.engineState === 'running') window.EventBus.emit('EMERGENCY_RATION');
+    if (k === 'f' && window.GameCore.engineState === 'running') window.EventBus.emit('VOID_RUNE_SHOT');
+    if (k === 'g' && window.GameCore.engineState === 'running') window.EventBus.emit('FIRE_RUNE_SHOT');
     if (k === 'b' && window.GameCore.engineState === 'running') window.EventBus.emit('CLAIM_PLAYER_CAMP');
     if (k === 'e' && window.GameCore.engineState === 'running') window.EventBus.emit('INTERACT_NEARBY');
     if (window.GameCore.engineState === 'running' && ['1', '2', '3', '4', '5'].includes(k)) window.EventBus.emit('PARTY_COMMAND', ({ '1': 'follow', '2': 'hold', '3': 'guard', '4': 'attack', '5': 'retreat' })[k]);
@@ -14,6 +18,7 @@ document.addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (win
 document.addEventListener('mousedown', e => {
     if (e.button === 2) { window.Input.isDraggingCam = true; window.Input.lastMouseX = e.clientX; window.Input.lastMouseY = e.clientY; }
     if (e.button === 0 && window.GameCore.engineState === 'running') window.EventBus.emit('PRIMARY_CLICK_DOWN', { clientX: e.clientX, clientY: e.clientY });
+    if (e.button === 1 && window.GameCore.engineState === 'running') window.EventBus.emit('SECONDARY_CLICK_DOWN', { clientX: e.clientX, clientY: e.clientY });
 });
 document.addEventListener('mouseup', e => { if (e.button === 2) window.Input.isDraggingCam = false; });
 document.addEventListener('mousemove', e => {

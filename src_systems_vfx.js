@@ -12,6 +12,7 @@ window.VFXManager = {
     get auras() { return ['None', ...Object.keys(this.defs).filter(k => this.defs[k].type === 'aura')]; },
     get onHits() { return ['None', ...Object.keys(this.defs).filter(k => this.defs[k].type === 'onHit')]; },
     transientVFX: [],
+    projectiles: [],
     
     applyAura: function(entity, def) {
         if(entity.auraMesh) { entity.visual.remove(entity.auraMesh); entity.auraMesh.geometry.dispose(); entity.auraMesh.material.dispose(); entity.auraMesh = null; }
@@ -38,6 +39,12 @@ window.VFXManager = {
         const pts = new THREE.Points(geo, mat); window.GameCore.scene.add(pts);
         this.transientVFX.push({ mesh: pts, velocities: velocities, life: 1.0, type: type });
     },
+    spawnProjectile: function({ position, direction, damage, damageType, speed, range, color, owner = 'enemy', statusEffect = null }) {
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }));
+        mesh.position.copy(position);
+        window.GameCore.scene.add(mesh);
+        this.projectiles.push({ mesh, direction: direction.clone().normalize(), damage, damageType, speed, remaining: range, owner, statusEffect });
+    },
     update: function(delta) {
         for (let i = this.transientVFX.length - 1; i >= 0; i--) {
             let vfx = this.transientVFX[i]; vfx.life -= delta * 2.0;
@@ -49,6 +56,60 @@ window.VFXManager = {
                     positions[j*3] += vfx.velocities[j].x * delta; positions[j*3+1] += vfx.velocities[j].y * delta; positions[j*3+2] += vfx.velocities[j].z * delta;
                 }
                 vfx.mesh.geometry.attributes.position.needsUpdate = true; vfx.mesh.material.opacity = vfx.life;
+            }
+        }
+        for (let index = this.projectiles.length - 1; index >= 0; index--) {
+            const projectile = this.projectiles[index];
+            const distance = projectile.speed * delta;
+            const previousPosition = projectile.mesh.position.clone();
+            projectile.mesh.position.addScaledVector(projectile.direction, distance);
+            projectile.remaining -= distance;
+            const player = window.GameCore.playerObj;
+            if (projectile.owner === 'player') {
+                const target = window.GameCore.activeEntities.find(entity => {
+                    if (entity.def.type !== 'npc' || entity.hp <= 0) return false;
+                    const targetPosition = entity.visual.position.clone().add(new THREE.Vector3(0, 1, 0));
+                    const travel = projectile.mesh.position.clone().sub(previousPosition);
+                    const travelLengthSq = travel.lengthSq();
+                    const progress = travelLengthSq ? Math.max(0, Math.min(1, targetPosition.clone().sub(previousPosition).dot(travel) / travelLengthSq)) : 0;
+                    return previousPosition.clone().addScaledVector(travel, progress).distanceTo(targetPosition) < 0.9;
+                });
+                if (target) {
+                    window.EventBus.emit('PLAYER_PROJECTILE_HIT', { target, damage: projectile.damage, damageType: projectile.damageType, position: projectile.mesh.position, statusEffect: projectile.statusEffect });
+                    projectile.remaining = 0;
+                }
+            }
+            if (projectile.owner === 'enemy' && player && projectile.mesh.position.distanceTo(player.visual.position.clone().add(new THREE.Vector3(0, 1, 0))) < 0.8 && !window.EngineParams.godMode) {
+                if (window.Input.isBlocking) {
+                    const poiseDamage = Math.max(8, Math.floor(projectile.damage * 0.7));
+                    window.GameState.pStats.poise = Math.max(0, window.GameState.pStats.poise - poiseDamage);
+                    if (window.GameState.pStats.poise <= 0) {
+                        window.GameState.pStats.guardBrokenUntil = performance.now() + 1000;
+                        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'GUARD BREAK!', pos: player.visual.position, color: '#ef4444' });
+                    } else {
+                        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'BLOCKED!', pos: player.visual.position, color: '#4ade80' });
+                    }
+                    window.EventBus.emit('UI_UPDATE_HUD');
+                    this.spawnHit('Sparks', projectile.mesh.position);
+                } else {
+                    const damage = Math.max(1, projectile.damage - window.GameCore.getResistance(projectile.damageType));
+                    window.GameState.pStats.hp = Math.max(0, window.GameState.pStats.hp - damage);
+                    window.EventBus.emit('ENTITY_DAMAGED', { damage, position: player.visual.position, isPlayer: true });
+                    window.EventBus.emit('UI_UPDATE_HUD');
+                    this.spawnHit(projectile.damageType === 'void' ? 'Void' : 'Sparks', projectile.mesh.position);
+                    if (window.GameState.pStats.hp <= 0) {
+                        if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(player, 'die');
+                        window.EventBus.emit('UI_LOG', 'You were struck down.');
+                        setTimeout(() => window.EventBus.emit('PLAYER_RESPAWN'), 3000);
+                    }
+                }
+                projectile.remaining = 0;
+            }
+            if (projectile.remaining <= 0) {
+                window.GameCore.scene.remove(projectile.mesh);
+                projectile.mesh.geometry.dispose();
+                projectile.mesh.material.dispose();
+                this.projectiles.splice(index, 1);
             }
         }
         window.GameCore.activeEntities.forEach(en => { if (en.auraMesh) this.animateAura(en.auraMesh, delta); });

@@ -9,7 +9,18 @@ window.EventBus.on('PARTY_COMMAND', command => {
 });
 
 function moveCompanion(companion, destination, speedMultiplier = 1, delta = 0) {
-    const direction = new window.THREE.Vector3().subVectors(destination, companion.visual.position);
+    const member = companion.companionId && window.GameState.party.members.find(candidate => candidate.id === companion.companionId);
+    const conditionMultiplier = member && (member.hunger >= 80 || member.injuries.length > 0) ? 0.65 : 1;
+    const destinationChanged = !companion.routeDestination || companion.routeDestination.distanceToSquared(destination) > 9;
+    companion.routeRefreshTimer = Math.max(0, (companion.routeRefreshTimer || 0) - delta);
+    if (destinationChanged || companion.routeRefreshTimer === 0 || !companion.route?.length) {
+        companion.route = window.Navigation.findRoute(companion.visual.position, destination, companion.def.radius || 0.5);
+        companion.routeDestination = destination.clone();
+        companion.routeRefreshTimer = 1;
+    }
+    while (companion.route.length > 1 && companion.visual.position.distanceTo(companion.route[0]) < 1.5) companion.route.shift();
+    const waypoint = companion.route[0] || destination;
+    const direction = new window.THREE.Vector3().subVectors(waypoint, companion.visual.position);
     direction.y = 0;
     if (direction.lengthSq() < 1) {
         companion.body.setLinvel({ x: 0, y: companion.body.linvel().y, z: 0 }, true);
@@ -33,13 +44,14 @@ function moveCompanion(companion, destination, speedMultiplier = 1, delta = 0) {
     const velocity = companion.body.linvel();
     if (delta > 0 && new window.THREE.Vector2(velocity.x, velocity.z).length() < 0.1) companion.stuckSeconds = (companion.stuckSeconds || 0) + delta; else companion.stuckSeconds = 0;
     if (companion.stuckSeconds > 3 && companion.visual.position.distanceTo(destination) > 6) {
-        const recoveryY = window.WorldGenerator.getTerrainHeight(destination.x, destination.z) + companion.def.height / 2;
-        companion.body.setTranslation({ x: destination.x, y: recoveryY, z: destination.z }, true);
+        const recoveryPoint = companion.route[0] || destination;
+        const recoveryY = window.WorldGenerator.getTerrainHeight(recoveryPoint.x, recoveryPoint.z) + companion.def.height / 2;
+        companion.body.setTranslation({ x: recoveryPoint.x, y: recoveryY, z: recoveryPoint.z }, true);
         companion.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
         companion.stuckSeconds = 0;
         return;
     }
-    companion.body.setLinvel({ x: direction.x * companion.def.speed * speedMultiplier, y: companion.body.linvel().y, z: direction.z * companion.def.speed * speedMultiplier }, true);
+    companion.body.setLinvel({ x: direction.x * companion.def.speed * speedMultiplier * conditionMultiplier, y: companion.body.linvel().y, z: direction.z * companion.def.speed * speedMultiplier * conditionMultiplier }, true);
     companion.visual.lookAt(companion.visual.position.clone().add(direction));
     if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(companion, 'walk');
 }
@@ -49,6 +61,15 @@ function isHostileFaction(faction) {
 }
 
 function defeatNpc(entity) {
+    if (entity.expeditionId) {
+        const village = window.VillageManager.villages.find(candidate => candidate.id === entity.targetVillageId);
+        const expedition = village?.expeditions.find(candidate => candidate.id === entity.expeditionId);
+        const alliesRemain = window.GameCore.activeEntities.some(candidate => candidate !== entity && candidate.expeditionId === entity.expeditionId && candidate.hp > 0);
+        if (expedition && !alliesRemain) {
+            expedition.status = 'defeated';
+            window.EventBus.emit('UI_LOG', `[DEFENSE] ${village.name} repelled the ${expedition.type}.`);
+        }
+    }
     if (entity.squadId) {
         const village = window.VillageManager.villages.find(candidate => candidate.id === entity.villageId);
         const squad = village?.squads.find(candidate => candidate.id === entity.squadId);
@@ -105,6 +126,10 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
     window.GameCore.activeEntities.forEach(en => {
         if(en.body && en.body.isDynamic && en.body.isDynamic()) { const p = en.body.translation(); en.visual.position.set(p.x, p.y, p.z); }
         if (en.def.type !== 'npc') return;
+        if (en.staggeredUntil && performance.now() < en.staggeredUntil) {
+            en.body.setLinvel({ x: 0, y: en.body.linvel().y, z: 0 }, true);
+            return;
+        }
 
         if (en.caravanId) {
             const village = window.VillageManager.villages.find(candidate => candidate.id === en.villageId);
@@ -142,7 +167,8 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                     moveCompanion(en, nearestHostile.visual.position, 1.1, delta);
                 } else if ((!en.companionAttackReadyAt || performance.now() >= en.companionAttackReadyAt) && window.GameCore.playEntityAnimation) {
                     en.companionAttackReadyAt = performance.now() + 900;
-                    const damage = 10 + window.GameState.pStats.strength.level;
+                    const conditionPenalty = member.hunger >= 80 || member.injuries.length > 0 ? 0.6 : 1;
+                    const damage = Math.max(1, Math.floor((10 + window.GameState.pStats.strength.level + (member.skills.meleeAtt || 0)) * conditionPenalty));
                     nearestHostile.hp -= damage;
                     window.GameCore.playEntityAnimation(en, 'attack');
                     window.EventBus.emit('ENTITY_DAMAGED', { damage, position: nearestHostile.visual.position, isPlayer: false });
@@ -219,14 +245,17 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         const hostile = en.def.faction === 'monster' || en.def.faction === 'forest' || window.GameState.reputation[en.def.faction] <= -50;
         const onProtectedPath = hostile && window.RoadManager.isRuneProtected(en.visual.position);
         const inVillageBarrier = hostile && window.RoadManager.isVillageProtected(en.visual.position);
+        const base = window.GameState.base;
+        const inPlayerWard = hostile && base.owned && base.wardRadius && base.position && Math.hypot(en.visual.position.x - base.position.x, en.visual.position.z - base.position.z) <= base.wardRadius;
         let target = null;
-        if (hostile && !onProtectedPath && !inVillageBarrier) {
+        if (hostile && !onProtectedPath && !inVillageBarrier && !inPlayerWard) {
             if (en.visual.position.distanceTo(pPos) < 15 && !isPlayerSafe && !window.EngineParams.isPlayerHidden) target = pPos;
         }
 
-        if (onProtectedPath || inVillageBarrier) {
+        if (onProtectedPath || inVillageBarrier || inPlayerWard) {
             const nearestTower = window.GameCore.activeEntities
-                .filter(entity => (onProtectedPath ? entity.name === 'Rune Tower' : entity.name === 'Floating Power Stone') && entity.def.active !== false)
+            .filter(entity => ((inPlayerWard || onProtectedPath) ? entity.name === 'Rune Tower' : entity.name === 'Floating Power Stone') && entity.def.active !== false)
+            .filter(entity => !inPlayerWard || entity.playerBase)
                 .sort((a, b) => a.visual.position.distanceTo(en.visual.position) - b.visual.position.distanceTo(en.visual.position))[0];
             if (nearestTower) {
                 const repel = new window.THREE.Vector3().subVectors(en.visual.position, nearestTower.visual.position);
@@ -255,6 +284,12 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         if (target) {
             let dir = new window.THREE.Vector3().subVectors(target, en.visual.position);
             if (dir.lengthSq() > 0.001) dir.normalize(); else dir.set(0, 0, 1);
+
+            if (en.def.phaseTwoAt && !en.phaseTwo && en.hp <= en.def.hp * en.def.phaseTwoAt) {
+                en.phaseTwo = true;
+                window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'ENRAGED!', pos: en.visual.position, color: '#ff6600' });
+                window.EventBus.emit('UI_LOG', `${en.name} entered phase two.`);
+            }
             
             let avoidance = new window.THREE.Vector3(0,0,0);
             obstacles.forEach(obs => {
@@ -268,23 +303,71 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             if (dir.lengthSq() > 0.001) dir.normalize(); else dir.set(0, 0, 1);
 
             // AI moves instantly without acceleration dampening for simplicity
-            en.body.setLinvel({ x: dir.x * en.def.speed, y: en.body.linvel().y, z: dir.z * en.def.speed }, true);
+            const phaseSpeed = en.phaseTwo ? (en.def.phaseTwoSpeed || 1) : 1;
+            en.body.setLinvel({ x: dir.x * en.def.speed * phaseSpeed, y: en.body.linvel().y, z: dir.z * en.def.speed * phaseSpeed }, true);
             
             if (en.visual && en.currentAnimState !== 'hit' && en.currentAnimState !== 'die') {
                 en.visual.lookAt(en.visual.position.clone().add(dir));
                 if(window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(en, 'walk');
             }
 
-            if(en.visual.position.distanceTo(pPos) < 1.8 && Math.random() < 0.05 && en.currentAnimState !== 'hit' && en.currentAnimState !== 'die') {
+            if(en.visual.position.distanceTo(pPos) < 1.8 && Math.random() < 0.05 && en.currentAnimState !== 'hit' && en.currentAnimState !== 'die' && !en.attackWindupUntil) {
+                en.attackWindupUntil = performance.now() + 350;
+                window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: '!', pos: en.visual.position, color: '#ffcc00'});
+                return;
+            }
+            if (en.def.voidBoltDamage && en.visual.position.distanceTo(pPos) <= en.def.voidBoltRange && en.visual.position.distanceTo(pPos) > 3 && !en.voidBoltWindupUntil && Math.random() < 0.025) {
+                en.voidBoltWindupUntil = performance.now() + 600;
+                window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'VOID BOLT!', pos: en.visual.position, color: '#a855f7' });
+                return;
+            }
+            if (en.voidBoltWindupUntil && performance.now() >= en.voidBoltWindupUntil) {
+                en.voidBoltWindupUntil = null;
+                const origin = en.visual.position.clone().add(new window.THREE.Vector3(0, 2.2, 0));
+                const direction = new window.THREE.Vector3().subVectors(pPos.clone().add(new window.THREE.Vector3(0, 1, 0)), origin);
+                window.VFXManager.spawnProjectile({ position: origin, direction, damage: en.def.voidBoltDamage, damageType: 'void', speed: en.def.voidBoltSpeed, range: en.def.voidBoltRange, color: '#a855f7' });
+                if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(en, 'attack');
+                return;
+            }
+            if (en.phaseTwo && en.def.fireBurstDamage && en.visual.position.distanceTo(pPos) < en.def.fireBurstRadius && !en.fireBurstWindupUntil && Math.random() < 0.02) {
+                en.fireBurstWindupUntil = performance.now() + 700;
+                window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'FIRE BURST!', pos: en.visual.position, color: '#ff6600' });
+                return;
+            }
+            if (en.fireBurstWindupUntil && performance.now() >= en.fireBurstWindupUntil) {
+                en.fireBurstWindupUntil = null;
+                const resistance = window.GameCore.getResistance('fire');
+                const damage = Math.max(1, en.def.fireBurstDamage - resistance);
+                window.GameState.pStats.hp = Math.max(0, window.GameState.pStats.hp - damage);
+                window.GameCore.applyStatusEffect('burning', 4, 2);
+                window.EventBus.emit('ENTITY_DAMAGED', { damage, position: pPos, isPlayer: true });
+                window.EventBus.emit('SPAWN_HIT_VFX', { type: 'Fire', pos: en.visual.position.clone().add(new window.THREE.Vector3(0, 1, 0)) });
+                return;
+            }
+            if(en.attackWindupUntil && performance.now() >= en.attackWindupUntil) {
+                en.attackWindupUntil = null;
                 if(window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(en, 'attack');
                 
                 if (!window.EngineParams.godMode) {
                     if (window.Input.isBlocking) {
-                        window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "BLOCKED!", pos: pPos, color: '#4ade80'}); 
+                        const poiseDamage = en.def.poiseDamage || Math.max(8, Math.floor((en.def.attackDamage || 15) * 0.8));
+                        window.GameState.pStats.poise = Math.max(0, window.GameState.pStats.poise - poiseDamage);
+                        if (window.GameState.pStats.poise <= 0) {
+                            window.GameState.pStats.guardBrokenUntil = performance.now() + 1000;
+                            window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: 'GUARD BREAK!', pos: pPos, color: '#ef4444'});
+                            if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(window.GameCore.playerObj, 'hit');
+                        } else {
+                            window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "BLOCKED!", pos: pPos, color: '#4ade80'});
+                        }
                         window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/tom-analog.mp3', pos: pPos, vol: -5});
                     } else {
-                        const rawDmg = en.def.attackDamage || 15; const armorDef = window.GameState.derivedStats.armor + window.GameCore.getBuffBonus('meleeDef') + window.GameCore.getBuffBonus('toughness'); const actualDmg = Math.max(1, rawDmg - armorDef);
+                        const rawDmg = en.def.attackDamage || 15;
+                        const armorDef = window.GameState.derivedStats.armor + window.GameCore.getBuffBonus('meleeDef') + window.GameCore.getBuffBonus('toughness');
+                        const damageType = en.def.damageType || 'physical';
+                        const mitigation = damageType === 'physical' ? armorDef : window.GameCore.getResistance(damageType);
+                        const actualDmg = Math.max(1, rawDmg - mitigation);
                         window.GameState.pStats.hp -= actualDmg; 
+                        if (en.def.poisonDuration) window.GameCore.applyStatusEffect('poison', en.def.poisonDuration, en.def.poisonTickDamage);
                         window.EventBus.emit('ENTITY_DAMAGED', { damage: actualDmg, position: pPos, isPlayer: true }); 
                         window.EventBus.emit('UI_UPDATE_HUD');
                         window.EventBus.emit('SPAWN_HIT_VFX', { type: window.AssetManager ? window.AssetManager.prefabs['Player'].vfx.onHit : 'Blood', pos: pPos.clone().add(new window.THREE.Vector3(0, 1, 0)) });
