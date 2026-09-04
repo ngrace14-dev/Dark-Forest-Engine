@@ -26,7 +26,7 @@ function rollRunPotential() {
 
 window.GameState = {
     pStats: {
-        hp: 100, maxHp: 100,
+        hp: 100, maxHp: 100, stamina: 100, maxStamina: 100,
         strength: { level: 1, xp: 0, next: 100 }, toughness: { level: 1, xp: 0, next: 100 },
         athletics: { level: 1, xp: 0, next: 100 }, dodge: { level: 1, xp: 0, next: 100 },
         meleeAtt: { level: 1, xp: 0, next: 100 }, meleeDef: { level: 1, xp: 0, next: 100 }
@@ -41,6 +41,7 @@ window.GameState = {
     reputation: { village: 0, adventurer: 0, monster: -100 },
     activeBuffs: {},
     runPotential: null,
+    base: { owned: false, name: 'Wayfarer Camp', position: null, storage: [], structures: [], farms: [], research: [] },
     party: { command: 'follow', selectedMembers: ['lyra-scout'], escortCaravanId: null, members: [
         { id: 'lyra-scout', name: 'Lyra', prefab: 'Female Adventurer', role: 'scout', hp: 100, maxHp: 100, recruited: true, inventory: ['mushrooms', 'food'], equipment: {}, skills: { scouting: 1, athletics: 1 }, personality: 'cautious', knowledge: [], loyalty: 65, hunger: 0, injuries: [], downed: false },
         { id: 'maris-guard', name: 'Maris', prefab: 'Female Guard', role: 'guardian', hp: 130, maxHp: 130, recruited: false, inventory: ['food'], equipment: { weapon: 'iron_sword' }, skills: { guarding: 2, meleeDef: 1 }, personality: 'steadfast', knowledge: [], loyalty: 50, hunger: 0, injuries: [], downed: false },

@@ -49,6 +49,15 @@ function isHostileFaction(faction) {
 }
 
 function defeatNpc(entity) {
+    if (entity.squadId) {
+        const village = window.VillageManager.villages.find(candidate => candidate.id === entity.villageId);
+        const squad = village?.squads.find(candidate => candidate.id === entity.squadId);
+        if (squad) {
+            squad.casualties = (squad.casualties || 0) + 1;
+            squad.size = Math.max(0, squad.size - 1);
+            if (squad.size === 0) squad.status = 'destroyed';
+        }
+    }
     if (entity.caravanId) {
         const village = window.VillageManager.villages.find(candidate => candidate.id === entity.villageId);
         const caravan = village?.caravans.find(candidate => candidate.id === entity.caravanId);
@@ -151,6 +160,28 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             const offset = new window.THREE.Vector3(en.companionId.length % 2 ? 2 : -2, 0, command === 'retreat' ? -5 : 3);
             if (command === 'guard' && nearestHostile && nearestHostile.visual.position.distanceTo(pPos) < 10) offset.copy(nearestHostile.visual.position).sub(pPos).multiplyScalar(0.5);
             moveCompanion(en, formationAnchor.clone().add(offset), command === 'retreat' ? 1.3 : 1, delta);
+            return;
+        }
+
+        if (en.squadId) {
+            const village = window.VillageManager.villages.find(candidate => candidate.id === en.villageId);
+            const squad = village?.squads.find(candidate => candidate.id === en.squadId);
+            if (!village || !squad || squad.status === 'destroyed') return;
+            const threat = window.GameCore.activeEntities
+                .filter(candidate => candidate.def.type === 'npc' && isHostileFaction(candidate.def.faction) && candidate.hp > 0 && candidate.visual.position.distanceTo(en.visual.position) < 30)
+                .sort((a, b) => en.visual.position.distanceTo(a.visual.position) - en.visual.position.distanceTo(b.visual.position))[0];
+            if (threat) {
+                squad.status = 'defending';
+                const distance = en.visual.position.distanceTo(threat.visual.position);
+                if (distance > 1.8) moveCompanion(en, threat.visual.position, 1.15, delta); else attackNpc(en, threat);
+                return;
+            }
+            squad.status = 'patrolling';
+            const guardIndex = Math.max(0, village.residents.findIndex(resident => resident.squadId === squad.id));
+            const angle = ((squad.patrolPhase || 0) + guardIndex * (Math.PI * 2 / Math.max(1, squad.size))) % (Math.PI * 2);
+            const patrolPoint = new window.THREE.Vector3(village.x + Math.cos(angle) * 12, en.visual.position.y, village.z + Math.sin(angle) * 12);
+            squad.patrolPhase = (squad.patrolPhase || 0) + delta * 0.15;
+            moveCompanion(en, patrolPoint, 0.7, delta);
             return;
         }
 

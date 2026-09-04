@@ -195,7 +195,7 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
         collider = window.GameCore.world.createCollider(colliderDesc, body);
     }
 
-    const entity = { id: Math.random().toString(36).substr(2, 9), name: name, def: def, visual: mesh, body: body, collider: collider, hp: def.hp || 50, chunkKey: chunkKey };
+    const entity = { id: Math.random().toString(36).substr(2, 9), name: name, def: def, visual: mesh, body: body, collider: collider, hp: def.hp || 50, poise: def.poise || 30, maxPoise: def.poise || 30, chunkKey: chunkKey };
     if(collider) collider.handle = Math.floor(Math.random() * 1000000); 
     body.userData = { entityId: entity.id };
     
@@ -257,6 +257,17 @@ function syncCaravanAgents() {
 }
 window.GameCore.syncCaravanAgents = syncCaravanAgents;
 
+function syncPlayerBase() {
+    const base = window.GameState.base;
+    if (!base.owned) return;
+    base.structures.forEach(structure => {
+        if (window.GameCore.activeEntities.some(entity => entity.playerBase && entity.name === structure.prefab)) return;
+        const entity = instantiatePrefab(structure.prefab, structure.x, window.WorldGenerator.getTerrainHeight(structure.x, structure.z), structure.z, 'persistent');
+        if (entity) entity.playerBase = true;
+    });
+}
+window.GameCore.syncPlayerBase = syncPlayerBase;
+
 window.GameCore.swapPlayerModel = function() {
     if (!window.GameCore.playerObj || !window.GameCore.scene) return;
     const def = window.AssetManager.prefabs['Player'];
@@ -282,8 +293,9 @@ window.GameCore.swapPlayerModel = function() {
 function performAttack() {
     if (window.Input.isBlocking || window.Input.isAttacking || !window.GameCore.playerObj.visual) return; 
     if (window.GameCore.playerObj.currentAnimState === 'hit' || window.GameCore.playerObj.currentAnimState === 'die') return;
+    if (window.GameState.pStats.stamina < 15) { window.EventBus.emit('UI_LOG', 'Too exhausted to attack.'); return; }
 
-    window.Input.isAttacking = true; window.Input.attackCooldown = 0.8;
+    window.GameState.pStats.stamina -= 15; window.Input.isAttacking = true; window.Input.attackCooldown = 0.8;
     playEntityAnimation(window.GameCore.playerObj, 'attack');
     
     const pPos = window.GameCore.playerObj.visual.position; const forwardDir = new THREE.Vector3(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
@@ -304,7 +316,7 @@ function performAttack() {
         
         if(en && (en.def.type === 'npc' || en.name === 'Blight Root')) {
             const rawDamage = window.GameState.derivedStats.weaponDamage + ((window.GameState.pStats.strength.level + window.GameCore.getBuffBonus('strength')) * 2) + window.GameCore.getBuffBonus('meleeAtt');
-            const damage = Math.max(1, rawDamage - (en.def.armor || 0)); en.hp -= damage;
+            const damage = Math.max(1, rawDamage - (en.def.armor || 0)); en.hp -= damage; en.poise = Math.max(0, en.poise - damage);
             window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: en.visual.position, isPlayer: false });
             window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
 
@@ -321,6 +333,10 @@ function performAttack() {
                 }, 2000);
                 if (en.name === 'Blight Root') { window.EventBus.emit('UI_LOG', `Destroyed the Blight Root! Safe zone restored.`); } 
                 else { window.GameState.inventory.gold += (en.def.faction === 'monster' ? 10 : 50); window.EventBus.emit('UI_UPDATE_HUD'); window.EventBus.emit('UI_LOG', `Killed ${en.name}. Looted gold.`); }
+            } else if (en.poise <= 0) {
+                en.poise = en.maxPoise;
+                playEntityAnimation(en, 'hit');
+                window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: 'STAGGERED', pos: en.visual.position, color: '#fbbf24'});
             } else {
                 playEntityAnimation(en, 'hit');
             }
@@ -337,10 +353,41 @@ window.EventBus.on('SPAWN_BLIGHT', () => {
     else window.EventBus.emit('UI_LOG', "No roads nearby to corrupt!");
 });
 window.EventBus.on('CLEAR_MAP', () => { window.GameCore.activeEntities.forEach(en => { if(en.def.faction === 'player') return; window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); }); window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => en.def.faction === 'player'); window.GameState.questBoard = []; window.EventBus.emit('UI_LOG', "World Entities Cleared."); });
+window.EventBus.on('CLAIM_PLAYER_CAMP', () => {
+    const base = window.GameState.base;
+    if (base.owned || !window.GameCore.playerObj) {
+        window.EventBus.emit('UI_LOG', base.owned ? 'You already control a camp.' : 'No valid camp location.');
+        return;
+    }
+    const pack = window.GameState.inventory.backpack;
+    if (pack.filter(itemId => itemId === 'wood').length < 3 || pack.filter(itemId => itemId === 'stone').length < 2) {
+        window.EventBus.emit('UI_LOG', 'Claiming a camp requires 3 timber and 2 stone.');
+        return;
+    }
+    const playerPosition = window.GameCore.playerObj.visual.position;
+    if (window.EngineParams.isPlayerSafe || window.RoadManager.isVillageProtected(playerPosition)) {
+        window.EventBus.emit('UI_LOG', 'Claim camps away from settlements and protected paths.');
+        return;
+    }
+    let woodNeeded = 3; let stoneNeeded = 2;
+    window.GameState.inventory.backpack = pack.filter(itemId => {
+        if (itemId === 'wood' && woodNeeded > 0) { woodNeeded--; return false; }
+        if (itemId === 'stone' && stoneNeeded > 0) { stoneNeeded--; return false; }
+        return true;
+    });
+    const camp = instantiatePrefab('Iron Fire Pit', playerPosition.x, window.WorldGenerator.getTerrainHeight(playerPosition.x, playerPosition.z), playerPosition.z, 'persistent');
+    if (!camp) return;
+    camp.playerBase = true;
+    base.owned = true;
+    base.position = { x: playerPosition.x, z: playerPosition.z };
+    base.structures.push({ prefab: 'Iron Fire Pit', x: playerPosition.x, z: playerPosition.z });
+    window.EventBus.emit('UI_LOG', 'Wayfarer Camp claimed. The fire marks your territory.');
+    window.EventBus.emit('RENDER_INVENTORY');
+});
 window.EventBus.on('WORLD_REGENERATE', () => {
     window.EventBus.emit('CLEAR_MAP'); const keys = Array.from(ChunkManager.activeChunks.keys()); keys.forEach(k => ChunkManager.unloadChunk(k)); ChunkManager.currentChunkX = null; 
     window.currentPrng = alea(window.EngineParams.worldSeed); window.currentNoise2D = window.createNoise2D(window.currentPrng);
-    if (window.GameCore.playerObj) { const vy = window.WorldGenerator.getTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 15; window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); spawnPartyMembers(); syncCaravanAgents(); ChunkManager.update(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, vy, window.GameCore.playerObj.visual.position.z)); }
+    if (window.GameCore.playerObj) { const vy = window.WorldGenerator.getTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 15; window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); spawnPartyMembers(); syncCaravanAgents(); syncPlayerBase(); ChunkManager.update(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, vy, window.GameCore.playerObj.visual.position.z)); }
     window.EventBus.emit('UI_LOG', `World Math Regenerated with Seed: ${window.EngineParams.worldSeed}`);
 });
 function regenerateWorldCycle() {
@@ -444,12 +491,25 @@ function simulateVillage(village) {
     village.industry ??= window.VillageManager.settlementProfiles[village.id];
     village.provision ??= window.VillageManager.provisionProfiles[village.id];
     village.provisionStock ??= { [village.provision.itemId]: 0 };
+    village.territory ??= { faction: 'kingdom', radius: village.capital ? 140 : 90, control: 100, underRaid: false };
     village.stats.ap = Math.min(200, (village.stats.ap || 0) + 10);
     const production = Math.max(1, Math.floor(village.population.current / 1500));
     village.stats[village.industry.produces] += production;
     village.provisionStock[village.provision.itemId] = (village.provisionStock[village.provision.itemId] || 0) + Math.max(1, Math.floor(production / 2));
     village.stats.food = Math.max(0, (village.stats.food || 0) - Math.ceil(village.population.current / 24));
     processVillageCaravans(village);
+
+    const localRaiders = window.GameCore.activeEntities.filter(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && Math.hypot(entity.visual.position.x - village.x, entity.visual.position.z - village.z) <= village.territory.radius);
+    village.territory.underRaid = localRaiders.length > 0;
+    village.territory.control = Math.max(0, Math.min(100, village.territory.control + (village.territory.underRaid ? -localRaiders.length * 2 : 1)));
+    if (village.territory.underRaid) window.EventBus.emit('UI_LOG', `[RAID] ${village.name} is under attack by ${localRaiders.length} hostile creature${localRaiders.length === 1 ? '' : 's'}.`);
+    if (village.territory.control === 0 && village.territory.faction === 'kingdom') {
+        village.territory.faction = 'forest';
+        village.stats.prosperity = Math.max(0, village.stats.prosperity - 25);
+        postVillageNeed(village, 'wood', 50, 'reclaiming occupied territory');
+        postVillageNeed(village, 'stone', 30, 'reclaiming occupied territory');
+        window.EventBus.emit('UI_LOG', `[OCCUPIED] ${village.name} has fallen under forest control.`);
+    }
 
     const importGoal = Math.ceil(village.population.current * 0.5);
     const suppliedImports = village.industry.imports.filter(resource => (village.stats[resource] || 0) >= importGoal);
@@ -494,7 +554,7 @@ function simulateVillage(village) {
         if (canFundVillageAction(village, squadCost, 'raising a guard squad')) {
             spendVillageResources(village, squadCost);
             const squadId = `${village.id}-squad-${village.squads.length + 1}`;
-            village.squads.push({ id: squadId, type: 'guard', size: 3, status: 'defending' });
+            village.squads.push({ id: squadId, type: 'guard', size: 3, casualties: 0, status: 'patrolling', patrolPhase: 0 });
             for (let index = 0; index < 3; index++) village.residents.push({ prefab: 'Guard', ox: 4 + index * 2, oz: 4, squadId });
             window.EventBus.emit('UI_LOG', `[DEFENSE] ${village.name} formed a new guard squad.`);
             return;
@@ -565,6 +625,7 @@ function fixedUpdateLogic(delta) {
 
     window.EngineParams.isPlayerSafe = false; 
     window.EngineParams.isPlayerHidden = false;
+    window.GameState.pStats.stamina = Math.min(window.GameState.pStats.maxStamina, window.GameState.pStats.stamina + (window.Input.isBlocking ? 3 : 12) * delta);
 
     if (window.GameCore.playerObj && window.GameState.pStats.hp > 0) {
         const playerPosition = window.GameCore.playerObj.visual.position;
@@ -606,7 +667,7 @@ function fixedUpdateLogic(delta) {
             if (window.Input.keys.d) moveDir.x += 1;
         }
         
-        window.Input.isBlocking = window.Input.keys.shift; 
+        window.Input.isBlocking = window.Input.keys.shift && window.GameState.pStats.stamina > 0; 
         window.Input.isMoving = moveDir.lengthSq() > 0;
         
         if (window.Input.isMoving) {
@@ -616,9 +677,11 @@ function fixedUpdateLogic(delta) {
             
             if (window.Input.isBlocking) {
                 accelerationForce *= 0.2; 
+                window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 8 * delta);
             } else {
                 window.GameCore.addXP('athletics', 0.1 * delta); 
-                if (window.Input.keys[' '] && window.Input.dashTimer <= 0) { 
+                if (window.Input.keys[' '] && window.Input.dashTimer <= 0 && window.GameState.pStats.stamina >= 25) { 
+                    window.GameState.pStats.stamina -= 25;
                     window.Input.dashTimer = Math.max(0.25, 2.0 - ((window.GameState.pStats.dodge.level + window.GameCore.getBuffBonus('dodge')) * 0.05)); 
                     window.Input.isDashing = true; 
                     window.GameCore.addXP('dodge', 15); 

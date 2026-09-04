@@ -85,6 +85,18 @@ function openMerchantShop(chest) {
     dialogue.querySelector('#btn-close-merchant').addEventListener('click', closeCompanionDialogue);
 }
 
+function openPlayerCamp() {
+    const dialogue = document.getElementById('companion-dialogue');
+    const base = window.GameState.base;
+    const stored = base.storage.length ? base.storage.map((itemId, index) => `<button class="withdraw-base-item border border-amber-700 bg-gray-900 p-2 text-left hover:border-amber-300" data-index="${index}">Withdraw ${window.ItemDatabase[itemId]?.name || itemId}</button>`).join('') : '<div class="text-gray-500">Storage is empty.</div>';
+    const carried = window.GameState.inventory.backpack.map((itemId, index) => `<button class="deposit-base-item border border-gray-700 bg-gray-900 p-2 text-left hover:border-amber-300" data-index="${index}">Store ${window.ItemDatabase[itemId]?.name || itemId}</button>`).join('') || '<div class="text-gray-500">Nothing to store.</div>';
+    dialogue.innerHTML = `<div class="mb-4 border-b border-amber-700 pb-3"><div class="text-amber-300 font-bold tracking-widest">${base.name.toUpperCase()}</div><div class="text-xs text-gray-500 mt-1">Storage | Structures ${base.structures.length}</div></div><div class="grid grid-cols-2 gap-3"><div><div class="text-xs text-amber-200 mb-2">CAMP STORAGE</div><div class="grid gap-2">${stored}</div></div><div><div class="text-xs text-gray-300 mb-2">YOUR PACK</div><div class="grid gap-2">${carried}</div></div></div><button id="btn-close-base" class="mt-4 border border-gray-600 px-3 py-2 text-xs hover:border-amber-400">Leave</button>`;
+    dialogue.classList.remove('hidden');
+    dialogue.querySelectorAll('.withdraw-base-item').forEach(button => button.addEventListener('click', () => window.EventBus.emit('WITHDRAW_BASE_ITEM', Number(button.dataset.index))));
+    dialogue.querySelectorAll('.deposit-base-item').forEach(button => button.addEventListener('click', () => window.EventBus.emit('DEPOSIT_BASE_ITEM', Number(button.dataset.index))));
+    dialogue.querySelector('#btn-close-base').addEventListener('click', closeCompanionDialogue);
+}
+
 function openCaravanDialogue(caravanEntity) {
     const dialogue = document.getElementById('companion-dialogue');
     const village = window.VillageManager.villages.find(candidate => candidate.id === caravanEntity.villageId);
@@ -185,6 +197,11 @@ window.EventBus.on('INTERACT_NEARBY', () => {
     const loot = window.GameCore.groundLoot.find(entry => Math.hypot(entry.visual.position.x - playerPosition.x, entry.visual.position.z - playerPosition.z) <= 2.5);
     if (loot) {
         window.EventBus.emit('PICKUP_GROUND_LOOT', loot.id);
+        return;
+    }
+    const playerBase = window.GameCore.activeEntities.find(entity => entity.playerBase && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 4);
+    if (playerBase) {
+        openPlayerCamp();
         return;
     }
     const caravan = window.GameCore.activeEntities.find(entity => entity.caravanId && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 4);
@@ -399,6 +416,23 @@ window.EventBus.on('PICKUP_GROUND_LOOT', lootId => {
     window.GameCore.scene.remove(loot.visual);
     window.GameState.inventory.backpack.push(loot.itemId);
     window.EventBus.emit('UI_LOG', `Picked up ${window.ItemDatabase[loot.itemId]?.name || loot.itemId}.`);
+    window.EventBus.emit('RENDER_INVENTORY');
+});
+
+window.EventBus.on('DEPOSIT_BASE_ITEM', packIndex => {
+    const itemId = window.GameState.inventory.backpack[packIndex];
+    if (!itemId) return;
+    window.GameState.inventory.backpack.splice(packIndex, 1);
+    window.GameState.base.storage.push(itemId);
+    openPlayerCamp();
+    window.EventBus.emit('RENDER_INVENTORY');
+});
+
+window.EventBus.on('WITHDRAW_BASE_ITEM', storageIndex => {
+    if (window.GameState.inventory.backpack.length >= 25 || !window.GameState.base.storage[storageIndex]) return;
+    const [itemId] = window.GameState.base.storage.splice(storageIndex, 1);
+    window.GameState.inventory.backpack.push(itemId);
+    openPlayerCamp();
     window.EventBus.emit('RENDER_INVENTORY');
 });
 window.EventBus.on('DEV_TOOLS_TOGGLE_ASSETS', () => {

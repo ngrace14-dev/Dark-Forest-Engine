@@ -127,7 +127,7 @@ window.VillageManager = {
             if (i > 0) remainingPopulation -= population;
             const profile = this.settlementProfiles[i];
             const provision = this.provisionProfiles[i];
-            this.villages.push({ id: i, name: i === 0 ? 'The Capital' : this.names[i - 1], x: Math.round(x), z: Math.round(z), connections: connections, capital: i === 0, nobleHouse: profile.house, nobleTitle: profile.title, industry: profile, provision, provisionStock: { [provision.itemId]: Math.max(10, Math.floor(population / 100)) }, stats: { ap: 50 + Math.floor(Math.random() * 50), food: population * 20, wood: population * 8, stone: population * 5, gold: population * 4, prosperity: 55 }, population: { current: population, capacity: Math.ceil(population * 1.2) }, expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [] });
+            this.villages.push({ id: i, name: i === 0 ? 'The Capital' : this.names[i - 1], x: Math.round(x), z: Math.round(z), connections: connections, capital: i === 0, nobleHouse: profile.house, nobleTitle: profile.title, industry: profile, provision, provisionStock: { [provision.itemId]: Math.max(10, Math.floor(population / 100)) }, territory: { faction: 'kingdom', radius: i === 0 ? 140 : 90, control: 100, underRaid: false }, stats: { ap: 50 + Math.floor(Math.random() * 50), food: population * 20, wood: population * 8, stone: population * 5, gold: population * 4, prosperity: 55 }, population: { current: population, capacity: Math.ceil(population * 1.2) }, expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [] });
         }
         window.RoadManager.generateRoads(this.villages);
         window.EventBus.emit('UI_LOG', "🌲 20 Settlements generated. Road Network integrated.");
@@ -141,6 +141,7 @@ window.VillageManager = {
             if (!v.population) v.population = { current: 8, capacity: 12 };
             if (!v.squads) v.squads = [];
             if (!v.caravans) v.caravans = [];
+            if (!v.territory) v.territory = { faction: 'kingdom', radius: v.capital ? 140 : 90, control: 100, underRaid: false };
             if (!v.capital) {
                 currentRadius += 10000 + Math.random() * 10000;
                 currentAngle += (Math.random() - 0.5) * (Math.PI / 1.5);
