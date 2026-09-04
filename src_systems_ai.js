@@ -1,7 +1,9 @@
 window.EventBus.on('PARTY_COMMAND', command => {
     window.GameState.party.command = command;
     window.GameCore.activeEntities.filter(entity => entity.companionId).forEach(entity => {
-        entity.holdPosition = command === 'hold' ? entity.visual.position.clone() : null;
+        const selected = window.GameState.party.selectedMembers.includes(entity.companionId);
+        entity.groupCommand = selected ? command : 'follow';
+        entity.holdPosition = selected && command === 'hold' ? entity.visual.position.clone() : null;
     });
     window.EventBus.emit('UI_LOG', `Party command: ${command.toUpperCase()}.`);
 });
@@ -29,7 +31,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         if (en.def.type !== 'npc') return;
 
         if (en.companionId) {
-            const command = window.GameState.party.command;
+            const command = en.groupCommand || 'follow';
             const hostileEntities = window.GameCore.activeEntities.filter(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && entity.hp > 0);
             const nearestHostile = hostileEntities.sort((a, b) => en.visual.position.distanceTo(a.visual.position) - en.visual.position.distanceTo(b.visual.position))[0];
             if (command === 'hold') {

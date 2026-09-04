@@ -66,6 +66,76 @@ window.EventBus.on('UI_TICK', ({ delta, camera }) => {
 });
 
 window.EventBus.on('PLAYER_LEVEL_UP', ({ statName, level }) => { window.EventBus.emit('UI_LOG', `Level Up! ${statName.toUpperCase()} is now ${level}`); });
+function closeCompanionDialogue() {
+    document.getElementById('companion-dialogue').classList.add('hidden');
+}
+
+function openCompanionInventory(member) {
+    const dialogue = document.getElementById('companion-dialogue');
+    const inventory = member.inventory || [];
+    const items = inventory.length ? inventory.map((itemId, index) => {
+        const item = window.ItemDatabase[itemId];
+        return `<button class="companion-take-item border border-gray-700 bg-gray-900 p-2 text-left hover:border-cyan-500" data-member="${member.id}" data-index="${index}">${item ? `${item.icon} ${item.name}` : itemId}</button>`;
+    }).join('') : '<div class="text-gray-500">No items carried.</div>';
+    dialogue.innerHTML = `<div class="mb-4 border-b border-gray-700 pb-3"><div class="text-cyan-300 font-bold tracking-widest">${member.name}'S PACK</div><div class="text-xs text-gray-500 mt-1">Role: ${member.role}</div></div><div class="grid gap-2 mb-4">${items}</div><button id="btn-close-companion" class="border border-gray-600 px-3 py-2 text-xs hover:border-cyan-400">Back</button>`;
+    dialogue.querySelectorAll('.companion-take-item').forEach(button => button.addEventListener('click', () => window.EventBus.emit('TAKE_COMPANION_ITEM', { memberId: button.dataset.member, index: Number(button.dataset.index) })));
+    dialogue.querySelector('#btn-close-companion').addEventListener('click', closeCompanionDialogue);
+}
+
+window.EventBus.on('INTERACT_NEARBY', () => {
+    if (!window.GameCore.playerObj) return;
+    const playerPosition = window.GameCore.playerObj.visual.position;
+    const companion = window.GameCore.activeEntities.find(entity => (entity.companionId || entity.recruitId) && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 3.5);
+    if (!companion) {
+        window.EventBus.emit('GATHER_NEARBY');
+        return;
+    }
+    const member = window.GameState.party.members.find(candidate => candidate.id === (companion.companionId || companion.recruitId));
+    if (!member) return;
+    const dialogue = document.getElementById('companion-dialogue');
+    const status = member.recruited ? `Loyalty ${member.loyalty} | Hunger ${member.hunger}` : `Unrecruited ${member.role}`;
+    const action = member.recruited ? `<button id="btn-companion-inventory" class="border border-cyan-700 px-3 py-2 text-xs text-cyan-200 hover:border-cyan-300">Open Inventory</button><button id="btn-select-companion" class="border border-cyan-700 px-3 py-2 text-xs text-cyan-200 hover:border-cyan-300">Select for Orders</button>` : `<button id="btn-recruit-companion" class="col-span-2 border border-green-700 px-3 py-2 text-xs text-green-200 hover:border-green-300">Recruit</button>`;
+    dialogue.innerHTML = `<div class="mb-4 border-b border-gray-700 pb-3"><div class="text-cyan-300 font-bold tracking-widest">${member.name}</div><div class="text-xs text-gray-500 mt-1">${status}</div></div><p class="mb-4 text-gray-300">${member.recruited ? 'Ready when you are.' : 'I will travel with someone worth trusting.'}</p><div class="grid grid-cols-2 gap-2"><button id="btn-talk-companion" class="border border-gray-600 px-3 py-2 text-xs hover:border-cyan-400">Talk</button>${action}<button id="btn-leave-companion" class="col-span-2 border border-gray-700 px-3 py-2 text-xs hover:border-gray-400">Leave</button></div>`;
+    dialogue.classList.remove('hidden');
+    dialogue.querySelector('#btn-talk-companion').addEventListener('click', () => { window.EventBus.emit('UI_LOG', `${member.name}: I am with you.`); });
+    dialogue.querySelector('#btn-companion-inventory')?.addEventListener('click', () => openCompanionInventory(member));
+    dialogue.querySelector('#btn-recruit-companion')?.addEventListener('click', () => window.EventBus.emit('RECRUIT_COMPANION', member.id));
+    dialogue.querySelector('#btn-select-companion')?.addEventListener('click', () => window.EventBus.emit('TOGGLE_PARTY_MEMBER_SELECTION', member.id));
+    dialogue.querySelector('#btn-leave-companion').addEventListener('click', closeCompanionDialogue);
+});
+
+window.EventBus.on('RECRUIT_COMPANION', memberId => {
+    const member = window.GameState.party.members.find(candidate => candidate.id === memberId);
+    const entity = window.GameCore.activeEntities.find(candidate => candidate.recruitId === memberId);
+    if (!member || !entity) return;
+    member.recruited = true;
+    entity.companionId = memberId;
+    delete entity.recruitId;
+    window.GameState.party.selectedMembers.push(memberId);
+    window.EventBus.emit('UI_LOG', `${member.name} joined the party.`);
+    closeCompanionDialogue();
+});
+
+window.EventBus.on('TOGGLE_PARTY_MEMBER_SELECTION', memberId => {
+    const selected = window.GameState.party.selectedMembers;
+    const index = selected.indexOf(memberId);
+    if (index >= 0) selected.splice(index, 1); else selected.push(memberId);
+    window.EventBus.emit('UI_LOG', `${memberId} ${index >= 0 ? 'removed from' : 'added to'} group orders.`);
+});
+
+window.EventBus.on('TAKE_COMPANION_ITEM', ({ memberId, index }) => {
+    const member = window.GameState.party.members.find(candidate => candidate.id === memberId);
+    if (!member || !member.inventory[index]) return;
+    if (window.GameState.inventory.backpack.length >= 25) {
+        window.EventBus.emit('UI_LOG', 'Backpack is full.');
+        return;
+    }
+    const [itemId] = member.inventory.splice(index, 1);
+    window.GameState.inventory.backpack.push(itemId);
+    window.EventBus.emit('UI_LOG', `Took ${window.ItemDatabase[itemId]?.name || itemId} from ${member.name}.`);
+    openCompanionInventory(member);
+    window.EventBus.emit('RENDER_INVENTORY');
+});
 window.EventBus.on('DEV_TOOLS_TOGGLE_ASSETS', () => {
     const panel = document.getElementById('asset-manager-panel');
     if(panel) { panel.classList.toggle('hidden'); panel.classList.toggle('flex'); if(!panel.classList.contains('hidden')) window.EventBus.emit('RENDER_ASSETS'); }

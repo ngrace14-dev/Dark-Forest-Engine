@@ -222,13 +222,13 @@ function spawnPartyMembers() {
     if (!window.GameCore.playerObj) return;
     const playerPosition = window.GameCore.playerObj.body.translation();
     window.GameState.party.members.forEach((member, index) => {
-        if (!member.recruited || window.GameCore.activeEntities.some(entity => entity.companionId === member.id)) return;
-        const companionX = playerPosition.x + 2 + index * 1.5;
+        if (window.GameCore.activeEntities.some(entity => entity.companionId === member.id || entity.recruitId === member.id)) return;
+        const companionX = playerPosition.x + 2 + index * 2;
         const companionZ = playerPosition.z + 2;
         const companion = instantiatePrefab(member.prefab, companionX, window.WorldGenerator.getTerrainHeight(companionX, companionZ), companionZ, 'persistent');
         if (companion) {
-            companion.companionId = member.id;
-            companion.hp = member.hp || 100;
+            if (member.recruited) companion.companionId = member.id; else companion.recruitId = member.id;
+            companion.hp = member.hp || member.maxHp || 100;
             companion.name = member.name;
         }
     });
