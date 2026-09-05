@@ -234,6 +234,54 @@ window.renderAssetManager = function() {
         }, 0); return;
     }
 
+    if (window.EngineState.currentAssetTab === 'models') {
+        const models = Object.keys(window.AssetManager.models);
+        if (!models.length) {
+            content.innerHTML = '<div class="text-gray-500 text-center mt-10 font-mono">No imported models. Use Upload Model to add a .glb or self-contained .gltf.</div>';
+            return;
+        }
+
+        const placeModel = (modelName, index, category) => {
+            const isNpc = category === 'npcs';
+            const prefabName = `Imported ${isNpc ? 'NPC' : 'Terrain'} ${index + 1}`;
+            window.AssetManager.prefabs[prefabName] = {
+                type: isNpc ? 'npc' : 'structure', category, radius: isNpc ? 0.5 : 2, height: isNpc ? 1.8 : 3,
+                modelScale: 1, color: 0xffffff, faction: isNpc ? 'monster' : undefined, behavior: isNpc ? 'wander_aggro' : undefined,
+                speed: isNpc ? 3 : undefined, isObstacle: !isNpc, customModel: modelName,
+                animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' },
+                vfx: { aura: 'None', onHit: 'None' }
+            };
+            const playerPosition = window.GameCore.playerObj?.body.translation();
+            if (playerPosition && window.GameCore.instantiatePrefab) {
+                const x = playerPosition.x + 3;
+                const z = playerPosition.z + 3;
+                window.GameCore.instantiatePrefab(prefabName, x, window.WorldGenerator.getTerrainHeight(x, z), z, 'persistent');
+            }
+            window.EventBus.emit('UI_LOG', `Created ${prefabName} from ${modelName}.`);
+            document.querySelector(`.asset-tab[data-tab="${category}"]`).click();
+        };
+
+        models.forEach((modelName, index) => {
+            const meta = window.AssetManager.modelMeta[modelName] || {};
+            const row = document.createElement('div');
+            row.className = 'flex items-center justify-between gap-4 bg-gray-800/80 p-3 rounded border border-gray-700 hover:border-cyan-600 transition-colors';
+            row.innerHTML = `<div class="min-w-0"><div class="text-cyan-200 font-bold text-sm truncate">${modelName}</div><div class="text-[10px] text-gray-500 mt-1">${meta.rigged ? 'Rigged' : 'Static'} | ${meta.animationCount || 0} animation${meta.animationCount === 1 ? '' : 's'}</div></div><div class="flex gap-2 shrink-0"><button class="model-use-player bg-cyan-900/50 hover:bg-cyan-600 border border-cyan-700 text-cyan-100 px-3 py-1.5 rounded text-xs font-bold" data-model="${modelName}">Use as Player</button><button class="model-create-npc bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-3 py-1.5 rounded text-xs" data-model="${modelName}" data-index="${index}">Create + Place NPC</button><button class="model-create-terrain bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-3 py-1.5 rounded text-xs" data-model="${modelName}" data-index="${index}">Create + Place Terrain</button></div>`;
+            content.appendChild(row);
+        });
+
+        content.querySelectorAll('.model-use-player').forEach(button => button.addEventListener('click', () => {
+            const player = window.AssetManager.prefabs.Player;
+            player.customModel = button.dataset.model;
+            const meta = window.AssetManager.modelMeta[player.customModel];
+            player.animationReady = Boolean(meta?.rigged && meta?.hasAnimations);
+            window.GameCore.swapPlayerModel();
+            window.EventBus.emit('UI_LOG', `Player model replaced with ${button.dataset.model}.`);
+        }));
+        content.querySelectorAll('.model-create-npc').forEach(button => button.addEventListener('click', () => placeModel(button.dataset.model, Number(button.dataset.index), 'npcs')));
+        content.querySelectorAll('.model-create-terrain').forEach(button => button.addEventListener('click', () => placeModel(button.dataset.model, Number(button.dataset.index), 'terrain')));
+        return;
+    }
+
     const availableModels = ['None', ...Object.keys(window.AssetManager.models)];
     const relevantPrefabs = Object.entries(window.AssetManager.prefabs).filter(([name, def]) => def.category === window.EngineState.currentAssetTab);
     if (relevantPrefabs.length === 0) { content.innerHTML = '<div class="text-gray-500 text-center mt-10 font-mono">No prefabs found for this category.</div>'; return; }
@@ -379,7 +427,7 @@ document.getElementById('asset-file-input').addEventListener('change', (e) => {
 
 document.querySelectorAll('.asset-tab').forEach(btn => {
     btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.asset-tab').forEach(b => { b.classList.remove('active', 'bg-indigo-600', 'text-white'); b.classList.add('bg-gray-800'); if (b.dataset.tab === 'villages') b.classList.add('text-yellow-400'); else if (b.dataset.tab === 'factions') b.classList.add('text-purple-400'); else if (b.dataset.tab === 'biomes') b.classList.add('text-blue-400'); else if (b.dataset.tab === 'vfx') b.classList.add('text-red-400'); else if (b.dataset.tab === 'world') b.classList.add('text-green-400'); else if (b.dataset.tab === 'mods') b.classList.add('text-pink-400'); else b.classList.add('text-gray-300'); });
+        document.querySelectorAll('.asset-tab').forEach(b => { b.classList.remove('active', 'bg-indigo-600', 'text-white'); b.classList.add('bg-gray-800'); if (b.dataset.tab === 'villages') b.classList.add('text-yellow-400'); else if (b.dataset.tab === 'factions') b.classList.add('text-purple-400'); else if (b.dataset.tab === 'biomes') b.classList.add('text-blue-400'); else if (b.dataset.tab === 'vfx') b.classList.add('text-red-400'); else if (b.dataset.tab === 'world') b.classList.add('text-green-400'); else if (b.dataset.tab === 'mods') b.classList.add('text-pink-400'); else if (b.dataset.tab === 'models') b.classList.add('text-cyan-400'); else b.classList.add('text-gray-300'); });
         e.target.className = `asset-tab active bg-indigo-600 text-white px-4 py-1.5 rounded text-xs font-bold transition-colors ${e.target.classList.contains('border') ? 'border border-indigo-900/50' : ''}`;
         window.EngineState.currentAssetTab = e.target.getAttribute('data-tab'); window.EngineState.editingVillageId = null; window.EventBus.emit('RENDER_ASSETS');
     });

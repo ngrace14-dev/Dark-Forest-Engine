@@ -206,6 +206,7 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     if(def.type === 'streetLight') { const light = new THREE.PointLight(0x9bdcff, def.active === false ? 0 : 2.5, 18); light.position.y = def.height; mesh.add(light); }
     setupEntityAnimations(entity); window.VFXManager.applyAura(entity, def); window.GameCore.activeEntities.push(entity); return entity;
 }
+window.GameCore.instantiatePrefab = instantiatePrefab;
 
 function spawnPlayer(x, y, z) {
     const def = window.AssetManager.prefabs['Player'];
