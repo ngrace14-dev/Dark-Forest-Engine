@@ -4,7 +4,9 @@ window.NetworkSession = {
     playerId: null,
     sessionId: null,
     partyMode: 'solo',
+    entities: new Map(),
     remotePlayers: new Map(),
+    remoteEntities: new Map(),
     connect: function(url = 'ws://localhost:8787') {
         if (this.socket || !url) return;
         try {
@@ -28,7 +30,7 @@ window.NetworkSession = {
         if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(message));
     },
     sendInput: function(x, z) { this.send({ type: 'INPUT', x, z }); },
-    sendPose: function(position) { this.send({ type: 'POSE', x: position.x, y: position.y, z: position.z }); },
+    sendAttack: function(heavy = false) { this.send({ type: 'ATTACK', heavy }); },
     setPartyMode: function(mode) {
         this.partyMode = mode === 'party' ? 'party' : 'solo';
         window.GameState.coop.partyMode = this.partyMode;
@@ -44,15 +46,27 @@ window.NetworkSession = {
             window.GameState.coop.sessionId = this.sessionId;
             return;
         }
+        if (message.type === 'COMBAT_EVENT') {
+            this.handleCombatEvent(message);
+            return;
+        }
         if (message.type !== 'SNAPSHOT') return;
         window.EngineParams.worldDay = message.session.worldDay;
         window.EngineParams.timeOfDay = message.session.timeOfDay;
         window.EngineParams.worldSeed = message.session.seed;
         const seen = new Set();
-        message.players.forEach(player => {
-            seen.add(player.id);
-            if (player.id === this.playerId) return;
-            this.updateRemotePlayer(player);
+        const entities = message.entities || message.players || [];
+        entities.forEach(player => {
+            const entityId = player.entityId || player.id;
+            seen.add(entityId);
+            this.entities.set(entityId, player);
+            if (player.id === this.playerId || player.ownerId === this.playerId) {
+                this.reconcileLocalPlayer(player);
+            } else if (player.kind === 'monster') {
+                this.updateRemoteEntity({ ...player, id: entityId });
+            } else {
+                this.updateRemotePlayer({ ...player, id: entityId });
+            }
         });
         this.remotePlayers.forEach((remote, id) => {
             if (!seen.has(id)) {
@@ -60,6 +74,29 @@ window.NetworkSession = {
                 this.remotePlayers.delete(id);
             }
         });
+        this.remoteEntities.forEach((remote, id) => {
+            if (!seen.has(id)) {
+                remote.visual?.removeFromParent();
+                this.remoteEntities.delete(id);
+            }
+        });
+        return;
+    },
+    handleCombatEvent: function(message) {
+        if (message.event !== 'attack_accepted') return;
+        if (message.actorId === this.playerId) return;
+        const remote = this.remotePlayers.get(message.actorId);
+        if (remote) remote.attackUntil = performance.now() + (message.heavy ? 500 : 300);
+    },
+    reconcileLocalPlayer: function(player) {
+        const local = window.GameCore.playerObj;
+        if (!local?.body) return;
+        if (Number.isFinite(player.stamina)) window.GameState.pStats.stamina = player.stamina;
+        const current = local.body.translation();
+        const distance = Math.hypot(current.x - player.x, current.z - player.z);
+        if (distance < 1.5) return;
+        local.body.setTranslation({ x: player.x, y: current.y, z: player.z }, true);
+        local.body.setLinvel({ x: 0, y: local.body.linvel().y, z: 0 }, true);
     },
     updateRemotePlayer: function(player) {
         let remote = this.remotePlayers.get(player.id);
@@ -75,6 +112,21 @@ window.NetworkSession = {
         remote.visual.position.lerp(new THREE.Vector3(player.x, player.y + 1, player.z), 0.35);
         remote.name = player.name;
         remote.partyMode = player.partyMode;
+    }
+    ,updateRemoteEntity: function(entity) {
+        let remote = this.remoteEntities.get(entity.id);
+        if (!remote) {
+            const color = entity.kind === 'monster' ? 0x991b1b : 0x94a3b8;
+            const visual = new THREE.Mesh(new THREE.CapsuleGeometry(0.65, 1.2, 4, 8), new THREE.MeshStandardMaterial({ color }));
+            visual.castShadow = true;
+            window.GameCore.scene?.add(visual);
+            remote = { visual };
+            this.remoteEntities.set(entity.id, remote);
+        }
+        if (!remote.visual) return;
+        if (!remote.visual.parent && window.GameCore.scene) window.GameCore.scene.add(remote.visual);
+        const y = window.WorldGenerator?.getTerrainHeight(entity.x, entity.z) || 0;
+        remote.visual.position.lerp(new THREE.Vector3(entity.x, y + 1, entity.z), 0.35);
     }
 };
 

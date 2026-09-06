@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <script type="importmap">
         {
@@ -65,6 +66,8 @@
 
             <div class="bg-gray-900/80 p-4 rounded-lg border border-gray-700 shadow-lg backdrop-blur-sm text-xs font-mono w-48 text-right pointer-events-auto">
                 <h3 class="text-gray-400 border-b border-gray-700 pb-1 mb-2">FACTION REP</h3>
+                <div id="arena-line" class="text-orange-300 text-[10px] mb-2 truncate">ARENA | HUB</div>
+                <div id="renown-line" class="text-amber-300 text-[10px] mb-2 truncate">RENOWN | UNKNOWN 0 | INFAMY 0</div>
                 <div id="world-cycle" class="text-amber-300 text-[10px] mb-2">DAY 0 | SHIFT IN 14</div>
                 <div class="flex justify-between mb-1"><span>Village:</span> <span id="rep-village" class="text-blue-400">0</span></div>
                 <div class="flex justify-between mb-1"><span>Guild:</span> <span id="rep-adventurer" class="text-green-400">0</span></div>
@@ -135,7 +138,7 @@
                 <button class="asset-tab bg-gray-800 hover:bg-gray-700 text-pink-400 px-4 py-1.5 rounded text-xs transition-colors border border-pink-900/50 font-bold" data-tab="mods">🧩 Mods</button>
             </div>
             <button id="btn-upload-file" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-2 shadow-[0_0_10px_rgba(79,70,229,0.3)]"><span>➕</span> Upload Model</button>
-            <input type="file" id="asset-file-input" class="hidden" accept=".glb,.gltf,.png,.jpg,.jpeg,.webp" multiple>
+            <input type="file" id="asset-file-input" class="hidden" accept=".glb,.gltf,.zip,.png,.jpg,.jpeg,.webp" multiple>
         </div>
         <div id="asset-content" class="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-3 bg-[#0a0c10]"></div>
     </div>

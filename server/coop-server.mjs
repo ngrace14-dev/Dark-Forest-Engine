@@ -8,7 +8,8 @@ const session = {
     worldDay: 0,
     timeOfDay: 14,
     cycleLengthDays: 14,
-    players: new Map()
+    players: new Map(),
+    entities: new Map()
 };
 
 function makeId() {
@@ -25,7 +26,8 @@ function snapshot() {
             timeOfDay: session.timeOfDay,
             cycleLengthDays: session.cycleLengthDays
         },
-        players: [...session.players.values()].map(({ input, ...player }) => player)
+        players: [...session.players.values()].map(({ input, socket, attackReadyAt, ...player }) => player),
+        entities: [...session.entities.values()].map(({ input, socket, attackReadyAt, ...entity }) => entity)
     };
 }
 
@@ -38,7 +40,28 @@ function broadcast() {
 
 function removePlayer(playerId) {
     session.players.delete(playerId);
+    session.entities.delete(playerId);
+    if (session.players.size === 0) {
+        for (const [entityId, entity] of session.entities) if (entity.kind === 'monster') session.entities.delete(entityId);
+    }
     broadcast();
+}
+
+function spawnMonster(index) {
+    const entityId = `monster-${index + 1}`;
+    session.entities.set(entityId, {
+        id: entityId,
+        entityId,
+        kind: 'monster',
+        ownerId: null,
+        name: index % 2 === 0 ? 'Network Ghoul' : 'Network Flesh Horror',
+        x: (index % 2 ? -1 : 1) * (10 + index * 4),
+        y: 0,
+        z: (index - 1) * 8,
+        hp: index % 2 === 0 ? 80 : 140,
+        maxHp: index % 2 === 0 ? 80 : 140,
+        speed: index % 2 === 0 ? 1.5 : 1.1
+    });
 }
 
 const server = new WebSocketServer({ port });
@@ -53,18 +76,28 @@ server.on('connection', socket => {
     const index = session.players.size;
     const player = {
         id: playerId,
+        entityId: playerId,
+        kind: 'player',
+        ownerId: playerId,
         name: `Wanderer ${index + 1}`,
         x: index === 0 ? 0 : 4,
         z: index === 0 ? 0 : 4,
         y: 0,
         hp: 100,
         maxHp: 100,
+        stamina: 100,
+        maxStamina: 100,
+        attackReadyAt: 0,
         connected: true,
         partyMode: 'solo',
         input: { x: 0, z: 0 },
         socket
     };
     session.players.set(playerId, player);
+    session.entities.set(playerId, player);
+    if (![...session.entities.values()].some(entity => entity.kind === 'monster')) {
+        for (let index = 0; index < 3; index++) spawnMonster(index);
+    }
     socket.send(JSON.stringify({ type: 'WELCOME', playerId, sessionId: session.id }));
     broadcast();
 
@@ -77,10 +110,14 @@ server.on('connection', socket => {
             const length = Math.hypot(inputX, inputZ) || 1;
             player.input = { x: inputX / length, z: inputZ / length };
         }
-        if (message.type === 'POSE') {
-            player.x = Number(message.x) || player.x;
-            player.y = Number(message.y) || player.y;
-            player.z = Number(message.z) || player.z;
+        if (message.type === 'ATTACK') {
+            const now = Date.now();
+            const staminaCost = message.heavy ? 35 : 15;
+            const cooldown = message.heavy ? 1200 : 800;
+            if (now < player.attackReadyAt || player.stamina < staminaCost) return;
+            player.attackReadyAt = now + cooldown;
+            player.stamina -= staminaCost;
+            broadcastEvent({ type: 'COMBAT_EVENT', event: 'attack_accepted', actorId: player.id, heavy: Boolean(message.heavy) });
         }
         if (message.type === 'SET_PARTY_MODE') {
             player.partyMode = message.mode === 'party' ? 'party' : 'solo';
@@ -89,6 +126,13 @@ server.on('connection', socket => {
     socket.on('close', () => removePlayer(playerId));
     socket.on('error', () => removePlayer(playerId));
 });
+
+function broadcastEvent(event) {
+    const message = JSON.stringify(event);
+    for (const player of session.players.values()) {
+        if (player.socket.readyState === 1) player.socket.send(message);
+    }
+}
 
 setInterval(() => {
     const step = 1 / tickRate;
@@ -100,6 +144,16 @@ setInterval(() => {
     for (const player of session.players.values()) {
         player.x += player.input.x * 4 * step;
         player.z += player.input.z * 4 * step;
+        player.stamina = Math.min(player.maxStamina, player.stamina + 12 * step);
+    }
+    for (const monster of session.entities.values()) {
+        if (monster.kind !== 'monster' || session.players.size === 0) continue;
+        const target = [...session.players.values()].sort((a, b) => Math.hypot(monster.x - a.x, monster.z - a.z) - Math.hypot(monster.x - b.x, monster.z - b.z))[0];
+        const distance = Math.hypot(target.x - monster.x, target.z - monster.z);
+        if (distance > 2) {
+            monster.x += (target.x - monster.x) / distance * monster.speed * step;
+            monster.z += (target.z - monster.z) / distance * monster.speed * step;
+        }
     }
     if (session.players.size > 0) broadcast();
 }, 1000 / tickRate);

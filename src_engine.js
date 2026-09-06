@@ -215,6 +215,131 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
 }
 window.GameCore.instantiatePrefab = instantiatePrefab;
 
+window.ArenaTestManager = {
+    center: { x: 120, z: 120 },
+    size: 40,
+    walls: [],
+    match: null,
+    ensureArena: function() {
+        if (this.walls.length > 0) return;
+        const groundY = window.WorldGenerator.getTerrainHeight(this.center.x, this.center.z);
+        const wallHeight = 8;
+        const wallThickness = 1;
+        const wallSpecs = [
+            { x: this.center.x, z: this.center.z - this.size / 2, width: this.size + 2, depth: wallThickness },
+            { x: this.center.x, z: this.center.z + this.size / 2, width: this.size + 2, depth: wallThickness },
+            { x: this.center.x - this.size / 2, z: this.center.z, width: wallThickness, depth: this.size },
+            { x: this.center.x + this.size / 2, z: this.center.z, width: wallThickness, depth: this.size }
+        ];
+        wallSpecs.forEach(spec => {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(spec.width, wallHeight, spec.depth), new THREE.MeshStandardMaterial({ color: 0x171b22, roughness: 0.9 }));
+            mesh.position.set(spec.x, groundY + wallHeight / 2, spec.z);
+            mesh.castShadow = true; mesh.receiveShadow = true; window.GameCore.scene.add(mesh);
+            const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(spec.x, groundY + wallHeight / 2, spec.z));
+            window.GameCore.world.createCollider(RAPIER.ColliderDesc.cuboid(spec.width / 2, wallHeight / 2, spec.depth / 2), body);
+            this.walls.push({ mesh, body });
+        });
+    },
+    enter: function() {
+        this.ensureArena();
+        window.EngineParams.arenaMode = true;
+        window.EventBus.emit('CMD_TELEPORT', this.center);
+        window.EventBus.emit('UI_LOG', '[ARENA] Locked gladiator test arena entered.');
+    },
+    startMatch: function(totalWaves = 3) {
+        if (this.match?.state === 'fighting') {
+            window.EventBus.emit('UI_LOG', '[ARENA] A match is already in progress.');
+            return;
+        }
+        this.enter();
+        this.clear();
+        this.match = { state: 'fighting', totalWaves, transitionTimer: 0, waveCleared: false };
+        window.EngineParams.arenaWave = 0;
+        window.GameState.gladiator.matchState = 'fighting';
+        window.GameState.gladiator.objective = `Survive ${totalWaves} waves`;
+        window.EventBus.emit('UI_LOG', `[ARENA] ${window.GameState.gladiator.name} enters the arena.`);
+        this.spawnWave();
+    },
+    spawnWave: function() {
+        if (!window.EngineParams.arenaMode) this.enter();
+        const wave = ++window.EngineParams.arenaWave;
+        const prefabs = ['Ghoul', 'Flesh Horror', 'Wendigo'];
+        const count = Math.min(8, 2 + wave);
+        for (let index = 0; index < count; index++) {
+            const angle = (index / count) * Math.PI * 2;
+            const radius = this.size * 0.35;
+            const x = this.center.x + Math.cos(angle) * radius;
+            const z = this.center.z + Math.sin(angle) * radius;
+            const prefab = prefabs[(wave + index) % prefabs.length];
+            const entity = instantiatePrefab(prefab, x, window.WorldGenerator.getTerrainHeight(x, z), z, 'arena');
+            if (entity) { entity.arenaEntity = true; entity.arenaWave = wave; }
+        }
+        window.EventBus.emit('UI_LOG', `[ARENA] Monster wave ${wave} spawned.`);
+    },
+    update: function(delta) {
+        if (!this.match || this.match.state !== 'fighting') return;
+        if (window.GameState.pStats.hp <= 0) { this.defeat(); return; }
+        const living = window.GameCore.activeEntities.filter(entity => entity.arenaEntity && entity.hp > 0);
+        if (living.length > 0) { this.match.waveCleared = false; return; }
+        if (!this.match.waveCleared) {
+            this.match.waveCleared = true;
+            this.match.transitionTimer = 2;
+            window.EventBus.emit('UI_LOG', `[ARENA] Wave ${window.EngineParams.arenaWave} cleared.`);
+        }
+        this.match.transitionTimer -= delta;
+        if (this.match.transitionTimer > 0) return;
+        if (window.EngineParams.arenaWave >= this.match.totalWaves) this.victory();
+        else { this.match.waveCleared = false; this.spawnWave(); }
+    },
+    victory: function() {
+        if (!this.match || this.match.state !== 'fighting') return;
+        this.match.state = 'victory';
+        const reward = 50 + this.match.totalWaves * 25;
+        window.GameCore.recordCombatVictory({ source: 'arena', reward, fame: this.match.totalWaves * 5, label: 'won an arena match' });
+        window.GameState.gladiator.matchState = 'victory';
+        window.GameState.gladiator.objective = `Victory. Reward: ${reward} gold`;
+        window.EventBus.emit('UI_LOG', `[ARENA] Victory. ${reward} gold awarded.`);
+        window.EventBus.emit('OPEN_ARENA_RESULT', { result: 'victory', reward });
+        window.EventBus.emit('UI_UPDATE_HUD');
+    },
+    defeat: function() {
+        if (!this.match || this.match.state !== 'fighting') return;
+        this.match.state = 'defeat';
+        window.GameCore.recordCombatDefeat({ source: 'arena', injury: `arena defeat on day ${window.EngineParams.worldDay}` });
+        window.GameState.gladiator.matchState = 'defeat';
+        window.GameState.gladiator.objective = 'Defeated. Recover before the next match.';
+        this.clear();
+        window.EventBus.emit('UI_LOG', '[ARENA] Defeat. The gladiator is dragged from the sand.');
+        window.EventBus.emit('OPEN_ARENA_RESULT', { result: 'defeat', reward: 0 });
+        window.EventBus.emit('UI_UPDATE_HUD');
+    },
+    clear: function() {
+        window.GameCore.activeEntities.filter(entity => entity.arenaEntity).forEach(entity => {
+            window.GameCore.scene.remove(entity.visual);
+            window.GameCore.world.removeRigidBody(entity.body);
+        });
+        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => !entity.arenaEntity);
+        window.EventBus.emit('UI_LOG', '[ARENA] Arena monsters cleared.');
+    },
+    exit: function() {
+        this.clear();
+        this.walls.forEach(wall => { window.GameCore.scene.remove(wall.mesh); window.GameCore.world.removeRigidBody(wall.body); });
+        this.walls = [];
+        window.EngineParams.arenaMode = false;
+        window.EngineParams.arenaWave = 0;
+        this.match = null;
+        window.GameState.gladiator.matchState = 'hub';
+        window.GameState.gladiator.objective = 'Awaiting a match';
+        window.EventBus.emit('CMD_TELEPORT', { x: 0, z: 0 });
+        window.EventBus.emit('UI_LOG', '[ARENA] Returned to the open world.');
+    }
+};
+window.EventBus.on('ENTER_ARENA_TEST', () => window.ArenaTestManager.enter());
+window.EventBus.on('START_ARENA_MATCH', () => window.ArenaTestManager.startMatch());
+window.EventBus.on('SPAWN_ARENA_WAVE', () => window.ArenaTestManager.spawnWave());
+window.EventBus.on('CLEAR_ARENA_TEST', () => window.ArenaTestManager.clear());
+window.EventBus.on('EXIT_ARENA_TEST', () => window.ArenaTestManager.exit());
+
 function spawnPlayer(x, y, z) {
     const def = window.AssetManager.prefabs['Player'];
     
@@ -273,6 +398,7 @@ function awardMonsterKill(target) {
         nearestVillage.stats.essence = (nearestVillage.stats.essence || 0) + essence;
     }
     const impact = target.def.boss ? 12 : (target.def.faction === 'forest' ? 4 : 2);
+    window.GameCore.recordRenown({ renown: target.def.boss ? 8 : 2, faction: 'village', reason: `defeated ${target.name}` });
     window.GameCore.recordFeat({ impact, label: `The ${target.name} fed a village's ward.` });
     window.EventBus.emit('UI_LOG', `[ESSENCE] ${nearestVillage?.name || 'The settlements'} gained ${essence} life essence.`);
 }
@@ -383,6 +509,8 @@ function performAttack(isHeavy = false) {
     const profile = isHeavy ? { stamina: 35, cooldown: 1.2, reach: 4, multiplier: 2.2, poise: 2.5, windup: 250, color: 0xffaa33 } : isDashStrike ? { stamina: 20, cooldown: 1, reach: 4.5, multiplier: 1.6, poise: 1.8, windup: 0, color: 0x60a5fa } : { stamina: 15, cooldown: 0.8, reach: 3, multiplier: 1, poise: 1, windup: 0, color: 0xffffff };
     if (window.GameState.pStats.stamina < profile.stamina) { window.EventBus.emit('UI_LOG', 'Too exhausted to attack.'); return; }
 
+    if (window.NetworkSession?.connected) window.NetworkSession.sendAttack(isHeavy);
+
     window.GameState.pStats.stamina -= profile.stamina; window.Input.isAttacking = true; window.Input.attackCooldown = profile.cooldown;
     playEntityAnimation(window.GameCore.playerObj, 'attack');
     
@@ -405,12 +533,13 @@ function performAttack(isHeavy = false) {
         
         if(en && (en.def.type === 'npc' || en.name === 'Blight Root')) {
             const rawDamage = window.GameState.derivedStats.weaponDamage + ((window.GameState.pStats.strength.level + window.GameCore.getBuffBonus('strength')) * 2) + window.GameCore.getBuffBonus('meleeAtt');
-            const damage = Math.max(1, Math.floor(rawDamage * profile.multiplier) - (en.def.armor || 0)); en.hp -= damage; en.poise = Math.max(0, en.poise - damage * profile.poise);
+            const damage = Math.max(1, Math.floor(rawDamage * profile.multiplier * window.GameCore.getCombatInjuryMultiplier()) - (en.def.armor || 0)); en.hp -= damage; en.poise = Math.max(0, en.poise - damage * profile.poise);
             window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: en.visual.position, isPlayer: false });
             window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
 
             if(en.def.faction !== 'monster' && en.def.faction !== 'forest' && en.name !== 'Blight Root') {
                 window.GameCore.adjustFactionStanding(en.def.faction, -20, `assaulted ${en.name}`);
+                window.GameCore.recordRenown({ infamy: 5, faction: en.def.faction, reason: `assaulted ${en.name}` });
                 if(window.GameState.factionRelations.player[en.def.faction === 'village' ? 'kingdom' : en.def.faction] <= -50) window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "HOSTILE!", pos: en.visual.position, color: '#ff0000'});
             }
 
@@ -634,7 +763,7 @@ function regenerateWorldCycle() {
     window.EventBus.emit('UI_LOG', `Day ${window.EngineParams.worldDay}: settlements shifted and the world regenerated at midnight.`);
 }
 window.EventBus.on('CMD_TELEPORT', (pos) => { const vy = window.WorldGenerator.getTerrainHeight(pos.x, pos.z) + 15; window.GameCore.playerObj.body.setTranslation({x:pos.x, y:vy, z:pos.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); ChunkManager.update(new THREE.Vector3(pos.x, vy, pos.z)); });
-window.EventBus.on('PLAYER_RESPAWN', () => { const respawnY = window.WorldGenerator.getTerrainHeight(0,0) + 15; window.GameCore.playerObj.body.setTranslation({x:0, y:respawnY, z:0}, true); window.GameState.pStats.hp = window.GameState.pStats.maxHp; window.GameState.inventory.gold = Math.floor(window.GameState.inventory.gold / 2); playEntityAnimation(window.GameCore.playerObj, 'idle'); window.EventBus.emit('UI_UPDATE_HUD'); });
+window.EventBus.on('PLAYER_RESPAWN', () => { if (!window.EngineParams.arenaMode && window.GameState.pStats.hp <= 0) window.GameCore.recordCombatDefeat({ source: 'open-world', injury: `open-world defeat on day ${window.EngineParams.worldDay}` }); const respawnY = window.WorldGenerator.getTerrainHeight(0,0) + 15; window.GameCore.playerObj.body.setTranslation({x:0, y:respawnY, z:0}, true); window.GameState.pStats.hp = window.GameState.pStats.maxHp; window.GameState.inventory.gold = Math.floor(window.GameState.inventory.gold / 2); playEntityAnimation(window.GameCore.playerObj, 'idle'); window.EventBus.emit('UI_UPDATE_HUD'); });
 
 async function bootEngine() {
     try {
@@ -890,11 +1019,9 @@ function fixedUpdateLogic(delta) {
     }
 
     if (window.NetworkSession?.connected && window.GameCore.playerObj) {
-        const playerPosition = window.GameCore.playerObj.visual.position;
         const moveX = (window.Input.keys.d ? 1 : 0) - (window.Input.keys.a ? 1 : 0);
         const moveZ = (window.Input.keys.s ? 1 : 0) - (window.Input.keys.w ? 1 : 0);
         window.NetworkSession.sendInput(moveX, moveZ);
-        window.NetworkSession.sendPose(playerPosition);
     }
     
     if(window.GameCore.worldTimer > 5) { 
@@ -903,6 +1030,7 @@ function fixedUpdateLogic(delta) {
         window.AdventurerManager?.syncNearby();
         window.GameCore.worldTimer = 0; 
     }
+    window.ArenaTestManager?.update(delta);
 
     window.EngineParams.isPlayerSafe = false; 
     window.EngineParams.isPlayerHidden = false;
@@ -1020,7 +1148,7 @@ function fixedUpdateLogic(delta) {
             window.GameCore.playerObj.body.applyImpulse({ x: moveDir.x * accelerationForce * delta, y: 0, z: moveDir.z * accelerationForce * delta }, true);
             
             const currentVel = window.GameCore.playerObj.body.linvel();
-            const maxSpeed = window.Input.isBlocking ? 2.0 : 6.0;
+            const maxSpeed = (window.Input.isBlocking ? 2.0 : 6.0) * window.GameCore.getCombatInjuryMultiplier();
             const flatVel = new THREE.Vector2(currentVel.x, currentVel.z);
             if (flatVel.length() > maxSpeed && !window.Input.isDashing) {
                 flatVel.normalize().multiplyScalar(maxSpeed);

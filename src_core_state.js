@@ -50,6 +50,8 @@ window.GameState = {
     activeBuffs: {},
     statusEffects: [],
     runPotential: null,
+    combatRecord: { wins: 0, losses: 0, fame: 0, injuries: [] },
+    renown: { score: 0, infamy: 0, title: 'Unknown', history: [] },
     coop: { sessionId: null, localPlayerId: null, partyMode: 'solo' },
     base: { owned: false, name: 'Wayfarer Camp', position: null, storage: [], structures: [], farms: [], research: [] },
     party: { command: 'follow', selectedMembers: ['lyra-scout'], escortCaravanId: null, members: [
@@ -59,6 +61,16 @@ window.GameState = {
     ] },
     questBoard: [],
     worldEvents: [],
+    gladiator: {
+        name: 'The Unblooded',
+        fame: 0,
+        gold: 0,
+        wins: 0,
+        losses: 0,
+        injuries: [],
+        matchState: 'hub',
+        objective: 'Awaiting a match'
+    },
     narrator: {
         avatar: 'crow',
         targetId: null,
@@ -109,7 +121,8 @@ window.EngineParams = {
     mapTileSizeMeters: 8046.72, visitedMapTiles: [], currentMapTile: null, sandReaverEncountered: false,
     fogDensity: 0.03, timeScale: 1.0, godMode: false,
     globalBrightness: 1.2, worldSeed: 'dark_forests_1337', isPlayerSafe: false,
-    cycleLengthDays: 14, lastCycleDay: 0
+    cycleLengthDays: 14, lastCycleDay: 0,
+    arenaMode: false, arenaWave: 0
 };
 
 window.GameCore = {
@@ -142,6 +155,86 @@ window.GameCore = {
         if (entity?.forestBlessing?.active) return entity.forestBlessing.combatLuck || 0;
         if (!entity && window.GameState.forestBlessing?.active) return window.GameState.forestBlessing.combatLuck || 0;
         return 0;
+    },
+    getCombatInjuryMultiplier: function() {
+        return Math.max(0.65, 1 - ((window.GameState.combatRecord?.injuries || []).length) * 0.05);
+    },
+    getRenownTitle: function() {
+        const renown = window.GameState.renown || { score: 0, infamy: 0 };
+        if (renown.infamy >= 75) return 'Dreaded';
+        if (renown.infamy >= 35) return 'Infamous';
+        if (renown.score >= 100) return 'Legend';
+        if (renown.score >= 50) return 'Renowned';
+        if (renown.score >= 20) return 'Known';
+        return 'Unknown';
+    },
+    recordRenown: function({ renown = 0, infamy = 0, faction = 'kingdom', reason = 'word spread' } = {}) {
+        const record = window.GameState.renown ??= { score: 0, infamy: 0, title: 'Unknown', history: [] };
+        record.history ??= [];
+        record.score = Math.max(0, Math.min(1000, record.score + renown));
+        record.infamy = Math.max(0, Math.min(1000, record.infamy + infamy));
+        record.title = this.getRenownTitle();
+        record.history.push({ day: window.EngineParams.worldDay, renown, infamy, faction, reason });
+        if (record.history.length > 100) record.history.shift();
+        const standingChange = Math.floor((renown - infamy) / 5);
+        if (standingChange !== 0) this.adjustFactionStanding(faction, standingChange, reason);
+        window.EventBus.emit('RENOWN_CHANGED', { renown, infamy, faction, reason });
+    },
+    getRenownDiscount: function(faction = 'kingdom') {
+        const record = window.GameState.renown || { score: 0, infamy: 0 };
+        const politicalFaction = faction === 'village' ? 'kingdom' : faction;
+        const standing = window.GameState.factionRelations.player[politicalFaction] || 0;
+        return Math.max(-0.25, Math.min(0.25, record.score * 0.002 + standing * 0.001 - record.infamy * 0.001));
+    },
+    getMerchantPrice: function(basePrice, faction = 'kingdom') {
+        return Math.max(1, Math.ceil(basePrice * (1 - this.getRenownDiscount(faction))));
+    },
+    treatCombatInjuries: function() {
+        const record = window.GameState.combatRecord ??= { wins: 0, losses: 0, fame: 0, injuries: [] };
+        record.injuries ??= [];
+        if (record.injuries.length === 0) {
+            window.EventBus.emit('UI_LOG', 'No combat injuries require treatment.');
+            return false;
+        }
+        const cost = record.injuries.length * 10;
+        if (window.GameState.inventory.gold < cost) {
+            window.EventBus.emit('UI_LOG', `Treatment requires ${cost} gold.`);
+            return false;
+        }
+        window.GameState.inventory.gold -= cost;
+        record.injuries = [];
+        window.GameState.gladiator.injuries = [];
+        window.EventBus.emit('UI_LOG', `Combat injuries treated for ${cost} gold.`);
+        window.EventBus.emit('COMBAT_INJURIES_TREATED', { cost });
+        window.EventBus.emit('UI_UPDATE_HUD');
+        return true;
+    },
+    recordCombatVictory: function({ source = 'open-world', reward = 0, fame = 0, label = 'won a fight' } = {}) {
+        const record = window.GameState.combatRecord ??= { wins: 0, losses: 0, fame: 0, injuries: [] };
+        record.injuries ??= [];
+        record.wins++;
+        record.fame += fame;
+        window.GameState.inventory.gold += reward;
+        if (source === 'arena') {
+            window.GameState.gladiator.wins = record.wins;
+            window.GameState.gladiator.fame = record.fame;
+            window.GameState.gladiator.gold += reward;
+        }
+        this.recordRenown({ renown: Math.max(2, fame), faction: source === 'arena' ? 'adventurer' : 'kingdom', reason: label });
+        window.GameCore.recordFeat({ impact: Math.max(1, fame), label });
+        window.EventBus.emit('COMBAT_VICTORY', { source, reward, fame });
+    },
+    recordCombatDefeat: function({ source = 'open-world', injury = 'combat injury' } = {}) {
+        const record = window.GameState.combatRecord ??= { wins: 0, losses: 0, fame: 0, injuries: [] };
+        record.injuries ??= [];
+        record.losses++;
+        record.injuries.push(injury);
+        if (source === 'arena') {
+            window.GameState.gladiator.losses = record.losses;
+            window.GameState.gladiator.injuries = [...record.injuries];
+        }
+        this.recordRenown({ infamy: 3, faction: source === 'arena' ? 'adventurer' : 'kingdom', reason: injury });
+        window.EventBus.emit('COMBAT_DEFEAT', { source, injury });
     },
     forestAttackMisses: function(entity = null) {
         const chance = this.getForestLuck(entity);

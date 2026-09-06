@@ -11,6 +11,11 @@ window.EventBus.on('UI_UPDATE_HUD', () => {
     document.getElementById('poise-bar').style.width = `${(window.GameState.pStats.poise / window.GameState.pStats.maxPoise) * 100}%`;
     document.getElementById('hud-food').innerText = window.GameState.inventory.food; 
     document.getElementById('hud-gold').innerText = window.GameState.inventory.gold;
+    const renownLine = document.getElementById('renown-line');
+    const renown = window.GameState.renown || { title: 'Unknown', score: 0, infamy: 0 };
+    if (renownLine) renownLine.innerText = `RENOWN | ${renown.title.toUpperCase()} ${renown.score} | INFAMY ${renown.infamy}`;
+    const arenaLine = document.getElementById('arena-line');
+    if (arenaLine) arenaLine.innerText = `ARENA | ${window.GameState.gladiator.matchState.toUpperCase()} | ${window.GameState.gladiator.objective}`;
     document.getElementById('rep-village').innerText = window.GameState.reputation.village; 
     document.getElementById('rep-adventurer').innerText = window.GameState.reputation.adventurer;
     document.getElementById('rep-monster').innerText = window.GameState.reputation.monster;
@@ -84,7 +89,8 @@ function openMerchantShop(chest) {
     const stock = chest.merchantInventory || [];
     const rows = stock.map((entry, index) => {
         const item = window.ItemDatabase[entry.itemId];
-        return `<button class="merchant-buy-item border border-amber-700 bg-gray-900 p-2 text-left hover:border-amber-300 disabled:opacity-40" data-chest="${chest.id}" data-index="${index}" ${entry.quantity <= 0 ? 'disabled' : ''}>${item ? item.icon : '•'} ${item?.name || entry.itemId} <span class="float-right text-amber-300">${entry.price}g | ${entry.quantity}</span></button>`;
+        const price = window.GameCore.getMerchantPrice(entry.price, 'kingdom');
+        return `<button class="merchant-buy-item border border-amber-700 bg-gray-900 p-2 text-left hover:border-amber-300 disabled:opacity-40" data-chest="${chest.id}" data-index="${index}" ${entry.quantity <= 0 ? 'disabled' : ''}>${item ? item.icon : '•'} ${item?.name || entry.itemId} <span class="float-right text-amber-300">${price}g | ${entry.quantity}</span></button>`;
     }).join('') || '<div class="text-gray-500">Sold out.</div>';
     dialogue.innerHTML = `<div class="mb-4 border-b border-amber-700 pb-3"><div class="text-amber-300 font-bold tracking-widest">PLAGUE DOCTOR MERCHANT</div><div class="text-xs text-gray-500 mt-1">Gold: ${window.GameState.inventory.gold}</div></div><div class="grid gap-2 mb-4">${rows}</div><button id="btn-close-merchant" class="border border-gray-600 px-3 py-2 text-xs hover:border-amber-400">Leave</button>`;
     dialogue.classList.remove('hidden');
@@ -106,6 +112,32 @@ function openPlayerCamp() {
     dialogue.querySelectorAll('.assign-base-job').forEach(button => button.addEventListener('click', () => window.EventBus.emit('ASSIGN_BASE_JOB', button.dataset.job)));
     dialogue.querySelector('#btn-close-base').addEventListener('click', closeCompanionDialogue);
 }
+
+function openGladiatorProfile() {
+    const dialogue = document.getElementById('companion-dialogue');
+    const gladiator = window.GameState.gladiator;
+    const weapon = window.GameState.inventory.equipment.weapon || 'unarmed';
+    const injuries = gladiator.injuries.length ? gladiator.injuries.map(injury => `<li>${injury}</li>`).join('') : '<li>No recorded injuries</li>';
+    dialogue.innerHTML = `<div class="mb-4 border-b border-orange-700 pb-3"><div class="text-orange-300 font-bold tracking-widest">GLADIATOR PROFILE</div><div class="text-xs text-gray-500 mt-1">${gladiator.name} | ${gladiator.matchState.toUpperCase()}</div></div><div class="grid grid-cols-2 gap-3 mb-4 text-xs"><div><div class="text-gray-500">FAME</div><div class="text-white text-lg font-bold">${gladiator.fame}</div></div><div><div class="text-gray-500">GOLD</div><div class="text-amber-300 text-lg font-bold">${gladiator.gold}</div></div><div><div class="text-gray-500">RENOWN</div><div class="text-amber-200">${window.GameState.renown.title} ${window.GameState.renown.score}</div></div><div><div class="text-gray-500">INFAMY</div><div class="text-red-300">${window.GameState.renown.infamy}</div></div><div><div class="text-gray-500">RECORD</div><div class="text-white">${gladiator.wins}W - ${gladiator.losses}L</div></div><div><div class="text-gray-500">WEAPON</div><div class="text-white">${window.ItemDatabase[weapon]?.name || weapon}</div></div></div><div class="border-t border-gray-800 pt-3 mb-4"><div class="text-xs text-orange-200 mb-1">CURRENT OBJECTIVE</div><div class="text-gray-300">${gladiator.objective}</div></div><div class="border-t border-gray-800 pt-3 mb-4"><div class="text-xs text-red-300 mb-1">INJURIES</div><ul class="text-xs text-gray-400 list-disc list-inside">${injuries}</ul></div><div class="grid grid-cols-2 gap-2"><button id="btn-start-gladiator-match" class="border border-orange-700 px-3 py-2 text-xs text-orange-200 hover:border-orange-300">Start Match</button><button id="btn-close-gladiator-profile" class="border border-gray-600 px-3 py-2 text-xs hover:border-gray-300">Close</button></div>`;
+    dialogue.classList.remove('hidden');
+    dialogue.querySelector('#btn-start-gladiator-match').addEventListener('click', () => { dialogue.classList.add('hidden'); window.EventBus.emit('START_ARENA_MATCH'); });
+    dialogue.querySelector('#btn-close-gladiator-profile').addEventListener('click', closeCompanionDialogue);
+}
+
+window.EventBus.on('OPEN_GLADIATOR_PROFILE', openGladiatorProfile);
+
+function openArenaResult({ result, reward = 0 }) {
+    const dialogue = document.getElementById('companion-dialogue');
+    const gladiator = window.GameState.gladiator;
+    const victory = result === 'victory';
+    const injuries = gladiator.injuries.length ? gladiator.injuries[gladiator.injuries.length - 1] : 'No new injuries';
+    dialogue.innerHTML = `<div class="mb-4 border-b ${victory ? 'border-amber-700' : 'border-red-700'} pb-3"><div class="${victory ? 'text-amber-300' : 'text-red-300'} font-bold tracking-widest">${victory ? 'ARENA VICTORY' : 'ARENA DEFEAT'}</div><div class="text-xs text-gray-500 mt-1">${gladiator.name}</div></div><div class="grid grid-cols-2 gap-3 mb-4 text-xs"><div><div class="text-gray-500">REWARD</div><div class="text-amber-300 text-lg font-bold">${reward} GOLD</div></div><div><div class="text-gray-500">FAME</div><div class="text-white text-lg font-bold">${gladiator.fame}</div></div><div><div class="text-gray-500">RECORD</div><div class="text-white">${gladiator.wins}W - ${gladiator.losses}L</div></div><div><div class="text-gray-500">INJURY</div><div class="text-red-300">${injuries}</div></div></div><div class="grid grid-cols-2 gap-2"><button id="btn-result-profile" class="border border-orange-700 px-3 py-2 text-xs text-orange-200 hover:border-orange-300">Gladiator Profile</button><button id="btn-result-exit" class="border border-gray-600 px-3 py-2 text-xs hover:border-gray-300">Return to World</button></div>`;
+    dialogue.classList.remove('hidden');
+    dialogue.querySelector('#btn-result-profile').addEventListener('click', openGladiatorProfile);
+    dialogue.querySelector('#btn-result-exit').addEventListener('click', () => { dialogue.classList.add('hidden'); window.EventBus.emit('EXIT_ARENA_TEST'); });
+}
+
+window.EventBus.on('OPEN_ARENA_RESULT', openArenaResult);
 
 function openCaravanDialogue(caravanEntity) {
     const dialogue = document.getElementById('companion-dialogue');
@@ -141,8 +173,15 @@ function openArmorerForge() {
 function openTreatmentCenter() {
     const dialogue = document.getElementById('companion-dialogue');
     dialogue.innerHTML = `<div class="mb-4 border-b border-green-700 pb-3"><div class="text-green-300 font-bold tracking-widest">PLAGUE TREATMENT</div><div class="text-xs text-gray-500 mt-1">Restore the party and tend injuries.</div></div><button id="btn-treatment" class="w-full border border-green-700 bg-gray-900 p-3 text-left hover:border-green-300">Treat Party <span class="float-right text-amber-300">10g</span></button><button id="btn-close-treatment" class="mt-3 border border-gray-600 px-3 py-2 text-xs hover:border-green-400">Leave</button>`;
+        const injuryCount = window.GameState.combatRecord?.injuries?.length || 0;
+        const injuryCost = injuryCount * 10;
+        dialogue.innerHTML = `<div class="mb-4 border-b border-green-700 pb-3"><div class="text-green-300 font-bold tracking-widest">PLAGUE TREATMENT</div><div class="text-xs text-gray-500 mt-1">Restore the party and tend injuries.</div></div><button id="btn-treatment" class="w-full border border-green-700 bg-gray-900 p-3 text-left hover:border-green-300">Treat Party <span class="float-right text-amber-300">10g</span></button><button id="btn-combat-treatment" class="mt-2 w-full border border-orange-700 bg-gray-900 p-3 text-left hover:border-orange-300">Treat Combat Injuries <span class="float-right text-amber-300">${injuryCost}g</span></button><button id="btn-close-treatment" class="mt-3 border border-gray-600 px-3 py-2 text-xs hover:border-green-400">Leave</button>`;
     dialogue.classList.remove('hidden');
     dialogue.querySelector('#btn-treatment').addEventListener('click', () => window.EventBus.emit('TREAT_PARTY'));
+        dialogue.querySelector('#btn-combat-treatment').addEventListener('click', () => { window.GameCore.treatCombatInjuries(); openTreatmentCenter(); });
+        const injuryCost = (window.GameState.combatRecord?.injuries?.length || 0) * 10;
+        dialogue.innerHTML = `<div class="mb-4 border-b border-orange-700 pb-3"><div class="text-orange-300 font-bold tracking-widest">GLADIATOR PROFILE</div><div class="text-xs text-gray-500 mt-1">${gladiator.name} | ${gladiator.matchState.toUpperCase()}</div></div><div class="grid grid-cols-2 gap-3 mb-4 text-xs"><div><div class="text-gray-500">FAME</div><div class="text-white text-lg font-bold">${gladiator.fame}</div></div><div><div class="text-gray-500">GOLD</div><div class="text-amber-300 text-lg font-bold">${gladiator.gold}</div></div><div><div class="text-gray-500">RENOWN</div><div class="text-amber-200">${window.GameState.renown.title} ${window.GameState.renown.score}</div></div><div><div class="text-gray-500">INFAMY</div><div class="text-red-300">${window.GameState.renown.infamy}</div></div><div><div class="text-gray-500">RECORD</div><div class="text-white">${gladiator.wins}W - ${gladiator.losses}L</div></div><div><div class="text-gray-500">WEAPON</div><div class="text-white">${window.ItemDatabase[weapon]?.name || weapon}</div></div></div><div class="border-t border-gray-800 pt-3 mb-4"><div class="text-xs text-orange-200 mb-1">CURRENT OBJECTIVE</div><div class="text-gray-300">${gladiator.objective}</div></div><div class="border-t border-gray-800 pt-3 mb-4"><div class="text-xs text-red-300 mb-1">INJURIES</div><ul class="text-xs text-gray-400 list-disc list-inside">${injuries}</ul></div><div class="grid grid-cols-3 gap-2"><button id="btn-start-gladiator-match" class="border border-orange-700 px-3 py-2 text-xs text-orange-200 hover:border-orange-300">Start Match</button><button id="btn-treat-gladiator" class="border border-green-700 px-3 py-2 text-xs text-green-200 hover:border-green-300">Treat ${injuryCost}g</button><button id="btn-close-gladiator-profile" class="border border-gray-600 px-3 py-2 text-xs hover:border-gray-300">Close</button></div>`;
+        dialogue.querySelector('#btn-treat-gladiator').addEventListener('click', () => { window.GameCore.treatCombatInjuries(); openGladiatorProfile(); });
     dialogue.querySelector('#btn-close-treatment').addEventListener('click', closeCompanionDialogue);
 }
 
@@ -318,7 +357,8 @@ window.EventBus.on('BUY_MERCHANT_ITEM', ({ chestId, index }) => {
     const chest = window.GameCore.activeEntities.find(entity => entity.id === chestId);
     const stock = chest?.merchantInventory?.[index];
     if (!stock || stock.quantity <= 0) return;
-    if (window.GameState.inventory.gold < stock.price) {
+    const price = window.GameCore.getMerchantPrice(stock.price, 'kingdom');
+    if (window.GameState.inventory.gold < price) {
         window.EventBus.emit('UI_LOG', 'Not enough gold.');
         return;
     }
@@ -326,7 +366,7 @@ window.EventBus.on('BUY_MERCHANT_ITEM', ({ chestId, index }) => {
         window.EventBus.emit('UI_LOG', 'Backpack is full.');
         return;
     }
-    window.GameState.inventory.gold -= stock.price;
+    window.GameState.inventory.gold -= price;
     stock.quantity--;
     window.GameState.inventory.backpack.push(stock.itemId);
     if (stock.itemId === 'food') window.GameState.inventory.food++;
@@ -422,7 +462,7 @@ window.EventBus.on('DELIVER_FETCH_QUEST', questIndex => {
         }
     }
     window.GameState.inventory.gold += quest.reward;
-    window.GameState.reputation.village += 5;
+    window.GameCore.recordRenown({ renown: 5, faction: 'village', reason: `fulfilled ${village?.name || 'village'} request` });
     window.GameState.questBoard.splice(questIndex, 1);
     window.EventBus.emit('UI_LOG', `Delivered ${quest.amount} ${quest.resource}. Earned ${quest.reward} gold.`);
     closeCompanionDialogue();

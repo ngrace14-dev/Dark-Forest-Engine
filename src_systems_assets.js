@@ -85,6 +85,90 @@ window.AssetManager = {
     }
 };
 
+window.AnimationPresetManager = {
+    presetLabels: {
+        swordShield: 'Sword and Shield', heavyWeapon: 'Heavy Weapon', agileMelee: 'Agile Melee', bowRanged: 'Bow and Ranged',
+        staffCasting: 'Staff Casting', advancedCasting: 'Advanced Casting', weaponMagic: 'Weapon and Magic', dualWeapon: 'Dual Weapon', creatureCombat: 'Creature Combat'
+    },
+    presets: {
+        swordShield: {
+            idle: ['idle', 'stand', 'breath'], walk: ['walk', 'run', 'jog'], attack: ['attack', 'slash', 'strike', 'sword', 'punch'],
+            block: ['block', 'guard', 'defend'], dash: ['dash', 'roll', 'dodge'], hit: ['hit', 'hurt', 'damage'], die: ['die', 'death', 'defeat']
+        },
+        heavyWeapon: {
+            idle: ['idle', 'stand', 'breath'], walk: ['walk', 'heavywalk', 'run'], attack: ['heavyattack', 'charged', 'smash', 'greatsword', 'attack'],
+            block: ['block', 'guard', 'brace'], dash: ['dash', 'lunge'], hit: ['hit', 'stagger', 'hurt', 'damage'], die: ['die', 'death', 'defeat']
+        },
+        agileMelee: {
+            idle: ['idle', 'stand', 'breath'], walk: ['walk', 'run', 'jog'], attack: ['dual', 'dagger', 'slash', 'strike', 'attack'],
+            block: ['block', 'guard', 'evade'], dash: ['roll', 'dodge', 'jump', 'dash'], hit: ['hit', 'hurt', 'damage'], die: ['die', 'death', 'defeat']
+        },
+        bowRanged: {
+            idle: ['idle', 'stand', 'breath', 'aim'], walk: ['walk', 'run', 'jog'], attack: ['shoot', 'bow', 'arrow', 'ranged', 'attack'],
+            block: ['block', 'guard', 'evade'], dash: ['dodge', 'roll', 'dash'], hit: ['hit', 'hurt', 'damage'], die: ['die', 'death', 'defeat']
+        },
+        staffCasting: {
+            idle: ['idle', 'stand', 'breath'], walk: ['walk', 'run'], attack: ['cast', 'spell', 'magic', 'staff', 'attack'],
+            block: ['barrier', 'shield', 'block', 'guard'], dash: ['teleport', 'dodge', 'dash'], hit: ['hit', 'hurt', 'damage'], die: ['die', 'death', 'defeat']
+        },
+        advancedCasting: {
+            idle: ['idle', 'chant', 'channel', 'stand'], walk: ['walk', 'run'], attack: ['spell', 'cast', 'chant', 'magic', 'attack'],
+            block: ['barrier', 'shield', 'block'], dash: ['teleport', 'dodge', 'dash'], hit: ['hit', 'hurt', 'damage'], die: ['die', 'death', 'defeat']
+        },
+        weaponMagic: {
+            idle: ['idle', 'stand', 'breath'], walk: ['walk', 'run'], attack: ['spellblade', 'sword', 'shield', 'slash', 'attack'],
+            block: ['shield', 'guard', 'block'], dash: ['dash', 'lunge', 'dodge'], hit: ['hit', 'stagger', 'hurt', 'damage'], die: ['die', 'death', 'defeat']
+        },
+        dualWeapon: {
+            idle: ['idle', 'stealth', 'crouch', 'stand'], walk: ['walk', 'sneak', 'run'], attack: ['assassin', 'dagger', 'dual', 'backstab', 'slash', 'attack'],
+            block: ['evade', 'dodge', 'guard', 'block'], dash: ['roll', 'dodge', 'leap', 'dash'], hit: ['hit', 'hurt', 'damage'], die: ['die', 'death', 'defeat']
+        },
+        creatureCombat: {
+            idle: ['idle', 'stand', 'breath'], walk: ['walk', 'run', 'crawl'], attack: ['attack', 'bite', 'claw', 'strike', 'slam'],
+            block: ['block', 'guard'], dash: ['dash', 'lunge', 'pounce'], hit: ['hit', 'hurt', 'damage'], die: ['die', 'death', 'defeat']
+        },
+        agile: {
+            idle: ['idle', 'stand', 'breath'], walk: ['walk', 'run', 'jog'], attack: ['attack', 'slash', 'strike', 'sword'],
+            block: ['block', 'guard', 'defend'], dash: ['dash', 'roll', 'dodge', 'jump'], hit: ['hit', 'hurt', 'damage'], die: ['die', 'death', 'defeat']
+        }
+    },
+    getClips: function(def) {
+        const clips = def.customModel ? [...(window.AssetManager.animations[def.customModel] || [])] : [];
+        window.AssetManager.globalAnimations.forEach(clip => { if (!clips.some(existing => existing.name === clip.name)) clips.push(clip); });
+        return clips;
+    },
+    applyToPrefab: function(prefabName, presetName, refresh = true) {
+        const def = window.AssetManager.prefabs[prefabName];
+        const preset = this.presets[presetName];
+        if (!def || !preset) return false;
+        const clips = this.getClips(def);
+        if (!clips.length) {
+            window.EventBus.emit('UI_LOG', `[ANIMATION] No clips available for ${prefabName}.`);
+            return false;
+        }
+        def.animMap ??= {};
+        Object.entries(preset).forEach(([state, tokens]) => {
+            const match = clips.find(clip => {
+                const name = clip.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return tokens.some(token => name.includes(token));
+            });
+            if (match) def.animMap[state] = match.name;
+        });
+        def.animationPreset = presetName;
+        if (refresh) {
+            if (prefabName === 'Player' && window.GameCore.playerObj) window.GameCore.swapPlayerModel();
+            else window.EventBus.emit('WORLD_REGENERATE');
+        }
+        window.EventBus.emit('UI_LOG', `[ANIMATION] Applied ${presetName} preset to ${prefabName}.`);
+        return true;
+    },
+    applyToPrefabs: function(prefabNames, presetName) {
+        prefabNames.forEach(prefabName => this.applyToPrefab(prefabName, presetName, false));
+        window.EventBus.emit('WORLD_REGENERATE');
+        window.EventBus.emit('UI_LOG', `[ANIMATION] Applied ${presetName} preset to ${prefabNames.length} prefabs.`);
+    }
+};
+
 window.renameVillage = function(id) {
     const v = window.VillageManager.villages.find(vil => vil.id === id);
     if(v) { const newName = prompt(`Enter new name for ${v.name}:`, v.name); if(newName && newName.trim() !== '') { v.name = newName.trim(); window.EventBus.emit('UI_LOG', `Village renamed to ${v.name}`); window.EventBus.emit('RENDER_ASSETS'); } }
@@ -332,6 +416,8 @@ window.renderAssetManager = function() {
             animSettingsHTML += `</div></div>`;
         }
 
+        const presetOptions = Object.entries(window.AnimationPresetManager.presetLabels).map(([id, label]) => `<option value="${id}" ${def.animationPreset === id ? 'selected' : ''}>${label}</option>`).join('');
+        const presetControlsHTML = (def.type === 'character' || def.type === 'npc') ? `<div class="flex flex-col gap-1"><label class="text-[9px] text-gray-500 uppercase font-bold">Animation Preset</label><div class="flex gap-1"><select class="anim-preset-select bg-gray-900 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 w-36" data-prefab="${name}"><option value="None">Manual</option>${presetOptions}</select><button class="anim-preset-apply-btn bg-orange-900/60 hover:bg-orange-700 border border-orange-700 text-orange-100 text-[10px] px-2 rounded" data-prefab="${name}">APPLY</button></div></div>` : '';
         if (!def.vfx) def.vfx = { aura: 'None', onHit: 'None' };
         let vfxSettingsHTML = `<div class="w-48 pl-4 border-l border-gray-700"><span class="text-[10px] font-bold text-red-400 block mb-1">PARTICLES & VFX:</span><div class="flex flex-col gap-1"><label class="text-[9px] text-gray-500">Aura (Passive)</label><select class="vfx-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-red-500 outline-none w-full" data-prefab="${name}" data-type="aura">${window.VFXManager.auras.map(v => `<option value="${v}" ${def.vfx.aura === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div class="flex flex-col gap-1 mt-1"><label class="text-[9px] text-gray-500">On Hit (Transient)</label><select class="vfx-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-red-500 outline-none w-full" data-prefab="${name}" data-type="onHit">${window.VFXManager.onHits.map(v => `<option value="${v}" ${def.vfx.onHit === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>`;
         
@@ -355,6 +441,7 @@ window.renderAssetManager = function() {
                     <label class="text-[9px] text-gray-500 uppercase font-bold">Scale Mult.</label>
                     <input type="number" step="0.001" min="0.001" class="asset-scale-input bg-gray-950 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 w-20 outline-none focus:border-indigo-500" data-prefab="${name}" value="${def.modelScale || 1.0}">
                 </div>
+                ${presetControlsHTML}
                 <button class="asset-apply-btn mt-4 bg-indigo-900/50 hover:bg-indigo-600 text-indigo-200 hover:text-white text-xs px-4 py-1.5 rounded border border-indigo-700 hover:border-indigo-400 transition-all font-bold" data-prefab="${name}">APPLY</button>
             </div>
         </div><div class="flex items-stretch bg-gray-900/50 border border-gray-800 p-2 rounded w-full">${animSettingsHTML}${vfxSettingsHTML}</div>`;
@@ -400,6 +487,13 @@ window.renderAssetManager = function() {
                         window.GameCore.swapPlayerModel(); 
                     }
                 }
+            });
+        });
+        document.querySelectorAll('.anim-preset-apply-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const prefabName = e.target.getAttribute('data-prefab');
+                const presetName = document.querySelector(`.anim-preset-select[data-prefab="${prefabName}"]`).value;
+                if (presetName !== 'None') window.AnimationPresetManager.applyToPrefab(prefabName, presetName);
             });
         });
     }, 0);
@@ -489,12 +583,38 @@ window.EventBus.on('ENGINE_READY', () => {
 });
 
 document.getElementById('btn-upload-file').addEventListener('click', () => { document.getElementById('asset-file-input').click(); });
+async function importMeshyArchive(file) {
+    if (!window.JSZip) {
+        window.EventBus.emit('UI_LOG', 'ZIP importer unavailable. Check the JSZip CDN connection.');
+        return;
+    }
+    try {
+        const archive = await window.JSZip.loadAsync(file);
+        const entries = Object.values(archive.files).filter(entry => !entry.dir && entry.name.toLowerCase().endsWith('.glb'));
+        if (!entries.length) {
+            window.EventBus.emit('UI_LOG', `No GLB models found in ${file.name}.`);
+            return;
+        }
+        for (const entry of entries) {
+            const blob = await entry.async('blob');
+            const folder = entry.name.split('/').slice(-2, -1)[0] || file.name.replace(/\.zip$/i, '');
+            const modelName = `${file.name.replace(/\.zip$/i, '')} - ${folder}`;
+            await loadModel(URL.createObjectURL(blob), modelName);
+        }
+        window.EventBus.emit('UI_LOG', `Imported ${entries.length} Meshy GLB model${entries.length === 1 ? '' : 's'} from ${file.name}.`);
+    } catch (error) {
+        console.error(`Could not import ${file.name}`, error);
+        window.EventBus.emit('UI_LOG', `Could not read Meshy archive ${file.name}.`);
+    }
+}
+
 document.getElementById('asset-file-input').addEventListener('change', (e) => {
     for (const file of e.target.files) {
-        if (file.name.toLowerCase().endsWith('.glb') || file.name.toLowerCase().endsWith('.gltf')) {
-            loadModel(URL.createObjectURL(file), file.name);
-        }
+        const lowerName = file.name.toLowerCase();
+        if (lowerName.endsWith('.zip')) importMeshyArchive(file);
+        else if (lowerName.endsWith('.glb') || lowerName.endsWith('.gltf')) loadModel(URL.createObjectURL(file), file.name);
     }
+    e.target.value = '';
 });
 
 document.querySelectorAll('.asset-tab').forEach(btn => {
