@@ -773,14 +773,14 @@ async function bootEngine() {
         window.GameCore.scene = new THREE.Scene(); window.GameCore.scene.fog = new THREE.FogExp2(0x040608, 0.03); window.GameCore.scene.background = new THREE.Color(0x040608);
         window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 1000);
         
-        renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); renderer.setSize(window.innerWidth || 800, window.innerHeight || 600); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.2; document.body.appendChild(renderer.domElement);
+        renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); renderer.setSize(window.innerWidth || 800, window.innerHeight || 600); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25; document.body.appendChild(renderer.domElement);
         clock = new THREE.Clock(); window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
 
         ambientLight = new THREE.AmbientLight(0x506070, 0.8); window.GameCore.scene.add(ambientLight);
         dirLight = new THREE.DirectionalLight(0xaaccff, 1.2); dirLight.position.set(20, 40, 20); dirLight.castShadow = true; dirLight.shadow.camera.left = -50; dirLight.shadow.camera.right = 50; dirLight.shadow.camera.top = 50; dirLight.shadow.camera.bottom = -50; window.GameCore.scene.add(dirLight);
 
         composer = new EffectComposer(renderer); composer.addPass(new RenderPass(window.GameCore.scene, window.GameCore.camera));
-        window.GameCore.passes.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.8, 0.4, 0.85); composer.addPass(window.GameCore.passes.bloom);
+        window.GameCore.passes.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), window.EngineParams.bloom, 0.25, 0.9); composer.addPass(window.GameCore.passes.bloom);
         
         const VignetteShader = { uniforms: { "tDiffuse": { value: null }, "darkness": { value: 0.35 } }, vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`, fragmentShader: `uniform float darkness; uniform sampler2D tDiffuse; varying vec2 vUv; void main() { vec4 texel = texture2D( tDiffuse, vUv ); float dist = distance(vUv, vec2(0.5)); float edge = smoothstep(0.25, 0.75, dist); texel.rgb *= 1.0 - edge * clamp(darkness, 0.0, 0.85); gl_FragColor = texel; }` };
         window.GameCore.passes.vignette = new ShaderPass(VignetteShader); composer.addPass(window.GameCore.passes.vignette);
@@ -793,10 +793,10 @@ async function bootEngine() {
         
         window.EventBus.on('ENV_UPDATE', () => {
             const angle = ((window.EngineParams.timeOfDay - 6) / 24) * Math.PI * 2; dirLight.position.x = Math.cos(angle) * 50; dirLight.position.y = Math.sin(angle) * 50; dirLight.position.z = Math.cos(angle) * 20;
-            const sunHeight = Math.sin(angle); let baseDirIntensity = 1.8; let baseAmbientIntensity = 1.15;
-            if (sunHeight > 0.2) { baseDirIntensity = 1.8; dirLight.color.setHex(0xffffff); ambientLight.color.setHex(0x708090); window.GameCore.scene.fog.color.setHex(0x182028); window.GameCore.scene.background = new THREE.Color(0x182028); }
-            else if (sunHeight > 0.0) { baseDirIntensity = 1.1; dirLight.color.setHex(0xffbb77); ambientLight.color.setHex(0x5a4650); window.GameCore.scene.fog.color.setHex(0x2a1710); window.GameCore.scene.background = new THREE.Color(0x2a1710); }
-            else { baseDirIntensity = 0.65; baseAmbientIntensity = 0.85; dirLight.color.setHex(0x7590b5); ambientLight.color.setHex(0x4a5668); window.GameCore.scene.fog.color.setHex(0x101820); window.GameCore.scene.background = new THREE.Color(0x101820); }
+            const sunHeight = Math.sin(angle); let baseDirIntensity = 1.55; let baseAmbientIntensity = 1.25;
+            if (sunHeight > 0.2) { baseDirIntensity = 1.55; dirLight.color.setHex(0xffffff); ambientLight.color.setHex(0x8090a0); window.GameCore.scene.fog.color.setHex(0x182028); window.GameCore.scene.background = new THREE.Color(0x182028); }
+            else if (sunHeight > 0.0) { baseDirIntensity = 1.15; baseAmbientIntensity = 1.05; dirLight.color.setHex(0xffbb77); ambientLight.color.setHex(0x6a5660); window.GameCore.scene.fog.color.setHex(0x2a1710); window.GameCore.scene.background = new THREE.Color(0x2a1710); }
+            else { baseDirIntensity = 0.8; baseAmbientIntensity = 0.95; dirLight.color.setHex(0x7590b5); ambientLight.color.setHex(0x58687a); window.GameCore.scene.fog.color.setHex(0x101820); window.GameCore.scene.background = new THREE.Color(0x101820); }
             dirLight.intensity = baseDirIntensity * window.EngineParams.globalBrightness; ambientLight.intensity = baseAmbientIntensity * window.EngineParams.globalBrightness; renderer.toneMappingExposure = Math.max(0.8, window.EngineParams.globalBrightness); window.GameCore.scene.fog.density = window.EngineParams.fogDensity;
         });
         

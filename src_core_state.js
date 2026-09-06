@@ -116,13 +116,13 @@ window.Input = {
 
 window.EngineParams = {
     playMode: true, brushActive: false, selectedPrefab: 'Village Hub', isPlayerHidden: false,
-    bloom: 0.8, vignette: 1.1, filterColor: '#2b4461', filterIntensity: 0.65,
+    bloom: 0.35, vignette: 1.1, filterColor: '#2b4461', filterIntensity: 0.65,
     timeOfDay: 14.0, worldDay: 0, dayLengthSeconds: 120, offPathCaptureCooldown: 0,
     mapTileSizeMeters: 8046.72, visitedMapTiles: [], currentMapTile: null, sandReaverEncountered: false,
     fogDensity: 0.03, timeScale: 1.0, godMode: false,
-    globalBrightness: 1.2, worldSeed: 'dark_forests_1337', isPlayerSafe: false,
+    globalBrightness: 1.5, worldSeed: 'dark_forests_1337', isPlayerSafe: false,
     cycleLengthDays: 14, lastCycleDay: 0,
-    arenaMode: false, arenaWave: 0
+    arenaMode: false, arenaWave: 0, suppressWorldRegenerate: false
 };
 
 window.GameCore = {

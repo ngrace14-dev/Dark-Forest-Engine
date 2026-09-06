@@ -36,7 +36,18 @@ try {
             continue
         }
 
-        $response.ContentType = if ($filePath.EndsWith('.glb', [StringComparison]::OrdinalIgnoreCase)) { 'model/gltf-binary' } else { 'application/octet-stream' }
+        $response.ContentType = switch -Regex ($filePath.ToLowerInvariant()) {
+            '\.html?$' { 'text/html; charset=utf-8'; break }
+            '\.js$' { 'text/javascript; charset=utf-8'; break }
+            '\.css$' { 'text/css; charset=utf-8'; break }
+            '\.json$' { 'application/json; charset=utf-8'; break }
+            '\.glb$' { 'model/gltf-binary'; break }
+            '\.gltf$' { 'model/gltf+json'; break }
+            '\.png$' { 'image/png'; break }
+            '\.jpe?g$' { 'image/jpeg'; break }
+            '\.webp$' { 'image/webp'; break }
+            default { 'application/octet-stream' }
+        }
         $bytes = [IO.File]::ReadAllBytes($filePath)
         $response.ContentLength64 = $bytes.Length
         $response.OutputStream.Write($bytes, 0, $bytes.Length)

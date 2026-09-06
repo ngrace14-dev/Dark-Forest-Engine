@@ -553,7 +553,7 @@ function loadModel(url, modelName) {
             const [prefabName, prefabDef] = matchingPrefab;
             prefabDef.customModel = modelName;
             window.EventBus.emit('UI_LOG', `Terrain model auto-assigned: ${modelName} -> ${prefabName}`);
-            window.EventBus.emit('WORLD_REGENERATE');
+            if (!window.EngineParams.suppressWorldRegenerate) window.EventBus.emit('WORLD_REGENERATE');
         }
         if (gltf.animations && gltf.animations.length > 0) {
             window.AssetManager.animations[modelName] = gltf.animations;
@@ -575,11 +575,8 @@ function loadModel(url, modelName) {
 }
 
 window.EventBus.on('ENGINE_READY', () => {
-    const terrainModels = ['Tree Stump', 'Dead Brush Hideout', 'Dead Oak Tree', 'Pointed Stone Monolith', 'Bramble Bush', 'Moss-Covered Log', 'Dried Riverbed Path'];
-    Promise.all(terrainModels.map(modelName => {
-        const model = bundledModels.find(entry => entry.name === modelName);
-        return model ? loadModel(resolveAssetPath(model.path), model.name) : Promise.resolve(null);
-    })).then(() => window.EventBus.emit('WORLD_REGENERATE'));
+    window.EventBus.emit('UI_LOG', '[ASSETS] Heavy Meshy terrain models deferred until explicitly loaded.');
+    window.EventBus.emit('WORLD_REGENERATE');
 });
 
 document.getElementById('btn-upload-file').addEventListener('click', () => { document.getElementById('asset-file-input').click(); });
