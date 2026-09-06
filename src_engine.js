@@ -204,7 +204,14 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     if(def.type === 'powerStone') { const light = new THREE.PointLight(0x7dd3fc, def.active === false ? 0.2 : 3, 25); light.position.y = def.height / 2; mesh.add(light); }
     if(def.type === 'firePit') { const light = new THREE.PointLight(0xff8a32, def.active === false ? 0 : 2.5, 12); light.position.y = def.height; mesh.add(light); }
     if(def.type === 'streetLight') { const light = new THREE.PointLight(0x9bdcff, def.active === false ? 0 : 2.5, 18); light.position.y = def.height; mesh.add(light); }
-    setupEntityAnimations(entity); window.VFXManager.applyAura(entity, def); window.GameCore.activeEntities.push(entity); return entity;
+    setupEntityAnimations(entity); window.VFXManager.applyAura(entity, def); window.GameCore.activeEntities.push(entity);
+    if (!window.GameState.narrator.targetId && (def.faction === 'village' || def.faction === 'adventurer')) {
+        window.GameState.narrator.targetId = entity.id;
+        window.GameState.narrator.targetName = entity.name;
+        applyForestBlessing(entity);
+        window.EventBus.emit('UI_LOG', `[THE CROW] It chooses ${entity.name} as the story's main character.`);
+    }
+    return entity;
 }
 window.GameCore.instantiatePrefab = instantiatePrefab;
 
@@ -220,6 +227,31 @@ function spawnPlayer(x, y, z) {
     setupEntityAnimations(window.GameCore.playerObj, true); window.VFXManager.applyAura(window.GameCore.playerObj, def);
 }
 
+function applyForestBlessing(entity, isPlayer = false) {
+    if (!entity) return;
+    const targetDef = entity.def || window.AssetManager.prefabs['Player'];
+    const blessing = isPlayer ? {
+        active: true, tier: 'true', name: "Forest's True Chosen", athletics: 3, dodge: 2, staminaRegen: 0.15, dangerSense: true, combatLuck: 0.30, teleportLuck: 0.35
+    } : {
+        active: true, tier: 'chosen', name: "Forest's Chosen", athletics: 2, dodge: 1, staminaRegen: 0.10, dangerSense: false, combatLuck: 0.20, teleportLuck: 0.20
+    };
+    if (isPlayer) {
+        const current = window.GameState.forestBlessing;
+        if (current.active && current.tier === blessing.tier) return;
+        window.GameState.forestBlessing = blessing;
+        window.GameCore.applyBuff('athletics', blessing.athletics, 315360000, blessing.name);
+        window.GameCore.applyBuff('dodge', blessing.dodge, 315360000, blessing.name);
+        window.GameCore.adjustFactionStanding('village', -5, 'the crow marked you');
+        window.EventBus.emit('UI_LOG', `[FOREST] ${blessing.name}: +${blessing.athletics} Athletics, +${blessing.dodge} Dodge, ${Math.round(blessing.combatLuck * 100)}% enemy miss chance.`);
+    } else {
+        entity.forestChosen = true;
+        entity.forestBlessing = blessing;
+        entity.speedMultiplier = 1.1;
+    }
+    window.VFXManager.applyAura(entity, { ...targetDef, vfx: { ...(targetDef.vfx || {}), aura: 'ForestChosen' } });
+}
+window.GameCore.applyForestBlessing = applyForestBlessing;
+
 function spawnGroundLoot(itemId, position) {
     if (!window.ItemDatabase[itemId]) return;
     const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.25), new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0x8a5a00, emissiveIntensity: 1 }));
@@ -228,6 +260,23 @@ function spawnGroundLoot(itemId, position) {
     window.GameCore.groundLoot.push({ id: Math.random().toString(36).slice(2), itemId, visual: mesh });
 }
 window.GameCore.spawnGroundLoot = spawnGroundLoot;
+
+function awardMonsterKill(target) {
+    if (!target?.def || (target.def.faction !== 'monster' && target.def.faction !== 'forest')) return;
+    const essence = Math.max(1, Math.ceil((target.def.hp || target.hp || 50) / 25));
+    const nearestVillage = window.VillageManager.villages.reduce((nearest, village) => {
+        const distance = Math.hypot(target.visual.position.x - village.x, target.visual.position.z - village.z);
+        return !nearest || distance < nearest.distance ? { village, distance } : nearest;
+    }, null)?.village;
+    if (nearestVillage) {
+        nearestVillage.stats ??= {};
+        nearestVillage.stats.essence = (nearestVillage.stats.essence || 0) + essence;
+    }
+    const impact = target.def.boss ? 12 : (target.def.faction === 'forest' ? 4 : 2);
+    window.GameCore.recordFeat({ impact, label: `The ${target.name} fed a village's ward.` });
+    window.EventBus.emit('UI_LOG', `[ESSENCE] ${nearestVillage?.name || 'The settlements'} gained ${essence} life essence.`);
+}
+window.GameCore.awardMonsterKill = awardMonsterKill;
 
 function spawnPartyMembers() {
     if (!window.GameCore.playerObj) return;
@@ -367,7 +416,9 @@ function performAttack(isHeavy = false) {
 
             if(en.hp <= 0) {
                 playEntityAnimation(en, 'die');
+                window.AdventurerManager?.markDefeated(en);
                 if (en.def.type === 'npc') spawnGroundLoot(en.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', en.visual.position);
+                awardMonsterKill(en);
                 setTimeout(() => {
                     window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e.id !== en.id);
                 }, 2000);
@@ -409,7 +460,9 @@ function performGuardbreaker() {
     window.EventBus.emit('SPAWN_HIT_VFX', { type: 'Sparks', pos: target.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
     if (target.hp <= 0) {
         playEntityAnimation(target, 'die');
+        window.AdventurerManager?.markDefeated(target);
         spawnGroundLoot(target.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', target.visual.position);
+        awardMonsterKill(target);
         window.GameState.inventory.gold += target.def.faction === 'monster' ? 10 : 50;
         window.EventBus.emit('UI_UPDATE_HUD');
         window.EventBus.emit('UI_LOG', `Killed ${target.name}. Looted gold.`);
@@ -465,7 +518,9 @@ window.EventBus.on('PLAYER_PROJECTILE_HIT', ({ target, damage, damageType, posit
     }
     if (target.hp <= 0) {
         playEntityAnimation(target, 'die');
+        window.AdventurerManager?.markDefeated(target);
         spawnGroundLoot(target.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', target.visual.position);
+        awardMonsterKill(target);
         window.GameState.inventory.gold += target.def.faction === 'monster' ? 10 : 50;
         window.EventBus.emit('UI_UPDATE_HUD');
         setTimeout(() => {
@@ -550,10 +605,32 @@ window.EventBus.on('WORLD_REGENERATE', () => {
     if (window.GameCore.playerObj) { const vy = window.WorldGenerator.getTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 15; window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); spawnPartyMembers(); syncCaravanAgents(); syncPlayerBase(); ChunkManager.update(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, vy, window.GameCore.playerObj.visual.position.z)); }
     window.EventBus.emit('UI_LOG', `World Math Regenerated with Seed: ${window.EngineParams.worldSeed}`);
 });
+function punishExposedActors() {
+    const player = window.GameCore.playerObj;
+    const playerSafe = player && (window.RoadManager.isSafeZone(player.visual.position) || window.RoadManager.isVillageProtected(player.visual.position));
+    const destination = () => window.RoadManager.getRandomPathPoint() || { x: 0, z: 0 };
+    if (player && !playerSafe) {
+        if (window.GameCore.getForestLuck() > 0 && Math.random() < (window.GameState.forestBlessing.teleportLuck || 0)) {
+            window.EventBus.emit('UI_LOG', '[THE CROW] The woods reach for you, but the landing bends away.');
+        } else {
+        const point = destination(); const y = window.WorldGenerator.getTerrainHeight(point.x, point.z) + 15;
+        player.body.setTranslation({ x: point.x, y, z: point.z }, true); player.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        window.EventBus.emit('UI_LOG', '[THE WOODS] The shift catches you. You are thrown across the new landscape.');
+        }
+    }
+    window.GameCore.activeEntities.filter(entity => entity.def.type === 'npc' && !window.RoadManager.isVillageProtected(entity.visual.position)).forEach(entity => {
+        if (window.GameCore.getForestLuck(entity) > 0 && Math.random() < (entity.forestBlessing.teleportLuck || 0)) return;
+        const point = destination(); const y = window.WorldGenerator.getTerrainHeight(point.x, point.z) + entity.def.height / 2;
+        entity.body.setTranslation({ x: point.x, y, z: point.z }, true); entity.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    });
+}
+
 function regenerateWorldCycle() {
+    punishExposedActors();
     if (window.VillageManager.villages.length > 0) window.VillageManager.shiftLocations();
     window.EngineParams.worldSeed = `${window.EngineParams.worldSeed.split('_cycle_')[0]}_cycle_${window.EngineParams.worldDay}`;
     window.EventBus.emit('WORLD_REGENERATE');
+    window.EngineParams.lastCycleDay = window.EngineParams.worldDay;
     window.EventBus.emit('UI_LOG', `Day ${window.EngineParams.worldDay}: settlements shifted and the world regenerated at midnight.`);
 }
 window.EventBus.on('CMD_TELEPORT', (pos) => { const vy = window.WorldGenerator.getTerrainHeight(pos.x, pos.z) + 15; window.GameCore.playerObj.body.setTranslation({x:pos.x, y:vy, z:pos.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); ChunkManager.update(new THREE.Vector3(pos.x, vy, pos.z)); });
@@ -570,13 +647,13 @@ async function bootEngine() {
         renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); renderer.setSize(window.innerWidth || 800, window.innerHeight || 600); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.2; document.body.appendChild(renderer.domElement);
         clock = new THREE.Clock(); window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
 
-        ambientLight = new THREE.AmbientLight(0x202530, 0.5); window.GameCore.scene.add(ambientLight);
-        dirLight = new THREE.DirectionalLight(0xaaccff, 0.8); dirLight.position.set(20, 40, 20); dirLight.castShadow = true; dirLight.shadow.camera.left = -50; dirLight.shadow.camera.right = 50; dirLight.shadow.camera.top = 50; dirLight.shadow.camera.bottom = -50; window.GameCore.scene.add(dirLight);
+        ambientLight = new THREE.AmbientLight(0x506070, 0.8); window.GameCore.scene.add(ambientLight);
+        dirLight = new THREE.DirectionalLight(0xaaccff, 1.2); dirLight.position.set(20, 40, 20); dirLight.castShadow = true; dirLight.shadow.camera.left = -50; dirLight.shadow.camera.right = 50; dirLight.shadow.camera.top = 50; dirLight.shadow.camera.bottom = -50; window.GameCore.scene.add(dirLight);
 
         composer = new EffectComposer(renderer); composer.addPass(new RenderPass(window.GameCore.scene, window.GameCore.camera));
         window.GameCore.passes.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.8, 0.4, 0.85); composer.addPass(window.GameCore.passes.bloom);
         
-        const VignetteShader = { uniforms: { "tDiffuse": { value: null }, "darkness": { value: 1.1 } }, vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`, fragmentShader: `uniform float darkness; uniform sampler2D tDiffuse; varying vec2 vUv; void main() { vec4 texel = texture2D( tDiffuse, vUv ); float dist = distance(vUv, vec2(0.5)); texel.rgb *= smoothstep(0.8, 0.2, dist * darkness); gl_FragColor = texel; }` };
+        const VignetteShader = { uniforms: { "tDiffuse": { value: null }, "darkness": { value: 0.35 } }, vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`, fragmentShader: `uniform float darkness; uniform sampler2D tDiffuse; varying vec2 vUv; void main() { vec4 texel = texture2D( tDiffuse, vUv ); float dist = distance(vUv, vec2(0.5)); float edge = smoothstep(0.25, 0.75, dist); texel.rgb *= 1.0 - edge * clamp(darkness, 0.0, 0.85); gl_FragColor = texel; }` };
         window.GameCore.passes.vignette = new ShaderPass(VignetteShader); composer.addPass(window.GameCore.passes.vignette);
         
         const ColorTintShader = { uniforms: { "tDiffuse": { value: null }, "tintColor": { value: new THREE.Color('#2b4461') }, "tintIntensity": { value: 0.65 } }, vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`, fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 tintColor; uniform float tintIntensity; varying vec2 vUv; void main() { vec4 texel = texture2D( tDiffuse, vUv ); vec3 tinted = texel.rgb * tintColor * 2.0; vec3 finalColor = mix(texel.rgb, tinted, tintIntensity); gl_FragColor = vec4( finalColor, texel.a ); }` };
@@ -587,11 +664,11 @@ async function bootEngine() {
         
         window.EventBus.on('ENV_UPDATE', () => {
             const angle = ((window.EngineParams.timeOfDay - 6) / 24) * Math.PI * 2; dirLight.position.x = Math.cos(angle) * 50; dirLight.position.y = Math.sin(angle) * 50; dirLight.position.z = Math.cos(angle) * 20;
-            const sunHeight = Math.sin(angle); let baseDirIntensity = 1.5; let baseAmbientIntensity = 1.0;
-            if (sunHeight > 0.2) { baseDirIntensity = 1.5; dirLight.color.setHex(0xffffff); ambientLight.color.setHex(0x606070); window.GameCore.scene.fog.color.setHex(0x0a0c10); window.GameCore.scene.background = new THREE.Color(0x0a0c10); } 
-            else if (sunHeight > 0.0) { baseDirIntensity = 0.8; dirLight.color.setHex(0xffaa55); ambientLight.color.setHex(0x403030); window.GameCore.scene.fog.color.setHex(0x1a0a05); window.GameCore.scene.background = new THREE.Color(0x1a0a05); } 
-            else { baseDirIntensity = 0.2; dirLight.color.setHex(0x334466); ambientLight.color.setHex(0x202030); window.GameCore.scene.fog.color.setHex(0x040608); window.GameCore.scene.background = new THREE.Color(0x040608); }
-            dirLight.intensity = baseDirIntensity * (window.EngineParams.globalBrightness * 0.8); ambientLight.intensity = baseAmbientIntensity * window.EngineParams.globalBrightness; renderer.toneMappingExposure = window.EngineParams.globalBrightness; window.GameCore.scene.fog.density = window.EngineParams.fogDensity;
+            const sunHeight = Math.sin(angle); let baseDirIntensity = 1.8; let baseAmbientIntensity = 1.15;
+            if (sunHeight > 0.2) { baseDirIntensity = 1.8; dirLight.color.setHex(0xffffff); ambientLight.color.setHex(0x708090); window.GameCore.scene.fog.color.setHex(0x182028); window.GameCore.scene.background = new THREE.Color(0x182028); }
+            else if (sunHeight > 0.0) { baseDirIntensity = 1.1; dirLight.color.setHex(0xffbb77); ambientLight.color.setHex(0x5a4650); window.GameCore.scene.fog.color.setHex(0x2a1710); window.GameCore.scene.background = new THREE.Color(0x2a1710); }
+            else { baseDirIntensity = 0.65; baseAmbientIntensity = 0.85; dirLight.color.setHex(0x7590b5); ambientLight.color.setHex(0x4a5668); window.GameCore.scene.fog.color.setHex(0x101820); window.GameCore.scene.background = new THREE.Color(0x101820); }
+            dirLight.intensity = baseDirIntensity * window.EngineParams.globalBrightness; ambientLight.intensity = baseAmbientIntensity * window.EngineParams.globalBrightness; renderer.toneMappingExposure = Math.max(0.8, window.EngineParams.globalBrightness); window.GameCore.scene.fog.density = window.EngineParams.fogDensity;
         });
         
         window.EventBus.emit('ENGINE_READY'); window.EventBus.emit('ENV_UPDATE');
@@ -656,7 +733,8 @@ function launchHostileExpedition(village) {
 }
 
 function simulateVillage(village) {
-    village.stats = { ap: 0, food: 0, wood: 0, stone: 0, gold: 0, ...village.stats };
+    village.stats = { ap: 0, food: 0, wood: 0, stone: 0, gold: 0, essence: 0, ...village.stats };
+    village.barrierIntegrity ??= 100;
     village.population ??= { current: 8, capacity: 12 };
     village.squads ??= [];
     village.caravans ??= [];
@@ -669,6 +747,15 @@ function simulateVillage(village) {
     village.stats.ap = Math.min(200, (village.stats.ap || 0) + 10);
     const production = Math.max(1, Math.floor(village.population.current / 1500));
     village.stats[village.industry.produces] += production;
+    const essenceCost = Math.max(1, Math.ceil(village.population.current / 5000));
+    village.barrierIntegrity = Math.max(0, (village.barrierIntegrity ?? 100) - essenceCost);
+    if ((village.stats.essence || 0) >= essenceCost) {
+        village.stats.essence -= essenceCost;
+        village.barrierIntegrity = Math.min(100, village.barrierIntegrity + 8);
+    } else if (village.barrierIntegrity === 0) {
+        postVillageNeed(village, 'essence', essenceCost, 'fueling the rune barrier');
+        if (Math.random() < 0.15) window.EventBus.emit('UI_LOG', `[BARRIER] ${village.name}'s ward is failing. Hunters must enter the woods.`);
+    }
     village.provisionStock[village.provision.itemId] = (village.provisionStock[village.provision.itemId] || 0) + Math.max(1, Math.floor(production / 2));
     village.stats.food = Math.max(0, (village.stats.food || 0) - Math.ceil(village.population.current / 24));
     processVillageCaravans(village);
@@ -756,14 +843,20 @@ function fixedUpdateLogic(delta) {
     if (window.EngineParams.offPathCaptureCooldown > 0) window.EngineParams.offPathCaptureCooldown = Math.max(0, window.EngineParams.offPathCaptureCooldown - delta);
     window.GameCore.worldTimer += delta;
 
-    const hoursPerSecond = 24 / window.EngineParams.dayLengthSeconds;
-    window.EngineParams.timeOfDay += delta * hoursPerSecond;
-    if (window.EngineParams.timeOfDay >= 24) {
-        const elapsedDays = Math.floor(window.EngineParams.timeOfDay / 24);
-        window.EngineParams.timeOfDay %= 24;
-        window.EngineParams.worldDay += elapsedDays;
-        for (let day = 0; day < elapsedDays; day++) { processCompanionNeeds(); processBaseJobs(); }
-        if (window.EngineParams.worldDay > 0 && window.EngineParams.worldDay % 14 === 0) regenerateWorldCycle();
+    if (!window.NetworkSession?.connected) {
+        const hoursPerSecond = 24 / window.EngineParams.dayLengthSeconds;
+        window.EngineParams.timeOfDay += delta * hoursPerSecond;
+        if (window.EngineParams.timeOfDay >= 24) {
+            const elapsedDays = Math.floor(window.EngineParams.timeOfDay / 24);
+            window.EngineParams.timeOfDay %= 24;
+            window.EngineParams.worldDay += elapsedDays;
+            for (let day = 0; day < elapsedDays; day++) {
+                processCompanionNeeds(); processBaseJobs();
+                window.AdventurerManager?.advanceDay();
+                window.GameState.processCrowDay();
+            }
+            if (window.EngineParams.worldDay > 0 && window.EngineParams.worldDay % window.EngineParams.cycleLengthDays === 0) regenerateWorldCycle();
+        }
     }
     window.EventBus.emit('ENV_UPDATE');
 
@@ -795,15 +888,26 @@ function fixedUpdateLogic(delta) {
             }
         }
     }
+
+    if (window.NetworkSession?.connected && window.GameCore.playerObj) {
+        const playerPosition = window.GameCore.playerObj.visual.position;
+        const moveX = (window.Input.keys.d ? 1 : 0) - (window.Input.keys.a ? 1 : 0);
+        const moveZ = (window.Input.keys.s ? 1 : 0) - (window.Input.keys.w ? 1 : 0);
+        window.NetworkSession.sendInput(moveX, moveZ);
+        window.NetworkSession.sendPose(playerPosition);
+    }
     
     if(window.GameCore.worldTimer > 5) { 
         window.VillageManager.villages.forEach(simulateVillage);
+        window.AdventurerManager?.syncDeparted();
+        window.AdventurerManager?.syncNearby();
         window.GameCore.worldTimer = 0; 
     }
 
     window.EngineParams.isPlayerSafe = false; 
     window.EngineParams.isPlayerHidden = false;
-    window.GameState.pStats.stamina = Math.min(window.GameState.pStats.maxStamina, window.GameState.pStats.stamina + (window.Input.isBlocking ? 3 : 12) * delta);
+    const staminaMultiplier = 1 + (window.GameState.forestBlessing?.staminaRegen || 0);
+    window.GameState.pStats.stamina = Math.min(window.GameState.pStats.maxStamina, window.GameState.pStats.stamina + (window.Input.isBlocking ? 3 : 12) * staminaMultiplier * delta);
     if (performance.now() >= window.GameState.pStats.guardBrokenUntil) window.GameState.pStats.poise = Math.min(window.GameState.pStats.maxPoise, window.GameState.pStats.poise + 10 * delta);
     window.GameState.statusEffects = window.GameState.statusEffects.filter(effect => {
         effect.remaining -= delta; effect.tickTimer -= delta;
@@ -827,7 +931,9 @@ function fixedUpdateLogic(delta) {
                 window.EventBus.emit('SPAWN_HIT_VFX', { type: effect.type === 'burning' ? 'Fire' : 'Void', pos: entity.visual.position });
                 if (entity.hp <= 0) {
                     playEntityAnimation(entity, 'die');
+                    window.AdventurerManager?.markDefeated(entity);
                     spawnGroundLoot(entity.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', entity.visual.position);
+                    awardMonsterKill(entity);
                     window.GameState.inventory.gold += entity.def.faction === 'monster' ? 10 : 50;
                     window.EventBus.emit('UI_UPDATE_HUD');
                     setTimeout(() => {
@@ -862,7 +968,8 @@ function fixedUpdateLogic(delta) {
 
     if (window.GameCore.playerObj && window.GameState.pStats.hp > 0) {
         const p = window.GameCore.playerObj.body.translation(); window.EngineParams.isPlayerSafe = window.RoadManager.isSafeZone(p);
-        const hostileNearby = window.GameCore.activeEntities.some(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && entity.visual.position.distanceTo(window.GameCore.playerObj.visual.position) < 15);
+        const detectionRadius = window.GameState.forestBlessing?.dangerSense ? 18 : 15;
+        const hostileNearby = window.GameCore.activeEntities.some(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && entity.visual.position.distanceTo(window.GameCore.playerObj.visual.position) < detectionRadius);
         if (!window.EngineParams.isPlayerSafe && !window.EngineParams.isPlayerHidden && hostileNearby && !window.EngineParams.godMode && window.EngineParams.offPathCaptureCooldown <= 0) {
             const pathPoint = window.RoadManager.getRandomPathPoint();
             if (pathPoint) {

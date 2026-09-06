@@ -1,5 +1,6 @@
 // Core Setup
 import './src_core_state.js';
+import './src_multiplayer.js';
 
 // Game Systems
 import './src_systems_inventory.js';

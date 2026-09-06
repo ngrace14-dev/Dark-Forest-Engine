@@ -1,0 +1,11 @@
+{
+  "name": "dark-forest-engine",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "coop-server": "node server/coop-server.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

@@ -60,7 +60,12 @@ function isHostileFaction(faction) {
     return faction === 'monster' || faction === 'forest';
 }
 
+function getEntitySpeed(entity) {
+    return entity.def.speed * (entity.speedMultiplier || 1);
+}
+
 function defeatNpc(entity) {
+    window.AdventurerManager?.markDefeated(entity);
     if (entity.expeditionId) {
         const village = window.VillageManager.villages.find(candidate => candidate.id === entity.targetVillageId);
         const expedition = village?.expeditions.find(candidate => candidate.id === entity.expeditionId);
@@ -111,6 +116,10 @@ function defeatNpc(entity) {
 function attackNpc(attacker, target) {
     if (attacker.npcAttackReadyAt && performance.now() < attacker.npcAttackReadyAt) return;
     attacker.npcAttackReadyAt = performance.now() + 1000;
+    if (window.GameCore.forestAttackMisses(target)) {
+        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'MISSED', pos: target.visual.position, color: '#86efac' });
+        return;
+    }
     const damage = Math.max(1, (attacker.def.attackDamage || 15) - (target.def.armor || 0));
     target.hp -= damage;
     if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(attacker, 'attack');
@@ -211,6 +220,24 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             return;
         }
 
+        if (en.adventurerPartyId) {
+            const record = window.AdventurerManager?.records.find(candidate => candidate.id === en.adventurerPartyId);
+            const leader = record && window.GameCore.activeEntities.find(candidate => candidate.adventurerRecordId === record.id);
+            if (record && leader && en !== leader) {
+                const memberIndex = record.party.findIndex(member => member.id === en.adventurerMemberId);
+                const offset = new window.THREE.Vector3(memberIndex % 2 === 0 ? 2 : -2, 0, 2);
+                moveCompanion(en, leader.visual.position.clone().add(offset), 1, delta);
+                return;
+            }
+            if (record && leader === en && record.destination) {
+                const destination = new window.THREE.Vector3(record.destination.x, en.visual.position.y, record.destination.z);
+                if (en.visual.position.distanceTo(destination) > 5) {
+                    moveCompanion(en, destination, 0.9, delta);
+                    return;
+                }
+            }
+        }
+
         if (en.def.lureTargets === 'male') {
             window.GameCore.activeEntities.forEach(targetEntity => {
                 if (targetEntity === en || targetEntity.def.type !== 'npc' || targetEntity.def.gender !== 'male' || targetEntity.currentAnimState === 'die') return;
@@ -232,7 +259,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 const lureDirection = new window.THREE.Vector3().subVectors(en.visual.position, targetEntity.visual.position);
                 if (lureDirection.lengthSq() > 0.001) {
                     lureDirection.normalize();
-                    targetEntity.body.setLinvel({ x: lureDirection.x * targetEntity.def.speed, y: targetEntity.body.linvel().y, z: lureDirection.z * targetEntity.def.speed }, true);
+                    targetEntity.body.setLinvel({ x: lureDirection.x * getEntitySpeed(targetEntity), y: targetEntity.body.linvel().y, z: lureDirection.z * getEntitySpeed(targetEntity) }, true);
                     if (targetEntity.visual && targetEntity.currentAnimState !== 'hit' && targetEntity.currentAnimState !== 'die') {
                         targetEntity.visual.lookAt(targetEntity.visual.position.clone().add(lureDirection));
                         if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(targetEntity, 'walk');
@@ -261,7 +288,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 const repel = new window.THREE.Vector3().subVectors(en.visual.position, nearestTower.visual.position);
                 if (repel.lengthSq() > 0.001) {
                     repel.normalize();
-                    en.body.setLinvel({ x: repel.x * en.def.speed, y: en.body.linvel().y, z: repel.z * en.def.speed }, true);
+                    en.body.setLinvel({ x: repel.x * getEntitySpeed(en), y: en.body.linvel().y, z: repel.z * getEntitySpeed(en) }, true);
                     if (en.visual && en.currentAnimState !== 'hit' && en.currentAnimState !== 'die') {
                         en.visual.lookAt(en.visual.position.clone().add(repel));
                         if(window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(en, 'walk');
@@ -304,7 +331,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
 
             // AI moves instantly without acceleration dampening for simplicity
             const phaseSpeed = en.phaseTwo ? (en.def.phaseTwoSpeed || 1) : 1;
-            en.body.setLinvel({ x: dir.x * en.def.speed * phaseSpeed, y: en.body.linvel().y, z: dir.z * en.def.speed * phaseSpeed }, true);
+            en.body.setLinvel({ x: dir.x * getEntitySpeed(en) * phaseSpeed, y: en.body.linvel().y, z: dir.z * getEntitySpeed(en) * phaseSpeed }, true);
             
             if (en.visual && en.currentAnimState !== 'hit' && en.currentAnimState !== 'die') {
                 en.visual.lookAt(en.visual.position.clone().add(dir));
@@ -336,6 +363,10 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             }
             if (en.fireBurstWindupUntil && performance.now() >= en.fireBurstWindupUntil) {
                 en.fireBurstWindupUntil = null;
+                if (window.GameCore.forestAttackMisses()) {
+                    window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'FORTUNE', pos: pPos, color: '#86efac' });
+                    return;
+                }
                 const resistance = window.GameCore.getResistance('fire');
                 const damage = Math.max(1, en.def.fireBurstDamage - resistance);
                 window.GameState.pStats.hp = Math.max(0, window.GameState.pStats.hp - damage);
@@ -347,6 +378,10 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             if(en.attackWindupUntil && performance.now() >= en.attackWindupUntil) {
                 en.attackWindupUntil = null;
                 if(window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(en, 'attack');
+                if (window.GameCore.forestAttackMisses()) {
+                    window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'MISSED', pos: pPos, color: '#86efac' });
+                    return;
+                }
                 
                 if (!window.EngineParams.godMode) {
                     if (window.Input.isBlocking) {
@@ -385,7 +420,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         } else {
             if (Math.random() < 0.02) {
                 const randomDir = new window.THREE.Vector3(Math.random()-0.5, 0, Math.random()-0.5).normalize();
-                en.body.setLinvel({ x: randomDir.x * (en.def.speed*0.5), y: en.body.linvel().y, z: randomDir.z * (en.def.speed*0.5) }, true);
+                    en.body.setLinvel({ x: randomDir.x * (getEntitySpeed(en) * 0.5), y: en.body.linvel().y, z: randomDir.z * (getEntitySpeed(en) * 0.5) }, true);
                 if (en.visual && en.currentAnimState !== 'hit' && en.currentAnimState !== 'die') {
                     en.visual.lookAt(en.visual.position.clone().add(randomDir));
                     if(window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(en, 'walk');

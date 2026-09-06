@@ -46,6 +46,7 @@ window.AssetManager = {
         'Weeping Willow': { type: 'structure', category: 'terrain', radius: 1.8, height: 14, modelScale: 1.0, color: 0x596b3a, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Bramble Bush': { type: 'structure', category: 'terrain', radius: 2.2, height: 3.5, modelScale: 1.0, color: 0x27351f, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Blood' } },
         'Tree Stump': { type: 'structure', category: 'terrain', radius: 1.2, height: 1.5, modelScale: 1.0, color: 0x5a3825, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
+        'Old Tree Stump': { type: 'structure', category: 'terrain', radius: 1.4, height: 1.8, modelScale: 1.0, color: 0x5a3825, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Glowing Mushroom': { type: 'structure', category: 'terrain', radius: 1.0, height: 1.0, modelScale: 1.0, color: 0x7dd3fc, isObstacle: false, gatherable: 'mushrooms', gatherCooldown: 15, gatherAmount: 1, customModel: null, animMap: {}, vfx: { aura: 'Holy', onHit: 'Sparks' } },
         'Oak Tree': { type: 'structure', category: 'terrain', radius: 1.0, height: 8, modelScale: 1.0, color: 0x4a5e28, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Coastal Driftwood': { type: 'structure', category: 'terrain', radius: 0.6, height: 1.2, modelScale: 1.0, color: 0x887766, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
@@ -58,6 +59,7 @@ window.AssetManager = {
         'Pathway Debris': { type: 'structure', category: 'terrain', radius: 4, height: 2.5, modelScale: 1.0, color: 0x625447, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Stone Path Wall Junction': { type: 'structure', category: 'terrain', radius: 5, height: 5, modelScale: 1.0, color: 0x686b70, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Stone Path': { type: 'structure', category: 'terrain', radius: 5, height: 0.4, modelScale: 1.0, color: 0x777777, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
+        'Stone Floor': { type: 'structure', category: 'terrain', radius: 5, height: 0.4, modelScale: 1.0, color: 0x777777, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Interior Stone Floor': { type: 'structure', category: 'terrain', radius: 5, height: 0.35, modelScale: 1.0, color: 0x303a32, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Dark Ritual Altar': { type: 'structure', category: 'terrain', radius: 2.5, height: 1.8, modelScale: 1.0, color: 0x39383b, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'Void', onHit: 'Sparks' } },
         'Plague Doctor Merchant Chest': { type: 'merchantChest', category: 'terrain', radius: 2, height: 3, modelScale: 1.0, color: 0x24201d, isObstacle: true, merchantInventory: [{ itemId: 'food', quantity: 20, price: 2 }, { itemId: 'leather_armor', quantity: 1, price: 40 }, { itemId: 'iron_sword', quantity: 1, price: 75 }], customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
@@ -235,9 +237,9 @@ window.renderAssetManager = function() {
     }
 
     if (window.EngineState.currentAssetTab === 'models') {
-        const models = Object.keys(window.AssetManager.models);
-        if (!models.length) {
-            content.innerHTML = '<div class="text-gray-500 text-center mt-10 font-mono">No imported models. Use Upload Model to add a .glb or self-contained .gltf.</div>';
+        const modelNames = [...new Set([...bundledModels.map(model => model.name), ...Object.keys(window.AssetManager.models)])];
+        if (!modelNames.length) {
+            content.innerHTML = '<div class="text-gray-500 text-center mt-10 font-mono">No bundled or imported models. Use Upload Model to add a .glb or self-contained .gltf.</div>';
             return;
         }
 
@@ -261,24 +263,39 @@ window.renderAssetManager = function() {
             document.querySelector(`.asset-tab[data-tab="${category}"]`).click();
         };
 
-        models.forEach((modelName, index) => {
+        modelNames.forEach((modelName, index) => {
             const meta = window.AssetManager.modelMeta[modelName] || {};
+            const loaded = Boolean(window.AssetManager.models[modelName]);
             const row = document.createElement('div');
             row.className = 'flex items-center justify-between gap-4 bg-gray-800/80 p-3 rounded border border-gray-700 hover:border-cyan-600 transition-colors';
-            row.innerHTML = `<div class="min-w-0"><div class="text-cyan-200 font-bold text-sm truncate">${modelName}</div><div class="text-[10px] text-gray-500 mt-1">${meta.rigged ? 'Rigged' : 'Static'} | ${meta.animationCount || 0} animation${meta.animationCount === 1 ? '' : 's'}</div></div><div class="flex gap-2 shrink-0"><button class="model-use-player bg-cyan-900/50 hover:bg-cyan-600 border border-cyan-700 text-cyan-100 px-3 py-1.5 rounded text-xs font-bold" data-model="${modelName}">Use as Player</button><button class="model-create-npc bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-3 py-1.5 rounded text-xs" data-model="${modelName}" data-index="${index}">Create + Place NPC</button><button class="model-create-terrain bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-3 py-1.5 rounded text-xs" data-model="${modelName}" data-index="${index}">Create + Place Terrain</button></div>`;
+            row.innerHTML = `<div class="min-w-0"><div class="text-cyan-200 font-bold text-sm truncate">${modelName}</div><div class="text-[10px] text-gray-500 mt-1">${loaded ? `${meta.rigged ? 'Rigged' : 'Static'} | ${meta.animationCount || 0} animation${meta.animationCount === 1 ? '' : 's'}` : 'Available - loads on use'}</div></div><div class="flex gap-2 shrink-0"><button class="model-use-player bg-cyan-900/50 hover:bg-cyan-600 border border-cyan-700 text-cyan-100 px-3 py-1.5 rounded text-xs font-bold" data-model="${modelName}">Use as Player</button><button class="model-create-npc bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-3 py-1.5 rounded text-xs" data-model="${modelName}" data-index="${index}">Create + Place NPC</button><button class="model-create-terrain bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-3 py-1.5 rounded text-xs" data-model="${modelName}" data-index="${index}">Create + Place Terrain</button></div>`;
             content.appendChild(row);
         });
 
-        content.querySelectorAll('.model-use-player').forEach(button => button.addEventListener('click', () => {
+        const useModel = async (button, action) => {
+            button.disabled = true;
+            const originalLabel = button.textContent;
+            button.textContent = 'Loading...';
+            const modelName = button.dataset.model;
+            if (!window.AssetManager.models[modelName]) {
+                const entry = bundledModels.find(model => model.name === modelName);
+                if (entry) await loadModel(resolveAssetPath(entry.path), modelName);
+            }
+            button.disabled = false;
+            button.textContent = originalLabel;
+            if (window.AssetManager.models[modelName]) action(modelName);
+        };
+
+        content.querySelectorAll('.model-use-player').forEach(button => button.addEventListener('click', () => useModel(button, modelName => {
             const player = window.AssetManager.prefabs.Player;
-            player.customModel = button.dataset.model;
+            player.customModel = modelName;
             const meta = window.AssetManager.modelMeta[player.customModel];
             player.animationReady = Boolean(meta?.rigged && meta?.hasAnimations);
             window.GameCore.swapPlayerModel();
-            window.EventBus.emit('UI_LOG', `Player model replaced with ${button.dataset.model}.`);
-        }));
-        content.querySelectorAll('.model-create-npc').forEach(button => button.addEventListener('click', () => placeModel(button.dataset.model, Number(button.dataset.index), 'npcs')));
-        content.querySelectorAll('.model-create-terrain').forEach(button => button.addEventListener('click', () => placeModel(button.dataset.model, Number(button.dataset.index), 'terrain')));
+            window.EventBus.emit('UI_LOG', `Player model replaced with ${modelName}.`);
+        })));
+        content.querySelectorAll('.model-create-npc').forEach(button => button.addEventListener('click', () => useModel(button, modelName => placeModel(modelName, Number(button.dataset.index), 'npcs'))));
+        content.querySelectorAll('.model-create-terrain').forEach(button => button.addEventListener('click', () => useModel(button, modelName => placeModel(modelName, Number(button.dataset.index), 'terrain'))));
         return;
     }
 
@@ -392,35 +409,90 @@ window.EventBus.on('RENDER_ASSETS', window.renderAssetManager);
 
 const gltfLoader = new GLTFLoader();
 function normalizeAssetName(value) { return value.toLowerCase().replace(/\.(glb|gltf)$/i, '').replace(/[^a-z0-9]/g, ''); }
+const localAssetBase = new URLSearchParams(window.location.search).get('assetBase');
+function resolveAssetPath(path) {
+    if (!localAssetBase) return new URL(path, import.meta.url).href;
+    return `${localAssetBase.replace(/\/$/, '')}/${path.replace(/^\.\//, '')}`;
+}
+const meshyLibraryBatches = [
+    ['20260904-212155', 6], ['20260904-212232', 8], ['20260904-212912', 8], ['20260904-213115', 7],
+    ['20260904-213519', 10], ['20260904-213600', 9], ['20260904-213738', 8], ['20260904-213743', 5], ['20260904-213819', 7]
+];
+let meshyAssetNumber = 0;
+const bundledModels = meshyLibraryBatches.flatMap(([batch, count]) => Array.from({ length: count }, (_, index) => {
+    meshyAssetNumber++;
+    const fileIndex = String(index + 1).padStart(2, '0');
+    return { name: `Meshy Asset ${String(meshyAssetNumber).padStart(2, '0')}`, path: `./assets/models/meshy-library/meshy-${batch}-${fileIndex}.glb` };
+}));
+for (let index = 1; index <= 21; index++) {
+    const assetNumber = String(meshyAssetNumber + index).padStart(2, '0');
+    const fileIndex = String(index).padStart(2, '0');
+    bundledModels.push({ name: `Meshy Asset ${assetNumber}`, path: `./assets/models/meshy-library/meshy-large-${fileIndex}.glb` });
+}
+const modelAssignments = [
+    ['Tree Stump', 'Tree Stump'], ['Dead Brush Hideout', 'Concealing Dead Brush'], ['Dried Riverbed Path', 'Stone Path'], ['Moss-Covered Log', 'Moss-Covered Log'], ['Skeletal Beast Remains', 'Skeletal Beast Remains'], ['Leaf Pile', 'Leaf Pile'],
+    ['Female Guard', 'Female Guard'], ['Noble Player Character', 'Noble Player Character'], ['Anime Female NPC', 'Female Adventurer'], ['Flesh Horror', 'Flesh Horror'], ['Wendigo', 'Wendigo'], ['Dark Forest Boss', 'Dark Forest Boss'], ['Slender Woman', 'Slender Woman'], ['Swamp Siren', 'Swamp Siren'],
+    ['Backpack Armor'], ['Leather Pants'], ['Leather Hood'], ['Advanced Leather Hood'], ['Leather Chest Armor'], ['Leather Bracers'], ['Leather Boots'], ['Leather Gloves'], ['Redhead Female Player', 'Female Warrior'], ['Female Scout', 'Village Scout'],
+    ['Female Black Steel Boots', 'Female Dark Steel Boots'], ['Female Black Steel Gloves', 'Female Dark Steel Gloves'], ['Female Black Steel Hood', 'Female Dark Steel Helm Cloak'], ['Noble Rune Sword', 'Iron Sword'], ['Female Shadow Guard', 'City Guard'], ['Flesh Pods', 'Tentacled Gothic Door'],
+    ['Floating Power Stone', 'Floating Power Stone'], ['Iron Brazier', 'Iron Fire Pit'], ['Floating Village Lamp', 'Floating Street Light'], ['Medical Cabinet', 'Plague Doctor Merchant Chest'], ['Village House', 'Watertight Gothic House'], ['Open Vendor Building', 'Plague Doctor Merchant House'],
+    ['Blacksmith Forge', 'Armorer Open Forge'], ['Plague Healing House', 'Plague Carrier Treatment Center'], ['Brick Building Facade', 'City Street Building Facade'], ['Collapsed Tomb Entrance', 'Collapsed Tomb Entrance'], ['Stone Shelving', 'Stone Shelving'], ['Stone Pile', 'Rubble Rock Pile'],
+    ['Dirt Pile', 'Pathway Debris'], ['Stone Wall Road Junction', 'Stone Path Wall Junction'], ['Stone Floor', 'Stone Floor'], ['Indoor Stone Floor', 'Interior Stone Floor'], ['Dark Gothic Shrine', 'Dark Ritual Altar'], ['Closed Vault', 'Gothic Vault Door'],
+    ['Safe Road Obelisk Tower', 'Rune Tower'], ['Village Bench', 'Decorative Bench'], ['Dead Oak Tree', 'Oak Tree'], ['Weeping Willow', 'Weeping Willow'], ['Bramble Bush', 'Bramble Bush'], ['Old Tree Stump', 'Old Tree Stump'], ['Pointed Stone Monolith', 'Razor Rock Monolith']
+];
+modelAssignments.forEach(([name, prefab], index) => {
+    if (!bundledModels[index]) return;
+    bundledModels[index].name = name;
+    if (prefab) window.AssetManager.prefabs[prefab].customModel = name;
+});
+const loadingModels = new Map();
+
+function loadModel(url, modelName) {
+    if (window.AssetManager.models[modelName]) return Promise.resolve(window.AssetManager.models[modelName]);
+    if (loadingModels.has(modelName)) return loadingModels.get(modelName);
+    const loading = new Promise(resolve => gltfLoader.load(url, (gltf) => {
+        window.AssetManager.models[modelName] = gltf.scene;
+        let rigged = false;
+        gltf.scene.traverse(child => { if (child.isSkinnedMesh && child.skeleton) rigged = true; });
+        window.AssetManager.modelMeta[modelName] = { rigged, hasAnimations: Boolean(gltf.animations && gltf.animations.length > 0), animationCount: gltf.animations ? gltf.animations.length : 0 };
+        const matchingPrefab = Object.entries(window.AssetManager.prefabs).find(([name, def]) => def.category === 'terrain' && normalizeAssetName(name) === normalizeAssetName(modelName));
+        if (matchingPrefab) {
+            const [prefabName, prefabDef] = matchingPrefab;
+            prefabDef.customModel = modelName;
+            window.EventBus.emit('UI_LOG', `Terrain model auto-assigned: ${modelName} -> ${prefabName}`);
+            window.EventBus.emit('WORLD_REGENERATE');
+        }
+        if (gltf.animations && gltf.animations.length > 0) {
+            window.AssetManager.animations[modelName] = gltf.animations;
+            gltf.animations.forEach(anim => {
+                if (!window.AssetManager.globalAnimations.find(existing => existing.name === anim.name)) window.AssetManager.globalAnimations.push(anim);
+            });
+        }
+        window.EventBus.emit('UI_LOG', `Asset ready: ${modelName}`);
+        window.EventBus.emit('RENDER_ASSETS');
+        resolve(gltf.scene);
+    }, undefined, (error) => {
+        console.error(`Could not load ${modelName}`, error);
+        window.EventBus.emit('UI_LOG', `Could not load ${modelName}. For .gltf, include all referenced files.`);
+        resolve(null);
+    }));
+    loadingModels.set(modelName, loading);
+    loading.finally(() => loadingModels.delete(modelName));
+    return loading;
+}
+
+window.EventBus.on('ENGINE_READY', () => {
+    const terrainModels = ['Tree Stump', 'Dead Brush Hideout', 'Dead Oak Tree', 'Pointed Stone Monolith', 'Bramble Bush', 'Moss-Covered Log', 'Dried Riverbed Path'];
+    Promise.all(terrainModels.map(modelName => {
+        const model = bundledModels.find(entry => entry.name === modelName);
+        return model ? loadModel(resolveAssetPath(model.path), model.name) : Promise.resolve(null);
+    })).then(() => window.EventBus.emit('WORLD_REGENERATE'));
+});
+
 document.getElementById('btn-upload-file').addEventListener('click', () => { document.getElementById('asset-file-input').click(); });
 document.getElementById('asset-file-input').addEventListener('change', (e) => {
     for (const file of e.target.files) {
         if (file.name.toLowerCase().endsWith('.glb') || file.name.toLowerCase().endsWith('.gltf')) {
-            const url = URL.createObjectURL(file); 
-            gltfLoader.load(url, (gltf) => { 
-                window.AssetManager.models[file.name] = gltf.scene; 
-                let rigged = false;
-                gltf.scene.traverse(child => { if (child.isSkinnedMesh && child.skeleton) rigged = true; });
-                window.AssetManager.modelMeta[file.name] = { rigged: rigged, hasAnimations: Boolean(gltf.animations && gltf.animations.length > 0), animationCount: gltf.animations ? gltf.animations.length : 0 };
-                const matchingPrefab = Object.entries(window.AssetManager.prefabs).find(([name, def]) => def.category === 'terrain' && normalizeAssetName(name) === normalizeAssetName(file.name));
-                if (matchingPrefab) {
-                    const [prefabName, prefabDef] = matchingPrefab;
-                    prefabDef.customModel = file.name;
-                    window.EventBus.emit('UI_LOG', `Terrain model auto-assigned: ${file.name} -> ${prefabName}`);
-                    window.EventBus.emit('WORLD_REGENERATE');
-                }
-                
-                if (gltf.animations && gltf.animations.length > 0) {
-                    window.AssetManager.animations[file.name] = gltf.animations; 
-                    gltf.animations.forEach(anim => {
-                        if(!window.AssetManager.globalAnimations.find(a => a.name === anim.name)) {
-                            window.AssetManager.globalAnimations.push(anim);
-                        }
-                    });
-                }
-                window.EventBus.emit('UI_LOG', `Asset Imported: ${file.name}`); 
-                window.EventBus.emit('RENDER_ASSETS'); 
-            }, undefined, (err) => console.error(err));
+            loadModel(URL.createObjectURL(file), file.name);
         }
     }
 });

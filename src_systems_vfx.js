@@ -4,6 +4,7 @@ window.VFXManager = {
         'Fire': { type: 'aura', color: '#ffaa00', size: 0.15, blend: THREE.AdditiveBlending, sprite: null },
         'Void': { type: 'aura', color: '#8800ff', size: 0.15, blend: THREE.AdditiveBlending, sprite: null },
         'Holy': { type: 'aura', color: '#ffffaa', size: 0.15, blend: THREE.AdditiveBlending, sprite: null },
+        'ForestChosen': { type: 'aura', color: '#76b852', size: 0.18, blend: THREE.AdditiveBlending, sprite: null },
         'Blood': { type: 'onHit', color: '#ff0000', size: 0.20, blend: THREE.NormalBlending, sprite: null },
         'Sparks': { type: 'onHit', color: '#ffff00', size: 0.20, blend: THREE.AdditiveBlending, sprite: null },
         'Dust': { type: 'onHit', color: '#887755', size: 0.20, blend: THREE.NormalBlending, sprite: null },
@@ -92,6 +93,11 @@ window.VFXManager = {
                     window.EventBus.emit('UI_UPDATE_HUD');
                     this.spawnHit('Sparks', projectile.mesh.position);
                 } else {
+                    if (window.GameCore.forestAttackMisses()) {
+                        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'FORTUNE', pos: player.visual.position, color: '#86efac' });
+                        projectile.remaining = 0;
+                        continue;
+                    }
                     const damage = Math.max(1, projectile.damage - window.GameCore.getResistance(projectile.damageType));
                     window.GameState.pStats.hp = Math.max(0, window.GameState.pStats.hp - damage);
                     window.EventBus.emit('ENTITY_DAMAGED', { damage, position: player.visual.position, isPlayer: true });

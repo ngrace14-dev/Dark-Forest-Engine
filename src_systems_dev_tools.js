@@ -28,5 +28,30 @@ window.EventBus.on('ENGINE_READY', () => {
         debugFolder.add({ s: () => window.EventBus.emit('SPAWN_INVASION') }, 's').name('💀 Spawn Ghoul Invasion');
         debugFolder.add({ b: () => window.EventBus.emit('SPAWN_BLIGHT') }, 'b').name('🥀 Spawn Road Blight');
         debugFolder.add({ c: () => window.EventBus.emit('CLEAR_MAP') }, 'c').name('💣 Clear Entities');
+
+        const narratorFolder = gui.addFolder('🐦 Crow Interest Tests');
+        narratorFolder.add({ gain: () => window.GameState.recordFeat({ impact: 10, label: 'Developer-forced feat' }) }, 'gain').name('⬆️ Gain Interest');
+        narratorFolder.add({ lose: () => window.GameState.loseCrowInterest(10, 'Developer-forced loss.') }, 'lose').name('⬇️ Lose Interest');
+        narratorFolder.add({ resolve: () => { window.GameState.narrator.targetHeat = 0; window.GameState.evaluateCrowInterest(); } }, 'resolve').name('🔀 Force Target Handoff');
+        narratorFolder.add({ player: () => {
+            window.GameState.narrator.targetId = 'player';
+            window.GameState.narrator.targetName = 'The Wanderer';
+            window.GameState.narrator.targetHeat = 50;
+            window.GameState.narrator.attention = 50;
+            window.GameState.narrator.playerClaimed = true;
+            window.GameCore.applyForestBlessing(window.GameCore.playerObj, true);
+        } }, 'player').name('🎭 Mark Player Chosen');
+        narratorFolder.add({ day: () => {
+            window.EngineParams.worldDay++;
+            window.AdventurerManager?.advanceDay();
+            window.GameState.processCrowDay();
+            window.EventBus.emit('UI_LOG', '[DEV] Simulated one world day.');
+        } }, 'day').name('📅 Simulate Day');
+        narratorFolder.add({ ledger: () => {
+            const records = window.AdventurerManager?.records || [];
+            console.table(records.map(record => ({ id: record.id, name: record.name, alive: record.alive, level: record.level, storyHeat: record.storyHeat, quest: record.quest?.type, progress: `${record.quest?.progress || 0}/${record.quest?.goal || 0}` })));
+            console.table({ ...window.GameState.narrator });
+            window.EventBus.emit('UI_LOG', '[DEV] Adventurer ledger and crow state written to the console.');
+        } }, 'ledger').name('📊 Dump Hidden Ledger');
     } catch(e) { console.warn("LIL-GUI failed.", e); }
 });

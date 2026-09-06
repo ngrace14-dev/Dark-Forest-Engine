@@ -9,6 +9,7 @@ document.addEventListener('keydown', e => {
     if (k === 'f' && window.GameCore.engineState === 'running') window.EventBus.emit('VOID_RUNE_SHOT');
     if (k === 'g' && window.GameCore.engineState === 'running') window.EventBus.emit('FIRE_RUNE_SHOT');
     if (k === 'b' && window.GameCore.engineState === 'running') window.EventBus.emit('CLAIM_PLAYER_CAMP');
+    if (k === 'p' && window.GameCore.engineState === 'running') window.NetworkSession?.togglePartyMode();
     if (k === 'e' && window.GameCore.engineState === 'running') window.EventBus.emit('INTERACT_NEARBY');
     if (window.GameCore.engineState === 'running' && ['1', '2', '3', '4', '5'].includes(k)) window.EventBus.emit('PARTY_COMMAND', ({ '1': 'follow', '2': 'hold', '3': 'guard', '4': 'attack', '5': 'retreat' })[k]);
     if (k === 'f5') { e.preventDefault(); window.EventBus.emit('GAME_SAVE'); }

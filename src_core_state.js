@@ -50,13 +50,38 @@ window.GameState = {
     activeBuffs: {},
     statusEffects: [],
     runPotential: null,
+    coop: { sessionId: null, localPlayerId: null, partyMode: 'solo' },
     base: { owned: false, name: 'Wayfarer Camp', position: null, storage: [], structures: [], farms: [], research: [] },
     party: { command: 'follow', selectedMembers: ['lyra-scout'], escortCaravanId: null, members: [
         { id: 'lyra-scout', name: 'Lyra', prefab: 'Female Adventurer', role: 'scout', hp: 100, maxHp: 100, recruited: true, inventory: ['mushrooms', 'food'], equipment: {}, skills: { scouting: 1, athletics: 1 }, personality: 'cautious', knowledge: [], loyalty: 65, hunger: 0, injuries: [], downed: false },
         { id: 'maris-guard', name: 'Maris', prefab: 'Female Guard', role: 'guardian', hp: 130, maxHp: 130, recruited: false, inventory: ['food'], equipment: { weapon: 'iron_sword' }, skills: { guarding: 2, meleeDef: 1 }, personality: 'steadfast', knowledge: [], loyalty: 50, hunger: 0, injuries: [], downed: false },
         { id: 'corvin-runic', name: 'Corvin', prefab: 'Tech Adventurer', role: 'runic adept', hp: 85, maxHp: 85, recruited: false, inventory: ['mushrooms'], equipment: {}, skills: { runecraft: 2, meleeAtt: 1 }, personality: 'curious', knowledge: [], loyalty: 45, hunger: 0, injuries: [], downed: false }
     ] },
-    questBoard: []
+    questBoard: [],
+    worldEvents: [],
+    narrator: {
+        avatar: 'crow',
+        targetId: null,
+        targetName: 'An unnamed survivor',
+        attention: 0,
+        targetHeat: 0,
+        lastActionDay: 0,
+        safeDays: 0,
+        playerClaimed: false,
+        feats: 0,
+        secretProgress: 0
+    },
+    forestBlessing: {
+        active: false,
+        tier: 'none',
+        name: 'No forest blessing',
+        athletics: 0,
+        dodge: 0,
+        staminaRegen: 0,
+        dangerSense: false,
+        combatLuck: 0,
+        teleportLuck: 0
+    }
 };
 
 window.EngineState = {
@@ -83,7 +108,8 @@ window.EngineParams = {
     timeOfDay: 14.0, worldDay: 0, dayLengthSeconds: 120, offPathCaptureCooldown: 0,
     mapTileSizeMeters: 8046.72, visitedMapTiles: [], currentMapTile: null, sandReaverEncountered: false,
     fogDensity: 0.03, timeScale: 1.0, godMode: false,
-    globalBrightness: 1.2, worldSeed: 'dark_forests_1337', isPlayerSafe: false
+    globalBrightness: 1.2, worldSeed: 'dark_forests_1337', isPlayerSafe: false,
+    cycleLengthDays: 14, lastCycleDay: 0
 };
 
 window.GameCore = {
@@ -112,6 +138,15 @@ window.GameCore = {
         }
         return buff.amount;
     },
+    getForestLuck: function(entity = null) {
+        if (entity?.forestBlessing?.active) return entity.forestBlessing.combatLuck || 0;
+        if (!entity && window.GameState.forestBlessing?.active) return window.GameState.forestBlessing.combatLuck || 0;
+        return 0;
+    },
+    forestAttackMisses: function(entity = null) {
+        const chance = this.getForestLuck(entity);
+        return chance > 0 && Math.random() < chance;
+    },
     applyStatusEffect: function(type, duration, tickDamage = 0) {
         const active = window.GameState.statusEffects.find(effect => effect.type === type);
         if (active) {
@@ -137,6 +172,67 @@ window.GameCore = {
         }
         if (reason) window.EventBus.emit('UI_LOG', `[STANDING] ${politicalFaction}: ${amount >= 0 ? '+' : ''}${amount} (${reason})`);
         window.EventBus.emit('UI_UPDATE_HUD');
+    },
+    recordFeat: function({ impact = 1, label = 'A noteworthy deed' } = {}) {
+        const narrator = window.GameState.narrator;
+        narrator.attention = Math.min(100, narrator.attention + impact);
+        narrator.targetHeat = Math.min(100, narrator.targetHeat + impact);
+        narrator.lastActionDay = window.EngineParams.worldDay;
+        narrator.feats++;
+        narrator.secretProgress = Math.min(99, narrator.secretProgress + Math.max(1, Math.floor(impact / 5)));
+        if (!narrator.playerClaimed && narrator.attention >= 25) {
+            narrator.playerClaimed = true;
+            narrator.targetId = 'player';
+            narrator.targetName = 'The Wanderer';
+            if (window.GameCore.applyForestBlessing) window.GameCore.applyForestBlessing(window.GameCore.playerObj, true);
+            window.EventBus.emit('UI_LOG', '[THE CROW] The eye leaves its chosen hero. It follows you now.');
+        } else if (narrator.playerClaimed) {
+            window.EventBus.emit('UI_LOG', `[THE CROW] ${label}.`);
+        }
+        window.EventBus.emit('UI_UPDATE_HUD');
+    },
+    loseCrowInterest: function(amount = 1, reason = 'The story grows quiet.') {
+        const narrator = window.GameState.narrator;
+        narrator.targetHeat = Math.max(0, narrator.targetHeat - amount);
+        narrator.attention = Math.max(0, narrator.attention - amount);
+        window.EventBus.emit('UI_LOG', `[THE CROW] ${reason}`);
+        window.EventBus.emit('UI_UPDATE_HUD');
+    },
+    evaluateCrowInterest: function() {
+        const narrator = window.GameState.narrator;
+        if (!narrator.targetId) return;
+        if (narrator.targetId === 'player' && window.GameState.forestBlessing?.active && narrator.targetHeat <= 0) {
+            delete window.GameState.activeBuffs.athletics;
+            delete window.GameState.activeBuffs.dodge;
+            window.GameState.forestBlessing = { active: false, tier: 'none', name: 'No forest blessing', athletics: 0, dodge: 0, staminaRegen: 0, dangerSense: false, combatLuck: 0, teleportLuck: 0 };
+            window.EventBus.emit('UI_LOG', '[THE CROW] Your story has gone still. The forest mark fades.');
+        }
+        if (narrator.targetHeat > 0) return;
+        const candidate = (window.AdventurerManager?.records || [])
+            .filter(record => record.alive !== false)
+            .sort((a, b) => (b.storyHeat || 0) - (a.storyHeat || 0))[0];
+        if (candidate) {
+            narrator.targetId = candidate.id;
+            narrator.targetName = candidate.name;
+            narrator.targetHeat = Math.max(10, candidate.storyHeat || 10);
+            narrator.playerClaimed = false;
+            window.EventBus.emit('UI_LOG', `[THE CROW] It abandons the quiet tale and follows ${candidate.name}.`);
+        }
+    },
+    processCrowDay: function() {
+        const narrator = window.GameState.narrator;
+        if (narrator.targetId === 'player') {
+            const player = window.GameCore.playerObj;
+            const sheltered = player && (window.EngineParams.isPlayerSafe || window.RoadManager?.isVillageProtected(player.visual.position));
+            if (sheltered) narrator.safeDays++;
+            else narrator.safeDays = 0;
+            if (sheltered) this.loseCrowInterest(2, 'The crow finds only a sheltered silhouette.');
+            if (window.EngineParams.worldDay - narrator.lastActionDay > 1) this.loseCrowInterest(3, 'The crow grows bored with your silence.');
+        } else {
+            const record = window.AdventurerManager?.records.find(candidate => candidate.id === narrator.targetId);
+            if (record) narrator.targetHeat = record.storyHeat;
+        }
+        this.evaluateCrowInterest();
     }
 };
 
@@ -157,7 +253,7 @@ window.EventBus.on('GAME_SAVE', () => {
             const member = window.GameState.party.members.find(candidate => candidate.id === entity.companionId);
             if (member) member.hp = entity.hp;
         });
-        localStorage.setItem('dark-forest-save', JSON.stringify({ gameState: window.GameState, engineParams: window.EngineParams, villages: window.VillageManager ? window.VillageManager.villages : [] }));
+        localStorage.setItem('dark-forest-save', JSON.stringify({ gameState: window.GameState, engineParams: window.EngineParams, villages: window.VillageManager ? window.VillageManager.villages : [], adventurers: window.AdventurerManager ? window.AdventurerManager.records : [] }));
         window.EventBus.emit('UI_LOG', 'Game saved locally.');
     } catch (error) {
         console.error('GAME_SAVE failed', error);
@@ -179,6 +275,7 @@ window.EventBus.on('GAME_LOAD', () => {
             window.VillageManager.villages = save.villages;
             window.RoadManager.generateRoads(window.VillageManager.villages);
         }
+        if (Array.isArray(save.adventurers) && window.AdventurerManager) window.AdventurerManager.records = save.adventurers;
         window.EventBus.emit('UI_UPDATE_HUD');
         window.EventBus.emit('UI_UPDATE_STATS');
         window.EventBus.emit('RENDER_INVENTORY');
