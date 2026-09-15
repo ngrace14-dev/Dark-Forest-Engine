@@ -323,9 +323,44 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             return;
         }
 
-        if (target) {
+                if (target) {
             let dir = new window.THREE.Vector3().subVectors(target, en.visual.position);
+            const dist = dir.length();
             if (dir.lengthSq() > 0.001) dir.normalize(); else dir.set(0, 0, 1);
+
+            // --- TACTICAL COMBAT AI (Kenshi/Diablo Style) ---
+            // Enemies now value their life and position strategically
+            en.aiMode ??= 'aggressive';
+            en.aiTimer ??= 0;
+            en.aiTimer -= delta;
+
+            if (en.aiTimer <= 0) {
+                // Tactical Rethink
+                const hpPercent = en.hp / (en.def.hp || 50);
+                const isInjured = hpPercent < 0.4;
+                const isNearDeath = hpPercent < 0.15;
+
+                if (isNearDeath && Math.random() < 0.7) {
+                    en.aiMode = 'flee';
+                    en.aiTimer = 3.0;
+                    window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'RETREATING!', pos: en.visual.position, color: '#f87171' });
+                } else if (isInjured && Math.random() < 0.4) {
+                    en.aiMode = 'skirmish'; // Circle the player and wait for an opening
+                    en.aiTimer = 2.0;
+                } else {
+                    en.aiMode = 'aggressive';
+                    en.aiTimer = 1.5;
+                }
+            }
+
+            if (en.aiMode === 'flee') {
+                // Run away from the target
+                dir.multiplyScalar(-1);
+            } else if (en.aiMode === 'skirmish' && dist < 6) {
+                // Circle the player instead of running straight in
+                const orbitDir = new window.THREE.Vector3(dir.z, 0, -dir.x); // Perpendicular vector
+                dir.addScaledVector(orbitDir, 2.0).normalize();
+            }
 
             if (en.def.phaseTwoAt && !en.phaseTwo && en.hp <= en.def.hp * en.def.phaseTwoAt) {
                 en.phaseTwo = true;
