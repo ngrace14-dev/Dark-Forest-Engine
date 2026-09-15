@@ -353,13 +353,35 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 }
             }
 
-            if (en.aiMode === 'flee') {
+                        if (en.aiMode === 'flee') {
                 // Run away from the target
                 dir.multiplyScalar(-1);
             } else if (en.aiMode === 'skirmish' && dist < 6) {
                 // Circle the player instead of running straight in
                 const orbitDir = new window.THREE.Vector3(dir.z, 0, -dir.x); // Perpendicular vector
                 dir.addScaledVector(orbitDir, 2.0).normalize();
+            } else if (en.name === 'Wendigo' && en.aiMode === 'stalking') {
+                // Specialized Wendigo Stalking Logic
+                const stalkDistance = 18;
+                if (dist > stalkDistance + 2) {
+                    // Close the gap fast
+                    en.aiMode = 'stalking';
+                } else if (dist < stalkDistance - 2) {
+                    // Back off to the edge of vision
+                    dir.multiplyScalar(-0.8);
+                } else {
+                    // Edge of vision reached: Orbit and wait for opportunity
+                    const orbitDir = new window.THREE.Vector3(dir.z, 0, -dir.x);
+                    dir.copy(orbitDir).normalize();
+                    
+                    // Opportunity Strike! (Low chance to lunge)
+                    if (Math.random() < 0.015) {
+                        en.aiMode = 'aggressive';
+                        en.aiTimer = 2.0; // Stay aggressive for 2 seconds
+                        window.EventBus.emit('UI_LOG', `[STALKER] The Wendigo screeches and lunges!`);
+                        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'LUNGE!', pos: en.visual.position, color: '#ffffff' });
+                    }
+                }
             }
 
             if (en.def.phaseTwoAt && !en.phaseTwo && en.hp <= en.def.hp * en.def.phaseTwoAt) {

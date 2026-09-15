@@ -14,7 +14,19 @@ window.AssetManager = {
         'Female Dark Steel Torso': { type: 'armor', category: 'characters', radius: 0.6, height: 1.3, modelScale: 1.0, color: 0x24272d, faction: 'player', playerCompatible: true, armorSlot: 'chest', customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Sparks' } },
         'Ghoul': { type: 'npc', category: 'npcs', radius: 0.5, height: 1.8, modelScale: 1.0, color: 0x991b1b, faction: 'monster', behavior: 'wander_aggro', speed: 3, customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'Void', onHit: 'Blood' } },
         'Flesh Horror': { type: 'npc', category: 'npcs', radius: 0.8, height: 3.2, modelScale: 1.0, color: 0x7f1d3a, faction: 'forest', behavior: 'wander_aggro', speed: 2.7, damageType: 'void', role: 'forestHorror', customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'Void', onHit: 'Blood' } },
-        'Wendigo': { type: 'npc', category: 'npcs', radius: 0.9, height: 3.4, modelScale: 1.0, color: 0x9ca3af, faction: 'monster', behavior: 'wander_aggro', speed: 3.6, role: 'apexPredator', customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'Void', onHit: 'Blood' } },
+        'Wendigo': { 
+            type: 'npc', category: 'npcs', radius: 0.9, height: 3.4, modelScale: 1.0, color: 0x9ca3af, faction: 'monster', 
+            behavior: 'stalking', // Specialized AI behavior
+            speed: 8.5,           // Faster than the player
+            hp: 450, 
+            attackDamage: 45, 
+            poiseDamage: 40,
+            role: 'apexPredator', 
+            habitat: 'mountain', 
+            customModel: null, 
+            animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, 
+            vfx: { aura: 'Void', onHit: 'Blood' } 
+        },
         'Dark Forest Boss': { type: 'npc', category: 'npcs', radius: 1.4, height: 4.5, modelScale: 1.0, color: 0x4c0519, faction: 'forest', behavior: 'wander_aggro', speed: 2.4, hp: 500, damageType: 'void', voidBoltDamage: 24, voidBoltSpeed: 13, voidBoltRange: 18, role: 'randomEncounterBoss', boss: true, encounterType: 'random', customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'Void', onHit: 'Blood' } },
         'Sand Reaver': { type: 'npc', category: 'npcs', radius: 1.6, height: 4, modelScale: 1.0, color: 0xc28a45, faction: 'monster', behavior: 'wander_aggro', speed: 3.2, hp: 7500, armor: 20, attackDamage: 70, damageType: 'fire', phaseTwoAt: 0.5, phaseTwoSpeed: 1.4, fireBurstDamage: 28, fireBurstRadius: 5, role: 'duneGuardian', boss: true, encounterType: 'duneEntry', habitat: 'desert', customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'Fire', onHit: 'Sparks' } },
         'Swamp Siren': { type: 'npc', category: 'npcs', radius: 0.7, height: 2.4, modelScale: 1.0, color: 0x64704b, faction: 'forest', gender: 'female', behavior: 'wander_aggro', speed: 2.9, hp: 180, damageType: 'poison', poisonDuration: 5, poisonTickDamage: 2, role: 'swampAmbusher', habitat: 'swamp', lureTargets: 'male', lureRadius: 24, customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'Void', onHit: 'Blood' } },
