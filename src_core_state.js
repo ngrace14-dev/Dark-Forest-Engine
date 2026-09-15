@@ -113,6 +113,8 @@ window.Input = {
     isMoving: false, isDashing: false, isBlocking: false, isAttacking: false,
     attackCooldown: 0, guardbreakerCooldown: 0, rationCooldown: 0, runeShotCooldown: 0, fireShotCooldown: 0, dashTimer: 0, 
     activeSweep: null, // Tracks if an attack hitbox is currently sweeping
+    hitPauseTimer: 0,  // Dragon's Dogma hit-stop micro-freeze
+    camShake: 0,       // Intensity of camera shake
     camAngle: Math.PI / 4, camPitch: Math.PI / 4, camDistance: 15,
     isDraggingCam: false, lastMouseX: 0, lastMouseY: 0
 };

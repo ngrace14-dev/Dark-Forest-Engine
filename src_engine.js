@@ -1239,9 +1239,14 @@ function fixedUpdateLogic(delta) {
                             window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: en.visual.position, isPlayer: false });
                             window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
                             
-                            // Audio sync
+                                                        // Audio sync & Hit Pause (Dragon's Dogma feel)
                             window.EventBus.emit('PLAY_SOUND', {url: sweep.isHeavy ? 'https://tonejs.github.io/audio/drum-samples/CRASH_1.mp3' : 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: en.visual.position, vol: -5});
-
+                            
+                            if (sweep.isHeavy || sweep.profile.isGuardbreaker) {
+                                window.Input.hitPauseTimer = 0.05; // 50ms freeze
+                                window.Input.camShake = 0.4;       // Start camera shake
+                            }
+                            
                             if(en.def.faction !== 'monster' && en.def.faction !== 'forest' && en.name !== 'Blight Root') {
                                 window.GameCore.adjustFactionStanding(en.def.faction, -20, `assaulted ${en.name}`);
                                 window.GameCore.recordRenown({ infamy: 5, faction: en.def.faction, reason: `assaulted ${en.name}` });
@@ -1293,14 +1298,34 @@ function animate() {
 
     if (window.EngineParams.playMode && window.GameCore.engineState === 'running') {
         accumulator += delta;
-        while (accumulator >= fixedTimeStep) { window.GameCore.world.step(); fixedUpdateLogic(fixedTimeStep); accumulator -= fixedTimeStep; }
         
+        // Dragon's Dogma "Hit-Pause" logic
+        let updatePhysics = true;
+        if (window.Input.hitPauseTimer > 0) {
+            window.Input.hitPauseTimer -= delta;
+            updatePhysics = false; // Freeze the physics and animations briefly on heavy impacts
+        }
+        
+        if (updatePhysics) {
+            while (accumulator >= fixedTimeStep) { window.GameCore.world.step(); fixedUpdateLogic(fixedTimeStep); accumulator -= fixedTimeStep; }
+            if (window.GameCore.playerObj && window.GameCore.playerObj.mixer) window.GameCore.playerObj.mixer.update(delta);
+            window.GameCore.activeEntities.forEach(en => { if (en.mixer) en.mixer.update(delta); });
+        }
+        
+        // VFX and UI still run during hit-pause to make the freeze feel intentional, not like lag
         window.VFXManager.update(delta);
         window.EventBus.emit('AI_TICK', { delta, isPlayerSafe: window.EngineParams.isPlayerSafe });
         window.EventBus.emit('UI_TICK', { delta, camera: window.GameCore.camera });
         
-        if (window.GameCore.playerObj && window.GameCore.playerObj.mixer) window.GameCore.playerObj.mixer.update(delta);
-        window.GameCore.activeEntities.forEach(en => { if (en.mixer) en.mixer.update(delta); });
+        // --- CAMERA SHAKE SYSTEM ---
+        if (window.Input.camShake > 0) {
+            const s = window.Input.camShake;
+            window.GameCore.camera.position.x += (Math.random() - 0.5) * s;
+            window.GameCore.camera.position.y += (Math.random() - 0.5) * s;
+            window.GameCore.camera.position.z += (Math.random() - 0.5) * s;
+            window.Input.camShake *= 0.9; // Fast decay
+            if (window.Input.camShake < 0.01) window.Input.camShake = 0;
+        }
     }
     if (composer) composer.render();
 }
