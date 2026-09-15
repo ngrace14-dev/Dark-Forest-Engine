@@ -109,8 +109,8 @@ window.EngineState = {
 };
 
 window.Input = {
-    keys: { w: false, a: false, s: false, d: false, ' ': false, shift: false },
-    isMoving: false, isDashing: false, isBlocking: false, isAttacking: false,
+    keys: { w: false, a: false, s: false, d: false, ' ': false, shift: false, x: false },
+    isMoving: false, isDashing: false, isBlocking: false, isAttacking: false, isStealth: false,
     attackCooldown: 0, guardbreakerCooldown: 0, rationCooldown: 0, runeShotCooldown: 0, fireShotCooldown: 0, dashTimer: 0, 
     activeSweep: null, // Tracks if an attack hitbox is currently sweeping
     hitPauseTimer: 0,  // Dragon's Dogma hit-stop micro-freeze

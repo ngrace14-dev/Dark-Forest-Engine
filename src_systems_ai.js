@@ -290,8 +290,20 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         const base = window.GameState.base;
         const inPlayerWard = hostile && base.owned && base.wardRadius && base.position && Math.hypot(en.visual.position.x - base.position.x, en.visual.position.z - base.position.z) <= base.wardRadius;
         let target = null;
-        if (hostile && !onProtectedPath && !inVillageBarrier && !inPlayerWard) {
-            if (en.visual.position.distanceTo(pPos) < 15 && !isPlayerSafe && !window.EngineParams.isPlayerHidden) target = pPos;
+                if (hostile && !onProtectedPath && !inVillageBarrier && !inPlayerWard) {
+            // Line of Sight & Stealth Check
+            const dist = en.visual.position.distanceTo(pPos);
+            
+            if (dist < 15 && !isPlayerSafe && !window.EngineParams.isPlayerHidden) {
+                if (window.Input.isStealth) {
+                    // In stealth: Only detect if VERY close (3m) or if already in chase
+                    if (dist < 3 || en.aiMode === 'aggressive' || en.aiMode === 'chase') {
+                        target = pPos;
+                    }
+                } else {
+                    target = pPos;
+                }
+            }
         }
 
         if (onProtectedPath || inVillageBarrier || inPlayerWard) {

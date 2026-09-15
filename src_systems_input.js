@@ -5,6 +5,7 @@ document.addEventListener('keydown', e => {
     if (k === 'i') { const p = document.getElementById('inventory-panel'); if(p) { p.classList.toggle('hidden'); if(!p.classList.contains('hidden')) window.EventBus.emit('RENDER_INVENTORY'); } }
     if (k === 'u') window.EventBus.emit('DEV_TOOLS_TOGGLE_ASSETS');
     if (k === 'q' && window.GameCore.engineState === 'running') window.EventBus.emit('GUARDBREAKER');
+    if (k === 'x' && window.GameCore.engineState === 'running') window.EventBus.emit('TOGGLE_STEALTH');
     if (k === 'r' && window.GameCore.engineState === 'running') window.EventBus.emit('EMERGENCY_RATION');
     if (k === 'f' && window.GameCore.engineState === 'running') window.EventBus.emit('VOID_RUNE_SHOT');
     if (k === 'g' && window.GameCore.engineState === 'running') window.EventBus.emit('FIRE_RUNE_SHOT');

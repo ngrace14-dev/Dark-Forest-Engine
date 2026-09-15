@@ -606,6 +606,38 @@ function performGuardbreaker() {
 window.EventBus.on('PRIMARY_CLICK_DOWN', () => { if(window.Input.attackCooldown <= 0) performAttack(); });
 window.EventBus.on('SECONDARY_CLICK_DOWN', () => { if(window.Input.attackCooldown <= 0) performAttack(true); });
 window.EventBus.on('GUARDBREAKER', performGuardbreaker);
+window.EventBus.on('TOGGLE_STEALTH', () => {
+    if (!window.GameCore.playerObj) return;
+    window.Input.isStealth = !window.Input.isStealth;
+    
+    const player = window.GameCore.playerObj;
+    if (window.Input.isStealth) {
+        window.EventBus.emit('UI_LOG', '[STEALTH] You blend into the surroundings.');
+        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'STEALTH', pos: player.visual.position, color: '#94a3b8' });
+        
+        // Chameleon Texture Logic: Match terrain color
+        const pPos = player.body.translation();
+        const biomeKey = window.WorldGenerator.getBiome(pPos.x, pPos.z);
+        const biomeColor = window.WorldGenConfig.biomes[biomeKey].color;
+        
+        player.visual.traverse(child => {
+            if (child.isMesh) {
+                child.userData.originalColor = child.material.color.clone();
+                child.material.color.set(biomeColor);
+                child.material.transparent = true;
+                child.material.opacity = 0.5;
+            }
+        });
+    } else {
+        window.EventBus.emit('UI_LOG', '[STEALTH] You reveal yourself.');
+        player.visual.traverse(child => {
+            if (child.isMesh && child.userData.originalColor) {
+                child.material.color.copy(child.userData.originalColor);
+                child.material.opacity = 1.0;
+            }
+        });
+    }
+});
 window.EventBus.on('VOID_RUNE_SHOT', () => {
     if (window.Input.runeShotCooldown > 0 || window.Input.isBlocking || !Object.values(window.GameState.inventory.runes).includes('voidward_rune')) return;
     if (window.GameState.pStats.stamina < 20 || !window.GameCore.playerObj.visual) { window.EventBus.emit('UI_LOG', 'A Voidward Rune and 20 stamina are required.'); return; }
