@@ -107,8 +107,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.addEventListener('keydown', (e) => {
     if (e.key.toLowerCase() === 'h') {
-        const limbs = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
+                const limbs = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
         const randomLimb = limbs[Math.floor(Math.random() * limbs.length)];
         window.playerHealth.takeDamage(randomLimb, 35);
     }
 });
+
+// --- GLOBAL COMBAT HOOKS ---
+window.GameCore.getCombatInjuryMultiplier = function(entity) {
+    // If player: Read from character health system
+    if (!entity || entity.def?.faction === 'player') {
+        return window.playerHealth ? window.playerHealth.penalties.speedMultiplier : 1.0;
+    }
+    // If NPC: Basic injury math
+    const hpPercent = entity.hp / (entity.def?.hp || 50);
+    if (hpPercent < 0.25) return 0.5; // Limping
+    return 1.0;
+};
+
+window.GameCore.applyCombatInjury = function(entity, damage, sourceName = 'Enemy') {
+    if (!entity || entity.hp <= 0) return;
+    
+    // 1. If the target is the player, apply to the limb system
+    if (entity.def?.faction === 'player') {
+        const limbs = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
+        const randomLimb = limbs[Math.floor(Math.random() * limbs.length)];
+        
+        // Critical hit logic
+        let actualDamage = damage;
+        if (sourceName === 'Wendigo' && Math.random() < 0.3) {
+            actualDamage *= 2.0; // Wendigos are bone-breakers
+            window.EventBus.emit('UI_LOG', `[CRITICAL] The Wendigo's claw crushed your ${randomLimb}!`);
+        }
+        
+        window.playerHealth.takeDamage(randomLimb, actualDamage);
+        return;
+    }
+
+    // 2. If the target is an NPC, simulate dlimb debuffs
+    if (entity.def?.type === 'npc') {
+        const hpPercent = entity.hp / (entity.def?.hp || 50);
+        if (hpPercent < 0.3 && !entity.isCrippled) {
+            entity.isCrippled = true;
+            entity.speedMultiplier = (entity.speedMultiplier || 1.0) * 0.4;
+            window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'CRIPPLED', pos: entity.visual.position, color: '#f87171' });
+            window.EventBus.emit('UI_LOG', `[COMBAT] You crippled the ${entity.name}'s legs!`);
+        }
+    }
+};

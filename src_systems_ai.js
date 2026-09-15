@@ -527,7 +527,11 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                         const armorDef = window.GameState.derivedStats.armor + window.GameCore.getBuffBonus('meleeDef') + window.GameCore.getBuffBonus('toughness');
                         const damageType = en.def.damageType || 'physical';
                         const mitigation = damageType === 'physical' ? armorDef : window.GameCore.getResistance(damageType);
-                        const actualDmg = Math.max(1, rawDmg - mitigation);
+                                                const actualDmg = Math.max(1, rawDmg - mitigation);
+                        
+                        // --- LIMB DAMAGE HOOK ---
+                        window.GameCore.applyCombatInjury(window.GameCore.playerObj, actualDmg, en.name);
+
                         window.GameState.pStats.hp -= actualDmg; 
                         if (en.def.poisonDuration) window.GameCore.applyStatusEffect('poison', en.def.poisonDuration, en.def.poisonTickDamage);
                         window.EventBus.emit('ENTITY_DAMAGED', { damage: actualDmg, position: pPos, isPlayer: true }); 
