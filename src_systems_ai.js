@@ -314,10 +314,19 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                         const dist = en.visual.position.distanceTo(prey.visual.position);
                         if (dist < 2.0) {
                             attackNpc(en, prey);
-                            if (prey.hp <= 0 && !en.isFed) {
+                            if (prey.hp <= 0) {
                                 en.isFed = true;
+                                en.lastFedDay = window.EngineParams.worldDay;
+                                en.hungerLevel = 0;
+                        
+                                // Reset feral visual if they were just starving (but not permanent feral)
+                                if (!en.permanentFeral) {
+                                    en.aiMode = 'skirmish';
+                                }
+
                                 en.hp = Math.min(en.hp * 1.5, (en.def.hp || 50) * 2);
-                                en.visual.scale.multiplyScalar(1.2); // Grow larger
+                                en.visual.scale.setScalar(en.def.modelScale || 1.0); // Reset scale
+                                en.visual.scale.multiplyScalar(1.2); // Growth
                                 window.EventBus.emit('UI_LOG', `[LIFE CYCLE] The ${en.name} has fed on its prey and grown stronger.`);
                             }
                         } else {
@@ -326,7 +335,31 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                             return;
                         }
                     }
-                }
+        }
+
+        // --- WENDIGO HUNGER & FERAL PROGRESSION ---
+        if (en.name === 'Wendigo') {
+                    const daysSinceFed = window.EngineParams.worldDay - (en.lastFedDay || 0);
+            
+                    // Progression: 1 month (14 days in your cycle) starts hunger, 3 months (42 days) goes permanent feral
+                    if (daysSinceFed > 42) {
+                        if (!en.permanentFeral) {
+                            en.permanentFeral = true;
+                            en.aiMode = 'aggressive';
+                            en.attackDamage = (en.attackDamage || 45) * 1.5;
+                            en.hp = (en.hp || 450) * 1.5;
+                            window.VFXManager.applyAura(en, { ...en.def, vfx: { aura: 'Fire' } }); // Rage aura
+                            window.EventBus.emit('UI_LOG', `[STALKER] A Wendigo has gone PERMANENTLY FERAL from months of starvation!`);
+                        }
+                        en.hungerLevel = 100;
+                    } else if (daysSinceFed > 14) {
+                        en.isStarving = true;
+                        en.hungerLevel = Math.min(100, (daysSinceFed - 14) * 5);
+                    } else {
+                        en.isStarving = false;
+                        en.hungerLevel = 0;
+                    }
+        }
 
                 const onProtectedPath = hostile && window.RoadManager.isRuneProtected(en.visual.position);
         const inVillageBarrier = hostile && window.RoadManager.isVillageProtected(en.visual.position);
@@ -445,7 +478,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 // specialized Wendigo Stalking Logic
                 const stalkDistance = 18;
 
-                // --- FIRE & SUPPORT AVOIDANCE (Kenshi Style) ---
+                                // --- FIRE & SUPPORT AVOIDANCE (Kenshi Style) ---
                 const nearby = window.GameCore.SpatialGrid.getNearbyEntities(en.visual.position.x, en.visual.position.z, 25);
                 
                 // 1. Check for Fire (Torches, pits, hubs)
@@ -454,13 +487,20 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 // 2. Check for Guard Support (Group strength)
                 const supportGuards = nearby.filter(e => e.def.faction === 'village' && e.hp > 0).length;
                 
-                // 3. Evaluate Risk
-                if (fireSource || supportGuards >= 3) {
+                // 3. Evaluate Risk (HUNGER OVERRIDE)
+                // If the wendigo is permanent feral or extreme starving, it ignores fire and support
+                const ignoresFear = en.permanentFeral || (en.hungerLevel > 80);
+
+                if (!ignoresFear && (fireSource || supportGuards >= 3)) {
                     // Too risky: Flee and break stalking
                     en.aiMode = 'flee';
                     en.aiTimer = 5.0;
                     if (Math.random() < 0.1) window.EventBus.emit('UI_LOG', `[PERCEPTION] The Wendigo recoils from the fire and guards.`);
                     return;
+                }
+                
+                if (ignoresFear && (fireSource || supportGuards >= 3) && Math.random() < 0.01) {
+                    window.EventBus.emit('UI_LOG', `[STALKER] The starving Wendigo ignores the fire! It's too hungry to care!`);
                 }
 
                 if (dist > stalkDistance + 2) {

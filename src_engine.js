@@ -244,10 +244,17 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     if(def.type === 'powerStone') { const light = new THREE.PointLight(0x7dd3fc, def.active === false ? 0.2 : 3, 25); light.position.y = def.height / 2; mesh.add(light); }
     if(def.type === 'firePit') { const light = new THREE.PointLight(0xff8a32, def.active === false ? 0 : 2.5, 12); light.position.y = def.height; mesh.add(light); }
     if(def.type === 'streetLight') { const light = new THREE.PointLight(0x9bdcff, def.active === false ? 0 : 2.5, 18); light.position.y = def.height; mesh.add(light); }
-    setupEntityAnimations(entity); window.VFXManager.applyAura(entity, def); 
+        setupEntityAnimations(entity); window.VFXManager.applyAura(entity, def); 
     
     // SPATIAL GRID: Register entity on spawn
     window.GameCore.SpatialGrid.registerEntity(entity);
+
+    // --- MONSTER HUNGER TRACKING ---
+    if (def.faction === 'monster' || def.faction === 'forest') {
+        entity.lastFedDay = window.EngineParams.worldDay;
+        entity.hungerLevel = 0; // 0 = full, 100 = starving
+        entity.isFeral = false;
+    }
 
     window.GameCore.activeEntities.push(entity);
     if (!window.GameState.narrator.targetId && (def.faction === 'village' || def.faction === 'adventurer')) {
