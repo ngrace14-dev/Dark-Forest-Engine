@@ -94,10 +94,17 @@ const ChunkManager = {
             if (chunkBiomeSpawns[biomeKey] < biome.density && rng() < 0.5) { if (biome.prefab !== 'None' && window.AssetManager.prefabs[biome.prefab]) { instantiatePrefab(biome.prefab, px, window.WorldGenerator.getTerrainHeight(px, pz), pz, key); chunkBiomeSpawns[biomeKey]++; } }
         }
     },
-    unloadChunk: function(key) {
+        unloadChunk: function(key) {
         const chunk = this.activeChunks.get(key); if(!chunk) return;
         chunk.mesh.geometry.dispose(); chunk.mesh.material.dispose(); window.GameCore.scene.remove(chunk.mesh); window.GameCore.world.removeRigidBody(chunk.body);
-        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { if(en.chunkKey === key) { window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); return false; } return true; });
+        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
+            if(en.chunkKey === key) { 
+                window.GameCore.releaseEntityIndex(en.memoryIndex); // Recycle memory
+                window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); 
+                return false; 
+            } 
+            return true; 
+        });
         this.activeChunks.delete(key);
     }
 };
@@ -201,7 +208,11 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
         collider = window.GameCore.world.createCollider(colliderDesc, body);
     }
 
-    const entity = { id: Math.random().toString(36).substr(2, 9), name: name, def: def, visual: mesh, body: body, collider: collider, hp: def.hp || 50, poise: def.poise || 30, maxPoise: def.poise || 30, chunkKey: chunkKey };
+    const entity = { id: Math.random().toString(36).substr(2, 9), name: name, def: def, visual: mesh, body: body, collider: collider, chunkKey: chunkKey };
+    
+    // DOD Optimization: Bind NPC stats to Memory Buffer
+    window.GameCore.bindEntityToBuffer(entity, def.hp || 50, def.poise || 30);
+
     if(collider) collider.handle = Math.floor(Math.random() * 1000000); 
     body.userData = { entityId: entity.id };
     
@@ -319,8 +330,9 @@ window.ArenaTestManager = {
         window.EventBus.emit('OPEN_ARENA_RESULT', { result: 'defeat', reward: 0 });
         window.EventBus.emit('UI_UPDATE_HUD');
     },
-    clear: function() {
+        clear: function() {
         window.GameCore.activeEntities.filter(entity => entity.arenaEntity).forEach(entity => {
+            window.GameCore.releaseEntityIndex(entity.memoryIndex); // Recycle memory
             window.GameCore.scene.remove(entity.visual);
             window.GameCore.world.removeRigidBody(entity.body);
         });
@@ -354,6 +366,19 @@ function spawnPlayer(x, y, z) {
     let body = window.GameCore.world.createRigidBody(rigidBodyDesc);
     let collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.capsule(Math.max(0.1, def.height/2 - def.radius), def.radius), body);
     window.GameCore.playerObj = { visual: getVisualMesh(def), body: body, collider: collider };
+    
+    // DOD Optimization: Bind Player stats to Memory Buffer
+    window.GameCore.bindEntityToBuffer(window.GameCore.playerObj, window.GameState.pStats.maxHp, window.GameState.pStats.maxPoise);
+    
+    // Proxy the global GameState.pStats to the memory buffer as well so existing UI code works
+    const pMemIdx = window.GameCore.playerObj.memoryIndex * 4;
+    Object.defineProperties(window.GameState.pStats, {
+        'hp': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 0], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 0] = v; } },
+        'maxHp': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 1], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 1] = v; } },
+        'poise': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 2], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 2] = v; } },
+        'maxPoise': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 3], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 3] = v; } }
+    });
+
     const p = body.translation(); window.GameCore.playerObj.visual.position.set(p.x, p.y, p.z); window.GameCore.scene.add(window.GameCore.playerObj.visual);
     setupEntityAnimations(window.GameCore.playerObj, true); window.VFXManager.applyAura(window.GameCore.playerObj, def);
 }
@@ -637,7 +662,15 @@ window.EventBus.on('SPAWN_BLIGHT', () => {
     if (pts.length > 0) { const pt = pts[Math.floor(Math.random() * pts.length)]; const root = instantiatePrefab('Blight Root', pt.x, window.WorldGenerator.getTerrainHeight(pt.x, pt.z), pt.z, 'persistent'); if (root) { root.hp = 150; window.EventBus.emit('UI_LOG', "🥀 A Blight Root has corrupted a nearby road!"); } } 
     else window.EventBus.emit('UI_LOG', "No roads nearby to corrupt!");
 });
-window.EventBus.on('CLEAR_MAP', () => { window.GameCore.activeEntities.forEach(en => { if(en.def.faction === 'player') return; window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); }); window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => en.def.faction === 'player'); window.GameState.questBoard = []; window.EventBus.emit('UI_LOG', "World Entities Cleared."); });
+window.EventBus.on('CLEAR_MAP', () => { 
+    window.GameCore.activeEntities.forEach(en => { 
+        if(en.def.faction === 'player') return; 
+        window.GameCore.releaseEntityIndex(en.memoryIndex); // Recycle memory
+        window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); 
+    }); 
+    window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => en.def.faction === 'player'); 
+    window.GameState.questBoard = []; window.EventBus.emit('UI_LOG', "World Entities Cleared."); 
+});
 window.EventBus.on('CLAIM_PLAYER_CAMP', () => {
     const base = window.GameState.base;
     if (base.owned || !window.GameCore.playerObj) {
@@ -1036,7 +1069,7 @@ function fixedUpdateLogic(delta) {
                     window.EventBus.emit('ENTITY_DAMAGED', { damage: effect.tickDamage, position: entity.visual.position, isPlayer: false });
                     window.EventBus.emit('SPAWN_HIT_VFX', { type: effect.type === 'burning' ? 'Fire' : 'Void', pos: entity.visual.position });
                     
-                    if (entity.hp <= 0) {
+                                        if (entity.hp <= 0) {
                         playEntityAnimation(entity, 'die');
                         window.AdventurerManager?.markDefeated(entity);
                         spawnGroundLoot(entity.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', entity.visual.position);
@@ -1044,6 +1077,7 @@ function fixedUpdateLogic(delta) {
                         window.GameState.inventory.gold += entity.def.faction === 'monster' ? 10 : 50;
                         window.EventBus.emit('UI_UPDATE_HUD');
                         setTimeout(() => {
+                            window.GameCore.releaseEntityIndex(entity.memoryIndex); // Recycle memory
                             window.GameCore.scene.remove(entity.visual);
                             window.GameCore.world.removeRigidBody(entity.body);
                             window.GameCore.activeEntities = window.GameCore.activeEntities.filter(candidate => candidate.id !== entity.id);
@@ -1214,17 +1248,18 @@ function fixedUpdateLogic(delta) {
                                 if(window.GameState.factionRelations.player[en.def.faction === 'village' ? 'kingdom' : en.def.faction] <= -50) window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "HOSTILE!", pos: en.visual.position, color: '#ff0000'});
                             }
 
-                            if(en.hp <= 0) {
-                                playEntityAnimation(en, 'die');
-                                window.AdventurerManager?.markDefeated(en);
-                                if (en.def.type === 'npc') spawnGroundLoot(en.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', en.visual.position);
-                                awardMonsterKill(en);
-                                setTimeout(() => {
-                                    window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e.id !== en.id);
-                                }, 2000);
-                                if (en.name === 'Blight Root') { window.EventBus.emit('UI_LOG', `Destroyed the Blight Root! Safe zone restored.`); } 
-                                else { window.GameState.inventory.gold += (en.def.faction === 'monster' ? 10 : 50); window.EventBus.emit('UI_UPDATE_HUD'); window.EventBus.emit('UI_LOG', `Killed ${en.name}. Looted gold.`); }
-                            } else if (en.poise <= 0) {
+                                        if(en.hp <= 0) {
+                playEntityAnimation(en, 'die');
+                window.AdventurerManager?.markDefeated(en);
+                if (en.def.type === 'npc') spawnGroundLoot(en.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', en.visual.position);
+                awardMonsterKill(en);
+                setTimeout(() => {
+                    window.GameCore.releaseEntityIndex(en.memoryIndex); // Recycle memory
+                    window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e.id !== en.id);
+                }, 2000);
+                if (en.name === 'Blight Root') { window.EventBus.emit('UI_LOG', `Destroyed the Blight Root! Safe zone restored.`); } 
+                else { window.GameState.inventory.gold += (en.def.faction === 'monster' ? 10 : 50); window.EventBus.emit('UI_UPDATE_HUD'); window.EventBus.emit('UI_LOG', `Killed ${en.name}. Looted gold.`); }
+            } else if (en.poise <= 0) {
                                 en.poise = en.maxPoise;
                                 en.staggeredUntil = performance.now() + 800;
                                 playEntityAnimation(en, 'hit');

@@ -131,6 +131,58 @@ window.EngineParams = {
 window.GameCore = {
     playerObj: null, activeEntities: [], groundLoot: [], engineState: 'menu', worldTimer: 0,
     scene: null, world: null, camera: null, passes: {}, playEntityAnimation: null, swapPlayerModel: null,
+    
+    // DATA-ORIENTED DESIGN (DOD) OPTIMIZATION
+    // Flat memory buffer for all entity combat stats (HP, MaxHP, Poise, MaxPoise)
+    // Allows 10,000 entities. Layout: [Index * 4 + 0] = HP, [1] = MaxHP, [2] = Poise, [3] = MaxPoise
+        MAX_ENTITIES: 10000,
+    entityStatBuffer: new Float32Array(40000), 
+    entityIndexPool: Array.from({length: 10000}, (_, i) => i).reverse(), // Stack of available indices
+    
+    // MEMORY MANAGEMENT HELPERS
+    // Binds an entity object's HP/Poise to the high-performance Float32 buffer
+    bindEntityToBuffer: function(entity, hp, poise) {
+        const index = this.entityIndexPool.pop();
+        if (index === undefined) { console.error("CRITICAL: ENTITY MEMORY LIMIT REACHED!"); return null; }
+        
+        const base = index * 4;
+        this.entityStatBuffer[base + 0] = hp;
+        this.entityStatBuffer[base + 1] = hp; // MaxHP
+        this.entityStatBuffer[base + 2] = poise;
+        this.entityStatBuffer[base + 3] = poise; // MaxPoise
+        
+        // Use property definitions to proxy existing code to the flat buffer
+        Object.defineProperties(entity, {
+            'hp': {
+                get: () => this.entityStatBuffer[base + 0],
+                set: (val) => { this.entityStatBuffer[base + 0] = val; },
+                configurable: true
+            },
+            'maxHp': {
+                get: () => this.entityStatBuffer[base + 1],
+                set: (val) => { this.entityStatBuffer[base + 1] = val; },
+                configurable: true
+            },
+            'poise': {
+                get: () => this.entityStatBuffer[base + 2],
+                set: (val) => { this.entityStatBuffer[base + 2] = val; },
+                configurable: true
+            },
+            'maxPoise': {
+                get: () => this.entityStatBuffer[base + 3],
+                set: (val) => { this.entityStatBuffer[base + 3] = val; },
+                configurable: true
+            },
+            'memoryIndex': { value: index, writable: false, configurable: true }
+        });
+        
+        return index;
+    },
+
+    releaseEntityIndex: function(index) {
+        if (index !== null && index !== undefined) this.entityIndexPool.push(index);
+    },
+    
     addXP: function(statName, amount) {
         let stat = window.GameState.pStats[statName]; if(!stat) return;
         stat.xp += amount;
