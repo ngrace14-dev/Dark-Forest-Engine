@@ -131,11 +131,26 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
     if(!window.GameCore || !window.GameCore.playerObj) return;
     const pPos = window.GameCore.playerObj.visual.position;
     const obstacles = window.GameCore.activeEntities.filter(e => e.def.isObstacle);
+    const now = performance.now();
 
     window.GameCore.activeEntities.forEach(en => {
         if(en.body && en.body.isDynamic && en.body.isDynamic()) { const p = en.body.translation(); en.visual.position.set(p.x, p.y, p.z); }
         if (en.def.type !== 'npc') return;
-        if (en.staggeredUntil && performance.now() < en.staggeredUntil) {
+
+        // --- AI DISTANCE THROTTLING (Kenshi Optimization) ---
+        const distToPlayer = en.visual.position.distanceTo(pPos);
+        
+        // 1. Throttling logic
+        if (distToPlayer > 100) {
+            // Extreme distance: Run logic once every 2 seconds
+            if (!en.lastAiUpdate || now - en.lastAiUpdate < 2000) return;
+        } else if (distToPlayer > 50) {
+            // Far distance: Run logic at 10 FPS
+            if (!en.lastAiUpdate || now - en.lastAiUpdate < 100) return;
+        }
+        en.lastAiUpdate = now;
+
+        if (en.staggeredUntil && now < en.staggeredUntil) {
             en.body.setLinvel({ x: 0, y: en.body.linvel().y, z: 0 }, true);
             return;
         }
@@ -384,17 +399,34 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 }
                 
                 if (!window.EngineParams.godMode) {
-                    if (window.Input.isBlocking) {
-                        const poiseDamage = en.def.poiseDamage || Math.max(8, Math.floor((en.def.attackDamage || 15) * 0.8));
-                        window.GameState.pStats.poise = Math.max(0, window.GameState.pStats.poise - poiseDamage);
-                        if (window.GameState.pStats.poise <= 0) {
-                            window.GameState.pStats.guardBrokenUntil = performance.now() + 1000;
-                            window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: 'GUARD BREAK!', pos: pPos, color: '#ef4444'});
-                            if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(window.GameCore.playerObj, 'hit');
+                                        if (window.Input.isBlocking) {
+                        const playerForward = new THREE.Vector3(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
+                        const dirToEnemy = new THREE.Vector3(en.visual.position.x - pPos.x, 0, en.visual.position.z - pPos.z).normalize();
+                        const angleToEnemy = playerForward.angleTo(dirToEnemy);
+                        
+                        // PERFECT BLOCK / PARRY (Dragon's Dogma Style)
+                        // If blocking and facing the enemy (within 45 degrees)
+                        if (angleToEnemy < Math.PI * 0.25) {
+                            const poiseDamage = en.def.poiseDamage || Math.max(8, Math.floor((en.def.attackDamage || 15) * 0.8));
+                            window.GameState.pStats.poise = Math.max(0, window.GameState.pStats.poise - (poiseDamage * 0.2)); // 80% poise reduction on successful parry
+                            
+                            // Visual/Audio Feedback
+                            window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "PARRIED!", pos: pPos, color: '#fcd34d'});
+                            window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/conga-analog.mp3', pos: pPos, vol: 0});
+                            
+                            // Push the enemy back and stagger them
+                            const pushDir = dirToEnemy.clone().multiplyScalar(5);
+                            en.body.applyImpulse({x: pushDir.x, y: 2, z: pushDir.z}, true);
+                            en.poise = Math.max(0, en.poise - 25);
+                            en.staggeredUntil = performance.now() + 1500;
+                            playEntityAnimation(en, 'hit');
+                            
+                            window.Input.hitPauseTimer = 0.08; // 80ms freeze on parry
                         } else {
-                            window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "BLOCKED!", pos: pPos, color: '#4ade80'});
+                            // Standard block (from side/back)
+                            window.GameState.pStats.poise = Math.max(0, window.GameState.pStats.poise - 20);
+                            window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "BLOCKED", pos: pPos, color: '#94a3b8'});
                         }
-                        window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/tom-analog.mp3', pos: pPos, vol: -5});
                     } else {
                         const rawDmg = en.def.attackDamage || 15;
                         const armorDef = window.GameState.derivedStats.armor + window.GameCore.getBuffBonus('meleeDef') + window.GameCore.getBuffBonus('toughness');

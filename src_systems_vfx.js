@@ -12,8 +12,54 @@ window.VFXManager = {
     },
     get auras() { return ['None', ...Object.keys(this.defs).filter(k => this.defs[k].type === 'aura')]; },
     get onHits() { return ['None', ...Object.keys(this.defs).filter(k => this.defs[k].type === 'onHit')]; },
-    transientVFX: [],
+        transientVFX: [],
     projectiles: [],
+    
+    // BATCHED VFX SYSTEM (Parity with Diablo 4 performance)
+    batchedHitSystem: null,
+    hitPool: [], 
+    
+    initBatchedVFX: function(scene) {
+        const maxParticles = 2000;
+        const geo = new THREE.SphereGeometry(0.1, 4, 4);
+        const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
+        this.batchedHitSystem = new THREE.InstancedMesh(geo, mat, maxParticles);
+        this.batchedHitSystem.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        this.batchedHitSystem.count = 0;
+        scene.add(this.batchedHitSystem);
+        
+        // Initialize pool
+        for(let i=0; i<maxParticles; i++) {
+            this.hitPool.push({
+                active: false,
+                pos: new THREE.Vector3(),
+                vel: new THREE.Vector3(),
+                color: new THREE.Color(),
+                life: 0,
+                index: i
+            });
+        }
+    },
+
+    spawnHitBatched: function(type, pos) {
+        if (!this.batchedHitSystem) this.initBatchedVFX(window.GameCore.scene);
+        const vfxDef = this.defs[type] || this.defs['Sparks'];
+        const count = 15;
+        const color = new THREE.Color(vfxDef.color);
+
+        let spawned = 0;
+        for (let i = 0; i < this.hitPool.length && spawned < count; i++) {
+            const p = this.hitPool[i];
+            if (!p.active) {
+                p.active = true;
+                p.pos.copy(pos);
+                p.vel.set((Math.random()-0.5)*6, Math.random()*6, (Math.random()-0.5)*6);
+                p.life = 0.5 + Math.random() * 0.5;
+                p.color.copy(color);
+                spawned++;
+            }
+        }
+    },
     
     applyAura: function(entity, def) {
         if(entity.auraMesh) { entity.visual.remove(entity.auraMesh); entity.auraMesh.geometry.dispose(); entity.auraMesh.material.dispose(); entity.auraMesh = null; }
@@ -47,6 +93,39 @@ window.VFXManager = {
         this.projectiles.push({ mesh, direction: direction.clone().normalize(), damage, damageType, speed, remaining: range, owner, statusEffect });
     },
     update: function(delta) {
+        // --- BATCHED VFX UPDATE ---
+        if (this.batchedHitSystem) {
+            let activeCount = 0;
+            const dummy = new THREE.Object3D();
+            const colors = new Float32Array(this.hitPool.length * 3);
+            
+            for (let i = 0; i < this.hitPool.length; i++) {
+                const p = this.hitPool[i];
+                if (p.active) {
+                    p.life -= delta * 2;
+                    if (p.life <= 0) {
+                        p.active = false;
+                        dummy.position.set(0, -1000, 0); // Move off-screen
+                    } else {
+                        p.vel.y -= 9.8 * delta;
+                        p.pos.addScaledVector(p.vel, delta);
+                        dummy.position.copy(p.pos);
+                        const s = p.life * 1.5;
+                        dummy.scale.set(s, s, s);
+                        activeCount++;
+                    }
+                    dummy.updateMatrix();
+                    this.batchedHitSystem.setMatrixAt(i, dummy.matrix);
+                    p.color.toArray(colors, i * 3);
+                }
+            }
+            this.batchedHitSystem.instanceMatrix.needsUpdate = true;
+            if (this.batchedHitSystem.instanceColor) {
+                this.batchedHitSystem.instanceColor.set(colors);
+                this.batchedHitSystem.instanceColor.needsUpdate = true;
+            }
+        }
+
         for (let i = this.transientVFX.length - 1; i >= 0; i--) {
             let vfx = this.transientVFX[i]; vfx.life -= delta * 2.0;
             if (vfx.life <= 0) { window.GameCore.scene.remove(vfx.mesh); vfx.mesh.geometry.dispose(); vfx.mesh.material.dispose(); this.transientVFX.splice(i, 1); } 
