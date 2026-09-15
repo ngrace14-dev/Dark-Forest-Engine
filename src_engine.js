@@ -1242,7 +1242,7 @@ function fixedUpdateLogic(delta) {
         if (window.Input.attackCooldown > 0) window.Input.attackCooldown -= delta; 
         else window.Input.isAttacking = false;
         
-        // --- DYNAMIC ARC SWEEP HITBOX LOGIC ---
+                // --- DYNAMIC ARC SWEEP HITBOX LOGIC ---
         if (window.Input.activeSweep) {
             window.Input.activeSweep.timer -= delta;
             
@@ -1252,9 +1252,7 @@ function fixedUpdateLogic(delta) {
                 const pPos = window.GameCore.playerObj.body.translation();
                 const playerForward = new THREE.Vector3(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
                 
-                                // --- SPATIAL GRID OPTIMIZATION (Diablo Style) ---
-                // Instead of sweeping through EVERY entity in the world (O(N)),
-                // only check entities in the player's current and adjacent grid cells (O(1)).
+                // --- SPATIAL GRID OPTIMIZATION (Diablo Style) ---
                 const nearbyEntities = window.GameCore.SpatialGrid.getNearbyEntities(pPos.x, pPos.z, sweep.profile.reach);
                 
                 for (let i = nearbyEntities.length - 1; i >= 0; i--) {
@@ -1265,21 +1263,31 @@ function fixedUpdateLogic(delta) {
                     const ePos = en.body.translation();
                     const distSq = (ePos.x - pPos.x)**2 + (ePos.z - pPos.z)**2;
                     
-                    // 1. Is it within reach?
                     if (distSq <= sweep.profile.reach * sweep.profile.reach) {
-                        // 2. Is it within the angle cone?
                         const dirToEnemy = new THREE.Vector3(ePos.x - pPos.x, 0, ePos.z - pPos.z).normalize();
                         const angleToEnemy = playerForward.angleTo(dirToEnemy);
                         
                         if (angleToEnemy <= sweep.profile.angle / 2) {
-                            // HIT DETECTED!
                             sweep.alreadyHit.add(en.id);
                             
+                            // COMBAT MULTIPLIERS
+                            let damageMultiplier = sweep.profile.multiplier;
+
+                            // --- ASSASSINATION MECHANIC (Kenshi Style) ---
+                            // 5x damage if Heavy Attacking from Stealth
+                            if (window.Input.isStealth && sweep.isHeavy) {
+                                damageMultiplier *= 5.0;
+                                window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "ASSASSINATION!", pos: en.visual.position, color: '#ff0000'});
+                                window.EventBus.emit('UI_LOG', `[CRITICAL] You assassinated ${en.name}!`);
+                                // Break stealth upon assassination
+                                window.EventBus.emit('TOGGLE_STEALTH');
+                            }
+
                             const rawDamage = window.GameState.derivedStats.weaponDamage + ((window.GameState.pStats.strength.level + window.GameCore.getBuffBonus('strength')) * 2) + window.GameCore.getBuffBonus('meleeAtt');
-                            const damage = Math.max(1, Math.floor(rawDamage * sweep.profile.multiplier * window.GameCore.getCombatInjuryMultiplier()) - (en.def.armor || 0)); 
+                            const damage = Math.max(1, Math.floor(rawDamage * damageMultiplier * window.GameCore.getCombatInjuryMultiplier()) - (en.def.armor || 0)); 
                             
                             en.hp -= damage; 
-                            en.poise = Math.max(0, en.poise - damage * sweep.profile.poise);
+                            // ... existing poise and vfx code ...
                             
                             window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: en.visual.position, isPlayer: false });
                             window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });

@@ -284,24 +284,50 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             return;
         }
 
-        const hostile = en.def.faction === 'monster' || en.def.faction === 'forest' || window.GameState.reputation[en.def.faction] <= -50;
+                const hostile = en.def.faction === 'monster' || en.def.faction === 'forest' || window.GameState.reputation[en.def.faction] <= -50;
         const onProtectedPath = hostile && window.RoadManager.isRuneProtected(en.visual.position);
         const inVillageBarrier = hostile && window.RoadManager.isVillageProtected(en.visual.position);
         const base = window.GameState.base;
         const inPlayerWard = hostile && base.owned && base.wardRadius && base.position && Math.hypot(en.visual.position.x - base.position.x, en.visual.position.z - base.position.z) <= base.wardRadius;
         let target = null;
-                if (hostile && !onProtectedPath && !inVillageBarrier && !inPlayerWard) {
-            // Line of Sight & Stealth Check
+
+        if (hostile && !onProtectedPath && !inVillageBarrier && !inPlayerWard) {
+            // --- ENHANCED PERCEPTION SYSTEM (Kenshi Style) ---
             const dist = en.visual.position.distanceTo(pPos);
             
-            if (dist < 15 && !isPlayerSafe && !window.EngineParams.isPlayerHidden) {
+            // 1. Sight-based detection
+            let canSeePlayer = false;
+            let detectionRange = 15;
+
+            // Nighttime penalty for AI sight
+            const time = window.EngineParams.timeOfDay;
+            const isNight = time < 6 || time > 19;
+            if (isNight) detectionRange *= 0.6; // NPCs see 40% less at night
+
+            if (dist < detectionRange && !isPlayerSafe && !window.EngineParams.isPlayerHidden) {
                 if (window.Input.isStealth) {
-                    // In stealth: Only detect if VERY close (3m) or if already in chase
-                    if (dist < 3 || en.aiMode === 'aggressive' || en.aiMode === 'chase') {
-                        target = pPos;
-                    }
+                    // Stealth reduces sight range massively
+                    if (dist < 3) canSeePlayer = true;
                 } else {
-                    target = pPos;
+                    canSeePlayer = true;
+                }
+            }
+
+            // 2. Sound-based detection (Diablo Style)
+            let canHearPlayer = false;
+            if (window.Input.isMoving && !window.Input.isStealth) {
+                const soundRange = window.Input.isDashing ? 18 : 10;
+                if (dist < soundRange) {
+                    canHearPlayer = true;
+                    // Note: You can't "hide" from sound with line-of-sight usually
+                }
+            }
+
+            if (canSeePlayer || canHearPlayer) {
+                target = pPos;
+                if (canHearPlayer && !canSeePlayer && Math.random() < 0.05) {
+                    window.EventBus.emit('UI_LOG', `[PERCEPTION] ${en.name} heard you!`);
+                    window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'HEARD!', pos: en.visual.position, color: '#fb923c' });
                 }
             }
         }
