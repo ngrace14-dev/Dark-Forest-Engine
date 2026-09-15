@@ -138,10 +138,65 @@ window.GameCore = {
     // Flat memory buffer for all entity combat stats (HP, MaxHP, Poise, MaxPoise)
     // Allows 10,000 entities. Layout: [Index * 4 + 0] = HP, [1] = MaxHP, [2] = Poise, [3] = MaxPoise
         MAX_ENTITIES: 10000,
-    entityStatBuffer: new Float32Array(40000), 
-    entityIndexPool: Array.from({length: 10000}, (_, i) => i).reverse(), // Stack of available indices
+        entityStatBuffer: new Float32Array(40000), 
+        entityIndexPool: Array.from({length: 10000}, (_, i) => i).reverse(), // Stack of available indices
     
-    // MEMORY MANAGEMENT HELPERS
+        // --- SPATIAL PARTITIONING GRID (Kenshi 1:1 Scale Optimization) ---
+        // Divides the world into 20m x 20m cells. Entities only check their own and 8 neighbors.
+        SpatialGrid: {
+            cellSize: 20,
+            cells: new Map(), // Key: "x,z" -> Value: Set of Entity IDs
+
+            getGridKey: function(x, z) {
+                return `${Math.floor(x / this.cellSize)},${Math.floor(z / this.cellSize)}`;
+            },
+
+            registerEntity: function(entity) {
+                const pos = entity.visual.position;
+                const key = this.getGridKey(pos.x, pos.z);
+                if (!this.cells.has(key)) this.cells.set(key, new Set());
+                this.cells.get(key).add(entity);
+                entity.currentGridKey = key;
+            },
+
+            unregisterEntity: function(entity) {
+                if (entity.currentGridKey && this.cells.has(entity.currentGridKey)) {
+                    this.cells.get(entity.currentGridKey).delete(entity);
+                }
+            },
+
+            updateEntity: function(entity) {
+                const pos = entity.visual.position;
+                const newKey = this.getGridKey(pos.x, pos.z);
+                if (newKey !== entity.currentGridKey) {
+                    this.unregisterEntity(entity);
+                    if (!this.cells.has(newKey)) this.cells.set(newKey, new Set());
+                    this.cells.get(newKey).add(entity);
+                    entity.currentGridKey = newKey;
+                }
+            },
+
+            // Returns all entities within the entity's cell and its 8 neighbors
+            getNearbyEntities: function(x, z, radius = 20) {
+                const nearby = [];
+                const centerX = Math.floor(x / this.cellSize);
+                const centerZ = Math.floor(z / this.cellSize);
+                const range = Math.ceil(radius / this.cellSize);
+
+                for (let ox = -range; ox <= range; ox++) {
+                    for (let oz = -range; oz <= range; oz++) {
+                        const key = `${centerX + ox},${centerZ + oz}`;
+                        const cell = this.cells.get(key);
+                        if (cell) {
+                            for (const en of cell) nearby.push(en);
+                        }
+                    }
+                }
+                return nearby;
+            }
+        },
+
+        // MEMORY MANAGEMENT HELPERS
     // Binds an entity object's HP/Poise to the high-performance Float32 buffer
     bindEntityToBuffer: function(entity, hp, poise) {
         const index = this.entityIndexPool.pop();

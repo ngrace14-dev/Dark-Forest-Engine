@@ -95,18 +95,19 @@ const ChunkManager = {
         }
     },
         unloadChunk: function(key) {
-        const chunk = this.activeChunks.get(key); if(!chunk) return;
-        chunk.mesh.geometry.dispose(); chunk.mesh.material.dispose(); window.GameCore.scene.remove(chunk.mesh); window.GameCore.world.removeRigidBody(chunk.body);
-        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
-            if(en.chunkKey === key) { 
-                window.GameCore.releaseEntityIndex(en.memoryIndex); // Recycle memory
-                window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); 
-                return false; 
-            } 
-            return true; 
-        });
-        this.activeChunks.delete(key);
-    }
+            const chunk = this.activeChunks.get(key); if(!chunk) return;
+            chunk.mesh.geometry.dispose(); chunk.mesh.material.dispose(); window.GameCore.scene.remove(chunk.mesh); window.GameCore.world.removeRigidBody(chunk.body);
+            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
+                if(en.chunkKey === key) { 
+                    window.GameCore.releaseEntityIndex(en.memoryIndex); // Recycle memory
+                    window.GameCore.SpatialGrid.unregisterEntity(en);  // Remove from grid
+                    window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); 
+                    return false; 
+                } 
+                return true; 
+            });
+            this.activeChunks.delete(key);
+        }
 };
 
 function getVisualMesh(def) {
@@ -221,7 +222,12 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     if(def.type === 'powerStone') { const light = new THREE.PointLight(0x7dd3fc, def.active === false ? 0.2 : 3, 25); light.position.y = def.height / 2; mesh.add(light); }
     if(def.type === 'firePit') { const light = new THREE.PointLight(0xff8a32, def.active === false ? 0 : 2.5, 12); light.position.y = def.height; mesh.add(light); }
     if(def.type === 'streetLight') { const light = new THREE.PointLight(0x9bdcff, def.active === false ? 0 : 2.5, 18); light.position.y = def.height; mesh.add(light); }
-    setupEntityAnimations(entity); window.VFXManager.applyAura(entity, def); window.GameCore.activeEntities.push(entity);
+    setupEntityAnimations(entity); window.VFXManager.applyAura(entity, def); 
+    
+    // SPATIAL GRID: Register entity on spawn
+    window.GameCore.SpatialGrid.registerEntity(entity);
+
+    window.GameCore.activeEntities.push(entity);
     if (!window.GameState.narrator.targetId && (def.faction === 'village' || def.faction === 'adventurer')) {
         window.GameState.narrator.targetId = entity.id;
         window.GameState.narrator.targetName = entity.name;
@@ -1050,13 +1056,16 @@ function fixedUpdateLogic(delta) {
     const playerAlive = window.GameCore.playerObj && window.GameState.pStats.hp > 0;
     const playerPosition = playerAlive ? window.GameCore.playerObj.visual.position : null;
     const detectionRadiusSq = playerAlive ? Math.pow(window.GameState.forestBlessing?.dangerSense ? 18 : 15, 2) : 0;
-    const nowSecs = performance.now() / 1000;
+        const nowSecs = performance.now() / 1000;
 
     // Single optimized O(N) backward pass over all active entities
     for (let i = window.GameCore.activeEntities.length - 1; i >= 0; i--) {
         const entity = window.GameCore.activeEntities[i];
         if (!entity || !entity.visual) continue;
         
+        // --- SPATIAL GRID: Update position in grid ---
+        window.GameCore.SpatialGrid.updateEntity(entity);
+
         // 1. Process Status Effects In-Place (No .filter arrays)
         if (entity.def.type === 'npc' && entity.statusEffects?.length > 0 && entity.hp > 0) {
             for (let j = entity.statusEffects.length - 1; j >= 0; j--) {
@@ -1211,9 +1220,13 @@ function fixedUpdateLogic(delta) {
                 const pPos = window.GameCore.playerObj.body.translation();
                 const playerForward = new THREE.Vector3(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
                 
-                // Sweep through active entities to see who is caught in the cone
-                for (let i = window.GameCore.activeEntities.length - 1; i >= 0; i--) {
-                    const en = window.GameCore.activeEntities[i];
+                                // --- SPATIAL GRID OPTIMIZATION (Diablo Style) ---
+                // Instead of sweeping through EVERY entity in the world (O(N)),
+                // only check entities in the player's current and adjacent grid cells (O(1)).
+                const nearbyEntities = window.GameCore.SpatialGrid.getNearbyEntities(pPos.x, pPos.z, sweep.profile.reach);
+                
+                for (let i = nearbyEntities.length - 1; i >= 0; i--) {
+                    const en = nearbyEntities[i];
                     if (!en || en.hp <= 0 || sweep.alreadyHit.has(en.id)) continue;
                     if (en.def.type !== 'npc' && en.name !== 'Blight Root') continue;
                     
