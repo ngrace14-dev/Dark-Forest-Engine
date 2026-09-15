@@ -36,8 +36,14 @@ const ChunkManager = {
             const vx = vertices[i] + chunkX; const vz = vertices[i+2] + chunkZ;
             const biomeKey = window.WorldGenerator.getBiome(vx, vz); const biome = window.WorldGenConfig.biomes[biomeKey]; let c = new THREE.Color(biome.color);
             
-            let minRoadDist = 9999;
-            for(let r=0; r<localRoadPoints.length; r++) { const dist = Math.sqrt(Math.pow(vx - localRoadPoints[r].x, 2) + Math.pow(vz - localRoadPoints[r].z, 2)); if(dist < minRoadDist) minRoadDist = dist; }
+                        let minRoadDistSq = 999999;
+            for(let r=0; r<localRoadPoints.length; r++) { 
+                const dx = vx - localRoadPoints[r].x;
+                const dz = vz - localRoadPoints[r].z;
+                const distSq = (dx * dx) + (dz * dz);
+                if(distSq < minRoadDistSq) minRoadDistSq = distSq; 
+            }
+            const minRoadDist = Math.sqrt(minRoadDistSq);
             if(minRoadDist < ROAD_WIDTH + 2) { const dirtInfluence = Math.max(0, 1.0 - (minRoadDist / (ROAD_WIDTH + 2))); c.lerp(new THREE.Color('#38281d'), dirtInfluence); }
 
             vertices[i+1] = window.WorldGenerator.getTerrainHeight(vx, vz); 
@@ -505,107 +511,65 @@ window.GameCore.swapPlayerModel = function() {
 function performAttack(isHeavy = false) {
     if (window.Input.isBlocking || window.Input.isAttacking || !window.GameCore.playerObj.visual) return; 
     if (window.GameCore.playerObj.currentAnimState === 'hit' || window.GameCore.playerObj.currentAnimState === 'die') return;
+    
     const isDashStrike = !isHeavy && window.Input.isDashing;
-    const profile = isHeavy ? { stamina: 35, cooldown: 1.2, reach: 4, multiplier: 2.2, poise: 2.5, windup: 250, color: 0xffaa33 } : isDashStrike ? { stamina: 20, cooldown: 1, reach: 4.5, multiplier: 1.6, poise: 1.8, windup: 0, color: 0x60a5fa } : { stamina: 15, cooldown: 0.8, reach: 3, multiplier: 1, poise: 1, windup: 0, color: 0xffffff };
+    
+    // ARC SWEEP PROFILE (AAA Style Hitboxes)
+    const profile = isHeavy ? 
+        { stamina: 35, cooldown: 1.2, reach: 4.5, radius: 1.5, angle: Math.PI * 0.8, multiplier: 2.2, poise: 2.5, windup: 0.25, duration: 0.3, color: 0xffaa33 } : 
+        isDashStrike ? 
+        { stamina: 20, cooldown: 1.0, reach: 5.0, radius: 1.2, angle: Math.PI * 0.4, multiplier: 1.6, poise: 1.8, windup: 0.1, duration: 0.2, color: 0x60a5fa } : 
+        { stamina: 15, cooldown: 0.8, reach: 3.5, radius: 1.0, angle: Math.PI * 0.6, multiplier: 1.0, poise: 1.0, windup: 0.15, duration: 0.2, color: 0xffffff };
+        
     if (window.GameState.pStats.stamina < profile.stamina) { window.EventBus.emit('UI_LOG', 'Too exhausted to attack.'); return; }
 
     if (window.NetworkSession?.connected) window.NetworkSession.sendAttack(isHeavy);
 
-    window.GameState.pStats.stamina -= profile.stamina; window.Input.isAttacking = true; window.Input.attackCooldown = profile.cooldown;
+    window.GameState.pStats.stamina -= profile.stamina; 
+    window.Input.isAttacking = true; 
+    window.Input.attackCooldown = profile.cooldown;
+    
     playEntityAnimation(window.GameCore.playerObj, 'attack');
     
-    const pPos = window.GameCore.playerObj.visual.position; const forwardDir = new THREE.Vector3(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
+    // Register the active sweep hitbox to be evaluated during fixedUpdateLogic
+    window.Input.activeSweep = {
+        profile: profile,
+        timer: profile.windup + profile.duration,
+        activeAt: profile.duration, // Start hitting after windup
+        alreadyHit: new Set(),
+        isHeavy: isHeavy
+    };
     
-    const slashGeo = new THREE.BoxGeometry(isHeavy ? 3 : isDashStrike ? 2.6 : 2, 0.1, 0.5); const slashMat = new THREE.MeshBasicMaterial({ color: profile.color }); const slash = new THREE.Mesh(slashGeo, slashMat);
-    slash.position.copy(pPos).add(new THREE.Vector3(0, 1, 0)).add(forwardDir.clone().multiplyScalar(isHeavy ? 2 : isDashStrike ? 2.25 : 1.5)); slash.quaternion.copy(window.GameCore.playerObj.visual.quaternion); window.GameCore.scene.add(slash);
-    
-    window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: pPos, vol: -10});
-    setTimeout(() => window.GameCore.scene.remove(slash), 100 + profile.windup); window.GameCore.addXP('meleeAtt', isHeavy ? 4 : 2); 
-
-    setTimeout(() => {
-    const rayOrigin = window.GameCore.playerObj.body.translation(); rayOrigin.x += forwardDir.x * 0.6; rayOrigin.y += 1.0; rayOrigin.z += forwardDir.z * 0.6;
-    const ray = new RAPIER.Ray(rayOrigin, { x: forwardDir.x, y: 0, z: forwardDir.z });
-    const hit = window.GameCore.world.castRay(ray, profile.reach, true, RAPIER.QueryFilterFlags.EXCLUDE_STATIC);
-
-    if (hit && hit.collider) {
-        let hitHandle = hit.collider.handle; let hitBody = hit.collider.parent();
-        let en = window.GameCore.activeEntities.find(e => e.collider === hit.collider || (e.collider && e.collider.handle === hitHandle) || (hitBody && hitBody.userData && e.id === hitBody.userData.entityId));
-        
-        if(en && (en.def.type === 'npc' || en.name === 'Blight Root')) {
-            const rawDamage = window.GameState.derivedStats.weaponDamage + ((window.GameState.pStats.strength.level + window.GameCore.getBuffBonus('strength')) * 2) + window.GameCore.getBuffBonus('meleeAtt');
-            const damage = Math.max(1, Math.floor(rawDamage * profile.multiplier * window.GameCore.getCombatInjuryMultiplier()) - (en.def.armor || 0)); en.hp -= damage; en.poise = Math.max(0, en.poise - damage * profile.poise);
-            window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: en.visual.position, isPlayer: false });
-            window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
-
-            if(en.def.faction !== 'monster' && en.def.faction !== 'forest' && en.name !== 'Blight Root') {
-                window.GameCore.adjustFactionStanding(en.def.faction, -20, `assaulted ${en.name}`);
-                window.GameCore.recordRenown({ infamy: 5, faction: en.def.faction, reason: `assaulted ${en.name}` });
-                if(window.GameState.factionRelations.player[en.def.faction === 'village' ? 'kingdom' : en.def.faction] <= -50) window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "HOSTILE!", pos: en.visual.position, color: '#ff0000'});
-            }
-
-            if(en.hp <= 0) {
-                playEntityAnimation(en, 'die');
-                window.AdventurerManager?.markDefeated(en);
-                if (en.def.type === 'npc') spawnGroundLoot(en.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', en.visual.position);
-                awardMonsterKill(en);
-                setTimeout(() => {
-                    window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e.id !== en.id);
-                }, 2000);
-                if (en.name === 'Blight Root') { window.EventBus.emit('UI_LOG', `Destroyed the Blight Root! Safe zone restored.`); } 
-                else { window.GameState.inventory.gold += (en.def.faction === 'monster' ? 10 : 50); window.EventBus.emit('UI_UPDATE_HUD'); window.EventBus.emit('UI_LOG', `Killed ${en.name}. Looted gold.`); }
-            } else if (en.poise <= 0) {
-                en.poise = en.maxPoise;
-                en.staggeredUntil = performance.now() + 800;
-                playEntityAnimation(en, 'hit');
-                window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: 'STAGGERED', pos: en.visual.position, color: '#fbbf24'});
-            } else {
-                playEntityAnimation(en, 'hit');
-            }
-        }
-    }
-    }, profile.windup);
+    // Play sound immediately on windup to sync with character exertion
+    window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: window.GameCore.playerObj.visual.position, vol: -10});
+    window.GameCore.addXP('meleeAtt', isHeavy ? 4 : 2); 
 }
 
 function performGuardbreaker() {
     if (window.Input.isBlocking || window.Input.isAttacking || window.Input.guardbreakerCooldown > 0 || !window.GameCore.playerObj.visual) return;
     if (window.GameState.pStats.stamina < 30) { window.EventBus.emit('UI_LOG', 'Too exhausted to use Guardbreaker.'); return; }
-    window.GameState.pStats.stamina -= 30;
+    
+    // ARC SWEEP PROFILE FOR GUARDBREAKER
+    const profile = { stamina: 30, cooldown: 0.7, reach: 3.5, radius: 1.0, angle: Math.PI * 0.4, multiplier: 0.7, poise: 999, windup: 0.2, duration: 0.2, color: '#fbbf24', isGuardbreaker: true };
+    
+    window.GameState.pStats.stamina -= profile.stamina;
     window.Input.guardbreakerCooldown = 5;
     window.Input.isAttacking = true;
-    window.Input.attackCooldown = 0.7;
+    window.Input.attackCooldown = profile.cooldown;
+    
     playEntityAnimation(window.GameCore.playerObj, 'attack');
-    const player = window.GameCore.playerObj;
-    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(player.visual.quaternion).normalize();
-    const rayOrigin = player.body.translation(); rayOrigin.x += forward.x * 0.6; rayOrigin.y += 1; rayOrigin.z += forward.z * 0.6;
-    const hit = window.GameCore.world.castRay(new RAPIER.Ray(rayOrigin, { x: forward.x, y: 0, z: forward.z }), 2.8, true, RAPIER.QueryFilterFlags.EXCLUDE_STATIC);
-    const hitBody = hit?.collider?.parent();
-    const target = hit && window.GameCore.activeEntities.find(entity => entity.collider === hit.collider || (hitBody?.userData && entity.id === hitBody.userData.entityId));
-    window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'GUARDBREAKER', pos: player.visual.position, color: '#fbbf24' });
-    if (!target || target.def.type !== 'npc') return;
-    const damage = Math.max(1, Math.floor((window.GameState.derivedStats.weaponDamage + window.GameState.pStats.strength.level) * 0.7) - (target.def.armor || 0));
-    target.hp -= damage;
-    target.poise = 0;
-    window.EventBus.emit('ENTITY_DAMAGED', { damage, position: target.visual.position, isPlayer: false });
-    window.EventBus.emit('SPAWN_HIT_VFX', { type: 'Sparks', pos: target.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
-    if (target.hp <= 0) {
-        playEntityAnimation(target, 'die');
-        window.AdventurerManager?.markDefeated(target);
-        spawnGroundLoot(target.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', target.visual.position);
-        awardMonsterKill(target);
-        window.GameState.inventory.gold += target.def.faction === 'monster' ? 10 : 50;
-        window.EventBus.emit('UI_UPDATE_HUD');
-        window.EventBus.emit('UI_LOG', `Killed ${target.name}. Looted gold.`);
-        setTimeout(() => {
-            window.GameCore.scene.remove(target.visual);
-            window.GameCore.world.removeRigidBody(target.body);
-            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => entity.id !== target.id);
-        }, 2000);
-    } else {
-        target.poise = target.maxPoise;
-        target.staggeredUntil = performance.now() + 1200;
-        playEntityAnimation(target, 'hit');
-        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'GUARD BROKEN!', pos: target.visual.position, color: '#fbbf24' });
-    }
+    window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'GUARDBREAKER', pos: window.GameCore.playerObj.visual.position, color: '#fbbf24' });
+    
+    // Register the active sweep hitbox
+    window.Input.activeSweep = {
+        profile: profile,
+        timer: profile.windup + profile.duration,
+        activeAt: profile.duration,
+        alreadyHit: new Set(),
+        isHeavy: true // Use heavy impact sounds
+    };
+    
+    window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: window.GameCore.playerObj.visual.position, vol: -10});
 }
 
 window.EventBus.on('PRIMARY_CLICK_DOWN', () => { if(window.Input.attackCooldown <= 0) performAttack(); });
@@ -1048,56 +1012,84 @@ function fixedUpdateLogic(delta) {
         }
         return effect.remaining > 0;
     });
-    window.GameCore.activeEntities.filter(entity => entity.def.type === 'npc' && entity.statusEffects?.length && entity.hp > 0).forEach(entity => {
-        entity.statusEffects = entity.statusEffects.filter(effect => {
-            effect.remaining -= delta;
-            effect.tickTimer -= delta;
-            if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
-                effect.tickTimer = 1;
-                entity.hp = Math.max(0, entity.hp - effect.tickDamage);
-                window.EventBus.emit('ENTITY_DAMAGED', { damage: effect.tickDamage, position: entity.visual.position, isPlayer: false });
-                window.EventBus.emit('SPAWN_HIT_VFX', { type: effect.type === 'burning' ? 'Fire' : 'Void', pos: entity.visual.position });
-                if (entity.hp <= 0) {
-                    playEntityAnimation(entity, 'die');
-                    window.AdventurerManager?.markDefeated(entity);
-                    spawnGroundLoot(entity.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', entity.visual.position);
-                    awardMonsterKill(entity);
-                    window.GameState.inventory.gold += entity.def.faction === 'monster' ? 10 : 50;
-                    window.EventBus.emit('UI_UPDATE_HUD');
-                    setTimeout(() => {
-                        window.GameCore.scene.remove(entity.visual);
-                        window.GameCore.world.removeRigidBody(entity.body);
-                        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(candidate => candidate.id !== entity.id);
-                    }, 2000);
-                    return false;
-                }
-            }
-            return effect.remaining > 0;
-        });
-    });
+        let isHidden = false;
+    let hostileNearby = false;
+    const playerAlive = window.GameCore.playerObj && window.GameState.pStats.hp > 0;
+    const playerPosition = playerAlive ? window.GameCore.playerObj.visual.position : null;
+    const detectionRadiusSq = playerAlive ? Math.pow(window.GameState.forestBlessing?.dangerSense ? 18 : 15, 2) : 0;
+    const nowSecs = performance.now() / 1000;
 
-    if (window.GameCore.playerObj && window.GameState.pStats.hp > 0) {
-        const playerPosition = window.GameCore.playerObj.visual.position;
-        window.EngineParams.isPlayerHidden = window.GameCore.activeEntities.some(entity => entity.def.concealment && entity.visual.position.distanceTo(playerPosition) <= (entity.def.hideRadius || entity.def.radius));
-        window.GameCore.activeEntities.forEach(entity => {
-            if (!entity.def.touchEffect || entity.def.active === false) return;
-            const touchRadius = entity.def.touchRadius || entity.def.radius + 1;
-            if (entity.visual.position.distanceTo(playerPosition) <= touchRadius) {
-                const now = performance.now() / 1000;
-                if (!entity.touchEffectAvailableAt || now >= entity.touchEffectAvailableAt) {
-                    entity.touchEffectAvailableAt = now + (entity.def.touchCooldown || 4);
-                    window.EventBus.emit('SPAWN_HIT_VFX', { type: entity.def.touchEffect, pos: entity.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
-                    if (entity.def.touchEffect === 'Poison') window.GameCore.applyStatusEffect('poison', 6, 3);
-                    window.EventBus.emit('UI_LOG', 'Poison cloud released by the flesh pods.');
+    // Single optimized O(N) backward pass over all active entities
+    for (let i = window.GameCore.activeEntities.length - 1; i >= 0; i--) {
+        const entity = window.GameCore.activeEntities[i];
+        if (!entity || !entity.visual) continue;
+        
+        // 1. Process Status Effects In-Place (No .filter arrays)
+        if (entity.def.type === 'npc' && entity.statusEffects?.length > 0 && entity.hp > 0) {
+            for (let j = entity.statusEffects.length - 1; j >= 0; j--) {
+                const effect = entity.statusEffects[j];
+                effect.remaining -= delta;
+                effect.tickTimer -= delta;
+                if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
+                    effect.tickTimer = 1;
+                    entity.hp = Math.max(0, entity.hp - effect.tickDamage);
+                    window.EventBus.emit('ENTITY_DAMAGED', { damage: effect.tickDamage, position: entity.visual.position, isPlayer: false });
+                    window.EventBus.emit('SPAWN_HIT_VFX', { type: effect.type === 'burning' ? 'Fire' : 'Void', pos: entity.visual.position });
+                    
+                    if (entity.hp <= 0) {
+                        playEntityAnimation(entity, 'die');
+                        window.AdventurerManager?.markDefeated(entity);
+                        spawnGroundLoot(entity.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', entity.visual.position);
+                        awardMonsterKill(entity);
+                        window.GameState.inventory.gold += entity.def.faction === 'monster' ? 10 : 50;
+                        window.EventBus.emit('UI_UPDATE_HUD');
+                        setTimeout(() => {
+                            window.GameCore.scene.remove(entity.visual);
+                            window.GameCore.world.removeRigidBody(entity.body);
+                            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(candidate => candidate.id !== entity.id);
+                        }, 2000);
+                        break; // Entity died, stop processing effects
+                    }
+                }
+                if (effect.remaining <= 0) entity.statusEffects.splice(j, 1);
+            }
+        }
+
+        // 2. Spatial Checks (Distance to Player)
+        if (playerAlive && entity.hp !== 0) {
+            const distSq = entity.visual.position.distanceToSquared(playerPosition);
+            
+            // Check Concealment
+            if (!isHidden && entity.def.concealment) {
+                const hideRad = entity.def.hideRadius || entity.def.radius;
+                if (distSq <= hideRad * hideRad) isHidden = true;
+            }
+            
+            // Check Touch Effects (Poison Clouds, etc)
+            if (entity.def.touchEffect && entity.def.active !== false) {
+                const touchRad = entity.def.touchRadius || entity.def.radius + 1;
+                if (distSq <= touchRad * touchRad) {
+                    if (!entity.touchEffectAvailableAt || nowSecs >= entity.touchEffectAvailableAt) {
+                        entity.touchEffectAvailableAt = nowSecs + (entity.def.touchCooldown || 4);
+                        window.EventBus.emit('SPAWN_HIT_VFX', { type: entity.def.touchEffect, pos: entity.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
+                        if (entity.def.touchEffect === 'Poison') window.GameCore.applyStatusEffect('poison', 6, 3);
+                        window.EventBus.emit('UI_LOG', 'Poison cloud released by the flesh pods.');
+                    }
                 }
             }
-        });
+            
+            // Check Hostiles Nearby
+            if (!hostileNearby && entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest')) {
+                if (distSq < detectionRadiusSq) hostileNearby = true;
+            }
+        }
     }
 
-    if (window.GameCore.playerObj && window.GameState.pStats.hp > 0) {
-        const p = window.GameCore.playerObj.body.translation(); window.EngineParams.isPlayerSafe = window.RoadManager.isSafeZone(p);
-        const detectionRadius = window.GameState.forestBlessing?.dangerSense ? 18 : 15;
-        const hostileNearby = window.GameCore.activeEntities.some(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && entity.visual.position.distanceTo(window.GameCore.playerObj.visual.position) < detectionRadius);
+    if (playerAlive) {
+        window.EngineParams.isPlayerHidden = isHidden;
+        const p = window.GameCore.playerObj.body.translation(); 
+        window.EngineParams.isPlayerSafe = window.RoadManager.isSafeZone(p);
+
         if (!window.EngineParams.isPlayerSafe && !window.EngineParams.isPlayerHidden && hostileNearby && !window.EngineParams.godMode && window.EngineParams.offPathCaptureCooldown <= 0) {
             const pathPoint = window.RoadManager.getRandomPathPoint();
             if (pathPoint) {
@@ -1171,9 +1163,82 @@ function fixedUpdateLogic(delta) {
             }
         }
         
-        if (window.Input.dashTimer > 0) window.Input.dashTimer -= delta; 
+                if (window.Input.dashTimer > 0) window.Input.dashTimer -= delta; 
         if (window.Input.attackCooldown > 0) window.Input.attackCooldown -= delta; 
         else window.Input.isAttacking = false;
+        
+        // --- DYNAMIC ARC SWEEP HITBOX LOGIC ---
+        if (window.Input.activeSweep) {
+            window.Input.activeSweep.timer -= delta;
+            
+            // If we have passed the windup phase, check for hits
+            if (window.Input.activeSweep.timer <= window.Input.activeSweep.activeAt) {
+                const sweep = window.Input.activeSweep;
+                const pPos = window.GameCore.playerObj.body.translation();
+                const playerForward = new THREE.Vector3(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
+                
+                // Sweep through active entities to see who is caught in the cone
+                for (let i = window.GameCore.activeEntities.length - 1; i >= 0; i--) {
+                    const en = window.GameCore.activeEntities[i];
+                    if (!en || en.hp <= 0 || sweep.alreadyHit.has(en.id)) continue;
+                    if (en.def.type !== 'npc' && en.name !== 'Blight Root') continue;
+                    
+                    const ePos = en.body.translation();
+                    const distSq = (ePos.x - pPos.x)**2 + (ePos.z - pPos.z)**2;
+                    
+                    // 1. Is it within reach?
+                    if (distSq <= sweep.profile.reach * sweep.profile.reach) {
+                        // 2. Is it within the angle cone?
+                        const dirToEnemy = new THREE.Vector3(ePos.x - pPos.x, 0, ePos.z - pPos.z).normalize();
+                        const angleToEnemy = playerForward.angleTo(dirToEnemy);
+                        
+                        if (angleToEnemy <= sweep.profile.angle / 2) {
+                            // HIT DETECTED!
+                            sweep.alreadyHit.add(en.id);
+                            
+                            const rawDamage = window.GameState.derivedStats.weaponDamage + ((window.GameState.pStats.strength.level + window.GameCore.getBuffBonus('strength')) * 2) + window.GameCore.getBuffBonus('meleeAtt');
+                            const damage = Math.max(1, Math.floor(rawDamage * sweep.profile.multiplier * window.GameCore.getCombatInjuryMultiplier()) - (en.def.armor || 0)); 
+                            
+                            en.hp -= damage; 
+                            en.poise = Math.max(0, en.poise - damage * sweep.profile.poise);
+                            
+                            window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: en.visual.position, isPlayer: false });
+                            window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
+                            
+                            // Audio sync
+                            window.EventBus.emit('PLAY_SOUND', {url: sweep.isHeavy ? 'https://tonejs.github.io/audio/drum-samples/CRASH_1.mp3' : 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: en.visual.position, vol: -5});
+
+                            if(en.def.faction !== 'monster' && en.def.faction !== 'forest' && en.name !== 'Blight Root') {
+                                window.GameCore.adjustFactionStanding(en.def.faction, -20, `assaulted ${en.name}`);
+                                window.GameCore.recordRenown({ infamy: 5, faction: en.def.faction, reason: `assaulted ${en.name}` });
+                                if(window.GameState.factionRelations.player[en.def.faction === 'village' ? 'kingdom' : en.def.faction] <= -50) window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "HOSTILE!", pos: en.visual.position, color: '#ff0000'});
+                            }
+
+                            if(en.hp <= 0) {
+                                playEntityAnimation(en, 'die');
+                                window.AdventurerManager?.markDefeated(en);
+                                if (en.def.type === 'npc') spawnGroundLoot(en.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', en.visual.position);
+                                awardMonsterKill(en);
+                                setTimeout(() => {
+                                    window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e.id !== en.id);
+                                }, 2000);
+                                if (en.name === 'Blight Root') { window.EventBus.emit('UI_LOG', `Destroyed the Blight Root! Safe zone restored.`); } 
+                                else { window.GameState.inventory.gold += (en.def.faction === 'monster' ? 10 : 50); window.EventBus.emit('UI_UPDATE_HUD'); window.EventBus.emit('UI_LOG', `Killed ${en.name}. Looted gold.`); }
+                            } else if (en.poise <= 0) {
+                                en.poise = en.maxPoise;
+                                en.staggeredUntil = performance.now() + 800;
+                                playEntityAnimation(en, 'hit');
+                                window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: 'STAGGERED', pos: en.visual.position, color: '#fbbf24'});
+                            } else {
+                                playEntityAnimation(en, 'hit');
+                            }
+                        }
+                    }
+                }
+            }
+            if (window.Input.activeSweep.timer <= 0) window.Input.activeSweep = null;
+        }
+
         if (window.Input.guardbreakerCooldown > 0) window.Input.guardbreakerCooldown -= delta;
         if (window.Input.rationCooldown > 0) window.Input.rationCooldown -= delta;
         if (window.Input.runeShotCooldown > 0) window.Input.runeShotCooldown -= delta;

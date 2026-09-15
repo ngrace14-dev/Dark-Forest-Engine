@@ -1,4 +1,5 @@
 window.EventBus = {
+    
     events: {},
     on: function(event, callback) { if(!this.events[event]) this.events[event] = []; this.events[event].push(callback); },
     emit: function(event, data) { if(this.events[event]) this.events[event].forEach(cb => cb(data)); }
@@ -110,7 +111,9 @@ window.EngineState = {
 window.Input = {
     keys: { w: false, a: false, s: false, d: false, ' ': false, shift: false },
     isMoving: false, isDashing: false, isBlocking: false, isAttacking: false,
-    attackCooldown: 0, guardbreakerCooldown: 0, rationCooldown: 0, runeShotCooldown: 0, fireShotCooldown: 0, dashTimer: 0, camAngle: Math.PI / 4, camPitch: Math.PI / 4, camDistance: 15,
+    attackCooldown: 0, guardbreakerCooldown: 0, rationCooldown: 0, runeShotCooldown: 0, fireShotCooldown: 0, dashTimer: 0, 
+    activeSweep: null, // Tracks if an attack hitbox is currently sweeping
+    camAngle: Math.PI / 4, camPitch: Math.PI / 4, camDistance: 15,
     isDraggingCam: false, lastMouseX: 0, lastMouseY: 0
 };
 
