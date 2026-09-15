@@ -441,9 +441,28 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 // Circle the player instead of running straight in
                 const orbitDir = new window.THREE.Vector3(dir.z, 0, -dir.x); // Perpendicular vector
                 dir.addScaledVector(orbitDir, 2.0).normalize();
-            } else if (en.name === 'Wendigo' && en.aiMode === 'stalking') {
-                // Specialized Wendigo Stalking Logic
+                        } else if (en.name === 'Wendigo' && en.aiMode === 'stalking') {
+                // specialized Wendigo Stalking Logic
                 const stalkDistance = 18;
+
+                // --- FIRE & SUPPORT AVOIDANCE (Kenshi Style) ---
+                const nearby = window.GameCore.SpatialGrid.getNearbyEntities(en.visual.position.x, en.visual.position.z, 25);
+                
+                // 1. Check for Fire (Torches, pits, hubs)
+                const fireSource = nearby.find(e => e.def.emitsLight && (e.def.type === 'firePit' || e.def.type === 'hub'));
+                
+                // 2. Check for Guard Support (Group strength)
+                const supportGuards = nearby.filter(e => e.def.faction === 'village' && e.hp > 0).length;
+                
+                // 3. Evaluate Risk
+                if (fireSource || supportGuards >= 3) {
+                    // Too risky: Flee and break stalking
+                    en.aiMode = 'flee';
+                    en.aiTimer = 5.0;
+                    if (Math.random() < 0.1) window.EventBus.emit('UI_LOG', `[PERCEPTION] The Wendigo recoils from the fire and guards.`);
+                    return;
+                }
+
                 if (dist > stalkDistance + 2) {
                     // Close the gap fast
                     en.aiMode = 'stalking';
