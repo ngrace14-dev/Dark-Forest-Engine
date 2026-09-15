@@ -126,8 +126,8 @@ window.VillageManager = {
         { house: 'House Blightwatch', title: 'Baronial House', tier: 'minor', industry: 'Rangers', produces: 'wood', imports: ['food', 'stone'] },
         { house: 'House Bleak', title: 'Baronial House', tier: 'minor', industry: 'Quarries', produces: 'stone', imports: ['food', 'wood'] },
         { house: 'House Wraith', title: 'Baronial House', tier: 'minor', industry: 'Fisheries', produces: 'food', imports: ['wood', 'gold'] },
-        { house: 'House Cull', title: 'Baronial House', tier: 'minor', industry: 'Leatherworks', produces: 'gold', imports: ['food', 'wood'] },
-        { house: 'House Terminus', title: 'High Marshal House', tier: 'major', industry: 'Mountain Arsenal', produces: 'stone', imports: ['food', 'wood', 'gold'], mountainGatekeeper: true, martial: true, endgameGateway: true }
+                { house: 'House Cull', title: 'Baronial House', tier: 'minor', industry: 'Leatherworks', produces: 'gold', imports: ['food', 'wood'] },
+        { house: 'House Terminus', title: 'High Marshal House', tier: 'major', industry: 'Mountain Arsenal', produces: 'stone', imports: ['food', 'wood', 'gold'], mountainGatekeeper: true, martial: true, endgameGateway: true, basePower: 75, leaderPower: 90 }
     ],
     provisionProfiles: [
         { itemId: 'royal_spiced_wine', name: 'Royal Spiced Wine', heal: 30, buff: 'toughness', amount: 1, duration: 90 },

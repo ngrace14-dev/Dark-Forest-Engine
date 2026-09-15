@@ -80,8 +80,30 @@ const ChunkManager = {
                     v.residents.forEach(resident => {
                         const residentX = v.x + (resident.ox || 0); const residentZ = v.z + (resident.oz || 0);
                         const residentEntity = instantiatePrefab(resident.prefab || 'Guard', residentX, window.WorldGenerator.getTerrainHeight(residentX, residentZ), residentZ, key);
-                        if (residentEntity) { residentEntity.villageId = v.id; residentEntity.squadId = resident.squadId || null; }
-                    });
+                        if (residentEntity) { 
+                            residentEntity.villageId = v.id; 
+                            residentEntity.squadId = resident.squadId || null; 
+                        
+                            // --- NOBLE HOUSE TERMINUS STAT BOOSTS ---
+                            if (v.nobleHouse === 'House Terminus') {
+                                const isLeader = resident.prefab === 'City Guard' || resident.prefab === 'Noble NPC';
+                                const baseStat = isLeader ? 85 : 65;
+                                const variance = Math.random() * 10;
+                            
+                                residentEntity.attackDamage = baseStat + variance;
+                                residentEntity.hp = (baseStat + variance) * 5;
+                                residentEntity.poise = (baseStat + variance) * 1.5;
+                                residentEntity.name = isLeader ? `Terminus Commander` : `Terminus Elite Guard`;
+                            
+                                // Visual distinction for Terminus (Obsidian Steel)
+                                residentEntity.visual.traverse(child => {
+                                    if (child.isMesh) {
+                                        child.material.color.set(0x111827); 
+                                    }
+                                });
+                            }
+                        }
+                });
                     window.AssetManager.prefabs['Village Hub'].customModel = originalModel;
                 }
             });

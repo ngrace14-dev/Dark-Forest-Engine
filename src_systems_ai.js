@@ -173,14 +173,20 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             return;
         }
 
-        if (en.companionId) {
+                if (en.companionId) {
             const member = window.GameState.party.members.find(candidate => candidate.id === en.companionId);
             if (member?.downed) return;
             const command = en.groupCommand || 'follow';
             const escortedCaravan = window.GameCore.activeEntities.find(entity => entity.caravanId === window.GameState.party.escortCaravanId);
             const formationAnchor = escortedCaravan ? escortedCaravan.visual.position : pPos;
-            const hostileEntities = window.GameCore.activeEntities.filter(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && entity.hp > 0);
-            const nearestHostile = hostileEntities.sort((a, b) => en.visual.position.distanceTo(a.visual.position) - en.visual.position.distanceTo(b.visual.position))[0];
+            
+            // --- SPATIAL GRID OPTIMIZATION ---
+            // Only look for hostiles in the nearby grid cells
+            const nearbyEntities = window.GameCore.SpatialGrid.getNearbyEntities(en.visual.position.x, en.visual.position.z, 20);
+            const hostileEntities = nearbyEntities.filter(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && entity.hp > 0);
+            
+            const nearestHostile = hostileEntities.sort((a, b) => en.visual.position.distanceToSquared(a.visual.position) - en.visual.position.distanceToSquared(b.visual.position))[0];
+            
             if (command === 'hold') {
                 if (en.holdPosition) moveCompanion(en, en.holdPosition, 1, delta);
                 return;
@@ -213,17 +219,29 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             return;
         }
 
-        if (en.squadId) {
+                if (en.squadId) {
             const village = window.VillageManager.villages.find(candidate => candidate.id === en.villageId);
             const squad = village?.squads.find(candidate => candidate.id === en.squadId);
             if (!village || !squad || squad.status === 'destroyed') return;
-            const threat = window.GameCore.activeEntities
-                .filter(candidate => candidate.def.type === 'npc' && isHostileFaction(candidate.def.faction) && candidate.hp > 0 && candidate.visual.position.distanceTo(en.visual.position) < 30)
+            
+            // --- NOBLE HOUSE TERMINUS: PUSHBACK LOGIC ---
+            const isTerminus = village.nobleHouse === 'House Terminus';
+            const scanRange = isTerminus ? 50 : 30; // Terminus guards scan further
+            
+            const nearbyEntities = window.GameCore.SpatialGrid.getNearbyEntities(en.visual.position.x, en.visual.position.z, scanRange);
+            const threat = nearbyEntities
+                .filter(candidate => candidate.def.type === 'npc' && isHostileFaction(candidate.def.faction) && candidate.hp > 0 && candidate.visual.position.distanceTo(en.visual.position) < scanRange)
                 .sort((a, b) => en.visual.position.distanceTo(a.visual.position) - en.visual.position.distanceTo(b.visual.position))[0];
+            
             if (threat) {
                 squad.status = 'defending';
                 const distance = en.visual.position.distanceTo(threat.visual.position);
                 if (distance > 1.8) moveCompanion(en, threat.visual.position, 1.15, delta); else attackNpc(en, threat);
+                
+                // If Terminus guard hits a Wendigo, scream for help
+                if (isTerminus && threat.name === 'Wendigo' && Math.random() < 0.05) {
+                    window.EventBus.emit('UI_LOG', `[TERMINUS] "Wendigo crossing the pass! Repel it back to the peaks!"`);
+                }
                 return;
             }
             squad.status = 'patrolling';
@@ -285,7 +303,32 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         }
 
                 const hostile = en.def.faction === 'monster' || en.def.faction === 'forest' || window.GameState.reputation[en.def.faction] <= -50;
-        const onProtectedPath = hostile && window.RoadManager.isRuneProtected(en.visual.position);
+        
+                // --- MONSTER LIFE CYCLES: FEEDING & GROWTH ---
+                if (hostile && en.def.type === 'npc' && !en.isFeeding) {
+                    // Scan for food (Caravans, NPCs, or dead remains)
+                    const nearby = window.GameCore.SpatialGrid.getNearbyEntities(en.visual.position.x, en.visual.position.z, 25);
+                    const prey = nearby.find(p => p !== en && (p.caravanId || p.def.faction === 'village') && p.hp > 0);
+            
+                    if (prey) {
+                        const dist = en.visual.position.distanceTo(prey.visual.position);
+                        if (dist < 2.0) {
+                            attackNpc(en, prey);
+                            if (prey.hp <= 0 && !en.isFed) {
+                                en.isFed = true;
+                                en.hp = Math.min(en.hp * 1.5, (en.def.hp || 50) * 2);
+                                en.visual.scale.multiplyScalar(1.2); // Grow larger
+                                window.EventBus.emit('UI_LOG', `[LIFE CYCLE] The ${en.name} has fed on its prey and grown stronger.`);
+                            }
+                        } else {
+                            // Hunt the prey
+                            moveCompanion(en, prey.visual.position, 1.1, delta);
+                            return;
+                        }
+                    }
+                }
+
+                const onProtectedPath = hostile && window.RoadManager.isRuneProtected(en.visual.position);
         const inVillageBarrier = hostile && window.RoadManager.isVillageProtected(en.visual.position);
         const base = window.GameState.base;
         const inPlayerWard = hostile && base.owned && base.wardRadius && base.position && Math.hypot(en.visual.position.x - base.position.x, en.visual.position.z - base.position.z) <= base.wardRadius;
