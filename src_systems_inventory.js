@@ -1,3 +1,5 @@
+// File: src_systems_inventory.js
+
 window.ItemDatabase = {
     'rusty_sword': { id: 'rusty_sword', name: 'Rusty Sword', type: 'weapon', slot: 'weapon', stats: { damage: 5 }, icon: '🗡️', color: 'text-gray-400' },
     'iron_sword': { id: 'iron_sword', name: 'Iron Sword', type: 'weapon', slot: 'weapon', stats: { damage: 15 }, icon: '⚔️', color: 'text-blue-400' },
@@ -15,13 +17,17 @@ window.ItemDatabase = {
     'beast_bones': { id: 'beast_bones', name: 'Beast Bones', type: 'resource', slot: 'backpack', stats: {}, icon: '🦴', color: 'text-stone-300' },
     'corrupted_resin': { id: 'corrupted_resin', name: 'Corrupted Resin', type: 'resource', slot: 'backpack', stats: {}, icon: '🧪', color: 'text-violet-300' },
     'mushrooms': { id: 'mushrooms', name: 'Forest Mushrooms', type: 'consumable', slot: 'backpack', stats: { heal: 10 }, icon: '🍄', color: 'text-red-300' },
-    'flesh_pods': { id: 'flesh_pods', name: 'Flesh Pods', type: 'consumable', slot: 'backpack', stats: { heal: 5 }, icon: '🫀', color: 'text-purple-300' }
-    ,'ember_rune': { id: 'ember_rune', name: 'Ember Rune', type: 'rune', slot: 'socket', stats: { damage: 4 }, icon: 'ᛟ', color: 'text-orange-300' }
-    ,'ward_rune': { id: 'ward_rune', name: 'Ward Rune', type: 'rune', slot: 'socket', stats: { defense: 4 }, icon: 'ᛉ', color: 'text-cyan-300' }
-    ,'swift_rune': { id: 'swift_rune', name: 'Swift Rune', type: 'rune', slot: 'socket', stats: { athletics: 2 }, icon: 'ᛊ', color: 'text-green-300' }
-    ,'fireward_rune': { id: 'fireward_rune', name: 'Fireward Rune', type: 'rune', slot: 'socket', stats: { resistances: { fire: 8 } }, icon: 'ᛞ', color: 'text-orange-300' }
-    ,'voidward_rune': { id: 'voidward_rune', name: 'Voidward Rune', type: 'rune', slot: 'socket', stats: { resistances: { void: 8 } }, icon: 'ᛇ', color: 'text-violet-300' }
-    ,'poisonward_rune': { id: 'poisonward_rune', name: 'Poisonward Rune', type: 'rune', slot: 'socket', stats: { resistances: { poison: 8 } }, icon: 'ᛜ', color: 'text-lime-300' }
+    'flesh_pods': { id: 'flesh_pods', name: 'Flesh Pods', type: 'consumable', slot: 'backpack', stats: { heal: 5 }, icon: '🫀', color: 'text-purple-300' },
+    'ember_rune': { id: 'ember_rune', name: 'Ember Rune', type: 'rune', slot: 'socket', stats: { damage: 4 }, icon: 'ᛟ', color: 'text-orange-300' },
+    'ward_rune': { id: 'ward_rune', name: 'Ward Rune', type: 'rune', slot: 'socket', stats: { defense: 4 }, icon: 'ᛉ', color: 'text-cyan-300' },
+    'swift_rune': { id: 'swift_rune', name: 'Swift Rune', type: 'rune', slot: 'socket', stats: { athletics: 2 }, icon: 'ᛊ', color: 'text-green-300' },
+    'fireward_rune': { id: 'fireward_rune', name: 'Fireward Rune', type: 'rune', slot: 'socket', stats: { resistances: { fire: 8 } }, icon: 'ᛞ', color: 'text-orange-300' },
+    'voidward_rune': { id: 'voidward_rune', name: 'Voidward Rune', type: 'rune', slot: 'socket', stats: { resistances: { void: 8 } }, icon: 'ᛇ', color: 'text-violet-300' },
+    'poisonward_rune': { id: 'poisonward_rune', name: 'Poisonward Rune', type: 'rune', slot: 'socket', stats: { resistances: { poison: 8 } }, icon: 'ᛜ', color: 'text-lime-300' },
+    
+    // NEW: Medical Items for Limb Damage
+    'bandage': { id: 'bandage', name: 'Dirty Bandage', type: 'medical', slot: 'backpack', stats: { healLimb: 25 }, icon: '🩹', color: 'text-red-400' },
+    'splint': { id: 'splint', name: 'Wooden Splint', type: 'medical', slot: 'backpack', stats: { healLimb: 50 }, icon: '🪵', color: 'text-amber-600' }
 };
 
 function recalculateStats() {
@@ -73,10 +79,13 @@ function renderInventory() {
     for(let i=0; i<25; i++) {
         if(i < pack.length && pack[i]) {
             const item = window.ItemDatabase[pack[i]];
+            // Updated tooltip to support healLimb
+            const statText = item.stats.defense ? 'DEF: +'+item.stats.defense : (item.stats.damage ? 'DMG: '+item.stats.damage : (item.stats.healLimb ? 'HEAL LIMB: '+item.stats.healLimb : 'HEAL: '+item.stats.heal));
+            
             html += `<div class="bg-gray-800 border border-gray-700 aspect-square rounded flex flex-col items-center justify-center text-[10px] ${item.color} hover:bg-gray-700 hover:border-gray-500 cursor-pointer transition-colors relative group shadow-sm" onclick="window.EventBus.emit('INV_USE', ${i})">
                 <span class="text-xl mb-0.5">${item.icon}</span>
                 <div class="absolute bottom-[105%] left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block w-max bg-gray-950 text-gray-300 text-[10px] p-1.5 rounded border border-gray-600 z-10 pointer-events-none shadow-lg">
-                    <span class="font-bold block text-white">${item.name}</span><span class="text-gray-500 block">${item.stats.defense ? 'DEF: +'+item.stats.defense : (item.stats.damage ? 'DMG: '+item.stats.damage : 'HEAL: '+item.stats.heal)}</span>
+                    <span class="font-bold block text-white">${item.name}</span><span class="text-gray-500 block">${statText}</span>
                 </div></div>`;
         } else { html += `<div class="bg-gray-800/40 border border-gray-700/50 aspect-square rounded"></div>`; }
     }
@@ -88,7 +97,7 @@ window.EventBus.on('INV_UNEQUIP', (slotId) => {
     if(itemId) {
         if(window.GameState.inventory.backpack.length < 25) {
             window.GameState.inventory.backpack.push(itemId); window.GameState.inventory.equipment[slotId] = null;
-            window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/hihat-analog.mp3', pos: window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : {x:0,y:0,z:0}, vol: -10});
+            window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/hihat-analog.mp3', pos: window.GameCore?.playerObj ? window.GameCore.playerObj.visual.position : {x:0,y:0,z:0}, vol: -10});
             recalculateStats(); renderInventory();
         } else { window.EventBus.emit('UI_LOG', "Backpack is full!"); }
     }
@@ -97,6 +106,7 @@ window.EventBus.on('INV_UNEQUIP', (slotId) => {
 window.EventBus.on('INV_USE', (packIndex) => {
     const itemId = window.GameState.inventory.backpack[packIndex]; if(!itemId) return;
     const item = window.ItemDatabase[itemId];
+    
     if(item.type === 'consumable') {
         if(item.id === 'food') {
             if(window.GameState.inventory.food <= 0) {
@@ -106,7 +116,7 @@ window.EventBus.on('INV_USE', (packIndex) => {
             window.GameState.pStats.hp = Math.min(window.GameState.pStats.hp + item.stats.heal, window.GameState.pStats.maxHp);
             window.GameState.inventory.food -= 1; window.GameState.inventory.backpack.splice(packIndex, 1);
             window.EventBus.emit('UI_LOG', `Ate ${item.name}. Recovered ${item.stats.heal} HP.`);
-            window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/tom-analog.mp3', pos: window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : {x:0,y:0,z:0}, vol: -5});
+            window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/tom-analog.mp3', pos: window.GameCore?.playerObj ? window.GameCore.playerObj.visual.position : {x:0,y:0,z:0}, vol: -5});
             window.EventBus.emit('UI_UPDATE_HUD');
         } else if (item.stats.heal) {
             window.GameState.pStats.hp = Math.min(window.GameState.pStats.hp + item.stats.heal, window.GameState.pStats.maxHp);
@@ -116,11 +126,39 @@ window.EventBus.on('INV_USE', (packIndex) => {
             if (item.stats.buff) window.EventBus.emit('UI_LOG', `${item.name} grants +${item.stats.amount} ${item.stats.buff} for ${item.stats.duration}s.`);
             window.EventBus.emit('UI_UPDATE_HUD');
         }
-    } else if(item.type === 'weapon' || item.type === 'armor') {
+    } 
+    // NEW: Medical Item Logic (Heals Limbs)
+    else if (item.type === 'medical') {
+        if (window.playerHealth) {
+            let worstLimb = null;
+            let lowestHP = 100;
+            
+            // Find the most damaged limb that isn't completely dead (or maybe you want to allow healing dead limbs?)
+            for (const [name, data] of Object.entries(window.playerHealth.limbs)) {
+                if (data.hp < lowestHP && data.hp > 0 && data.hp < data.max) {
+                    lowestHP = data.hp;
+                    worstLimb = name;
+                }
+            }
+
+            if (worstLimb) {
+                window.playerHealth.limbs[worstLimb].hp = Math.min(window.playerHealth.limbs[worstLimb].max, window.playerHealth.limbs[worstLimb].hp + item.stats.healLimb);
+                window.GameState.inventory.backpack.splice(packIndex, 1);
+                window.EventBus.emit('UI_LOG', `🩹 Used ${item.name}. Healed ${worstLimb} for ${item.stats.healLimb} HP.`);
+                window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/tom-analog.mp3', pos: window.GameCore?.playerObj ? window.GameCore.playerObj.visual.position : {x:0,y:0,z:0}, vol: -5});
+                window.playerHealth.checkStatus();
+                window.playerHealth.updateUI();
+            } else {
+                window.EventBus.emit('UI_LOG', 'All limbs are fully healed or beyond saving.');
+                return; // Don't consume the item
+            }
+        }
+    }
+    else if(item.type === 'weapon' || item.type === 'armor') {
         const currentEquipped = window.GameState.inventory.equipment[item.slot];
         window.GameState.inventory.equipment[item.slot] = itemId; window.GameState.inventory.backpack.splice(packIndex, 1);
         if(currentEquipped) window.GameState.inventory.backpack.push(currentEquipped);
-        window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : {x:0,y:0,z:0}, vol: -10});
+        window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: window.GameCore?.playerObj ? window.GameCore.playerObj.visual.position : {x:0,y:0,z:0}, vol: -10});
         recalculateStats();
     } else if (item.type === 'rune') {
         window.EventBus.emit('OPEN_RUNE_SOCKET', packIndex);
@@ -141,7 +179,7 @@ window.EventBus.on('EMERGENCY_RATION', () => {
 });
 
 window.EventBus.on('GATHER_NEARBY', () => {
-    if (!window.GameCore.playerObj) return;
+    if (!window.GameCore?.playerObj) return;
     const playerPosition = window.GameCore.playerObj.visual.position;
     const spot = window.GameCore.activeEntities.find(entity => entity.def.gatherable && entity.visual.position.distanceTo(playerPosition) <= entity.def.radius + 2.5);
     if (!spot) {
@@ -168,7 +206,7 @@ window.EventBus.on('GATHER_NEARBY', () => {
 window.EventBus.on('RENDER_INVENTORY', renderInventory);
 window.EventBus.on('RECALCULATE_STATS', recalculateStats);
 window.EventBus.on('ENGINE_READY', () => {
-    window.VillageManager.provisionProfiles.forEach(provision => {
+    window.VillageManager?.provisionProfiles.forEach(provision => {
         window.ItemDatabase[provision.itemId] = { id: provision.itemId, name: provision.name, type: 'consumable', slot: 'backpack', stats: { heal: provision.heal, buff: provision.buff, amount: provision.amount, duration: provision.duration }, icon: '🍲', color: 'text-amber-300' };
     });
     recalculateStats();
