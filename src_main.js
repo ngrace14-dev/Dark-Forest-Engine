@@ -9,5 +9,13 @@ import './src_systems_dev_tools.js';
 import './src_systems_vfx.js';
 import './src_systems_world.js';
 import './src_systems_assets.js';
+import './src_systems_navigation.js';
+import './src_systems_villages.js';
+import './src_systems_adventurers.js';
+import './src_systems_roads.js';
 import './src_systems_health.js';
+
+
+
+
 import './src_engine.js';

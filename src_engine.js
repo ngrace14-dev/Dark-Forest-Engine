@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -15,6 +16,12 @@ const fixedTimeStep = 1.0 / 60.0; let accumulator = 0.0;
 
 const ChunkManager = {
     activeChunks: new Map(), currentChunkX: null, currentChunkZ: null,
+    
+    // --- INSTANCED SCENERY (Diablo 4 Style Batching) ---
+    // Stores InstancedMesh objects for each prefab type per chunk
+    // Structure: key -> Map(prefabName -> InstancedMesh)
+    instancedMeshes: new Map(),
+
     update: function(playerPos) {
         const cx = Math.floor(playerPos.x / 60); const cz = Math.floor(playerPos.z / 60);
         if (cx !== this.currentChunkX || cz !== this.currentChunkZ) { this.currentChunkX = cx; this.currentChunkZ = cz; this.loadChunksAround(cx, cz); }
@@ -59,6 +66,11 @@ const ChunkManager = {
         this.activeChunks.set(key, { mesh, body: groundBody, collider });
         
         const rng = alea(`${window.EngineParams.worldSeed}_${cx}_${cz}`);
+        
+        // --- INSTANCING PREPARATION ---
+        const chunkInstances = new Map(); // prefabName -> Array of transforms
+        this.instancedMeshes.set(key, chunkInstances);
+
         const placedLightCells = new Set();
         localRoadPoints.forEach(point => {
             if (point.x < chunkX - 30 || point.x >= chunkX + 30 || point.z < chunkZ - 30 || point.z >= chunkZ + 30) return;
@@ -68,6 +80,7 @@ const ChunkManager = {
             const lightY = window.WorldGenerator.getTerrainHeight(point.x, point.z);
             instantiatePrefab('Floating Street Light', point.x, lightY, point.z, key);
         });
+        
         if (window.VillageManager.villages.length > 0) {
             window.VillageManager.villages.forEach(v => {
                 if (v.x >= chunkX - 30 && v.x < chunkX + 30 && v.z >= chunkZ - 30 && v.z < chunkZ + 30) {
@@ -109,28 +122,92 @@ const ChunkManager = {
             });
         }
         
-        const chunkBiomeSpawns = {}; 
+        // --- SCENERY INSTANCING LOGIC ---
+        const sceneryData = new Map(); // prefabName -> transform list
+
         for(let i=0; i<150; i++) {
-            const px = chunkX + (rng() - 0.5) * 60; const pz = chunkZ + (rng() - 0.5) * 60; const biomeKey = window.WorldGenerator.getBiome(px, pz); const biome = window.WorldGenConfig.biomes[biomeKey];
-            if (!chunkBiomeSpawns[biomeKey]) chunkBiomeSpawns[biomeKey] = 0;
-            if (chunkBiomeSpawns[biomeKey] < biome.density && rng() < 0.5) { if (biome.prefab !== 'None' && window.AssetManager.prefabs[biome.prefab]) { instantiatePrefab(biome.prefab, px, window.WorldGenerator.getTerrainHeight(px, pz), pz, key); chunkBiomeSpawns[biomeKey]++; } }
+            const px = chunkX + (rng() - 0.5) * 60; const pz = chunkZ + (rng() - 0.5) * 60; 
+            const biomeKey = window.WorldGenerator.getBiome(px, pz); const biome = window.WorldGenConfig.biomes[biomeKey];
+            
+            if (biome.prefab !== 'None' && window.AssetManager.prefabs[biome.prefab]) {
+                const def = window.AssetManager.prefabs[biome.prefab];
+                // Only instance static non-animated structures/mountains
+                if ((def.type === 'structure' || def.type === 'mountain') && !def.customModel) {
+                    if (!sceneryData.has(biome.prefab)) sceneryData.set(biome.prefab, []);
+                    const py = window.WorldGenerator.getTerrainHeight(px, pz);
+                    sceneryData.get(biome.prefab).push({ x: px, y: py, z: pz, scale: 0.8 + rng() * 0.4, rot: rng() * Math.PI * 2 });
+                } else {
+                    // Dynamic or custom models still use normal instantiation
+                    instantiatePrefab(biome.prefab, px, window.WorldGenerator.getTerrainHeight(px, pz), pz, key);
+                }
+            }
         }
-    },
-        unloadChunk: function(key) {
-            const chunk = this.activeChunks.get(key); if(!chunk) return;
-            chunk.mesh.geometry.dispose(); chunk.mesh.material.dispose(); window.GameCore.scene.remove(chunk.mesh); window.GameCore.world.removeRigidBody(chunk.body);
-            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
-                if(en.chunkKey === key) { 
-                    window.GameCore.releaseEntityIndex(en.memoryIndex); // Recycle memory
-                    window.GameCore.SpatialGrid.unregisterEntity(en);  // Remove from grid
-                    window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); 
-                    return false; 
-                } 
-                return true; 
+
+        // Finalize Instanced Meshes
+        sceneryData.forEach((transforms, prefabName) => {
+            const def = window.AssetManager.prefabs[prefabName];
+            let geometry;
+            if(def.type === 'structure') geometry = new THREE.BoxGeometry(def.radius*2, def.height, def.radius*2);
+            else if(def.type === 'mountain') geometry = new THREE.ConeGeometry(def.radius, def.height, 16);
+            
+            const material = new THREE.MeshStandardMaterial({ color: def.color });
+            const imesh = new THREE.InstancedMesh(geometry, material, transforms.length);
+            imesh.receiveShadow = true; imesh.castShadow = true;
+            
+            const dummy = new THREE.Object3D();
+            transforms.forEach((t, i) => {
+                dummy.position.set(t.x, t.y + def.height/2, t.z);
+                dummy.rotation.y = t.rot;
+                dummy.scale.setScalar(t.scale);
+                dummy.updateMatrix();
+                imesh.setMatrixAt(i, dummy.matrix);
+                
+                // Create physical colliders for instances
+                const rbDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(t.x, t.y + def.height/2, t.z);
+                const body = window.GameCore.world.createRigidBody(rbDesc);
+                let colDesc;
+                if(def.type === 'structure') colDesc = RAPIER.ColliderDesc.cuboid(def.radius * t.scale, def.height/2 * t.scale, def.radius * t.scale);
+                else colDesc = RAPIER.ColliderDesc.cone(def.height/2 * t.scale, def.radius * t.scale);
+                window.GameCore.world.createCollider(colDesc, body);
+                
+                // Track these for cleanup
+                if (!this.activeChunks.get(key).instanceBodies) this.activeChunks.get(key).instanceBodies = [];
+                this.activeChunks.get(key).instanceBodies.push(body);
             });
-            this.activeChunks.delete(key);
+            
+            window.GameCore.scene.add(imesh);
+            chunkInstances.set(prefabName, imesh);
+        });
+    },
+    unloadChunk: function(key) {
+        const chunk = this.activeChunks.get(key); if(!chunk) return;
+        chunk.mesh.geometry.dispose(); chunk.mesh.material.dispose(); window.GameCore.scene.remove(chunk.mesh); window.GameCore.world.removeRigidBody(chunk.body);
+        
+        // Cleanup Instances
+        const instances = this.instancedMeshes.get(key);
+        if (instances) {
+            instances.forEach(imesh => {
+                imesh.geometry.dispose(); imesh.material.dispose(); window.GameCore.scene.remove(imesh);
+            });
+            this.instancedMeshes.delete(key);
         }
+        if (chunk.instanceBodies) {
+            chunk.instanceBodies.forEach(body => window.GameCore.world.removeRigidBody(body));
+        }
+
+        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
+            if(en.chunkKey === key) { 
+                window.GameCore.releaseEntityIndex(en.memoryIndex);
+                window.GameCore.SpatialGrid.unregisterEntity(en);
+                window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); 
+                return false; 
+            } 
+            return true; 
+        });
+        this.activeChunks.delete(key);
+    }
 };
+
 
 function getVisualMesh(def) {
     let meshGroup = new THREE.Group();
@@ -574,7 +651,7 @@ function performAttack(isHeavy = false) {
     
     const isDashStrike = !isHeavy && window.Input.isDashing;
     
-    // ARC SWEEP PROFILE (AAA Style Hitboxes)
+        // ARC SWEEP PROFILE (AAA Style Hitboxes)
     const profile = isHeavy ? 
         { stamina: 35, cooldown: 1.2, reach: 4.5, radius: 1.5, angle: Math.PI * 0.8, multiplier: 2.2, poise: 2.5, windup: 0.25, duration: 0.3, color: 0xffaa33 } : 
         isDashStrike ? 
@@ -597,8 +674,11 @@ function performAttack(isHeavy = false) {
         timer: profile.windup + profile.duration,
         activeAt: profile.duration, // Start hitting after windup
         alreadyHit: new Set(),
-        isHeavy: isHeavy
+        isHeavy: isHeavy,
+        playerPos: new THREE.Vector3(), // Pre-allocate to avoid GC
+        playerForward: new THREE.Vector3()
     };
+
     
     // Play sound immediately on windup to sync with character exertion
     window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: window.GameCore.playerObj.visual.position, vol: -10});
@@ -1053,6 +1133,11 @@ function fixedUpdateLogic(delta) {
     }
     window.EventBus.emit('ENV_UPDATE');
 
+    // --- TERRAIN ALIGNMENT RAYCASTER ---
+    const raycaster = new THREE.Raycaster();
+    const downVector = new THREE.Vector3(0, -1, 0);
+
+
     if (window.GameCore.playerObj) {
         const playerPosition = window.GameCore.playerObj.visual.position;
         if (window.WorldGenerator.getBiome(playerPosition.x, playerPosition.z) === 'desert' && !window.EngineParams.sandReaverEncountered) {
@@ -1088,12 +1173,16 @@ function fixedUpdateLogic(delta) {
         window.NetworkSession.sendInput(moveX, moveZ);
     }
     
-    if(window.GameCore.worldTimer > 5) { 
-        window.VillageManager.villages.forEach(simulateVillage);
-        window.AdventurerManager?.syncDeparted();
-        window.AdventurerManager?.syncNearby();
-        window.GameCore.worldTimer = 0; 
-    }
+        if(window.GameCore.worldTimer > 0.25) { 
+            if (window.VillageManager && window.VillageManager.simulateNextVillage) {
+                window.VillageManager.simulateNextVillage(); // Sliced Simulation
+            }
+            window.AdventurerManager?.syncDeparted();
+            window.AdventurerManager?.syncNearby();
+            window.GameCore.worldTimer = 0; 
+        }
+
+
     window.ArenaTestManager?.update(delta);
 
     window.EngineParams.isPlayerSafe = false; 
@@ -1127,7 +1216,7 @@ function fixedUpdateLogic(delta) {
         // --- SPATIAL GRID: Update position in grid ---
         window.GameCore.SpatialGrid.updateEntity(entity);
 
-        // 1. Process Status Effects In-Place (No .filter arrays)
+                // 1. Process Status Effects In-Place (No .filter arrays)
         if (entity.def.type === 'npc' && entity.statusEffects?.length > 0 && entity.hp > 0) {
             for (let j = entity.statusEffects.length - 1; j >= 0; j--) {
                 const effect = entity.statusEffects[j];
@@ -1156,6 +1245,38 @@ function fixedUpdateLogic(delta) {
                     }
                 }
                 if (effect.remaining <= 0) entity.statusEffects.splice(j, 1);
+            }
+        }
+
+        // --- VISUAL GROUND ALIGNMENT (Dragon's Dogma Style) ---
+        // Align characters so they don't look like they are floating on slopes
+        if (entity.def.type === 'npc' || entity.def.type === 'character') {
+            const ePos = entity.visual.position;
+            // Raycast straight down from slightly above the entity
+            raycaster.set(new THREE.Vector3(ePos.x, ePos.y + 2, ePos.z), downVector);
+            const activeMeshes = [];
+            // Optimize: Only check collision against the ground chunks, not other actors
+            for (const chunk of ChunkManager.activeChunks.values()) {
+                if (chunk.mesh) activeMeshes.push(chunk.mesh);
+            }
+            
+            const intersects = raycaster.intersectObjects(activeMeshes, false);
+            if (intersects.length > 0) {
+                const hitNormal = intersects[0].face.normal;
+                
+                // We want to align the entity's Y axis with the ground normal, 
+                // but preserve its current Y-rotation (facing direction).
+                const targetQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), hitNormal);
+                
+                // Extract current Y rotation
+                const currentYRotation = new THREE.Euler().setFromQuaternion(entity.visual.quaternion, 'YXZ').y;
+                const yQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), currentYRotation);
+                
+                // Combine slope alignment + facing direction
+                targetQuaternion.multiply(yQuat);
+                
+                // Slerp for smooth transition (looks natural as they walk over bumps)
+                entity.visual.quaternion.slerp(targetQuaternion, delta * 5.0);
             }
         }
 
@@ -1206,101 +1327,117 @@ function fixedUpdateLogic(delta) {
             }
         }
         
-        const moveDir = new THREE.Vector3(0, 0, 0); 
-        if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') {
-            if (window.Input.keys.w) moveDir.z -= 1; 
-            if (window.Input.keys.s) moveDir.z += 1; 
-            if (window.Input.keys.a) moveDir.x -= 1; 
-            if (window.Input.keys.d) moveDir.x += 1;
-        }
-        
-        window.Input.isBlocking = window.Input.keys.shift && window.GameState.pStats.stamina > 0 && performance.now() >= window.GameState.pStats.guardBrokenUntil; 
-        window.Input.isMoving = moveDir.lengthSq() > 0;
-        
-        if (window.Input.isMoving) {
-            moveDir.normalize(); moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), window.Input.camAngle); 
-            
-            let accelerationForce = 35 + ((window.GameState.pStats.athletics.level + window.GameCore.getBuffBonus('athletics')) * 0.5);
-            
-            if (window.Input.isBlocking) {
-                accelerationForce *= 0.2; 
-                window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 8 * delta);
-            } else {
-                window.GameCore.addXP('athletics', 0.1 * delta); 
-                if (window.Input.keys[' '] && window.Input.dashTimer <= 0 && window.GameState.pStats.stamina >= 25) { 
-                    window.GameState.pStats.stamina -= 25;
-                    window.Input.dashTimer = Math.max(0.25, 2.0 - ((window.GameState.pStats.dodge.level + window.GameCore.getBuffBonus('dodge')) * 0.05)); 
-                    window.Input.isDashing = true; 
-                    window.GameCore.addXP('dodge', 15); 
-                    
-                    window.GameCore.playerObj.body.applyImpulse({ x: moveDir.x * 30, y: 0, z: moveDir.z * 30 }, true);
-                    playEntityAnimation(window.GameCore.playerObj, 'dash');
-                    
-                    setTimeout(() => window.Input.isDashing = false, 200); 
-                    window.EventBus.emit('PLAY_SOUND', {url:'https://tonejs.github.io/audio/drum-samples/hihat-analog.mp3', pos: window.GameCore.playerObj.visual.position}); 
+                const moveDir = _v1.set(0, 0, 0); 
+                if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') {
+                    if (window.Input.keys.w) moveDir.z -= 1; 
+                    if (window.Input.keys.s) moveDir.z += 1; 
+                    if (window.Input.keys.a) moveDir.x -= 1; 
+                    if (window.Input.keys.d) moveDir.x += 1;
                 }
-            }
+        
+                window.Input.isBlocking = window.Input.keys.shift && window.GameState.pStats.stamina > 0 && performance.now() >= window.GameState.pStats.guardBrokenUntil; 
+                window.Input.isMoving = moveDir.lengthSq() > 0;
+        
+                if (window.Input.isMoving) {
+                    moveDir.normalize(); moveDir.applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle); 
             
-            window.GameCore.playerObj.body.applyImpulse({ x: moveDir.x * accelerationForce * delta, y: 0, z: moveDir.z * accelerationForce * delta }, true);
+                    let accelerationForce = 35 + ((window.GameState.pStats.athletics.level + window.GameCore.getBuffBonus('athletics')) * 0.5);
             
-            const currentVel = window.GameCore.playerObj.body.linvel();
-            const maxSpeed = (window.Input.isBlocking ? 2.0 : 6.0) * window.GameCore.getCombatInjuryMultiplier();
-            const flatVel = new THREE.Vector2(currentVel.x, currentVel.z);
-            if (flatVel.length() > maxSpeed && !window.Input.isDashing) {
-                flatVel.normalize().multiplyScalar(maxSpeed);
-                window.GameCore.playerObj.body.setLinvel({ x: flatVel.x, y: currentVel.y, z: flatVel.y }, true);
-            }
+                    if (window.Input.isBlocking) {
+                        accelerationForce *= 0.2; 
+                        window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 8 * delta);
+                    } else {
+                        window.GameCore.addXP('athletics', 0.1 * delta); 
+                        if (window.Input.keys[' '] && window.Input.dashTimer <= 0 && window.GameState.pStats.stamina >= 25) { 
+                            window.GameState.pStats.stamina -= 25;
+                            window.Input.dashTimer = Math.max(0.25, 2.0 - ((window.GameState.pStats.dodge.level + window.GameCore.getBuffBonus('dodge')) * 0.05)); 
+                            window.Input.isDashing = true; 
+                            window.GameCore.addXP('dodge', 15); 
+                    
+                            window.GameCore.playerObj.body.applyImpulse({ x: moveDir.x * 30, y: 0, z: moveDir.z * 30 }, true);
+                            playEntityAnimation(window.GameCore.playerObj, 'dash');
+                    
+                            setTimeout(() => window.Input.isDashing = false, 200); 
+                            window.EventBus.emit('PLAY_SOUND', {url:'https://tonejs.github.io/audio/drum-samples/hihat-analog.mp3', pos: window.GameCore.playerObj.visual.position}); 
+                        }
+                    }
+            
+                    window.GameCore.playerObj.body.applyImpulse({ x: moveDir.x * accelerationForce * delta, y: 0, z: moveDir.z * accelerationForce * delta }, true);
+            
+                    const currentVel = window.GameCore.playerObj.body.linvel();
+                    const maxSpeed = (window.Input.isBlocking ? 2.0 : 6.0) * window.GameCore.getCombatInjuryMultiplier();
+                    const flatVelX = currentVel.x;
+                    const flatVelZ = currentVel.z;
+                    const flatVelLenSq = flatVelX * flatVelX + flatVelZ * flatVelZ;
+            
+                    if (flatVelLenSq > maxSpeed * maxSpeed && !window.Input.isDashing) {
+                        const multiplier = maxSpeed / Math.sqrt(flatVelLenSq);
+                        window.GameCore.playerObj.body.setLinvel({ x: flatVelX * multiplier, y: currentVel.y, z: flatVelZ * multiplier }, true);
+                    }
 
-            if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
-                if (window.Input.isBlocking) {
-                    playEntityAnimation(window.GameCore.playerObj, 'block');
-                } else {
-                    window.GameCore.playerObj.visual.lookAt(window.GameCore.playerObj.visual.position.clone().add(moveDir)); 
-                    playEntityAnimation(window.GameCore.playerObj, 'walk'); 
+                    if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
+                        if (window.Input.isBlocking) {
+                            playEntityAnimation(window.GameCore.playerObj, 'block');
+                        } else {
+                            // Update facing direction using an Euler to avoid overriding the slope alignment
+                            const targetFacing = _v2.copy(window.GameCore.playerObj.visual.position).add(moveDir);
+                            const lookMatrix = new THREE.Matrix4().lookAt(window.GameCore.playerObj.visual.position, targetFacing, new THREE.Vector3(0,1,0));
+                            const targetYRot = new THREE.Euler().setFromRotationMatrix(lookMatrix).y;
+                    
+                            const currentQuat = window.GameCore.playerObj.visual.quaternion;
+                            const euler = new THREE.Euler().setFromQuaternion(currentQuat, 'YXZ');
+                            euler.y = targetYRot;
+                            window.GameCore.playerObj.visual.quaternion.setFromEuler(euler);
+                    
+                            playEntityAnimation(window.GameCore.playerObj, 'walk'); 
+                        }
+                    }
+
+                } else if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
+                    if (window.Input.isBlocking) {
+                        playEntityAnimation(window.GameCore.playerObj, 'block');
+                    } else {
+                        playEntityAnimation(window.GameCore.playerObj, 'idle'); 
+                    }
                 }
-            }
-        } else if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
-            if (window.Input.isBlocking) {
-                playEntityAnimation(window.GameCore.playerObj, 'block');
-            } else {
-                playEntityAnimation(window.GameCore.playerObj, 'idle'); 
-            }
-        }
+
         
                 if (window.Input.dashTimer > 0) window.Input.dashTimer -= delta; 
         if (window.Input.attackCooldown > 0) window.Input.attackCooldown -= delta; 
         else window.Input.isAttacking = false;
         
                 // --- DYNAMIC ARC SWEEP HITBOX LOGIC ---
-        if (window.Input.activeSweep) {
-            window.Input.activeSweep.timer -= delta;
+                if (window.Input.activeSweep) {
+                    window.Input.activeSweep.timer -= delta;
             
-            // If we have passed the windup phase, check for hits
-            if (window.Input.activeSweep.timer <= window.Input.activeSweep.activeAt) {
-                const sweep = window.Input.activeSweep;
-                const pPos = window.GameCore.playerObj.body.translation();
-                const playerForward = new THREE.Vector3(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
+                    // If we have passed the windup phase, check for hits
+                    if (window.Input.activeSweep.timer <= window.Input.activeSweep.activeAt) {
+                        const sweep = window.Input.activeSweep;
+                        const pTrans = window.GameCore.playerObj.body.translation();
+                        sweep.playerPos.set(pTrans.x, pTrans.y, pTrans.z);
+                        sweep.playerForward.set(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
                 
-                // --- SPATIAL GRID OPTIMIZATION (Diablo Style) ---
-                const nearbyEntities = window.GameCore.SpatialGrid.getNearbyEntities(pPos.x, pPos.z, sweep.profile.reach);
+                        // --- SPATIAL GRID OPTIMIZATION (Diablo Style) ---
+                        const nearbyEntities = window.GameCore.SpatialGrid.getNearbyEntities(sweep.playerPos.x, sweep.playerPos.z, sweep.profile.reach);
                 
-                for (let i = nearbyEntities.length - 1; i >= 0; i--) {
-                    const en = nearbyEntities[i];
-                    if (!en || en.hp <= 0 || sweep.alreadyHit.has(en.id)) continue;
-                    if (en.def.type !== 'npc' && en.name !== 'Blight Root') continue;
+                        for (let i = nearbyEntities.length - 1; i >= 0; i--) {
+                            const en = nearbyEntities[i];
+                            if (!en || en.hp <= 0 || sweep.alreadyHit.has(en.id)) continue;
+                            if (en.def.type !== 'npc' && en.name !== 'Blight Root') continue;
                     
-                    const ePos = en.body.translation();
-                    const distSq = (ePos.x - pPos.x)**2 + (ePos.z - pPos.z)**2;
+                            const eTrans = en.body.translation();
+                            const distSq = (eTrans.x - sweep.playerPos.x)**2 + (eTrans.z - sweep.playerPos.z)**2;
                     
-                    if (distSq <= sweep.profile.reach * sweep.profile.reach) {
-                        const dirToEnemy = new THREE.Vector3(ePos.x - pPos.x, 0, ePos.z - pPos.z).normalize();
-                        const angleToEnemy = playerForward.angleTo(dirToEnemy);
+                            if (distSq <= sweep.profile.reach * sweep.profile.reach) {
+                                _v1.set(eTrans.x - sweep.playerPos.x, 0, eTrans.z - sweep.playerPos.z).normalize();
+                                const angleToEnemy = sweep.playerForward.angleTo(_v1);
                         
-                        if (angleToEnemy <= sweep.profile.angle / 2) {
-                            sweep.alreadyHit.add(en.id);
+                                if (angleToEnemy <= sweep.profile.angle / 2) {
+                                    sweep.alreadyHit.add(en.id);
                             
-                            // COMBAT MULTIPLIERS
-                            let damageMultiplier = sweep.profile.multiplier;
+                                    // COMBAT MULTIPLIERS
+                                    let damageMultiplier = sweep.profile.multiplier;
+
 
                             // --- ASSASSINATION MECHANIC (Kenshi Style) ---
                             // 5x damage if Heavy Attacking from Stealth
@@ -1385,6 +1522,12 @@ function fixedUpdateLogic(delta) {
     }
 }
 
+// MATH POOLING (Prevents GC Stutter)
+const _v1 = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+const _m1 = new THREE.Matrix4();
+const _q1 = new THREE.Quaternion();
+
 function animate() {
     requestAnimationFrame(animate);
     const rawDelta = clock.getDelta(); const delta = Math.min(rawDelta, 0.1) * window.EngineParams.timeScale;
@@ -1392,36 +1535,52 @@ function animate() {
     if (window.EngineParams.playMode && window.GameCore.engineState === 'running') {
         accumulator += delta;
         
-        // Dragon's Dogma "Hit-Pause" logic
         let updatePhysics = true;
         if (window.Input.hitPauseTimer > 0) {
             window.Input.hitPauseTimer -= delta;
-            updatePhysics = false; // Freeze the physics and animations briefly on heavy impacts
+            updatePhysics = false;
         }
         
         if (updatePhysics) {
             while (accumulator >= fixedTimeStep) { window.GameCore.world.step(); fixedUpdateLogic(fixedTimeStep); accumulator -= fixedTimeStep; }
+            
+            // ANIMATION OPTIMIZATION: Only update visible or nearby mixers
             if (window.GameCore.playerObj && window.GameCore.playerObj.mixer) window.GameCore.playerObj.mixer.update(delta);
-            window.GameCore.activeEntities.forEach(en => { if (en.mixer) en.mixer.update(delta); });
+            
+            const playerPos = window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : null;
+            const frustum = new THREE.Frustum();
+            frustum.setFromProjectionMatrix(_m1.multiplyMatrices(window.GameCore.camera.projectionMatrix, window.GameCore.camera.matrixWorldInverse));
+
+            for (let i = 0; i < window.GameCore.activeEntities.length; i++) {
+                const en = window.GameCore.activeEntities[i];
+                if (!en.mixer) continue;
+                
+                // Only update if within 60 units OR visible in camera
+                const distSq = playerPos ? en.visual.position.distanceToSquared(playerPos) : 0;
+                if (distSq < 3600 || frustum.containsPoint(en.visual.position)) {
+                    en.mixer.update(delta);
+                    en.visual.visible = true; // Optimization: Toggle visibility for GPU
+                } else {
+                    en.visual.visible = false;
+                }
+            }
         }
         
-        // VFX and UI still run during hit-pause to make the freeze feel intentional, not like lag
         window.VFXManager.update(delta);
         window.EventBus.emit('AI_TICK', { delta, isPlayerSafe: window.EngineParams.isPlayerSafe });
         window.EventBus.emit('UI_TICK', { delta, camera: window.GameCore.camera });
         
-        // --- CAMERA SHAKE SYSTEM ---
         if (window.Input.camShake > 0) {
-            const s = window.Input.camShake;
-            window.GameCore.camera.position.x += (Math.random() - 0.5) * s;
-            window.GameCore.camera.position.y += (Math.random() - 0.5) * s;
-            window.GameCore.camera.position.z += (Math.random() - 0.5) * s;
-            window.Input.camShake *= 0.9; // Fast decay
+            window.GameCore.camera.position.x += (Math.random() - 0.5) * window.Input.camShake;
+            window.GameCore.camera.position.y += (Math.random() - 0.5) * window.Input.camShake;
+            window.GameCore.camera.position.z += (Math.random() - 0.5) * window.Input.camShake;
+            window.Input.camShake *= 0.9;
             if (window.Input.camShake < 0.01) window.Input.camShake = 0;
         }
     }
     if (composer) composer.render();
 }
+
 
 document.getElementById('btn-start').addEventListener('click', async () => {
     try { if(window.Tone) await window.Tone.start(); } catch(e) { console.warn("Audio Context blocked, proceeding silently."); }
