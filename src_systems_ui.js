@@ -1,5 +1,118 @@
 let floatingTexts = [];
 
+// ==========================================
+// SQUAD & FACTION MANAGEMENT UI
+// ==========================================
+
+function openSquadManager() {
+    const panel = document.getElementById('squad-manager-panel');
+    if (!panel) return;
+    
+    // Refresh the content
+    window.EventBus.emit('RENDER_SQUAD_MANAGER');
+    
+    // Toggle visibility
+    if (panel.classList.contains('hidden')) {
+        panel.classList.remove('hidden');
+        panel.classList.add('flex');
+    } else {
+        panel.classList.add('hidden');
+        panel.classList.remove('flex');
+    }
+}
+
+window.EventBus.on('TOGGLE_SQUAD_MANAGER', openSquadManager);
+
+window.EventBus.on('RENDER_SQUAD_MANAGER', () => {
+    const content = document.getElementById('squad-manager-content');
+    if (!content) return;
+    
+    const party = window.GameState.party.members.filter(m => m.recruited);
+    
+    let html = `
+        <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+            <h2 class="text-cyan-400 font-bold tracking-widest text-sm uppercase">🛡️ Party Management</h2>
+            <div class="text-[10px] text-gray-400">Total Members: ${party.length}</div>
+        </div>
+        
+        <div class="space-y-2 mb-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+    `;
+    
+    if (party.length === 0) {
+        html += `<div class="text-gray-500 text-center text-xs py-4">No companions recruited. Talk to adventurers in the world.</div>`;
+    } else {
+        party.forEach(member => {
+            const isSelected = window.GameState.party.selectedMembers.includes(member.id);
+            const isDowned = member.downed;
+            
+            const hpPercent = (member.hp / (member.maxHp || 100)) * 100;
+            const hungerPercent = (member.hunger / 100) * 100;
+            const loyaltyPercent = (member.loyalty / 100) * 100;
+            
+            const borderClass = isSelected ? 'border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.3)]' : 'border-gray-700 hover:border-gray-500';
+            const bgClass = isDowned ? 'bg-red-900/20' : 'bg-gray-800/80';
+            
+            html += `
+                <div class="p-3 rounded border ${borderClass} ${bgClass} transition-colors cursor-pointer" onclick="window.EventBus.emit('TOGGLE_PARTY_MEMBER_SELECTION', '${member.id}'); window.EventBus.emit('RENDER_SQUAD_MANAGER');">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} class="pointer-events-none accent-cyan-500">
+                            <span class="text-white font-bold text-xs">${member.name}</span>
+                            ${isDowned ? '<span class="bg-red-600 text-white text-[9px] px-1 rounded font-bold uppercase">Downed</span>' : ''}
+                        </div>
+                        <div class="text-[10px] text-cyan-200 uppercase">${member.role}</div>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="flex flex-col gap-1">
+                            <div class="flex justify-between text-[9px] text-gray-400 font-bold uppercase"><span>HP</span><span>${Math.floor(member.hp)}/${member.maxHp||100}</span></div>
+                            <div class="w-full h-1.5 bg-gray-900 rounded-full overflow-hidden"><div class="h-full bg-red-500" style="width: ${hpPercent}%"></div></div>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <div class="flex justify-between text-[9px] text-gray-400 font-bold uppercase"><span>Hunger</span><span>${Math.floor(member.hunger)}%</span></div>
+                            <div class="w-full h-1.5 bg-gray-900 rounded-full overflow-hidden"><div class="h-full bg-yellow-500" style="width: ${hungerPercent}%"></div></div>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <div class="flex justify-between text-[9px] text-gray-400 font-bold uppercase"><span>Loyalty</span><span>${Math.floor(member.loyalty)}%</span></div>
+                            <div class="w-full h-1.5 bg-gray-900 rounded-full overflow-hidden"><div class="h-full bg-blue-500" style="width: ${loyaltyPercent}%"></div></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    html += `</div>
+        <div class="border-t border-gray-700 pt-3">
+            <div class="text-[10px] text-gray-400 font-bold uppercase mb-2">Issue Squad Command (Selected: ${window.GameState.party.selectedMembers.length})</div>
+            <div class="grid grid-cols-5 gap-2">
+                <button class="bg-gray-700 hover:bg-cyan-600 text-white text-[10px] py-2 rounded font-bold transition-colors" onclick="window.EventBus.emit('PARTY_COMMAND', 'follow')">Follow</button>
+                <button class="bg-gray-700 hover:bg-yellow-600 text-white text-[10px] py-2 rounded font-bold transition-colors" onclick="window.EventBus.emit('PARTY_COMMAND', 'hold')">Hold</button>
+                <button class="bg-gray-700 hover:bg-blue-600 text-white text-[10px] py-2 rounded font-bold transition-colors" onclick="window.EventBus.emit('PARTY_COMMAND', 'guard')">Guard</button>
+                <button class="bg-gray-700 hover:bg-red-600 text-white text-[10px] py-2 rounded font-bold transition-colors" onclick="window.EventBus.emit('PARTY_COMMAND', 'attack')">Attack</button>
+                <button class="bg-gray-700 hover:bg-purple-600 text-white text-[10px] py-2 rounded font-bold transition-colors" onclick="window.EventBus.emit('PARTY_COMMAND', 'retreat')">Retreat</button>
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = html;
+});
+
+// Setup Initial Squad UI Container on Load
+window.addEventListener('DOMContentLoaded', () => {
+    const uiContainer = document.createElement('div');
+    uiContainer.id = 'squad-manager-panel';
+    uiContainer.className = 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-900/95 border border-cyan-700 rounded-lg p-5 shadow-2xl z-40 hidden flex-col w-[450px] backdrop-blur-md';
+    
+    uiContainer.innerHTML = `
+        <button onclick="document.getElementById('squad-manager-panel').classList.add('hidden'); document.getElementById('squad-manager-panel').classList.remove('flex');" class="absolute top-2 right-2 text-gray-500 hover:text-white font-bold">&times;</button>
+        <div id="squad-manager-content"></div>
+    `;
+    
+    document.body.appendChild(uiContainer);
+});
+
+
 window.EventBus.on('UI_LOG', (msg) => {
     const el = document.getElementById('event-log'); if(!el) return;
     const entry = document.createElement('div'); entry.innerText = `> ${msg}`; el.appendChild(entry); el.scrollTop = el.scrollHeight;
@@ -518,3 +631,17 @@ document.getElementById('btn-close-asset')?.addEventListener('click', () => { do
 document.getElementById('btn-stats')?.addEventListener('click', () => document.getElementById('stats-panel').classList.toggle('hidden'));
 document.getElementById('btn-inv')?.addEventListener('click', () => { document.getElementById('inventory-panel').classList.toggle('hidden'); if(!document.getElementById('inventory-panel').classList.contains('hidden')) window.EventBus.emit('RENDER_INVENTORY'); });
 document.getElementById('btn-asset')?.addEventListener('click', () => { window.EventBus.emit('DEV_TOOLS_TOGGLE_ASSETS'); });
+
+// Add Squad Button to HUD if it exists
+window.addEventListener('DOMContentLoaded', () => {
+    const hudControls = document.querySelector('#hud .flex.gap-2.pointer-events-auto');
+    if (hudControls && !document.getElementById('btn-squad')) {
+        const squadBtn = document.createElement('button');
+        squadBtn.id = 'btn-squad';
+        squadBtn.className = 'bg-cyan-900/60 hover:bg-cyan-700 text-cyan-200 hover:text-white px-3 py-1.5 rounded border border-cyan-800 transition-colors font-bold tracking-widest text-[10px] shadow-lg backdrop-blur-sm uppercase';
+        squadBtn.innerText = 'SQUAD (G)';
+        hudControls.appendChild(squadBtn);
+        
+        squadBtn.addEventListener('click', () => window.EventBus.emit('TOGGLE_SQUAD_MANAGER'));
+    }
+});
