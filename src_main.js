@@ -2,6 +2,7 @@
 // 1. Core Data
 import './src_core_state.js';
 // 2. Systems (Must load before Engine boot)
+import './src_systems_world.js';
 import './src_systems_inventory.js';
 import './src_systems_ui.js';
 import './src_systems_input.js';
@@ -15,6 +16,7 @@ import './src_systems_ai.js';
 import './src_systems_assets.js';
 // 3. Mod Tools / Overlays
 import './src_firebase.js';
+import './src_multiplayer.js';
 import './src_systems_editor.js';
 import './src_systems_dev_tools.js';
 import './src_systems_health.js';

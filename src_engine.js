@@ -1461,9 +1461,12 @@ function fixedUpdateLogic(delta) {
                             const rawDamage = window.GameState.derivedStats.weaponDamage + ((window.GameState.pStats.strength.level + window.GameCore.getBuffBonus('strength')) * 2) + window.GameCore.getBuffBonus('meleeAtt');
                             const damage = Math.max(1, Math.floor(rawDamage * damageMultiplier * window.GameCore.getCombatInjuryMultiplier()) - (en.def.armor || 0)); 
                             
-                            en.hp -= damage; 
-                            // ... existing poise and vfx code ...
+                                                        en.hp -= damage; 
                             
+                            // POISE DAMAGE
+                            const poiseDamage = sweep.profile.poise || 10;
+                            en.poise = Math.max(0, en.poise - poiseDamage);
+
                             window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: en.visual.position, isPlayer: false });
                             window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
                             
@@ -1475,7 +1478,7 @@ function fixedUpdateLogic(delta) {
                                                             window.Input.camShake = 0.5;       // Start camera shake
                                 
                                                             // RECOIL (DD2 style): Small pushback for the attacker on heavy impact
-                                                            const recoilDir = playerForward.clone().negate();
+                                                            const recoilDir = sweep.playerForward.clone().negate();
                                                             window.GameCore.playerObj.body.applyImpulse({ 
                                                                 x: recoilDir.x * 5, 
                                                                 y: 0, 

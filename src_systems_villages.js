@@ -240,4 +240,5 @@ window.VillageManager = {
             if (raider) { raider.expeditionId = expedition.id; raider.targetVillageId = village.id; }
         }
         window.EventBus.emit('UI_LOG', isTerminus ? '[MOUNTAIN INCURSION] Terminus calls its martial houses to the gate.' : `[RAID] A forest expedition advances on ${village.name}.`);
-    },
+    }
+};

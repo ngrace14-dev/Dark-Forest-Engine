@@ -597,8 +597,8 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 
                 if (!window.EngineParams.godMode) {
                                         if (window.Input.isBlocking) {
-                        const playerForward = new THREE.Vector3(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
-                        const dirToEnemy = new THREE.Vector3(en.visual.position.x - pPos.x, 0, en.visual.position.z - pPos.z).normalize();
+                                            const playerForward = new window.THREE.Vector3(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
+                                            const dirToEnemy = new window.THREE.Vector3(en.visual.position.x - pPos.x, 0, en.visual.position.z - pPos.z).normalize();
                         const angleToEnemy = playerForward.angleTo(dirToEnemy);
                         
                         // PERFECT BLOCK / PARRY (Dragon's Dogma Style)
