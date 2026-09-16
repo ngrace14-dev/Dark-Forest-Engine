@@ -13,7 +13,11 @@ import './src_systems_navigation.js';
 import './src_systems_villages.js';
 import './src_systems_adventurers.js';
 import './src_systems_roads.js';
+import './src_firebase.js';
+import './src_systems_editor.js';
 import './src_systems_health.js';
+
+
 
 
 

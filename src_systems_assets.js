@@ -555,36 +555,61 @@ const loadingModels = new Map();
 function loadModel(url, modelName) {
     if (window.AssetManager.models[modelName]) return Promise.resolve(window.AssetManager.models[modelName]);
     if (loadingModels.has(modelName)) return loadingModels.get(modelName);
-    const loading = new Promise(resolve => gltfLoader.load(url, (gltf) => {
-        window.AssetManager.models[modelName] = gltf.scene;
-        let rigged = false;
-        gltf.scene.traverse(child => { if (child.isSkinnedMesh && child.skeleton) rigged = true; });
-        window.AssetManager.modelMeta[modelName] = { rigged, hasAnimations: Boolean(gltf.animations && gltf.animations.length > 0), animationCount: gltf.animations ? gltf.animations.length : 0 };
-        const matchingPrefab = Object.entries(window.AssetManager.prefabs).find(([name, def]) => def.category === 'terrain' && normalizeAssetName(name) === normalizeAssetName(modelName));
-        if (matchingPrefab) {
-            const [prefabName, prefabDef] = matchingPrefab;
-            prefabDef.customModel = modelName;
-            window.EventBus.emit('UI_LOG', `Terrain model auto-assigned: ${modelName} -> ${prefabName}`);
-            if (!window.EngineParams.suppressWorldRegenerate) window.EventBus.emit('WORLD_REGENERATE');
+    
+    const loading = new Promise(async (resolve) => {
+        let finalUrl = url;
+
+        // --- FIREBASE GLB STREAMING INTEGRATION ---
+        // If the URL starts with 'gs://' or a specific Firebase path marker, 
+        // we intercept it and swap it for a signed Firebase Download URL.
+        if (url.startsWith('gs://') || url.includes('firebase')) {
+            try {
+                if (window.getFirebaseUrl) {
+                    finalUrl = await window.getFirebaseUrl(url);
+                    window.EventBus.emit('UI_LOG', `[CLOUD] Streaming ${modelName} from Firebase...`);
+                } else {
+                    console.warn(`[CLOUD] Firebase module missing. Cannot fetch ${url}`);
+                }
+            } catch (err) {
+                console.error(`[CLOUD] Failed to resolve Firebase URL for ${modelName}`, err);
+                resolve(null);
+                return;
+            }
         }
-        if (gltf.animations && gltf.animations.length > 0) {
-            window.AssetManager.animations[modelName] = gltf.animations;
-            gltf.animations.forEach(anim => {
-                if (!window.AssetManager.globalAnimations.find(existing => existing.name === anim.name)) window.AssetManager.globalAnimations.push(anim);
-            });
-        }
-        window.EventBus.emit('UI_LOG', `Asset ready: ${modelName}`);
-        window.EventBus.emit('RENDER_ASSETS');
-        resolve(gltf.scene);
-    }, undefined, (error) => {
-        console.error(`Could not load ${modelName}`, error);
-        window.EventBus.emit('UI_LOG', `Could not load ${modelName}. For .gltf, include all referenced files.`);
-        resolve(null);
-    }));
+
+        gltfLoader.load(finalUrl, (gltf) => {
+            window.AssetManager.models[modelName] = gltf.scene;
+            let rigged = false;
+            gltf.scene.traverse(child => { if (child.isSkinnedMesh && child.skeleton) rigged = true; });
+            window.AssetManager.modelMeta[modelName] = { rigged, hasAnimations: Boolean(gltf.animations && gltf.animations.length > 0), animationCount: gltf.animations ? gltf.animations.length : 0 };
+            const matchingPrefab = Object.entries(window.AssetManager.prefabs).find(([name, def]) => def.category === 'terrain' && normalizeAssetName(name) === normalizeAssetName(modelName));
+            if (matchingPrefab) {
+                const [prefabName, prefabDef] = matchingPrefab;
+                prefabDef.customModel = modelName;
+                window.EventBus.emit('UI_LOG', `Terrain model auto-assigned: ${modelName} -> ${prefabName}`);
+                if (!window.EngineParams.suppressWorldRegenerate) window.EventBus.emit('WORLD_REGENERATE');
+            }
+            if (gltf.animations && gltf.animations.length > 0) {
+                window.AssetManager.animations[modelName] = gltf.animations;
+                gltf.animations.forEach(anim => {
+                    if (!window.AssetManager.globalAnimations.find(existing => existing.name === anim.name)) window.AssetManager.globalAnimations.push(anim);
+                });
+            }
+            window.EventBus.emit('UI_LOG', `Asset ready: ${modelName}`);
+            window.EventBus.emit('RENDER_ASSETS');
+            resolve(gltf.scene);
+        }, undefined, (error) => {
+            console.error(`Could not load ${modelName} from ${finalUrl}`, error);
+            window.EventBus.emit('UI_LOG', `Could not load ${modelName}.`);
+            resolve(null);
+        });
+    });
+    
     loadingModels.set(modelName, loading);
     loading.finally(() => loadingModels.delete(modelName));
     return loading;
 }
+
 
 window.EventBus.on('ENGINE_READY', () => {
     window.EventBus.emit('UI_LOG', '[ASSETS] Heavy Meshy terrain models deferred until explicitly loaded.');

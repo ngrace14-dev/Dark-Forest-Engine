@@ -18,15 +18,24 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (window.Input.keys.hasOwnProperty(k)) window.Input.keys[k] = false; });
 document.addEventListener('mousedown', e => {
+        if (window.EngineParams.editMode) return;
+    
     if (e.button === 2) { window.Input.isDraggingCam = true; window.Input.lastMouseX = e.clientX; window.Input.lastMouseY = e.clientY; }
+
     if (e.button === 0 && window.GameCore.engineState === 'running') window.EventBus.emit('PRIMARY_CLICK_DOWN', { clientX: e.clientX, clientY: e.clientY });
     if (e.button === 1 && window.GameCore.engineState === 'running') window.EventBus.emit('SECONDARY_CLICK_DOWN', { clientX: e.clientX, clientY: e.clientY });
 });
 document.addEventListener('mouseup', e => { if (e.button === 2) window.Input.isDraggingCam = false; });
 document.addEventListener('mousemove', e => {
     if (window.Input.isDraggingCam) { 
+        if (window.EngineParams.editMode) {
+            // Mouselook handled by EditorManager
+            return;
+        }
+        
         window.Input.camAngle -= (e.clientX - window.Input.lastMouseX) * 0.01; 
         window.Input.camPitch += (e.clientY - window.Input.lastMouseY) * 0.01;
+
         
         // Clamp pitch between ground-level (0.1) and top-down (almost PI/2) to prevent flipping
         window.Input.camPitch = Math.max(0.1, Math.min(Math.PI / 2.1, window.Input.camPitch));

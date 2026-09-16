@@ -10,6 +10,10 @@ import alea from 'alea';
 
 window.THREE = THREE; 
 window.SkeletonUtils = SkeletonUtils;
+window.RAPIER = RAPIER;
+
+window.RAPIER = RAPIER;
+
 
 let renderer, clock, composer, ambientLight, dirLight;
 const fixedTimeStep = 1.0 / 60.0; let accumulator = 0.0;
@@ -57,10 +61,11 @@ const ChunkManager = {
             const colorNoise = window.currentNoise2D(vx * 0.1, vz * 0.1) * 0.05; c.r += colorNoise; c.g += colorNoise; c.b += colorNoise;
             colors.push(c.r, c.g, c.b);
         }
-        geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geo.attributes.position.needsUpdate = true; geo.computeVertexNormals();
-        const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 }); const mesh = new THREE.Mesh(geo, mat); mesh.position.set(chunkX, 0, chunkZ); mesh.receiveShadow = true; window.GameCore.scene.add(mesh);
+                geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geo.attributes.position.needsUpdate = true; geo.computeVertexNormals();
+        const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 }); const mesh = new THREE.Mesh(geo, mat); mesh.position.set(chunkX, 0, chunkZ); mesh.receiveShadow = true; mesh.userData.isTerrain = true; mesh.userData.chunkKey = key; window.GameCore.scene.add(mesh);
 
         const physicsVertices = new Float32Array(vertices); const indicesU32 = new Uint32Array(geo.index.array); 
+ 
         const groundBody = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(chunkX, 0, chunkZ));
         const collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.trimesh(physicsVertices, indicesU32), groundBody);
         this.activeChunks.set(key, { mesh, body: groundBody, collider });
@@ -343,6 +348,10 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     return entity;
 }
 window.GameCore.instantiatePrefab = instantiatePrefab;
+window.GameCore.ChunkManager = ChunkManager;
+
+window.GameCore.ChunkManager = ChunkManager;
+
 
 window.ArenaTestManager = {
     center: { x: 120, z: 120 },
@@ -1541,11 +1550,20 @@ function animate() {
             updatePhysics = false;
         }
         
-        if (updatePhysics) {
-            while (accumulator >= fixedTimeStep) { window.GameCore.world.step(); fixedUpdateLogic(fixedTimeStep); accumulator -= fixedTimeStep; }
+                if (updatePhysics) {
+            if (!window.EngineParams.editMode) {
+                while (accumulator >= fixedTimeStep) { window.GameCore.world.step(); fixedUpdateLogic(fixedTimeStep); accumulator -= fixedTimeStep; }
+            } else {
+                // If in Edit Mode, do not step physics, but still call Editor Update for free-cam
+                window.EditorManager?.update(delta);
+                accumulator = 0; // Prevent death spiral buildup
+            }
             
             // ANIMATION OPTIMIZATION: Only update visible or nearby mixers
-            if (window.GameCore.playerObj && window.GameCore.playerObj.mixer) window.GameCore.playerObj.mixer.update(delta);
+            if (!window.EngineParams.editMode && window.GameCore.playerObj && window.GameCore.playerObj.mixer) {
+                window.GameCore.playerObj.mixer.update(delta);
+            }
+
             
             const playerPos = window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : null;
             const frustum = new THREE.Frustum();
@@ -1566,9 +1584,12 @@ function animate() {
             }
         }
         
-        window.VFXManager.update(delta);
-        window.EventBus.emit('AI_TICK', { delta, isPlayerSafe: window.EngineParams.isPlayerSafe });
+                window.VFXManager.update(delta);
+        if (!window.EngineParams.editMode) {
+            window.EventBus.emit('AI_TICK', { delta, isPlayerSafe: window.EngineParams.isPlayerSafe });
+        }
         window.EventBus.emit('UI_TICK', { delta, camera: window.GameCore.camera });
+
         
         if (window.Input.camShake > 0) {
             window.GameCore.camera.position.x += (Math.random() - 0.5) * window.Input.camShake;
