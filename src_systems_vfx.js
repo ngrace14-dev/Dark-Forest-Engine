@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 window.VFXManager = {
     defs: {
         'Fire': { type: 'aura', color: '#ffaa00', size: 0.15, blend: THREE.AdditiveBlending, sprite: null },
@@ -74,24 +75,19 @@ window.VFXManager = {
         const pts = new THREE.Points(geo, mat); pts.userData = { type: type, height: def.height }; pts.position.y = def.height / 2; 
         entity.auraMesh = pts; entity.visual.add(pts);
     },
-    spawnHit: function(type, pos) {
-        if(type === 'None' || !this.defs[type] || !window.GameCore.scene) return;
-        const vfxDef = this.defs[type]; const count = 20; const geo = new THREE.BufferGeometry(); const positions = new Float32Array(count * 3); const velocities = [];
-        for(let i=0; i<count; i++) {
-            positions[i*3] = pos.x; positions[i*3+1] = pos.y; positions[i*3+2] = pos.z;
-            velocities.push(new THREE.Vector3((Math.random()-0.5)*5, Math.random()*5, (Math.random()-0.5)*5));
-        }
-        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const mat = new THREE.PointsMaterial({ color: new THREE.Color(vfxDef.color), size: vfxDef.size, transparent: true, depthWrite: false, blending: vfxDef.blend, map: vfxDef.sprite || null, alphaTest: vfxDef.sprite ? 0.01 : 0 });
-        const pts = new THREE.Points(geo, mat); window.GameCore.scene.add(pts);
-        this.transientVFX.push({ mesh: pts, velocities: velocities, life: 1.0, type: type });
+        spawnHit: function(type, pos) {
+        this.spawnHitBatched(type, pos);
     },
     spawnProjectile: function({ position, direction, damage, damageType, speed, range, color, owner = 'enemy', statusEffect = null }) {
-        const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }));
+        // Simple Projectile Pooling could be added here, but for now we'll optimize the mesh creation
+        const geo = new THREE.SphereGeometry(0.22, 8, 6); // Lower poly
+        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 });
+        const mesh = new THREE.Mesh(geo, mat);
         mesh.position.copy(position);
         window.GameCore.scene.add(mesh);
         this.projectiles.push({ mesh, direction: direction.clone().normalize(), damage, damageType, speed, remaining: range, owner, statusEffect });
     },
+
     update: function(delta) {
         // --- BATCHED VFX UPDATE ---
         if (this.batchedHitSystem) {

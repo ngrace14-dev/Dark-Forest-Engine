@@ -1322,12 +1322,23 @@ function fixedUpdateLogic(delta) {
                             window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
                             
                                                         // Audio sync & Hit Pause (Dragon's Dogma feel)
-                            window.EventBus.emit('PLAY_SOUND', {url: sweep.isHeavy ? 'https://tonejs.github.io/audio/drum-samples/CRASH_1.mp3' : 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: en.visual.position, vol: -5});
+                                                        window.EventBus.emit('PLAY_SOUND', {url: sweep.isHeavy ? 'https://tonejs.github.io/audio/drum-samples/CRASH_1.mp3' : 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: en.visual.position, vol: -5});
                             
-                            if (sweep.isHeavy || sweep.profile.isGuardbreaker) {
-                                window.Input.hitPauseTimer = 0.05; // 50ms freeze
-                                window.Input.camShake = 0.4;       // Start camera shake
-                            }
+                                                        if (sweep.isHeavy || sweep.profile.isGuardbreaker) {
+                                                            window.Input.hitPauseTimer = 0.08; // 80ms freeze (DD2 style)
+                                                            window.Input.camShake = 0.5;       // Start camera shake
+                                
+                                                            // RECOIL (DD2 style): Small pushback for the attacker on heavy impact
+                                                            const recoilDir = playerForward.clone().negate();
+                                                            window.GameCore.playerObj.body.applyImpulse({ 
+                                                                x: recoilDir.x * 5, 
+                                                                y: 0, 
+                                                                z: recoilDir.z * 5 
+                                                            }, true);
+                                                        } else {
+                                                            window.Input.hitPauseTimer = 0.03; // Light hit-pause
+                                                        }
+
                             
                             if(en.def.faction !== 'monster' && en.def.faction !== 'forest' && en.name !== 'Blight Root') {
                                 window.GameCore.adjustFactionStanding(en.def.faction, -20, `assaulted ${en.name}`);
