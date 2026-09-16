@@ -110,8 +110,291 @@ window.addEventListener('DOMContentLoaded', () => {
     `;
     
     document.body.appendChild(uiContainer);
+    // Create Map Modal
+    const mapModal = document.createElement('div');
+    mapModal.id = 'faction-map-panel';
+    mapModal.className = 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-900/95 border border-indigo-700 rounded-lg p-5 shadow-2xl z-40 hidden flex-col w-[600px] h-[600px] backdrop-blur-md';
+    mapModal.innerHTML = `
+        <button onclick="document.getElementById('faction-map-panel').classList.add('hidden'); document.getElementById('faction-map-panel').classList.remove('flex');" class="absolute top-2 right-2 text-gray-500 hover:text-white font-bold">&times;</button>
+        <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+            <h2 class="text-indigo-400 font-bold tracking-widest text-sm uppercase">🗺️ Kingdom Cartography</h2>
+            <div class="text-[10px] text-gray-400">Day <span id="map-day-counter">0</span></div>
+        </div>
+        <div id="map-canvas-container" class="relative flex-1 bg-gray-950 border border-gray-700 rounded overflow-hidden">
+            <canvas id="faction-map-canvas" class="w-full h-full"></canvas>
+            <div id="map-tooltip" class="absolute bg-gray-800 text-white text-[10px] p-2 rounded shadow-lg border border-gray-600 hidden pointer-events-none transform -translate-x-1/2 -translate-y-full mt-[-10px] z-50"></div>
+        </div>
+        <div class="mt-4 flex justify-between text-[10px] uppercase font-bold text-gray-400">
+            <div class="flex items-center gap-2"><div class="w-3 h-3 bg-blue-500 rounded-full"></div> Kingdom Control</div>
+            <div class="flex items-center gap-2"><div class="w-3 h-3 bg-red-900 rounded-full border border-red-500"></div> Forest Control (Occupied)</div>
+            <div class="flex items-center gap-2"><div class="w-3 h-3 bg-yellow-400 rotate-45"></div> The Capital</div>
+        </div>
+    `;
+    document.body.appendChild(mapModal);
+    
+    // Add Map Button to HUD
+    const hudControls = document.querySelector('#hud .flex.gap-2.pointer-events-auto');
+    if (hudControls && !document.getElementById('btn-map')) {
+        const mapBtn = document.createElement('button');
+        mapBtn.id = 'btn-map';
+        mapBtn.className = 'bg-indigo-900/60 hover:bg-indigo-700 text-indigo-200 hover:text-white px-3 py-1.5 rounded border border-indigo-800 transition-colors font-bold tracking-widest text-[10px] shadow-lg backdrop-blur-sm uppercase';
+        mapBtn.innerText = 'MAP (M)';
+        hudControls.appendChild(mapBtn);
+        
+        mapBtn.addEventListener('click', () => window.EventBus.emit('TOGGLE_MAP'));
+    }
 });
 
+// ==========================================
+// FACTION MAP RENDERING LOGIC
+// ==========================================
+window.EventBus.on('TOGGLE_MAP', () => {
+    const panel = document.getElementById('faction-map-panel');
+    if (!panel) return;
+    
+    if (panel.classList.contains('hidden')) {
+        panel.classList.remove('hidden');
+        panel.classList.add('flex');
+        window.EventBus.emit('RENDER_MAP');
+    } else {
+        panel.classList.add('hidden');
+        panel.classList.remove('flex');
+    }
+});
+
+window.EventBus.on('RENDER_MAP', () => {
+    const canvas = document.getElementById('faction-map-canvas');
+    if (!canvas || !window.VillageManager) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    // Set actual canvas resolution to match display size to prevent blurring
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    
+    document.getElementById('map-day-counter').innerText = window.EngineParams?.worldDay || 0;
+
+    // Clear map
+    ctx.fillStyle = '#030712'; // Very dark blue/gray
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    const villages = window.VillageManager.villages;
+    if (!villages || villages.length === 0) {
+        ctx.fillStyle = '#4b5563';
+        ctx.font = '12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('Settlement web not yet generated.', canvas.width/2, canvas.height/2);
+        return;
+    }
+
+    // Map bounds calculation (find the min/max X and Z coordinates)
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    villages.forEach(v => {
+        if (v.x < minX) minX = v.x; if (v.x > maxX) maxX = v.x;
+        if (v.z < minZ) minZ = v.z; if (v.z > maxZ) maxZ = v.z;
+    });
+    
+    // Add padding to bounds
+    const padding = 15000;
+    minX -= padding; maxX += padding; minZ -= padding; maxZ += padding;
+    
+    const rangeX = maxX - minX;
+    const rangeZ = maxZ - minZ;
+    const scaleX = canvas.width / rangeX;
+    const scaleZ = canvas.height / rangeZ;
+    const scale = Math.min(scaleX, scaleZ) * 0.9; // Keep aspect ratio, zoom out slightly
+    
+    const offsetX = canvas.width / 2 - ((minX + maxX) / 2) * scale;
+    const offsetZ = canvas.height / 2 - ((minZ + maxZ) / 2) * scale;
+
+    const toCanvas = (worldX, worldZ) => ({
+        x: worldX * scale + offsetX,
+        y: worldZ * scale + offsetZ
+    });
+
+    // 1. Draw Road Network (Connections)
+    ctx.strokeStyle = '#374151'; // Gray-700
+    ctx.lineWidth = 1.5;
+    villages.forEach(v => {
+        const start = toCanvas(v.x, v.z);
+        v.connections.forEach(targetId => {
+            const target = villages.find(t => t.id === targetId);
+            if (target) {
+                const end = toCanvas(target.x, target.z);
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+            }
+        });
+    });
+
+    // 2. Draw Territory Radius
+    villages.forEach(v => {
+        const pos = toCanvas(v.x, v.z);
+        const pixelRadius = (v.territory.radius || 90) * 10 * scale; // exaggerate radius for map visibility
+        
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, pixelRadius, 0, Math.PI * 2);
+        
+        if (v.territory.faction === 'forest') {
+            ctx.fillStyle = 'rgba(127, 29, 29, 0.15)'; // Red tint for occupied
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; // Red border
+        } else {
+            ctx.fillStyle = 'rgba(59, 130, 246, 0.1)'; // Blue tint for kingdom
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)'; // Blue border
+        }
+        
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    });
+
+    // Store mapped positions for the hover tooltip
+    canvas.mappedNodes = [];
+
+    // 3. Draw Village Nodes
+    villages.forEach(v => {
+        const pos = toCanvas(v.x, v.z);
+        
+        // Save for hover detection
+        canvas.mappedNodes.push({
+            x: pos.x, y: pos.y,
+            radius: 8,
+            data: v
+        });
+
+        // Node Color based on status
+        let fillColor = '#3b82f6'; // Default Blue
+        let strokeColor = '#93c5fd';
+        
+        if (v.territory.faction === 'forest') {
+            fillColor = '#450a0a'; // Dark Red
+            strokeColor = '#ef4444';
+        } else if (v.territory.underRaid) {
+            fillColor = '#f59e0b'; // Amber (Under Attack)
+            strokeColor = '#fcd34d';
+        }
+
+        ctx.fillStyle = fillColor;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2;
+
+        if (v.capital) {
+            // Draw a diamond for the capital
+            const s = 8;
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y - s);
+            ctx.lineTo(pos.x + s, pos.y);
+            ctx.lineTo(pos.x, pos.y + s);
+            ctx.lineTo(pos.x - s, pos.y);
+            ctx.closePath();
+            ctx.fillStyle = '#eab308'; // Gold
+            ctx.strokeStyle = '#fef08a';
+            ctx.fill();
+            ctx.stroke();
+        } else {
+            // Draw circle for standard village
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        }
+        
+        // Draw Village Name
+        ctx.fillStyle = v.territory.faction === 'forest' ? '#ef4444' : '#9ca3af';
+        ctx.font = v.capital ? 'bold 11px sans-serif' : '9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(v.name, pos.x, pos.y - 12);
+    });
+    
+    // Draw Player Position (if active)
+    if (window.GameCore && window.GameCore.playerObj) {
+        const pTrans = window.GameCore.playerObj.body.translation();
+        const pPos = toCanvas(pTrans.x, pTrans.z);
+        
+        ctx.beginPath();
+        ctx.arc(pPos.x, pPos.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#22c55e'; // Green for player
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        // Pulse effect
+        ctx.beginPath();
+        ctx.arc(pPos.x, pPos.y, 8 + Math.sin(Date.now() / 200) * 2, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
+        ctx.stroke();
+    }
+});
+
+// Setup Hover Tooltips for the Map
+window.addEventListener('DOMContentLoaded', () => {
+    // We attach this via DOMContentLoaded to ensure the canvas exists when we bind the event
+    setTimeout(() => {
+        const canvas = document.getElementById('faction-map-canvas');
+        const tooltip = document.getElementById('map-tooltip');
+        
+        if (canvas && tooltip) {
+            canvas.addEventListener('mousemove', (e) => {
+                if (!canvas.mappedNodes) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                let hoveredNode = null;
+                
+                // Find if mouse is over any node
+                for (const node of canvas.mappedNodes) {
+                    const dx = mouseX - node.x;
+                    const dy = mouseY - node.y;
+                    if (dx*dx + dy*dy <= node.radius * node.radius * 4) { // slightly generous hitbox
+                        hoveredNode = node;
+                        break;
+                    }
+                }
+                
+                if (hoveredNode) {
+                    const v = hoveredNode.data;
+                    const isOccupied = v.territory.faction === 'forest';
+                    
+                    let html = `
+                        <div class="font-bold text-sm ${isOccupied ? 'text-red-400' : 'text-blue-300'} mb-1">${v.name} ${v.capital ? '(Capital)' : ''}</div>
+                        <div class="text-[9px] text-gray-400 mb-2">${v.nobleHouse} | ${v.industry?.industry || 'Unknown'}</div>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+                            <div><span class="text-gray-500">Pop:</span> ${v.population?.current || 0}/${v.population?.capacity || 0}</div>
+                            <div><span class="text-gray-500">Prosperity:</span> <span class="${v.stats.prosperity > 70 ? 'text-green-400' : 'text-white'}">${v.stats.prosperity}%</span></div>
+                            <div><span class="text-gray-500">Food:</span> ${v.stats.food || 0}</div>
+                            <div><span class="text-gray-500">Ward:</span> ${v.barrierIntegrity}%</div>
+                        </div>
+                    `;
+                    
+                    if (v.territory.underRaid) {
+                        html += `<div class="mt-2 text-yellow-400 font-bold bg-yellow-900/30 px-1 py-0.5 rounded text-center">⚠️ UNDER ATTACK</div>`;
+                    } else if (isOccupied) {
+                        html += `<div class="mt-2 text-red-400 font-bold bg-red-900/30 px-1 py-0.5 rounded text-center">💀 OCCUPIED BY FOREST</div>`;
+                    }
+                    
+                    tooltip.innerHTML = html;
+                    tooltip.style.left = `${hoveredNode.x}px`;
+                    tooltip.style.top = `${hoveredNode.y}px`;
+                    tooltip.classList.remove('hidden');
+                    canvas.style.cursor = 'pointer';
+                } else {
+                    tooltip.classList.add('hidden');
+                    canvas.style.cursor = 'crosshair';
+                }
+            });
+            
+            canvas.addEventListener('mouseleave', () => {
+                tooltip.classList.add('hidden');
+            });
+        }
+    }, 1000);
+});
 
 window.EventBus.on('UI_LOG', (msg) => {
     const el = document.getElementById('event-log'); if(!el) return;
