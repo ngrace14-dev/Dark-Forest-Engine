@@ -8,6 +8,27 @@ window.EditorManager = {
     raycaster: new THREE.Raycaster(),
     mouse: new THREE.Vector2(),
     
+    // Advanced Sculpting State
+    isSculpting: false,
+    sculptBrushSize: 5.0,
+    sculptStrength: 0.5,
+    sculptMode: 'raise', // 'raise', 'lower', 'flatten'
+    brushMesh: null,
+    
+    // Foliage Painter State
+    isPainting: false,
+    paintBrushSize: 8.0,
+    paintDensity: 0.1, // instances per square meter
+    selectedPaintPrefab: 'Oak Tree',
+    paintBrushMesh: null,
+
+    // Snap-to-Grid Builder State
+    isBuilding: false,
+    buildGridSize: 2.0, // 2m snap grid (Valheim style)
+    selectedBuildPrefab: 'Watertight Gothic House',
+    buildGhostMesh: null,
+    buildRotationOffset: 0,
+    
     // Free Cam Properties
     camVelocity: new THREE.Vector3(),
     camDirection: new THREE.Vector3(),
@@ -35,12 +56,92 @@ window.EditorManager = {
         // Listeners for picking and mode swapping
         window.EventBus.on('TOGGLE_EDITOR', this.toggleEditor.bind(this));
         
+        this.setupBrushes();
+
         // Hook into the document directly for editor-specific controls
         document.addEventListener('keydown', this.handleKeyDown.bind(this));
         window.renderer.domElement.addEventListener('pointerdown', this.onPointerDown.bind(this));
         window.renderer.domElement.addEventListener('mousemove', this.onMouseMove.bind(this));
         
         window.EventBus.emit('UI_LOG', '[EDITOR] World Builder Module Initialized. Press F2 to activate.');
+    },
+
+    setupBrushes: function() {
+        // Sculpting Brush Visual
+        const brushGeo = new THREE.RingGeometry(this.sculptBrushSize - 0.2, this.sculptBrushSize, 32);
+        brushGeo.rotateX(-Math.PI / 2);
+        const brushMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthTest: false });
+        this.brushMesh = new THREE.Mesh(brushGeo, brushMat);
+        this.brushMesh.visible = false;
+        window.GameCore.scene.add(this.brushMesh);
+
+        // Painting Brush Visual
+        const paintGeo = new THREE.RingGeometry(this.paintBrushSize - 0.2, this.paintBrushSize, 32);
+        paintGeo.rotateX(-Math.PI / 2);
+        const paintMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthTest: false });
+        this.paintBrushMesh = new THREE.Mesh(paintGeo, paintMat);
+        this.paintBrushMesh.visible = false;
+        window.GameCore.scene.add(this.paintBrushMesh);
+        
+        // Builder Ghost Mesh
+        this.buildGhostMesh = new THREE.Group();
+        this.buildGhostMesh.visible = false;
+        window.GameCore.scene.add(this.buildGhostMesh);
+    },
+
+    updateBrushVisuals: function() {
+        if (this.brushMesh) {
+            this.brushMesh.geometry.dispose();
+            const brushGeo = new THREE.RingGeometry(this.sculptBrushSize - 0.2, this.sculptBrushSize, 32);
+            brushGeo.rotateX(-Math.PI / 2);
+            this.brushMesh.geometry = brushGeo;
+        }
+        if (this.paintBrushMesh) {
+            this.paintBrushMesh.geometry.dispose();
+            const paintGeo = new THREE.RingGeometry(this.paintBrushSize - 0.2, this.paintBrushSize, 32);
+            paintGeo.rotateX(-Math.PI / 2);
+            this.paintBrushMesh.geometry = paintGeo;
+        }
+    },
+    
+    updateBuilderGhost: function() {
+        // Clear old ghost
+        while(this.buildGhostMesh.children.length > 0){ 
+            const child = this.buildGhostMesh.children[0];
+            this.buildGhostMesh.remove(child); 
+        }
+        
+        const def = window.AssetManager.prefabs[this.selectedBuildPrefab];
+        if(!def) return;
+        
+        // Use the existing logic to get the mesh geometry, but apply a ghost material
+        let meshGroup = new THREE.Group();
+        if (def.customModel && window.AssetManager.models[def.customModel]) {
+            const customModel = window.SkeletonUtils.clone(window.AssetManager.models[def.customModel]); 
+            const absoluteScale = def.modelScale || 1.0;
+            customModel.scale.setScalar(absoluteScale); 
+            customModel.position.y = -def.height / 2; 
+            
+            // Apply blue hologram material
+            customModel.traverse(child => { 
+                if (child.isMesh) { 
+                    child.material = new THREE.MeshBasicMaterial({ color: 0x3b82f6, wireframe: true, transparent: true, opacity: 0.5 });
+                } 
+            });
+            meshGroup.add(customModel);
+        } else {
+            let mesh;
+            if(def.type === 'structure') mesh = new THREE.Mesh(new THREE.BoxGeometry(def.radius*2, def.height, def.radius*2));
+            else if(def.type === 'mountain') mesh = new THREE.Mesh(new THREE.ConeGeometry(def.radius, def.height, 16));
+            else mesh = new THREE.Mesh(new THREE.CylinderGeometry(def.radius, def.radius, def.height, 8));
+            
+            mesh.material = new THREE.MeshBasicMaterial({ color: 0x3b82f6, wireframe: true, transparent: true, opacity: 0.5 });
+            meshGroup.add(mesh);
+        }
+        
+        meshGroup.position.y = def.height/2; // Offset center
+        meshGroup.rotation.y = this.buildRotationOffset;
+        this.buildGhostMesh.add(meshGroup);
     },
 
     toggleEditor: function() {
@@ -75,6 +176,13 @@ window.EditorManager = {
                 window.Input.camAngle = this.yaw;
                 window.Input.camPitch = this.pitch;
             }
+            
+            this.isSculpting = false;
+            this.isPainting = false;
+            this.isBuilding = false;
+            if(this.brushMesh) this.brushMesh.visible = false;
+            if(this.paintBrushMesh) this.paintBrushMesh.visible = false;
+            if(this.buildGhostMesh) this.buildGhostMesh.visible = false;
         }
     },
 
@@ -157,10 +265,33 @@ window.EditorManager = {
             window.EventBus.emit('UI_LOG', '[EDITOR] Gizmo: Scale');
         } else if (key === 'delete' || key === 'backspace') {
             this.deleteSelected();
+        } else if (key === 'b') { // Terrain Sculpt Brush
+            this.isSculpting = !this.isSculpting;
+            this.isPainting = false; this.isBuilding = false;
+            this.updateBrushVisibility();
+            window.EventBus.emit('UI_LOG', this.isSculpting ? '[EDITOR] Sculpt Mode Enabled. Left click to raise, Alt+Click to lower.' : '[EDITOR] Object Mode Enabled.');
+        } else if (key === 'p') { // Foliage Paint Brush
+            this.isPainting = !this.isPainting;
+            this.isSculpting = false; this.isBuilding = false;
+            this.updateBrushVisibility();
+            window.EventBus.emit('UI_LOG', this.isPainting ? `[EDITOR] Paint Mode Enabled. Spawning: ${this.selectedPaintPrefab}` : '[EDITOR] Object Mode Enabled.');
+        } else if (key === 'o') { // Snap-to-Grid Builder
+            this.isBuilding = !this.isBuilding;
+            this.isPainting = false; this.isSculpting = false;
+            this.updateBrushVisibility();
+            if (this.isBuilding) this.updateBuilderGhost();
+            window.EventBus.emit('UI_LOG', this.isBuilding ? `[EDITOR] Build Mode Enabled. Snapping: ${this.selectedBuildPrefab}` : '[EDITOR] Object Mode Enabled.');
+        } else if (key === '[' || key === ']') {
+            const mod = key === '[' ? -1 : 1;
+            if (this.isSculpting) { this.sculptBrushSize = Math.max(1, Math.min(20, this.sculptBrushSize + mod)); this.updateBrushVisuals(); }
+            if (this.isPainting) { this.paintBrushSize = Math.max(2, Math.min(30, this.paintBrushSize + mod)); this.updateBrushVisuals(); }
+            if (this.isBuilding && key === ']') { this.buildRotationOffset += Math.PI / 4; this.updateBuilderGhost(); } // Rotate building right
+            if (this.isBuilding && key === '[') { this.buildRotationOffset -= Math.PI / 4; this.updateBuilderGhost(); } // Rotate building left
         } else if (e.shiftKey && key === 'e') {
             e.preventDefault();
             this.exportBlueprint();
         } else if (e.shiftKey && key === 'a') {
+
             e.preventDefault();
             this.AnimationStudio.toggle(this);
         } else if (key === 'escape') {
@@ -317,7 +448,40 @@ window.EditorManager = {
             this.guideDots = [];
             this.targetEntity = null;
             this.videoNode = null;
+        },
+        
+        // --- IK PUPPETEER (Forward Kinematics Dragging) ---
+        // Attaches the main Transform Gizmo to the specific bone so the user can drag it
+        bindGizmoToBone: function(editor, boneMesh) {
+            if (!this.isActive) return;
+            // Detach from the main mesh, attach to the wireframe dot
+            editor.transformControl.detach();
+            editor.transformControl.attach(boneMesh);
+            
+            // Listen for dragging the dot to update the actual bone
+            editor.transformControl.addEventListener('change', () => {
+                if (boneMesh.userData.targetBone) {
+                    // Force the actual 3D bone to match where the user dragged the dot
+                    const bone = boneMesh.userData.targetBone;
+                    // For Forward Kinematics, we update the bone's world position 
+                    // (Three.js requires converting this back to local space, but for IK we usually use a solver. 
+                    // For this simple version, we'll just snap the bone's rotation to look at the dot, simulating an IK limb pull)
+                    
+                    // Simple Limb Pointing Logic
+                    if (bone.parent) {
+                        bone.parent.lookAt(boneMesh.position);
+                    }
+                }
+            });
+            window.EventBus.emit('UI_LOG', `[ANIM STUDIO] IK Puppeteer: Bound to ${boneMesh.userData.targetBone.name}`);
         }
+    },
+    
+    updateBrushVisibility: function() {
+        if(this.brushMesh) this.brushMesh.visible = this.isSculpting;
+        if(this.paintBrushMesh) this.paintBrushMesh.visible = this.isPainting;
+        if(this.buildGhostMesh) this.buildGhostMesh.visible = this.isBuilding;
+        if(this.isSculpting || this.isPainting || this.isBuilding) this.deselect();
     },
 
     onMouseMove: function(e) {
@@ -337,6 +501,46 @@ window.EditorManager = {
             const euler = new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ');
             window.GameCore.camera.quaternion.setFromEuler(euler);
         }
+        
+        // Raycast for Brushes and Builders
+        if ((this.isSculpting || this.isPainting || this.isBuilding) && !window.Input.isDraggingCam) {
+            this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            this.raycaster.setFromCamera(this.mouse, window.GameCore.camera);
+            
+            const chunkMeshes = [];
+            if (window.GameCore.ChunkManager) {
+                for (const chunk of window.GameCore.ChunkManager.activeChunks.values()) {
+                    if (chunk.mesh) chunkMeshes.push(chunk.mesh);
+                }
+            }
+            
+            const intersects = this.raycaster.intersectObjects(chunkMeshes, false);
+            if (intersects.length > 0) {
+                const hitPoint = intersects[0].point;
+                
+                if (this.isSculpting) {
+                    this.brushMesh.position.copy(hitPoint);
+                    this.brushMesh.position.y += 0.1; 
+                    if (e.buttons === 1) this.applySculpt(hitPoint, e.altKey ? 'lower' : 'raise', chunkMeshes);
+                }
+                
+                if (this.isPainting) {
+                    this.paintBrushMesh.position.copy(hitPoint);
+                    this.paintBrushMesh.position.y += 0.1;
+                    if (e.buttons === 1) this.applyPaint(hitPoint, chunkMeshes);
+                }
+                
+                if (this.isBuilding) {
+                    // Valheim Style Grid Snapping
+                    const snappedX = Math.round(hitPoint.x / this.buildGridSize) * this.buildGridSize;
+                    const snappedZ = Math.round(hitPoint.z / this.buildGridSize) * this.buildGridSize;
+                    const y = window.WorldGenerator ? window.WorldGenerator.getTerrainHeight(snappedX, snappedZ) : hitPoint.y;
+                    
+                    this.buildGhostMesh.position.set(snappedX, y, snappedZ);
+                }
+            }
+        }
     },
 
     onPointerDown: function(e) {
@@ -354,6 +558,33 @@ window.EditorManager = {
         // Build list of selectable meshes from active entities
         const selectables = [];
         const entityMap = new Map(); // Maps Mesh -> Entity Object
+
+        // IK PUPPETEER CHECK (Check if clicking a dot)
+        if (this.AnimationStudio.isActive) {
+            const dotIntersects = this.raycaster.intersectObjects(this.AnimationStudio.guideDots, false);
+            if (dotIntersects.length > 0) {
+                this.AnimationStudio.bindGizmoToBone(this, dotIntersects[0].object);
+                return;
+            }
+        }
+        
+        // SCULPTING / PAINTING / BUILDING CLICKS
+        if (this.isSculpting || this.isPainting || this.isBuilding) {
+            const chunkMeshes = [];
+            if (window.GameCore.ChunkManager) {
+                for (const chunk of window.GameCore.ChunkManager.activeChunks.values()) {
+                    if (chunk.mesh) chunkMeshes.push(chunk.mesh);
+                }
+            }
+            const intersects = this.raycaster.intersectObjects(chunkMeshes, false);
+            if (intersects.length > 0) {
+                const hitPoint = intersects[0].point;
+                if (this.isSculpting) this.applySculpt(hitPoint, e.altKey ? 'lower' : 'raise', chunkMeshes);
+                if (this.isPainting) this.applyPaint(hitPoint, chunkMeshes);
+                if (this.isBuilding) this.applyBuild();
+            }
+            return;
+        }
 
         window.GameCore.activeEntities.forEach(entity => {
             if (entity.visual) {
@@ -381,12 +612,102 @@ window.EditorManager = {
 
             if (entity) {
                 this.selectEntity(entity);
+            } else if (hitMesh.userData && hitMesh.userData.isTerrain) {
+                this.deselect();
             } else {
-                // Hit terrain or something unselectable
                 this.deselect();
             }
         } else {
             this.deselect();
+        }
+    },
+    
+    // --- TOOL ACTIONS ---
+    
+    applySculpt: function(centerPt, mode, chunkMeshes) {
+        const radiusSq = this.sculptBrushSize * this.sculptBrushSize;
+        const strength = mode === 'raise' ? this.sculptStrength : -this.sculptStrength;
+        
+        chunkMeshes.forEach(mesh => {
+            const positions = mesh.geometry.attributes.position.array;
+            let modified = false;
+            
+            const vertexWorldPos = new THREE.Vector3();
+            
+            for (let i = 0; i < positions.length; i += 3) {
+                vertexWorldPos.set(positions[i], positions[i+1], positions[i+2]);
+                vertexWorldPos.applyMatrix4(mesh.matrixWorld);
+                
+                const dx = vertexWorldPos.x - centerPt.x;
+                const dz = vertexWorldPos.z - centerPt.z;
+                const distSq = (dx * dx) + (dz * dz);
+                
+                if (distSq < radiusSq) {
+                    const falloff = 1.0 - (Math.sqrt(distSq) / this.sculptBrushSize);
+                    positions[i+1] += strength * falloff;
+                    modified = true;
+                }
+            }
+            
+            if (modified) {
+                mesh.geometry.attributes.position.needsUpdate = true;
+                mesh.geometry.computeVertexNormals(); 
+                this.rebuildChunkCollider(mesh.userData.chunkKey, positions, mesh.geometry.index.array, mesh.position.x, mesh.position.z);
+            }
+        });
+    },
+
+    rebuildChunkCollider: function(chunkKey, vertices, indices, chunkX, chunkZ) {
+        if (!window.GameCore.ChunkManager) return;
+        const chunk = window.GameCore.ChunkManager.activeChunks.get(chunkKey);
+        if (!chunk) return;
+        window.GameCore.world.removeCollider(chunk.collider, true);
+        const physicsVertices = new Float32Array(vertices); 
+        const indicesU32 = new Uint32Array(indices); 
+        const colliderDesc = window.RAPIER.ColliderDesc.trimesh(physicsVertices, indicesU32);
+        chunk.collider = window.GameCore.world.createCollider(colliderDesc, chunk.body);
+    },
+
+    applyPaint: function(centerPt, chunkMeshes) {
+        // Only paint every few frames to avoid lag
+        if (Math.random() > 0.3) return; 
+        
+        // Spawn random instances inside the brush radius
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.random() * this.paintBrushSize;
+        const x = centerPt.x + Math.cos(angle) * radius;
+        const z = centerPt.z + Math.sin(angle) * radius;
+        
+        // Find terrain height at this specific sub-point
+        let y = centerPt.y;
+        if (window.WorldGenerator) y = window.WorldGenerator.getTerrainHeight(x, z);
+
+        // Spawn dynamic entity (Instancing will be applied when the chunk unloads/loads next)
+        const entity = window.GameCore.instantiatePrefab(this.selectedPaintPrefab, x, y, z, 'persistent');
+        if (entity) {
+            // Add a random scale variance to painted foliage
+            const variance = 0.8 + Math.random() * 0.4;
+            entity.visual.scale.multiplyScalar(variance);
+            
+            // Random Y rotation
+            entity.visual.rotation.y = Math.random() * Math.PI * 2;
+        }
+    },
+
+    applyBuild: function() {
+        if (!this.buildGhostMesh || !this.buildGhostMesh.visible) return;
+        
+        const pos = this.buildGhostMesh.position;
+        const rot = this.buildRotationOffset;
+        
+        const entity = window.GameCore.instantiatePrefab(this.selectedBuildPrefab, pos.x, pos.y, pos.z, 'persistent');
+        if (entity) {
+            entity.visual.rotation.y = rot;
+            // Update physics rotation to match
+            const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rot, 0, 'YXZ'));
+            entity.body.setRotation({x: q.x, y: q.y, z: q.z, w: q.w}, true);
+            
+            window.EventBus.emit('UI_LOG', `[BUILDER] Placed ${this.selectedBuildPrefab}`);
         }
     },
 
