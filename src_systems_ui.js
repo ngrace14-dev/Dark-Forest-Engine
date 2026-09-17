@@ -63,7 +63,29 @@ window.EventBus.on('RENDER_SQUAD_MANAGER', () => {
                         <div class="text-[10px] text-cyan-200 uppercase">${member.role}</div>
                     </div>
                     
+                                                    <div class="grid grid-cols-4 gap-2 mb-2">
+                                                                <div class="flex flex-col">
+                                                                    <div class="text-[8px] text-gray-500 uppercase font-bold">Tier</div>
+                                                                    <div class="text-[10px] ${member.tier === 'war_master' ? 'text-yellow-400 font-bold' : 'text-indigo-400'} capitalize">${member.tier.replace('_', ' ')}</div>
+                                                                </div>
+                                                                <div class="flex flex-col">
+                                                                    <div class="text-[8px] text-gray-500 uppercase font-bold">Authority</div>
+                                                                    <div class="text-[10px] text-white">${member.commandAuthority} Units</div>
+                                                                </div>
+                                                                <div class="flex flex-col">
+                                                                    <div class="text-[8px] text-gray-500 uppercase font-bold">Exp (Led)</div>
+                                                                    <div class="text-[10px] text-green-400">${member.battlesLed || 0}/100</div>
+                                                                </div>
+                                                                <div class="flex flex-col">
+                                                                    <div class="text-[8px] text-gray-500 uppercase font-bold">Dispatch</div>
+                                                                    <div class="text-[10px] text-gray-400 truncate">${member.dispatchTarget || 'With Player'}</div>
+                                                                </div>
+                                                            </div>
+
+
+                    
                     <div class="grid grid-cols-3 gap-3">
+
                         <div class="flex flex-col gap-1">
                             <div class="flex justify-between text-[9px] text-gray-400 font-bold uppercase"><span>HP</span><span>${Math.floor(member.hp)}/${member.maxHp||100}</span></div>
                             <div class="w-full h-1.5 bg-gray-900 rounded-full overflow-hidden"><div class="h-full bg-red-500" style="width: ${hpPercent}%"></div></div>
@@ -83,9 +105,18 @@ window.EventBus.on('RENDER_SQUAD_MANAGER', () => {
     }
     
     html += `</div>
-        <div class="border-t border-gray-700 pt-3">
+                <div class="border-t border-gray-700 pt-3">
+            <div class="flex justify-between items-center mb-2">
+                <div class="text-[10px] text-gray-400 font-bold uppercase">Tactical Formation</div>
+                <select class="bg-gray-800 text-cyan-400 text-[10px] border border-gray-700 rounded px-1" onchange="window.GameState.party.formation = this.value; window.EventBus.emit('UI_LOG', 'Formation changed: ' + this.value.toUpperCase());">
+                    <option value="line" ${window.GameState.party.formation === 'line' ? 'selected' : ''}>Line</option>
+                    <option value="shield_wall" ${window.GameState.party.formation === 'shield_wall' ? 'selected' : ''}>Shield Wall</option>
+                    <option value="skirmish" ${window.GameState.party.formation === 'skirmish' ? 'selected' : ''}>Loose Skirmish</option>
+                </select>
+            </div>
             <div class="text-[10px] text-gray-400 font-bold uppercase mb-2">Issue Squad Command (Selected: ${window.GameState.party.selectedMembers.length})</div>
             <div class="grid grid-cols-5 gap-2">
+
                 <button class="bg-gray-700 hover:bg-cyan-600 text-white text-[10px] py-2 rounded font-bold transition-colors" onclick="window.EventBus.emit('PARTY_COMMAND', 'follow')">Follow</button>
                 <button class="bg-gray-700 hover:bg-yellow-600 text-white text-[10px] py-2 rounded font-bold transition-colors" onclick="window.EventBus.emit('PARTY_COMMAND', 'hold')">Hold</button>
                 <button class="bg-gray-700 hover:bg-blue-600 text-white text-[10px] py-2 rounded font-bold transition-colors" onclick="window.EventBus.emit('PARTY_COMMAND', 'guard')">Guard</button>
@@ -281,7 +312,7 @@ window.EventBus.on('RENDER_MAP', () => {
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 2;
 
-        if (v.capital) {
+                if (v.capital) {
             // Draw a diamond for the capital
             const s = 8;
             ctx.beginPath();
@@ -294,13 +325,37 @@ window.EventBus.on('RENDER_MAP', () => {
             ctx.strokeStyle = '#fef08a';
             ctx.fill();
             ctx.stroke();
+
+                        // --- MONARCH ARMY STRENGTH DISPLAY ---
+            if (v.royalArmySize) {
+                ctx.fillStyle = '#ef4444';
+                ctx.font = 'bold 10px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`LEGION: ${Math.floor(v.royalArmySize)}`, pos.x, pos.y + 20);
+            }
         } else {
+            // ... existing code ...
             // Draw circle for standard village
             ctx.beginPath();
             ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
+
+            // --- NOBLE LEVY DISPLAY ---
+            if (v.nobleLevySize) {
+                ctx.fillStyle = '#60a5fa';
+                ctx.font = '9px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`LEVY: ${Math.floor(v.nobleLevySize)}`, pos.x, pos.y + 15);
+            }
+            
+            if (v.terminusEliteGuard) {
+                ctx.fillStyle = '#fbbf24';
+                ctx.font = 'bold 9px monospace';
+                ctx.fillText(`ELITE: ${v.terminusEliteGuard}`, pos.x, pos.y + 25);
+            }
         }
+
         
         // Draw Village Name
         ctx.fillStyle = v.territory.faction === 'forest' ? '#ef4444' : '#9ca3af';
@@ -558,15 +613,116 @@ const runeRecipes = {
 
 function openArmorerForge() {
     const dialogue = document.getElementById('companion-dialogue');
-    const rows = Object.entries(runeRecipes).map(([runeId, cost]) => {
+    const pack = window.GameState.inventory.backpack;
+    const gold = window.GameState.inventory.gold;
+
+    const runeRows = Object.entries(runeRecipes).map(([runeId, cost]) => {
         const rune = window.ItemDatabase[runeId];
-        return `<button class="craft-rune border border-orange-700 bg-gray-900 p-2 text-left hover:border-orange-300" data-rune="${runeId}">${rune.icon} Craft ${rune.name}<span class="float-right text-amber-300">${cost.gold}g, ${cost.wood} wood, ${cost.stone} stone</span></button>`;
+        const canAfford = gold >= cost.gold && pack.filter(id => id === 'wood').length >= cost.wood && pack.filter(id => id === 'stone').length >= cost.stone;
+        return `<button class="craft-rune border border-orange-700 bg-gray-900 p-2 text-left hover:border-orange-300 disabled:opacity-50" data-rune="${runeId}" ${!canAfford ? 'disabled' : ''}>
+            ${rune.icon} Craft ${rune.name}
+            <span class="float-right text-amber-300 text-[9px]">${cost.gold}g, ${cost.wood}w, ${cost.stone}s</span>
+        </button>`;
     }).join('');
-    dialogue.innerHTML = `<div class="mb-4 border-b border-orange-700 pb-3"><div class="text-orange-300 font-bold tracking-widest">RUNEFORGE</div><div class="text-xs text-gray-500 mt-1">Bind runic power into your equipment.</div></div><div class="grid gap-2 mb-4">${rows}</div><button id="btn-close-forge" class="border border-gray-600 px-3 py-2 text-xs hover:border-orange-400">Leave</button>`;
+
+    const prosthetics = [
+        { type: 'clockwork', side: 'leftArm', label: 'Clockwork Arm (L)' },
+        { type: 'clockwork', side: 'rightArm', label: 'Clockwork Arm (R)' },
+        { type: 'clockwork', side: 'leftLeg', label: 'Clockwork Leg (L)' },
+        { type: 'clockwork', side: 'rightLeg', label: 'Clockwork Leg (R)' },
+        { type: 'void', side: 'leftArm', label: 'Void Arm (L)' },
+        { type: 'void', side: 'rightArm', label: 'Void Arm (R)' },
+        { type: 'void', side: 'leftLeg', label: 'Void Leg (L)' },
+        { type: 'void', side: 'rightLeg', label: 'Void Leg (R)' }
+    ];
+
+    const prostheticRows = prosthetics.map(p => {
+        const type = p.type;
+        const side = p.side;
+        const costs = {
+            'clockwork': { gold: 250, wood: 10, stone: 5 },
+            'void': { gold: 1000, corrupted_resin: 15, beast_bones: 10 }
+        };
+        const cost = costs[type];
+        let canAfford = gold >= cost.gold;
+        let costLabel = `${cost.gold}g`;
+        for (const [res, amt] of Object.entries(cost)) {
+            if (res === 'gold') continue;
+            const count = pack.filter(id => id === res).length;
+            if (count < amt) canAfford = false;
+            costLabel += `, ${amt}${res[0]}`;
+        }
+
+        return `<button class="forge-prosthetic border border-orange-700 bg-gray-900 p-2 text-left hover:border-orange-300 disabled:opacity-50" data-type="${type}" data-side="${side}" ${!canAfford ? 'disabled' : ''}>
+            🛠️ Forge ${p.label}
+            <span class="float-right text-amber-300 text-[9px]">${costLabel}</span>
+        </button>`;
+    }).join('');
+
+    // Upgrade Section (Tempering & Masterworking)
+    const equippedItems = Object.entries(window.GameState.inventory.equipment)
+        .filter(([slot, id]) => id !== null)
+        .map(([slot, id]) => ({ slot, id, ...window.ItemDatabase[id] }));
+
+    const upgradeRows = equippedItems.map(item => {
+        const mwCost = (item.masterworkLevel || 0) * 100 + 100;
+        const canMW = gold >= mwCost;
+        
+        return `
+            <div class="border border-gray-700 bg-gray-900 p-2 mb-2 rounded">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-white font-bold text-xs">${item.icon} ${item.name} (Rank ${item.masterworkLevel || 0})</span>
+                    <button class="masterwork-btn bg-amber-700 hover:bg-amber-600 px-2 py-1 text-[9px] rounded disabled:opacity-50" data-id="${item.id}" ${!canMW ? 'disabled' : ''}>
+                        MASTERWORK (${mwCost}g)
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 gap-1">
+                    ${Object.entries(window.BlacksmithManager.temperingRecipes).map(([key, recipe]) => {
+                        let canTemper = true;
+                        let costStr = "";
+                        for (const [res, amt] of Object.entries(recipe.cost)) {
+                            const count = pack.filter(id => id === res).length;
+                            if (count < amt) canTemper = false;
+                            costStr += `${amt}${res[0]} `;
+                        }
+                        return `<button class="temper-btn border border-gray-600 bg-gray-800 p-1 text-[9px] hover:border-orange-400 disabled:opacity-50" data-id="${item.id}" data-recipe="${key}" ${!canTemper ? 'disabled' : ''}>
+                            ${recipe.name} (${costStr})
+                        </button>`;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    dialogue.innerHTML = `
+        <div class="mb-4 border-b border-orange-700 pb-3">
+            <div class="text-orange-300 font-bold tracking-widest uppercase">Ancient Runic Blacksmith</div>
+            <div class="text-[10px] text-gray-500 mt-1">Gold: ${gold} | Mastery: ${window.GameState.renown.score}</div>
+        </div>
+        
+        <div class="max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+            <div class="text-xs text-orange-200 mb-2 uppercase font-bold border-l-2 border-orange-600 pl-2">Rune Binding</div>
+            <div class="grid gap-1 mb-4">${runeRows}</div>
+
+            <div class="text-xs text-orange-200 mb-2 uppercase font-bold border-l-2 border-orange-600 pl-2">Prosthetic Forging</div>
+            <div class="grid gap-1 mb-4">${prostheticRows}</div>
+
+            <div class="text-xs text-orange-200 mb-2 uppercase font-bold border-l-2 border-orange-600 pl-2">Equipment Modification</div>
+            <div class="space-y-1 mb-4">${upgradeRows || '<div class="text-gray-500 text-[10px]">No equipment to modify.</div>'}</div>
+        </div>
+
+        <button id="btn-close-forge" class="w-full mt-4 border border-gray-600 px-3 py-2 text-xs hover:border-orange-400">Leave Forge</button>
+    `;
+
     dialogue.classList.remove('hidden');
-    dialogue.querySelectorAll('.craft-rune').forEach(button => button.addEventListener('click', () => window.EventBus.emit('CRAFT_RUNE', button.dataset.rune)));
+
+    dialogue.querySelectorAll('.craft-rune').forEach(btn => btn.addEventListener('click', () => { window.EventBus.emit('CRAFT_RUNE', btn.dataset.rune); openArmorerForge(); }));
+    dialogue.querySelectorAll('.forge-prosthetic').forEach(btn => btn.addEventListener('click', () => { window.BlacksmithManager.forgeProsthetic(btn.dataset.type, btn.dataset.side); openArmorerForge(); }));
+    dialogue.querySelectorAll('.masterwork-btn').forEach(btn => btn.addEventListener('click', () => { window.BlacksmithManager.masterwork(btn.dataset.id); openArmorerForge(); }));
+    dialogue.querySelectorAll('.temper-btn').forEach(btn => btn.addEventListener('click', () => { window.BlacksmithManager.temperItem(btn.dataset.id, btn.dataset.recipe); openArmorerForge(); }));
     dialogue.querySelector('#btn-close-forge').addEventListener('click', closeCompanionDialogue);
 }
+
 
 function openTreatmentCenter() {
     const dialogue = document.getElementById('companion-dialogue');
@@ -636,7 +792,21 @@ function openCompanionInventory(member) {
 
 window.EventBus.on('INTERACT_NEARBY', () => {
     if (!window.GameCore.playerObj) return;
+    
+    // Check for Huntsman Scorn (Village Outcast)
+    if (window.EncounterDirector && window.EncounterDirector.huntsmanMarkTimer > 0) {
+        const playerPosition = window.GameCore.playerObj.visual.position;
+        const inVillage = window.RoadManager.isVillageProtected(playerPosition);
+        
+        if (inVillage) {
+            window.EventBus.emit('UI_LOG', `[OUTCAST] The villagers recoil at the Huntsman's mark. "Away with you, cursed one!"`);
+            window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'SHUNNED', pos: playerPosition, color: '#f87171' });
+            return; // Block interaction in villages
+        }
+    }
+
     const playerPosition = window.GameCore.playerObj.visual.position;
+
     const loot = window.GameCore.groundLoot.find(entry => Math.hypot(entry.visual.position.x - playerPosition.x, entry.visual.position.z - playerPosition.z) <= 2.5);
     if (loot) {
         window.EventBus.emit('PICKUP_GROUND_LOOT', loot.id);

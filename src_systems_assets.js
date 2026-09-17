@@ -92,8 +92,17 @@ window.AssetManager = {
         'Village Hub': { type: 'hub', category: 'terrain', radius: 2, height: 4, modelScale: 1.0, color: 0x3b82f6, isObstacle: true, emitsLight: true, customModel: null, animMap: {}, vfx: { aura: 'Holy', onHit: 'Sparks' } },
         'Decorative Bench': { type: 'structure', category: 'terrain', radius: 1.2, height: 1.2, modelScale: 1.0, color: 0x4a3024, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Rune Tower': { type: 'runeTower', category: 'terrain', radius: 2, height: 12, modelScale: 1.0, color: 0x64748b, isObstacle: true, active: true, protectionRadius: 18, customModel: null, animMap: {}, vfx: { aura: 'Holy', onHit: 'Sparks' } },
-        'Blight Root': { type: 'structure', category: 'terrain', radius: 1.5, height: 6, modelScale: 1.0, color: 0x8b5cf6, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'Void', onHit: 'Blood' } },
+                'Blight Root': { type: 'structure', category: 'terrain', radius: 1.5, height: 6, modelScale: 1.0, color: 0x8b5cf6, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'Void', onHit: 'Blood' } },
+        'Huntsman': { 
+            type: 'npc', category: 'npcs', radius: 0.6, height: 2.2, modelScale: 1.0, color: 0x111111, faction: 'monster', 
+            behavior: 'stalking', speed: 9.0, hp: 1200, armor: 40, attackDamage: 65, poiseDamage: 80,
+            role: 'humiliator', boss: true, habitat: 'darkForest',
+            customModel: null, 
+            animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, 
+            vfx: { aura: 'Void', onHit: 'Sparks' } 
+        },
         'Iron Sword': { type: 'weapon', category: 'weapons', radius: 0.2, height: 1, modelScale: 1.0, color: 0xcccccc, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Sparks' } }
+
     }
 };
 

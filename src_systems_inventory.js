@@ -1,5 +1,6 @@
 // File: src_systems_inventory.js
 
+
 window.ItemDatabase = {
     'rusty_sword': { id: 'rusty_sword', name: 'Rusty Sword', type: 'weapon', slot: 'weapon', stats: { damage: 5 }, icon: '🗡️', color: 'text-gray-400' },
     'iron_sword': { id: 'iron_sword', name: 'Iron Sword', type: 'weapon', slot: 'weapon', stats: { damage: 15 }, icon: '⚔️', color: 'text-blue-400' },
@@ -26,16 +27,40 @@ window.ItemDatabase = {
     'poisonward_rune': { id: 'poisonward_rune', name: 'Poisonward Rune', type: 'rune', slot: 'socket', stats: { resistances: { poison: 8 } }, icon: 'ᛜ', color: 'text-lime-300' },
     
     // NEW: Medical Items for Limb Damage
-    'bandage': { id: 'bandage', name: 'Dirty Bandage', type: 'medical', slot: 'backpack', stats: { healLimb: 25 }, icon: '🩹', color: 'text-red-400' },
-    'splint': { id: 'splint', name: 'Wooden Splint', type: 'medical', slot: 'backpack', stats: { healLimb: 50 }, icon: '🪵', color: 'text-amber-600' }
+        'bandage': { id: 'bandage', name: 'Dirty Bandage', type: 'medical', slot: 'backpack', stats: { healLimb: 25 }, icon: '🩹', color: 'text-red-400' },
+    'splint': { id: 'splint', name: 'Wooden Splint', type: 'medical', slot: 'backpack', stats: { healLimb: 50 }, icon: '🪵', color: 'text-amber-600' },
+
+    // PROSTHETICS
+    'clockwork_arm': { id: 'clockwork_arm', name: 'Clockwork Arm', type: 'prosthetic', slot: 'leftArm_prosthetic', stats: { hpBonus: 20, strength: 2 }, icon: '🦾', color: 'text-orange-400' },
+    'clockwork_leg': { id: 'clockwork_leg', name: 'Clockwork Leg', type: 'prosthetic', slot: 'leftLeg_prosthetic', stats: { hpBonus: 20, athletics: 2 }, icon: '⚙️', color: 'text-orange-400' },
+    'void_arm': { id: 'void_arm', name: 'Void-Infused Arm', type: 'prosthetic', slot: 'rightArm_prosthetic', stats: { hpBonus: 50, strength: 5, resistances: { void: 10 } }, icon: '🟣', color: 'text-purple-500' },
+    'void_leg': { id: 'void_leg', name: 'Void-Infused Leg', type: 'prosthetic', slot: 'rightLeg_prosthetic', stats: { hpBonus: 50, athletics: 5, resistances: { void: 10 } }, icon: '🌑', color: 'text-purple-500' }
 };
 
 function recalculateStats() {
     let totalArmor = 0; let totalDamage = 0;
     const eq = window.GameState.inventory.equipment;
-    ['head', 'chest', 'waist', 'hands', 'legs'].forEach(slot => { if (eq[slot] && window.ItemDatabase[eq[slot]]) totalArmor += window.ItemDatabase[eq[slot]].stats.defense; });
+    
+    // Base armor slots
+    ['head', 'chest', 'waist', 'hands', 'legs'].forEach(slot => { if (eq[slot] && window.ItemDatabase[eq[slot]]) totalArmor += window.ItemDatabase[eq[slot]].stats.defense || 0; });
+    
+    // Weapon
     if (eq.weapon && window.ItemDatabase[eq.weapon]) totalDamage += window.ItemDatabase[eq.weapon].stats.damage; else totalDamage += 2; 
-    Object.values(window.GameState.inventory.runes || {}).forEach(runeId => {
+
+            // --- PROSTHETICS STATS ---
+        ['leftArm_prosthetic', 'rightArm_prosthetic', 'leftLeg_prosthetic', 'rightLeg_prosthetic'].forEach(slot => {
+            const itemId = window.GameState.inventory.equipment[slot];
+            const item = itemId ? window.ItemDatabase[itemId] : null;
+            if (item && item.stats) {
+                totalArmor += item.stats.defense || 0;
+                // Add attribute bonuses like Strength or Athletics
+                // These will be picked up by the GameCore.addXP and derivedStat systems
+            }
+        });
+
+        // --- RUNE STATS ---
+
+
         const rune = window.ItemDatabase[runeId];
         if (!rune) return;
         totalArmor += rune.stats.defense || 0;
@@ -51,10 +76,19 @@ function renderInventory() {
     const panel = document.getElementById('inventory-panel'); if(!panel) return;
     const eq = window.GameState.inventory.equipment; const pack = window.GameState.inventory.backpack;
     
-    const getSlotHtml = (slotId, label, heightClass) => {
+        const getSlotHtml = (slotId, label, heightClass) => {
         const item = eq[slotId] ? window.ItemDatabase[eq[slotId]] : null;
         const border = item ? 'border-blue-900/50 shadow-[inset_0_0_20px_rgba(59,130,246,0.1)]' : 'border-gray-700';
-        const content = item ? `<div class="text-2xl mb-1">${item.icon}</div><div class="${item.color} font-bold">${item.name}</div><div class="text-[9px] text-gray-400 mt-1">${item.stats.defense ? 'DEF: +'+item.stats.defense : 'DMG: '+item.stats.damage}</div>` : `<div class="text-gray-600">${label}<br>(Empty)</div>`;
+        
+        let statDisplay = "";
+        if (item) {
+            if (item.stats.defense) statDisplay = 'DEF: +'+item.stats.defense;
+            else if (item.stats.damage) statDisplay = 'DMG: '+item.stats.damage;
+            else if (item.stats.strength) statDisplay = 'STR: +'+item.stats.strength;
+            else if (item.stats.athletics) statDisplay = 'ATH: +'+item.stats.athletics;
+        }
+
+        const content = item ? `<div class="text-2xl mb-1">${item.icon}</div><div class="${item.color} font-bold">${item.name}</div><div class="text-[9px] text-gray-400 mt-1">${statDisplay}</div>` : `<div class="text-gray-600">${label}<br>(Empty)</div>`;
         return `<div class="border ${border} bg-gray-800 p-2 text-center text-xs h-${heightClass} flex flex-col items-center justify-center rounded cursor-pointer hover:bg-gray-700 transition-colors" onclick="window.EventBus.emit('INV_UNEQUIP', '${slotId}')">${content}</div>`;
     };
 
@@ -66,10 +100,26 @@ function renderInventory() {
                 <div>TOTAL ARMOR: <span class="text-green-400 font-bold">${window.GameState.derivedStats.armor}</span></div>
             </div>
         </div>
-        <div class="grid grid-cols-2 gap-4 mb-6">
-            <div class="space-y-3">${getSlotHtml('head', 'HEAD', '16')} ${getSlotHtml('chest', 'CHEST', '24')} ${getSlotHtml('waist', 'WAIST', '16')} ${getSlotHtml('hands', 'HANDS', '16')} ${getSlotHtml('legs', 'LEGS', '24')}</div>
-            <div class="space-y-3">${getSlotHtml('weapon', 'WEAPON', '40')} <div class="border border-gray-700 bg-gray-800 p-2 text-center text-xs h-24 flex flex-col items-center justify-center rounded text-gray-600">BACKPACK<br>(No Mod)</div></div>
+        <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="space-y-3">
+                ${getSlotHtml('head', 'HEAD', '16')} 
+                ${getSlotHtml('chest', 'CHEST', '24')} 
+                ${getSlotHtml('waist', 'WAIST', '16')} 
+                ${getSlotHtml('hands', 'HANDS', '16')} 
+                ${getSlotHtml('legs', 'LEGS', '24')}
+            </div>
+            <div class="space-y-3">
+                ${getSlotHtml('leftArm_prosthetic', 'L-ARM', '20')}
+                ${getSlotHtml('rightArm_prosthetic', 'R-ARM', '20')}
+                ${getSlotHtml('leftLeg_prosthetic', 'L-LEG', '20')}
+                ${getSlotHtml('rightLeg_prosthetic', 'R-LEG', '20')}
+            </div>
+            <div class="space-y-3">
+                ${getSlotHtml('weapon', 'WEAPON', '40')} 
+                <div class="border border-gray-700 bg-gray-800 p-2 text-center text-xs h-24 flex flex-col items-center justify-center rounded text-gray-600 uppercase">Auxiliary</div>
+            </div>
         </div>
+
         <h3 class="text-xs font-bold text-gray-400 border-b border-gray-700 pb-1 mb-2 flex justify-between">
             <span>BACKPACK CONTENTS</span><span class="text-gray-600 font-normal text-[9px] uppercase">Click to Use</span>
         </h3>
@@ -96,12 +146,21 @@ window.EventBus.on('INV_UNEQUIP', (slotId) => {
     const itemId = window.GameState.inventory.equipment[slotId];
     if(itemId) {
         if(window.GameState.inventory.backpack.length < 25) {
-            window.GameState.inventory.backpack.push(itemId); window.GameState.inventory.equipment[slotId] = null;
+            window.GameState.inventory.backpack.push(itemId); 
+            window.GameState.inventory.equipment[slotId] = null;
+            
+            // Handle Prosthetic Removal
+            if (slotId.includes('_prosthetic') && window.playerHealth) {
+                const limbName = slotId.replace('_prosthetic', '');
+                window.playerHealth.removeProsthetic(limbName);
+            }
+
             window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/hihat-analog.mp3', pos: window.GameCore?.playerObj ? window.GameCore.playerObj.visual.position : {x:0,y:0,z:0}, vol: -10});
             recalculateStats(); renderInventory();
         } else { window.EventBus.emit('UI_LOG', "Backpack is full!"); }
     }
 });
+
 
 window.EventBus.on('INV_USE', (packIndex) => {
     const itemId = window.GameState.inventory.backpack[packIndex]; if(!itemId) return;
@@ -154,13 +213,32 @@ window.EventBus.on('INV_USE', (packIndex) => {
             }
         }
     }
-    else if(item.type === 'weapon' || item.type === 'armor') {
+        else if(item.type === 'weapon' || item.type === 'armor' || item.type === 'prosthetic') {
+        // Validation for prosthetics
+        if (item.type === 'prosthetic') {
+            const limbName = item.slot.replace('_prosthetic', '');
+            if (window.playerHealth && !window.playerHealth.limbs[limbName].isAmputated) {
+                window.EventBus.emit('UI_LOG', `Cannot equip ${item.name}: Your ${limbName} is still attached!`);
+                return;
+            }
+        }
+
         const currentEquipped = window.GameState.inventory.equipment[item.slot];
-        window.GameState.inventory.equipment[item.slot] = itemId; window.GameState.inventory.backpack.splice(packIndex, 1);
+        window.GameState.inventory.equipment[item.slot] = itemId; 
+        window.GameState.inventory.backpack.splice(packIndex, 1);
+        
         if(currentEquipped) window.GameState.inventory.backpack.push(currentEquipped);
+        
+        // Handle Prosthetic Integration
+        if (item.type === 'prosthetic' && window.playerHealth) {
+            const limbName = item.slot.replace('_prosthetic', '');
+            window.playerHealth.applyProsthetic(limbName, item);
+        }
+
         window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: window.GameCore?.playerObj ? window.GameCore.playerObj.visual.position : {x:0,y:0,z:0}, vol: -10});
         recalculateStats();
-    } else if (item.type === 'rune') {
+    } 
+ else if (item.type === 'rune') {
         window.EventBus.emit('OPEN_RUNE_SOCKET', packIndex);
         return;
     }

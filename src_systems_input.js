@@ -10,13 +10,15 @@ document.addEventListener('keydown', e => {
         if (k === 'x' && window.GameCore.engineState === 'running') window.EventBus.emit('TOGGLE_STEALTH');
 
 
-    if (k === 'r' && window.GameCore.engineState === 'running') window.EventBus.emit('EMERGENCY_RATION');
+        if (k === 'r' && window.GameCore.engineState === 'running') window.EventBus.emit('EMERGENCY_RATION');
     if (k === 'f' && window.GameCore.engineState === 'running') window.EventBus.emit('VOID_RUNE_SHOT');
     if (k === 'g' && window.GameCore.engineState === 'running') window.EventBus.emit('FIRE_RUNE_SHOT');
     if (k === 'b' && window.GameCore.engineState === 'running') window.EventBus.emit('CLAIM_PLAYER_CAMP');
+    
+    if (k === '2') window.EventBus.emit('TOGGLE_EDITOR');
     if (k === 'p' && window.GameCore.engineState === 'running') window.NetworkSession?.togglePartyMode();
     if (k === 'e' && window.GameCore.engineState === 'running') window.EventBus.emit('INTERACT_NEARBY');
-    if (window.GameCore.engineState === 'running' && ['1', '2', '3', '4', '5'].includes(k)) window.EventBus.emit('PARTY_COMMAND', ({ '1': 'follow', '2': 'hold', '3': 'guard', '4': 'attack', '5': 'retreat' })[k]);
+    if (window.GameCore.engineState === 'running' && ['1', '3', '4', '5'].includes(k)) window.EventBus.emit('PARTY_COMMAND', ({ '1': 'follow', '3': 'guard', '4': 'attack', '5': 'retreat' })[k]);
     if (k === 'f5') { e.preventDefault(); window.EventBus.emit('GAME_SAVE'); }
     if (k === 'f9') { e.preventDefault(); window.EventBus.emit('GAME_LOAD'); }
 });

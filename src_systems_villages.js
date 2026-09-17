@@ -1,28 +1,28 @@
-import * as THREE from 'three';
+imporhe void encursion should just t * as THREE from 'three';
 
 window.VillageManager = {
     villages: [], kingdomPopulation: 250000, capitalPopulationShare: 0.25, names: ["Oakhaven", "Gallows Hill", "Mire's Edge", "Blackwood", "Hollow Creek", "Ashen Hold", "Dire Rest", "Crow's Perch", "Widow's Peak", "Thornbury", "Gloomhaven", "Duskendale", "Grimsby", "Shadowfen", "Blighted Watch", "Bleakmire", "Wraith's End", "Cullfield", "Terminus"],
     settlementProfiles: [
-        { house: 'The Royal Family', title: 'Royal House', tier: 'major', industry: 'Royal Mint', produces: 'gold', imports: ['food', 'wood', 'stone'] },
-        { house: 'House Oakheart', title: 'Baronial House', tier: 'minor', industry: 'Timberwrights', produces: 'wood', imports: ['food', 'stone'] },
-        { house: 'House Gallows', title: 'Baronial House', tier: 'minor', industry: 'Ropeworks', produces: 'wood', imports: ['food', 'gold'] },
-        { house: 'House Mire', title: 'Baronial House', tier: 'minor', industry: 'Herbalists', produces: 'food', imports: ['wood', 'gold'] },
-        { house: 'House Blackwood', title: 'Ducal House', tier: 'major', industry: 'Ironworks', produces: 'stone', imports: ['food', 'wood'] },
-        { house: 'House Hollow', title: 'Baronial House', tier: 'minor', industry: 'Tanners', produces: 'food', imports: ['wood', 'gold'] },
-        { house: 'House Ashen', title: 'Ducal House', tier: 'major', industry: 'Stoneworks', produces: 'stone', imports: ['food', 'wood'] },
-        { house: 'House Dire', title: 'Baronial House', tier: 'minor', industry: 'Milling', produces: 'food', imports: ['wood', 'stone'] },
-        { house: 'House Crow', title: 'Baronial House', tier: 'minor', industry: 'Courier Guild', produces: 'gold', imports: ['food', 'wood'] },
-        { house: 'House Widow', title: 'Ducal House', tier: 'major', industry: 'Redwood Monopoly', produces: 'wood', imports: ['food', 'stone'] },
-        { house: 'House Thorn', title: 'Baronial House', tier: 'minor', industry: 'Apiaries', produces: 'food', imports: ['wood', 'gold'] },
-        { house: 'House Gloom', title: 'Baronial House', tier: 'minor', industry: 'Glassworks', produces: 'stone', imports: ['food', 'wood'] },
-        { house: 'House Dusken', title: 'Baronial House', tier: 'minor', industry: 'Textiles', produces: 'gold', imports: ['food', 'wood'] },
-        { house: 'House Grim', title: 'Baronial House', tier: 'minor', industry: 'Foundry', produces: 'stone', imports: ['food', 'wood'] },
-        { house: 'House Shadowfen', title: 'Ducal House', tier: 'major', industry: 'Alchemy Monopoly', produces: 'gold', imports: ['food', 'wood', 'stone'] },
-        { house: 'House Blightwatch', title: 'Baronial House', tier: 'minor', industry: 'Rangers', produces: 'wood', imports: ['food', 'stone'] },
-        { house: 'House Bleak', title: 'Baronial House', tier: 'minor', industry: 'Quarries', produces: 'stone', imports: ['food', 'wood'] },
-        { house: 'House Wraith', title: 'Baronial House', tier: 'minor', industry: 'Fisheries', produces: 'food', imports: ['wood', 'gold'] },
-                { house: 'House Cull', title: 'Baronial House', tier: 'minor', industry: 'Leatherworks', produces: 'gold', imports: ['food', 'wood'] },
-        { house: 'House Terminus', title: 'High Marshal House', tier: 'major', industry: 'Mountain Arsenal', produces: 'stone', imports: ['food', 'wood', 'gold'], mountainGatekeeper: true, martial: true, endgameGateway: true, basePower: 75, leaderPower: 90 }
+        { house: 'The Royal Family', leader: 'King Alaric', title: 'Monarch', tier: 'monarch', industry: 'Royal Mint', produces: 'gold', imports: ['food', 'wood', 'stone'] },
+        { house: 'House Oakheart', leader: 'Baron Oakheart', title: 'War Master', tier: 'war_master', industry: 'Timberwrights', produces: 'wood', imports: ['food', 'stone'] },
+        { house: 'House Gallows', leader: 'Baroness Gallows', title: 'War Master', tier: 'war_master', industry: 'Ropeworks', produces: 'wood', imports: ['food', 'gold'] },
+        { house: 'House Mire', leader: 'Elder Mire', title: 'War Master', tier: 'war_master', industry: 'Herbalists', produces: 'food', imports: ['wood', 'gold'] },
+        { house: 'House Blackwood', leader: 'Duke Blackwood', title: 'War Master', tier: 'war_master', industry: 'Ironworks', produces: 'stone', imports: ['food', 'wood'] },
+        { house: 'House Hollow', leader: 'Baron Hollow', title: 'War Master', tier: 'war_master', industry: 'Tanners', produces: 'food', imports: ['wood', 'gold'] },
+        { house: 'House Ashen', leader: 'Duke Ashen', title: 'War Master', tier: 'war_master', industry: 'Stoneworks', produces: 'stone', imports: ['food', 'wood'] },
+        { house: 'House Dire', leader: 'Baron Dire', title: 'War Master', tier: 'war_master', industry: 'Milling', produces: 'food', imports: ['wood', 'stone'] },
+        { house: 'House Crow', leader: 'Master Crow', title: 'War Master', tier: 'war_master', industry: 'Courier Guild', produces: 'gold', imports: ['food', 'wood'] },
+        { house: 'House Widow', leader: 'Duchess Widow', title: 'War Master', tier: 'war_master', industry: 'Redwood Monopoly', produces: 'wood', imports: ['food', 'stone'] },
+        { house: 'House Thorn', leader: 'Baron Thorn', title: 'War Master', tier: 'war_master', industry: 'Apiaries', produces: 'food', imports: ['wood', 'gold'] },
+        { house: 'House Gloom', leader: 'Baron Gloom', title: 'War Master', tier: 'war_master', industry: 'Glassworks', produces: 'stone', imports: ['food', 'wood'] },
+        { house: 'House Dusken', leader: 'Baron Dusken', title: 'War Master', tier: 'war_master', industry: 'Textiles', produces: 'gold', imports: ['food', 'wood'] },
+        { house: 'House Grim', leader: 'Baron Grim', title: 'War Master', tier: 'war_master', industry: 'Foundry', produces: 'stone', imports: ['food', 'wood'] },
+        { house: 'House Shadowfen', leader: 'Duke Shadowfen', title: 'War Master', tier: 'war_master', industry: 'Alchemy Monopoly', produces: 'gold', imports: ['food', 'wood', 'stone'] },
+        { house: 'House Blightwatch', leader: 'Ranger General', title: 'War Master', tier: 'war_master', industry: 'Rangers', produces: 'wood', imports: ['food', 'stone'] },
+        { house: 'House Bleak', leader: 'Baron Bleak', title: 'War Master', tier: 'war_master', industry: 'Quarries', produces: 'stone', imports: ['food', 'wood'] },
+        { house: 'House Wraith', leader: 'Baron Wraith', title: 'War Master', tier: 'war_master', industry: 'Fisheries', produces: 'food', imports: ['wood', 'gold'] },
+        { house: 'House Cull', leader: 'Baron Cull', title: 'War Master', tier: 'war_master', industry: 'Leatherworks', produces: 'gold', imports: ['food', 'wood'] },
+        { house: 'House Terminus', leader: 'High Marshal Vane', title: 'War Master', tier: 'war_master', industry: 'Mountain Arsenal', produces: 'stone', imports: ['food', 'wood', 'gold'], mountainGatekeeper: true, martial: true, endgameGateway: true, basePower: 75, leaderPower: 90 }
     ],
     provisionProfiles: [
         { itemId: 'royal_spiced_wine', name: 'Royal Spiced Wine', heal: 30, buff: 'toughness', amount: 1, duration: 90 },
@@ -62,8 +62,32 @@ window.VillageManager = {
             if (i > 0) remainingPopulation -= population;
             const profile = this.settlementProfiles[i];
             const provision = this.provisionProfiles[i];
-            this.villages.push({ id: i, name: i === 0 ? 'The Capital' : this.names[i - 1], x: Math.round(x), z: Math.round(z), connections: connections, capital: i === 0, nobleHouse: profile.house, nobleTitle: profile.title, industry: profile, provision, provisionStock: { [provision.itemId]: Math.max(10, Math.floor(population / 100)) }, territory: { faction: 'kingdom', radius: i === 0 ? 140 : 90, barrierRadius: i === 0 ? 140 : 90, control: 100, underRaid: false }, barrierIntegrity: 100, expeditions: [], stats: { ap: 50 + Math.floor(Math.random() * 50), food: population * 20, wood: population * 8, stone: population * 5, gold: population * 4, essence: 0, prosperity: 55 }, population: { current: population, capacity: Math.ceil(population * 1.2) }, expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [] });
+            this.villages.push({ 
+                id: i, name: i === 0 ? 'The Capital' : this.names[i - 1], x: Math.round(x), z: Math.round(z), 
+                connections: connections, capital: i === 0, nobleHouse: profile.house, nobleLeader: profile.leader,
+                nobleTitle: profile.title, industry: profile, provision, 
+                provisionStock: { [provision.itemId]: Math.max(10, Math.floor(population / 100)) }, 
+                territory: { faction: 'kingdom', radius: i === 0 ? 140 : 90, barrierRadius: i === 0 ? 140 : 90, control: 100, underRaid: false }, 
+                barrierIntegrity: 100, expeditions: [], 
+                stats: { ap: 50 + Math.floor(Math.random() * 50), food: population * 20, wood: population * 8, stone: population * 5, gold: population * 4, essence: 0, prosperity: 55 }, 
+                population: { current: population, capacity: Math.ceil(population * 1.2) }, 
+                expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [],
+                // --- EMERGENT DIPLOMACY ---
+                relations: {}, // targetVillageId -> opinion score (-100 to 100)
+                diplomaticState: {}, // targetVillageId -> 'allied' | 'neutral' | 'hostile'
+                tensions: 0 // Overall house unrest (leads to Civil War)
+            });
         }
+        
+        // Initialize mutual relations
+        this.villages.forEach(v1 => {
+            this.villages.forEach(v2 => {
+                if (v1.id !== v2.id) {
+                    v1.relations[v2.id] = 0;
+                    v1.diplomaticState[v2.id] = 'neutral';
+                }
+            });
+        });
         window.RoadManager.generateRoads(this.villages);
         window.EventBus.emit('UI_LOG', "🌲 20 Settlements generated. Road Network integrated.");
         if(window.EngineState.currentAssetTab === 'villages' || window.EngineState.currentAssetTab === 'world') window.EventBus.emit('RENDER_ASSETS');
@@ -114,6 +138,22 @@ window.VillageManager = {
 
         const localRaiders = window.GameCore.activeEntities.filter(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && Math.hypot(entity.visual.position.x - village.x, entity.visual.position.z - village.z) <= village.territory.radius);
         village.territory.underRaid = localRaiders.length > 0;
+
+        // --- DIPLOMATIC IMPACT OF RAIDS (Shared Defense) ---
+        if (village.territory.underRaid) {
+            // Impact is scaled: Only a "Walking Calamity" (Renown > 500) has Monarch-level impact
+            const playerImpactScale = (window.GameState.renown.score > 500) ? 5.0 : 1.0;
+
+            // Nearby houses grow closer when defending against the forest
+            this.villages.forEach(other => {
+                if (other.id !== village.id && Math.hypot(other.x - village.x, other.z - village.z) < 20000) {
+                    other.relations[village.id] = Math.min(100, (other.relations[village.id] || 0) + 1 * playerImpactScale);
+                }
+            });
+            // Tensions increase if the Crown doesn't help
+            village.tensions = Math.min(100, (village.tensions || 0) + 0.5);
+        }
+
         village.territory.control = Math.max(0, Math.min(100, village.territory.control + (village.territory.underRaid ? -localRaiders.length * 2 : 1)));
         if (village.territory.underRaid) window.EventBus.emit('UI_LOG', `[RAID] ${village.name} is under attack by ${localRaiders.length} hostile creature${localRaiders.length === 1 ? '' : 's'}.`);
         const activeExpedition = village.expeditions.some(expedition => expedition.status === 'raiding');
@@ -177,11 +217,54 @@ window.VillageManager = {
             }
         }
 
+        // --- MILITARY MOBILIZATION & HOUSE LEVIES ---
+        if (village.capital) {
+            // Monarch grows to 10k, starts with 500
+            village.royalArmySize = Math.min(10000, (village.royalArmySize || 500) + (village.stats.prosperity / 20));
+        } else {
+            // War Masters grow to 2500 per noble house
+            village.nobleLevySize = Math.min(2500, (village.nobleLevySize || 50) + (village.stats.prosperity / 40));
+            
+            // Special Exception: House Terminus Mountain Guard
+            if (village.nobleHouse === 'House Terminus') {
+                // Initialize if needed
+                village.terminusEliteGuard ??= 300;
+                village.terminusRecruits ??= []; // [{ xp: 0, count: 5 }]
+
+                const deficit = 300 - village.terminusEliteGuard;
+                if (deficit > 0 && village.nobleLevySize > 0) {
+                    // Pull from noble levies to start training
+                    const intake = Math.min(deficit, Math.ceil(village.nobleLevySize * 0.1));
+                    village.nobleLevySize -= intake;
+                    village.terminusRecruits.push({ xp: 0, count: intake });
+                    if (Math.random() < 0.1) window.EventBus.emit('UI_LOG', `[TERMINUS] ${intake} new recruits have begun the grueling mountain training.`);
+                }
+
+                // Process Training XP
+                for (let i = village.terminusRecruits.length - 1; i >= 0; i--) {
+                    const batch = village.terminusRecruits[i];
+                    batch.xp += 5 + (village.stats.prosperity / 20); // Prosperous villages train faster
+                    if (batch.xp >= 100) {
+                        village.terminusEliteGuard = Math.min(300, village.terminusEliteGuard + batch.count);
+                        village.terminusRecruits.splice(i, 1);
+                        window.EventBus.emit('UI_LOG', `[TERMINUS] A batch of ${batch.count} elite guards have finished training and joined the 300.`);
+                    }
+                }
+            }
+        }
+
         const caravanCost = { ap: 35, food: 15, gold: 20 };
         if (!village.caravans.some(caravan => caravan.status === 'traveling' || caravan.status === 'arrived') && freePopulation >= 1 && this.canFundVillageAction(village, caravanCost, 'sending a merchant caravan')) {
             this.spendVillageResources(village, caravanCost);
             const destination = this.villages.find(candidate => village.connections.includes(candidate.id) && candidate.industry && candidate.industry.imports.includes(village.industry.produces));
             const targetVillage = destination || this.villages.find(candidate => village.connections.includes(candidate.id));
+            
+            // --- DIPLOMATIC IMPACT OF TRADE ---
+            if (targetVillage) {
+                village.relations[targetVillage.id] = Math.min(100, (village.relations[targetVillage.id] || 0) + 2);
+                targetVillage.relations[village.id] = Math.min(100, (targetVillage.relations[village.id] || 0) + 2);
+            }
+
             const caravan = { id: `${village.id}-caravan-${window.EngineParams.worldDay}-${village.caravans.length + 1}`, status: 'traveling', targetVillageId: targetVillage.id, cargo: village.industry.produces, amount: Math.max(1, Math.floor(village.population.current / 1000)), launchedOnDay: window.EngineParams.worldDay };
             village.caravans.push(caravan);
             const caravanEntity = window.GameCore.instantiatePrefab('Merchant Caravan', village.x + 3, window.WorldGenerator.getTerrainHeight(village.x + 3, village.z), village.z, 'persistent');

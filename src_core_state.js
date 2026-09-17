@@ -32,10 +32,16 @@ window.GameState = {
         athletics: { level: 1, xp: 0, next: 100 }, dodge: { level: 1, xp: 0, next: 100 },
         meleeAtt: { level: 1, xp: 0, next: 100 }, meleeDef: { level: 1, xp: 0, next: 100 }
     },
-    inventory: { 
+        inventory: { 
         food: 100, gold: 0, 
-        equipment: { head: null, chest: 'leather_armor', waist: null, hands: null, legs: 'pants', weapon: 'iron_sword' },
-        runes: { head: null, chest: null, waist: null, hands: null, legs: null, weapon: null },
+        equipment: { 
+            head: null, chest: 'leather_armor', waist: null, hands: null, legs: 'pants', weapon: 'iron_sword',
+            leftArm_prosthetic: null, rightArm_prosthetic: null, leftLeg_prosthetic: null, rightLeg_prosthetic: null
+        },
+        runes: { 
+            head: null, chest: null, waist: null, hands: null, legs: null, weapon: null,
+            leftArm_prosthetic: null, rightArm_prosthetic: null, leftLeg_prosthetic: null, rightLeg_prosthetic: null
+        },
         backpack: ['rusty_sword', 'food', 'food', 'food', 'ember_rune']
     },
     derivedStats: { armor: 0, weaponDamage: 0 },
@@ -55,11 +61,41 @@ window.GameState = {
     renown: { score: 0, infamy: 0, title: 'Unknown', history: [] },
     coop: { sessionId: null, localPlayerId: null, partyMode: 'solo' },
     base: { owned: false, name: 'Wayfarer Camp', position: null, storage: [], structures: [], farms: [], research: [] },
-    party: { command: 'follow', selectedMembers: ['lyra-scout'], escortCaravanId: null, members: [
-        { id: 'lyra-scout', name: 'Lyra', prefab: 'Female Adventurer', role: 'scout', hp: 100, maxHp: 100, recruited: true, inventory: ['mushrooms', 'food'], equipment: {}, skills: { scouting: 1, athletics: 1 }, personality: 'cautious', knowledge: [], loyalty: 65, hunger: 0, injuries: [], downed: false },
-        { id: 'maris-guard', name: 'Maris', prefab: 'Female Guard', role: 'guardian', hp: 130, maxHp: 130, recruited: false, inventory: ['food'], equipment: { weapon: 'iron_sword' }, skills: { guarding: 2, meleeDef: 1 }, personality: 'steadfast', knowledge: [], loyalty: 50, hunger: 0, injuries: [], downed: false },
-        { id: 'corvin-runic', name: 'Corvin', prefab: 'Tech Adventurer', role: 'runic adept', hp: 85, maxHp: 85, recruited: false, inventory: ['mushrooms'], equipment: {}, skills: { runecraft: 2, meleeAtt: 1 }, personality: 'curious', knowledge: [], loyalty: 45, hunger: 0, injuries: [], downed: false }
-    ] },
+            party: { command: 'follow', selectedMembers: ['lyra-scout'], escortCaravanId: null, formation: 'line', 
+        resonanceLevel: 0,
+        tacticalLearning: { aggression: 0.5, flanking: 0.5, skillPreference: {}, averageEngagementDist: 10 },
+        members: [
+            { 
+                id: 'lyra-scout', name: 'Lyra', prefab: 'Female Adventurer', role: 'scout', group: 'archers', hp: 100, maxHp: 100, recruited: true, 
+                tier: 'commander', commandAuthority: 15, dispatchTarget: null, learningWeights: { aggression: 0.5, flanking: 0.5 },
+                inventory: ['mushrooms', 'food'], equipment: { weapon: 'short_bow' }, 
+                skills: { scouting: 3, athletics: 2, ranged: 4 }, 
+                personality: 'cautious', 
+                knowledge: { locations: ['Wayfarer Camp', 'Riverwood'], enemies: ['Wolf'], materials: ['mushrooms'] },
+                loyalty: 65, hunger: 0, injuries: [], downed: false,
+                voicePitch: 1.1, specialization: 'Gatherer'
+            },
+            { 
+                id: 'maris-guard', name: 'Maris', prefab: 'Female Guard', role: 'guardian', group: 'infantry', hp: 130, maxHp: 130, recruited: false, 
+                tier: 'elite', commandAuthority: 5, dispatchTarget: null, learningWeights: { aggression: 0.5, flanking: 0.5 },
+                inventory: ['food'], equipment: { weapon: 'iron_sword', shield: 'wooden_shield' }, 
+                skills: { guarding: 3, meleeDef: 2 }, 
+                personality: 'steadfast', 
+                knowledge: { locations: ['Stronghold'], enemies: ['Bandit', 'Wendigo'], materials: [] },
+                loyalty: 50, hunger: 0, injuries: [], downed: false,
+                voicePitch: 0.9, specialization: 'Challenger'
+            },
+            { 
+                id: 'corvin-runic', name: 'Corvin', prefab: 'Tech Adventurer', role: 'runic adept', group: 'infantry', hp: 85, maxHp: 85, recruited: false, 
+                tier: 'pawn', commandAuthority: 0, dispatchTarget: null, learningWeights: { aggression: 0.5, flanking: 0.5 },
+                inventory: ['mushrooms'], equipment: {}, 
+                skills: { runecraft: 3, meleeAtt: 1 }, 
+                personality: 'curious', 
+                knowledge: { locations: [], enemies: ['Void Wraith'], materials: ['ember_rune'] },
+                loyalty: 45, hunger: 0, injuries: [], downed: false,
+                voicePitch: 1.0, specialization: 'Medic'
+            }
+        ] },
     questBoard: [],
     worldEvents: [],
     gladiator: {
@@ -280,10 +316,20 @@ window.GameCore = {
         if (renown.score >= 20) return 'Known';
         return 'Unknown';
     },
-    recordRenown: function({ renown = 0, infamy = 0, faction = 'kingdom', reason = 'word spread' } = {}) {
+        recordRenown: function({ renown = 0, infamy = 0, faction = 'kingdom', reason = 'word spread' } = {}) {
         const record = window.GameState.renown ??= { score: 0, infamy: 0, title: 'Unknown', history: [] };
+        
+        // --- ADVENTURER LIMITER ---
+        // Player's basic global impact is capped to NPC-levels (limit growth rate)
+        // until they hit high renown levels.
+        let finalRenown = renown;
+        if (record.score < 500) {
+            finalRenown = Math.min(renown, 5); // Capped impact per event for "Average Joe"
+        }
+
         record.history ??= [];
-        record.score = Math.max(0, Math.min(1000, record.score + renown));
+        record.score = Math.max(0, Math.min(1000, record.score + finalRenown));
+
         record.infamy = Math.max(0, Math.min(1000, record.infamy + infamy));
         record.title = this.getRenownTitle();
         record.history.push({ day: window.EngineParams.worldDay, renown, infamy, faction, reason });

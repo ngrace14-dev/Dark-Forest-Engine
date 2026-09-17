@@ -1,16 +1,22 @@
 import * as THREE from 'three';
 
+
+
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import RAPIER from 'rapier';
+
 import alea from 'alea';
 
 window.THREE = THREE; 
 window.SkeletonUtils = SkeletonUtils;
+window.BufferGeometryUtils = BufferGeometryUtils;
 window.RAPIER = RAPIER;
+
 
 window.RAPIER = RAPIER;
 
@@ -18,7 +24,25 @@ window.RAPIER = RAPIER;
 let renderer, clock, composer, ambientLight, dirLight;
 const fixedTimeStep = 1.0 / 60.0; let accumulator = 0.0;
 
-const ChunkManager = {
+
+// Reusable math objects to prevent GC
+const _v1 = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
+const _q1 = new THREE.Quaternion();
+const _e1 = new THREE.Euler();
+const _m1 = new THREE.Matrix4();
+
+
+
+// Reusable math objects to prevent GC
+const _v1 = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
+const _q1 = new THREE.Quaternion();
+const _e1 = new THREE.Euler();
+const _m1 = new THREE.Matrix4();
+
     activeChunks: new Map(), currentChunkX: null, currentChunkZ: null,
     
     // --- INSTANCED SCENERY (Diablo 4 Style Batching) ---
@@ -111,9 +135,11 @@ const ChunkManager = {
                                 residentEntity.attackDamage = baseStat + variance;
                                 residentEntity.hp = (baseStat + variance) * 5;
                                 residentEntity.poise = (baseStat + variance) * 1.5;
-                                residentEntity.name = isLeader ? `Terminus Commander` : `Terminus Elite Guard`;
+                                                                residentEntity.name = isLeader ? `Terminus Commander` : `Terminus Elite Guard`;
+                                residentEntity.isTerminusElite = true; 
                             
                                 // Visual distinction for Terminus (Obsidian Steel)
+
                                 residentEntity.visual.traverse(child => {
                                     if (child.isMesh) {
                                         child.material.color.set(0x111827); 
@@ -180,11 +206,13 @@ const ChunkManager = {
                 this.activeChunks.get(key).instanceBodies.push(body);
             });
             
-            window.GameCore.scene.add(imesh);
+                        window.GameCore.scene.add(imesh);
             chunkInstances.set(prefabName, imesh);
         });
+        
+        window.EventBus.emit('CHUNK_GENERATED');
     },
-    unloadChunk: function(key) {
+        unloadChunk: function(key) {
         const chunk = this.activeChunks.get(key); if(!chunk) return;
         chunk.mesh.geometry.dispose(); chunk.mesh.material.dispose(); window.GameCore.scene.remove(chunk.mesh); window.GameCore.world.removeRigidBody(chunk.body);
         
@@ -200,8 +228,9 @@ const ChunkManager = {
             chunk.instanceBodies.forEach(body => window.GameCore.world.removeRigidBody(body));
         }
 
-        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
+                window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
             if(en.chunkKey === key) { 
+                if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(en.id);
                 window.GameCore.releaseEntityIndex(en.memoryIndex);
                 window.GameCore.SpatialGrid.unregisterEntity(en);
                 window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); 
@@ -210,6 +239,7 @@ const ChunkManager = {
             return true; 
         });
         this.activeChunks.delete(key);
+        window.EventBus.emit('CHUNK_UNLOADED');
     }
 };
 
@@ -217,32 +247,51 @@ const ChunkManager = {
 function getVisualMesh(def) {
     let meshGroup = new THREE.Group();
     if (def.customModel && window.AssetManager.models[def.customModel]) {
-        const sourceModel = window.AssetManager.models[def.customModel];
-        
-        // SKINNED MESH FIX: Use SkeletonUtils to properly clone bones
-        const customModel = window.SkeletonUtils.clone(sourceModel); 
-        
-        customModel.traverse(child => { 
-            if (child.isMesh) { 
-                child.castShadow = true; 
-                child.receiveShadow = true; 
-                child.frustumCulled = false; // Fixes meshes vanishing when animating
-            } 
-        });
-        
-        // EXACT SCALE FIX: No more bounding box auto-scaling math
-        const absoluteScale = def.modelScale || 1.0;
-        customModel.scale.setScalar(absoluteScale); 
-        customModel.position.y = -def.height / 2; 
-        meshGroup.add(customModel);
+        // ... existing code ...
     } else {
-        let mesh; if(def.type === 'structure' || def.type === 'hub') mesh = new THREE.Mesh(new THREE.BoxGeometry(def.radius*2, def.height, def.radius*2), new THREE.MeshStandardMaterial({ color: def.color })); else if(def.type === 'mountain') mesh = new THREE.Mesh(new THREE.ConeGeometry(def.radius, def.height, 16), new THREE.MeshStandardMaterial({ color: def.color })); else mesh = new THREE.Mesh(new THREE.CylinderGeometry(def.radius, def.radius, def.height, 8), new THREE.MeshStandardMaterial({ color: def.color }));
-        mesh.castShadow = true; mesh.receiveShadow = true; meshGroup.add(mesh);
+        if (def.type === 'character' || def.type === 'npc') {
+            // KENSHI-STYLE COMPOSITE PLACEHOLDER
+            const legs = new THREE.Mesh(
+                new THREE.BoxGeometry(def.radius * 0.8, def.height * 0.3, def.radius * 0.8),
+                new THREE.MeshStandardMaterial({ color: def.color, roughness: 0.8 })
+            );
+            legs.position.y = def.height * 0.15 - def.height/2;
+            legs.castShadow = true; legs.receiveShadow = true;
+            meshGroup.add(legs);
+
+            const torso = new THREE.Mesh(
+                new THREE.BoxGeometry(def.radius * 1.5, def.height * 0.5, def.radius * 1.2),
+                new THREE.MeshStandardMaterial({ color: def.color, roughness: 0.8 })
+            );
+            torso.position.y = def.height * 0.55 - def.height/2;
+            torso.castShadow = true; torso.receiveShadow = true;
+            meshGroup.add(torso);
+
+            const head = new THREE.Mesh(
+                new THREE.BoxGeometry(def.radius, def.radius, def.radius),
+                new THREE.MeshStandardMaterial({ color: def.color, roughness: 0.8 })
+            );
+            head.position.y = def.height * 0.85 - def.height/2;
+            head.castShadow = true; head.receiveShadow = true;
+            meshGroup.add(head);
+        } else {
+            let mesh; 
+            if(def.type === 'structure' || def.type === 'hub') mesh = new THREE.Mesh(new THREE.BoxGeometry(def.radius*2, def.height, def.radius*2), new THREE.MeshStandardMaterial({ color: def.color })); 
+            else if(def.type === 'mountain') mesh = new THREE.Mesh(new THREE.ConeGeometry(def.radius, def.height, 16), new THREE.MeshStandardMaterial({ color: def.color })); 
+            else mesh = new THREE.Mesh(new THREE.CylinderGeometry(def.radius, def.radius, def.height, 8), new THREE.MeshStandardMaterial({ color: def.color }));
+            mesh.castShadow = true; mesh.receiveShadow = true; 
+            meshGroup.add(mesh);
+        }
     }
     return meshGroup;
 }
 
+
 function playEntityAnimation(entity, state) {
+    if (window.GameCore.AnimationSystem) {
+        window.GameCore.AnimationSystem.transitionTo(entity, state);
+        return;
+    }
     if (!entity.mixer || !entity.actions || !entity.actions[state]) return; 
     if (entity.currentAnimState === 'die') return; // Cannot override death
     if (entity.currentAnimState === state) return; 
@@ -277,6 +326,11 @@ function setupEntityAnimations(entity, isPlayer = false) {
     let clips = window.AssetManager.animations[def.customModel] || [];
     clips = clips.concat(window.AssetManager.globalAnimations || []);
     if (clips.length === 0) return;
+
+    if (window.GameCore.AnimationSystem) {
+        window.GameCore.AnimationSystem.initEntity(entity, entity.visual, clips);
+        return;
+    }
 
     entity.mixer = new THREE.AnimationMixer(entity.visual); entity.actions = {}; entity.currentAnimState = null; 
     
@@ -451,8 +505,9 @@ window.ArenaTestManager = {
         window.EventBus.emit('OPEN_ARENA_RESULT', { result: 'defeat', reward: 0 });
         window.EventBus.emit('UI_UPDATE_HUD');
     },
-        clear: function() {
+                clear: function() {
         window.GameCore.activeEntities.filter(entity => entity.arenaEntity).forEach(entity => {
+            if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(entity.id);
             window.GameCore.releaseEntityIndex(entity.memoryIndex); // Recycle memory
             window.GameCore.scene.remove(entity.visual);
             window.GameCore.world.removeRigidBody(entity.body);
@@ -798,6 +853,7 @@ window.EventBus.on('PLAYER_PROJECTILE_HIT', ({ target, damage, damageType, posit
         window.GameState.inventory.gold += target.def.faction === 'monster' ? 10 : 50;
         window.EventBus.emit('UI_UPDATE_HUD');
         setTimeout(() => {
+            if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(target.id);
             window.GameCore.scene.remove(target.visual);
             window.GameCore.world.removeRigidBody(target.body);
             window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => entity.id !== target.id);
@@ -815,12 +871,14 @@ window.EventBus.on('SPAWN_HIT_VFX', ({type, pos}) => window.VFXManager.spawnHit(
 window.EventBus.on('SPAWN_INVASION', () => { const p = window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : new THREE.Vector3(); for(let i=0; i<3; i++) instantiatePrefab('Ghoul', p.x + (Math.random()-0.5)*15, window.WorldGenerator.getTerrainHeight(p.x, p.z), p.z + (Math.random()-0.5)*15); window.EventBus.emit('UI_LOG', "Ghoul Invasion Spawned!"); });
 window.EventBus.on('SPAWN_BLIGHT', () => {
     if (!window.GameCore.playerObj) return; const p = window.GameCore.playerObj.visual.position; const pts = window.RoadManager.getRoadPointsNear(Math.floor(p.x/60), Math.floor(p.z/60));
-    if (pts.length > 0) { const pt = pts[Math.floor(Math.random() * pts.length)]; const root = instantiatePrefab('Blight Root', pt.x, window.WorldGenerator.getTerrainHeight(pt.x, pt.z), pt.z, 'persistent'); if (root) { root.hp = 150; window.EventBus.emit('UI_LOG', "🥀 A Blight Root has corrupted a nearby road!"); } } 
+        if (pts.length > 0) { const pt = pts[Math.floor(Math.random() * pts.length)]; const root = instantiatePrefab('Blight Root', pt.x, window.WorldGenerator.getTerrainHeight(pt.x, pt.z), pt.z, 'persistent'); if (root) { root.hp = 150; window.EventBus.emit('UI_LOG', "A Blight Root has corrupted a nearby road!"); } } 
+ 
     else window.EventBus.emit('UI_LOG', "No roads nearby to corrupt!");
 });
 window.EventBus.on('CLEAR_MAP', () => { 
     window.GameCore.activeEntities.forEach(en => { 
         if(en.def.faction === 'player') return; 
+        if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(en.id);
         window.GameCore.releaseEntityIndex(en.memoryIndex); // Recycle memory
         window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); 
     }); 
@@ -1123,8 +1181,30 @@ function simulateVillage(village) {
 function fixedUpdateLogic(delta) {
     if (window.GameCore.playerObj) ChunkManager.update(window.GameCore.playerObj.visual.position);
     if (window.EngineParams.offPathCaptureCooldown > 0) window.EngineParams.offPathCaptureCooldown = Math.max(0, window.EngineParams.offPathCaptureCooldown - delta);
+    
     window.GameCore.worldTimer += delta;
 
+    updateWorldClock(delta);
+    
+    // Sliced Systems Updates
+    if(window.GameCore.worldTimer > 0.25) { 
+        updatePeriodicSystems();
+        window.GameCore.worldTimer = 0; 
+    }
+
+    // Direct Module Updates
+    window.ArenaTestManager?.update(delta);
+    window.VATManager?.update(delta);
+    window.EncounterDirector?.update(delta);
+    if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.update(delta);
+
+    updatePlayerStats(delta);
+    updateEntities(delta);
+    updatePlayerMovement(delta);
+    updateCombatHitboxes(delta);
+}
+
+function updateWorldClock(delta) {
     if (!window.NetworkSession?.connected) {
         const hoursPerSecond = 24 / window.EngineParams.dayLengthSeconds;
         window.EngineParams.timeOfDay += delta * hoursPerSecond;
@@ -1141,64 +1221,23 @@ function fixedUpdateLogic(delta) {
         }
     }
     window.EventBus.emit('ENV_UPDATE');
+}
 
-    // --- TERRAIN ALIGNMENT RAYCASTER ---
-    const raycaster = new THREE.Raycaster();
-    const downVector = new THREE.Vector3(0, -1, 0);
-
-
-    if (window.GameCore.playerObj) {
-        const playerPosition = window.GameCore.playerObj.visual.position;
-        if (window.WorldGenerator.getBiome(playerPosition.x, playerPosition.z) === 'desert' && !window.EngineParams.sandReaverEncountered) {
-            const encounterX = playerPosition.x + (Math.random() - 0.5) * 50;
-            const encounterZ = playerPosition.z + (Math.random() - 0.5) * 50;
-            const guardian = instantiatePrefab('Sand Reaver', encounterX, window.WorldGenerator.getTerrainHeight(encounterX, encounterZ), encounterZ, 'persistent');
-            if (guardian) {
-                window.EngineParams.sandReaverEncountered = true;
-                window.EventBus.emit('UI_LOG', 'The Sand Reaver rises to guard the Endless Dunes.');
-            }
-        }
-        const tileX = Math.floor(playerPosition.x / window.EngineParams.mapTileSizeMeters);
-        const tileZ = Math.floor(playerPosition.z / window.EngineParams.mapTileSizeMeters);
-        const tileKey = `${tileX},${tileZ}`;
-        if (tileKey !== window.EngineParams.currentMapTile) {
-            window.EngineParams.currentMapTile = tileKey;
-            if (!window.EngineParams.visitedMapTiles.includes(tileKey)) {
-                window.EngineParams.visitedMapTiles.push(tileKey);
-                const settlementInTile = window.VillageManager.villages.some(village => Math.floor(village.x / window.EngineParams.mapTileSizeMeters) === tileX && Math.floor(village.z / window.EngineParams.mapTileSizeMeters) === tileZ);
-                if (!settlementInTile && window.EngineParams.worldDay >= 7 && !window.GameCore.activeEntities.some(entity => entity.name === 'Dark Forest Boss') && Math.random() < 0.0005) {
-                    const encounterX = playerPosition.x + (Math.random() - 0.5) * 60;
-                    const encounterZ = playerPosition.z + (Math.random() - 0.5) * 60;
-                    const boss = instantiatePrefab('Dark Forest Boss', encounterX, window.WorldGenerator.getTerrainHeight(encounterX, encounterZ), encounterZ, 'persistent');
-                    if (boss) window.EventBus.emit('UI_LOG', 'A Dark Forest boss has emerged nearby!');
-                }
-            }
-        }
+function updatePeriodicSystems() {
+    if (window.VillageManager && window.VillageManager.simulateNextVillage) {
+        window.VillageManager.simulateNextVillage();
     }
+    window.AdventurerManager?.syncDeparted();
+    window.AdventurerManager?.syncNearby();
+}
 
-    if (window.NetworkSession?.connected && window.GameCore.playerObj) {
-        const moveX = (window.Input.keys.d ? 1 : 0) - (window.Input.keys.a ? 1 : 0);
-        const moveZ = (window.Input.keys.s ? 1 : 0) - (window.Input.keys.w ? 1 : 0);
-        window.NetworkSession.sendInput(moveX, moveZ);
-    }
-    
-        if(window.GameCore.worldTimer > 0.25) { 
-            if (window.VillageManager && window.VillageManager.simulateNextVillage) {
-                window.VillageManager.simulateNextVillage(); // Sliced Simulation
-            }
-            window.AdventurerManager?.syncDeparted();
-            window.AdventurerManager?.syncNearby();
-            window.GameCore.worldTimer = 0; 
-        }
-
-
-    window.ArenaTestManager?.update(delta);
-
+function updatePlayerStats(delta) {
     window.EngineParams.isPlayerSafe = false; 
     window.EngineParams.isPlayerHidden = false;
     const staminaMultiplier = 1 + (window.GameState.forestBlessing?.staminaRegen || 0);
     window.GameState.pStats.stamina = Math.min(window.GameState.pStats.maxStamina, window.GameState.pStats.stamina + (window.Input.isBlocking ? 3 : 12) * staminaMultiplier * delta);
     if (performance.now() >= window.GameState.pStats.guardBrokenUntil) window.GameState.pStats.poise = Math.min(window.GameState.pStats.maxPoise, window.GameState.pStats.poise + 10 * delta);
+    
     window.GameState.statusEffects = window.GameState.statusEffects.filter(effect => {
         effect.remaining -= delta; effect.tickTimer -= delta;
         if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
@@ -1210,115 +1249,58 @@ function fixedUpdateLogic(delta) {
         }
         return effect.remaining > 0;
     });
-        let isHidden = false;
-    let hostileNearby = false;
+}
+
+function updateEntities(delta) {
     const playerAlive = window.GameCore.playerObj && window.GameState.pStats.hp > 0;
     const playerPosition = playerAlive ? window.GameCore.playerObj.visual.position : null;
     const detectionRadiusSq = playerAlive ? Math.pow(window.GameState.forestBlessing?.dangerSense ? 18 : 15, 2) : 0;
-        const nowSecs = performance.now() / 1000;
+    const nowSecs = performance.now() / 1000;
+    const camPos = window.GameCore.camera ? window.GameCore.camera.position : new THREE.Vector3();
+    const raycaster = new THREE.Raycaster();
+    const downVector = new THREE.Vector3(0, -1, 0);
 
-    // Single optimized O(N) backward pass over all active entities
+    let isHidden = false;
+    let hostileNearby = false;
+
     for (let i = window.GameCore.activeEntities.length - 1; i >= 0; i--) {
         const entity = window.GameCore.activeEntities[i];
         if (!entity || !entity.visual) continue;
         
-        // --- SPATIAL GRID: Update position in grid ---
         window.GameCore.SpatialGrid.updateEntity(entity);
+        window.VATManager?.processLOD(entity, camPos);
 
-                // 1. Process Status Effects In-Place (No .filter arrays)
         if (entity.def.type === 'npc' && entity.statusEffects?.length > 0 && entity.hp > 0) {
-            for (let j = entity.statusEffects.length - 1; j >= 0; j--) {
-                const effect = entity.statusEffects[j];
-                effect.remaining -= delta;
-                effect.tickTimer -= delta;
-                if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
-                    effect.tickTimer = 1;
-                    entity.hp = Math.max(0, entity.hp - effect.tickDamage);
-                    window.EventBus.emit('ENTITY_DAMAGED', { damage: effect.tickDamage, position: entity.visual.position, isPlayer: false });
-                    window.EventBus.emit('SPAWN_HIT_VFX', { type: effect.type === 'burning' ? 'Fire' : 'Void', pos: entity.visual.position });
-                    
-                                        if (entity.hp <= 0) {
-                        playEntityAnimation(entity, 'die');
-                        window.AdventurerManager?.markDefeated(entity);
-                        spawnGroundLoot(entity.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', entity.visual.position);
-                        awardMonsterKill(entity);
-                        window.GameState.inventory.gold += entity.def.faction === 'monster' ? 10 : 50;
-                        window.EventBus.emit('UI_UPDATE_HUD');
-                        setTimeout(() => {
-                            window.GameCore.releaseEntityIndex(entity.memoryIndex); // Recycle memory
-                            window.GameCore.scene.remove(entity.visual);
-                            window.GameCore.world.removeRigidBody(entity.body);
-                            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(candidate => candidate.id !== entity.id);
-                        }, 2000);
-                        break; // Entity died, stop processing effects
-                    }
-                }
-                if (effect.remaining <= 0) entity.statusEffects.splice(j, 1);
-            }
+            processEntityStatusEffects(entity, delta);
         }
 
-        // --- VISUAL GROUND ALIGNMENT (Dragon's Dogma Style) ---
-        // Align characters so they don't look like they are floating on slopes
         if (entity.def.type === 'npc' || entity.def.type === 'character') {
-            const ePos = entity.visual.position;
-            // Raycast straight down from slightly above the entity
-            raycaster.set(new THREE.Vector3(ePos.x, ePos.y + 2, ePos.z), downVector);
-            const activeMeshes = [];
-            // Optimize: Only check collision against the ground chunks, not other actors
-            for (const chunk of ChunkManager.activeChunks.values()) {
-                if (chunk.mesh) activeMeshes.push(chunk.mesh);
-            }
-            
-            const intersects = raycaster.intersectObjects(activeMeshes, false);
-            if (intersects.length > 0) {
-                const hitNormal = intersects[0].face.normal;
-                
-                // We want to align the entity's Y axis with the ground normal, 
-                // but preserve its current Y-rotation (facing direction).
-                const targetQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), hitNormal);
-                
-                // Extract current Y rotation
-                const currentYRotation = new THREE.Euler().setFromQuaternion(entity.visual.quaternion, 'YXZ').y;
-                const yQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), currentYRotation);
-                
-                // Combine slope alignment + facing direction
-                targetQuaternion.multiply(yQuat);
-                
-                // Slerp for smooth transition (looks natural as they walk over bumps)
-                entity.visual.quaternion.slerp(targetQuaternion, delta * 5.0);
-            }
+            alignEntityToGround(entity, delta, raycaster, downVector);
         }
 
-        // 2. Spatial Checks (Distance to Player)
         if (playerAlive && entity.hp !== 0) {
             const distSq = entity.visual.position.distanceToSquared(playerPosition);
-            
-            // Check Concealment
             if (!isHidden && entity.def.concealment) {
                 const hideRad = entity.def.hideRadius || entity.def.radius;
                 if (distSq <= hideRad * hideRad) isHidden = true;
             }
-            
-            // Check Touch Effects (Poison Clouds, etc)
             if (entity.def.touchEffect && entity.def.active !== false) {
                 const touchRad = entity.def.touchRadius || entity.def.radius + 1;
                 if (distSq <= touchRad * touchRad) {
                     if (!entity.touchEffectAvailableAt || nowSecs >= entity.touchEffectAvailableAt) {
                         entity.touchEffectAvailableAt = nowSecs + (entity.def.touchCooldown || 4);
-                        window.EventBus.emit('SPAWN_HIT_VFX', { type: entity.def.touchEffect, pos: entity.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
+                        window.EventBus.emit('SPAWN_HIT_VFX', { type: entity.def.touchEffect, pos: entity.visual.position.clone().add(_v1.set(0, 1, 0)) });
                         if (entity.def.touchEffect === 'Poison') window.GameCore.applyStatusEffect('poison', 6, 3);
                         window.EventBus.emit('UI_LOG', 'Poison cloud released by the flesh pods.');
                     }
                 }
             }
-            
-            // Check Hostiles Nearby
             if (!hostileNearby && entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest')) {
                 if (distSq < detectionRadiusSq) hostileNearby = true;
             }
         }
     }
-
+    
     if (playerAlive) {
         window.EngineParams.isPlayerHidden = isHidden;
         const p = window.GameCore.playerObj.body.translation(); 
@@ -1332,288 +1314,196 @@ function fixedUpdateLogic(delta) {
                 window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
                 window.EngineParams.offPathCaptureCooldown = 10;
                 window.EventBus.emit('UI_LOG', 'The forest caught you off the safe path and dragged you back to the road.');
-                return;
             }
         }
-        
-                const moveDir = _v1.set(0, 0, 0); 
-                if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') {
-                    if (window.Input.keys.w) moveDir.z -= 1; 
-                    if (window.Input.keys.s) moveDir.z += 1; 
-                    if (window.Input.keys.a) moveDir.x -= 1; 
-                    if (window.Input.keys.d) moveDir.x += 1;
-                }
-        
-                window.Input.isBlocking = window.Input.keys.shift && window.GameState.pStats.stamina > 0 && performance.now() >= window.GameState.pStats.guardBrokenUntil; 
-                window.Input.isMoving = moveDir.lengthSq() > 0;
-        
-                if (window.Input.isMoving) {
-                    moveDir.normalize(); moveDir.applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle); 
-            
-                    let accelerationForce = 35 + ((window.GameState.pStats.athletics.level + window.GameCore.getBuffBonus('athletics')) * 0.5);
-            
-                    if (window.Input.isBlocking) {
-                        accelerationForce *= 0.2; 
-                        window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 8 * delta);
-                    } else {
-                        window.GameCore.addXP('athletics', 0.1 * delta); 
-                        if (window.Input.keys[' '] && window.Input.dashTimer <= 0 && window.GameState.pStats.stamina >= 25) { 
-                            window.GameState.pStats.stamina -= 25;
-                            window.Input.dashTimer = Math.max(0.25, 2.0 - ((window.GameState.pStats.dodge.level + window.GameCore.getBuffBonus('dodge')) * 0.05)); 
-                            window.Input.isDashing = true; 
-                            window.GameCore.addXP('dodge', 15); 
-                    
-                            window.GameCore.playerObj.body.applyImpulse({ x: moveDir.x * 30, y: 0, z: moveDir.z * 30 }, true);
-                            playEntityAnimation(window.GameCore.playerObj, 'dash');
-                    
-                            setTimeout(() => window.Input.isDashing = false, 200); 
-                            window.EventBus.emit('PLAY_SOUND', {url:'https://tonejs.github.io/audio/drum-samples/hihat-analog.mp3', pos: window.GameCore.playerObj.visual.position}); 
-                        }
-                    }
-            
-                    window.GameCore.playerObj.body.applyImpulse({ x: moveDir.x * accelerationForce * delta, y: 0, z: moveDir.z * accelerationForce * delta }, true);
-            
-                    const currentVel = window.GameCore.playerObj.body.linvel();
-                    const maxSpeed = (window.Input.isBlocking ? 2.0 : 6.0) * window.GameCore.getCombatInjuryMultiplier();
-                    const flatVelX = currentVel.x;
-                    const flatVelZ = currentVel.z;
-                    const flatVelLenSq = flatVelX * flatVelX + flatVelZ * flatVelZ;
-            
-                    if (flatVelLenSq > maxSpeed * maxSpeed && !window.Input.isDashing) {
-                        const multiplier = maxSpeed / Math.sqrt(flatVelLenSq);
-                        window.GameCore.playerObj.body.setLinvel({ x: flatVelX * multiplier, y: currentVel.y, z: flatVelZ * multiplier }, true);
-                    }
-
-                    if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
-                        if (window.Input.isBlocking) {
-                            playEntityAnimation(window.GameCore.playerObj, 'block');
-                        } else {
-                            // Update facing direction using an Euler to avoid overriding the slope alignment
-                            const targetFacing = _v2.copy(window.GameCore.playerObj.visual.position).add(moveDir);
-                            const lookMatrix = new THREE.Matrix4().lookAt(window.GameCore.playerObj.visual.position, targetFacing, new THREE.Vector3(0,1,0));
-                            const targetYRot = new THREE.Euler().setFromRotationMatrix(lookMatrix).y;
-                    
-                            const currentQuat = window.GameCore.playerObj.visual.quaternion;
-                            const euler = new THREE.Euler().setFromQuaternion(currentQuat, 'YXZ');
-                            euler.y = targetYRot;
-                            window.GameCore.playerObj.visual.quaternion.setFromEuler(euler);
-                    
-                            playEntityAnimation(window.GameCore.playerObj, 'walk'); 
-                        }
-                    }
-
-                } else if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
-                    if (window.Input.isBlocking) {
-                        playEntityAnimation(window.GameCore.playerObj, 'block');
-                    } else {
-                        playEntityAnimation(window.GameCore.playerObj, 'idle'); 
-                    }
-                }
-
-        
-                if (window.Input.dashTimer > 0) window.Input.dashTimer -= delta; 
-        if (window.Input.attackCooldown > 0) window.Input.attackCooldown -= delta; 
-        else window.Input.isAttacking = false;
-        
-                // --- DYNAMIC ARC SWEEP HITBOX LOGIC ---
-                if (window.Input.activeSweep) {
-                    window.Input.activeSweep.timer -= delta;
-            
-                    // If we have passed the windup phase, check for hits
-                    if (window.Input.activeSweep.timer <= window.Input.activeSweep.activeAt) {
-                        const sweep = window.Input.activeSweep;
-                        const pTrans = window.GameCore.playerObj.body.translation();
-                        sweep.playerPos.set(pTrans.x, pTrans.y, pTrans.z);
-                        sweep.playerForward.set(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
-                
-                        // --- SPATIAL GRID OPTIMIZATION (Diablo Style) ---
-                        const nearbyEntities = window.GameCore.SpatialGrid.getNearbyEntities(sweep.playerPos.x, sweep.playerPos.z, sweep.profile.reach);
-                
-                        for (let i = nearbyEntities.length - 1; i >= 0; i--) {
-                            const en = nearbyEntities[i];
-                            if (!en || en.hp <= 0 || sweep.alreadyHit.has(en.id)) continue;
-                            if (en.def.type !== 'npc' && en.name !== 'Blight Root') continue;
-                    
-                            const eTrans = en.body.translation();
-                            const distSq = (eTrans.x - sweep.playerPos.x)**2 + (eTrans.z - sweep.playerPos.z)**2;
-                    
-                            if (distSq <= sweep.profile.reach * sweep.profile.reach) {
-                                _v1.set(eTrans.x - sweep.playerPos.x, 0, eTrans.z - sweep.playerPos.z).normalize();
-                                const angleToEnemy = sweep.playerForward.angleTo(_v1);
-                        
-                                if (angleToEnemy <= sweep.profile.angle / 2) {
-                                    sweep.alreadyHit.add(en.id);
-                            
-                                    // COMBAT MULTIPLIERS
-                                    let damageMultiplier = sweep.profile.multiplier;
-
-
-                            // --- ASSASSINATION MECHANIC (Kenshi Style) ---
-                            // 5x damage if Heavy Attacking from Stealth
-                            if (window.Input.isStealth && sweep.isHeavy) {
-                                damageMultiplier *= 5.0;
-                                window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "ASSASSINATION!", pos: en.visual.position, color: '#ff0000'});
-                                window.EventBus.emit('UI_LOG', `[CRITICAL] You assassinated ${en.name}!`);
-                                // Break stealth upon assassination
-                                window.EventBus.emit('TOGGLE_STEALTH');
-                            }
-
-                            const rawDamage = window.GameState.derivedStats.weaponDamage + ((window.GameState.pStats.strength.level + window.GameCore.getBuffBonus('strength')) * 2) + window.GameCore.getBuffBonus('meleeAtt');
-                            const damage = Math.max(1, Math.floor(rawDamage * damageMultiplier * window.GameCore.getCombatInjuryMultiplier()) - (en.def.armor || 0)); 
-                            
-                                                        en.hp -= damage; 
-                            
-                            // POISE DAMAGE
-                            const poiseDamage = sweep.profile.poise || 10;
-                            en.poise = Math.max(0, en.poise - poiseDamage);
-
-                            window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: en.visual.position, isPlayer: false });
-                            window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(new THREE.Vector3(0, 1, 0)) });
-                            
-                                                        // Audio sync & Hit Pause (Dragon's Dogma feel)
-                                                        window.EventBus.emit('PLAY_SOUND', {url: sweep.isHeavy ? 'https://tonejs.github.io/audio/drum-samples/CRASH_1.mp3' : 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: en.visual.position, vol: -5});
-                            
-                                                        if (sweep.isHeavy || sweep.profile.isGuardbreaker) {
-                                                            window.Input.hitPauseTimer = 0.08; // 80ms freeze (DD2 style)
-                                                            window.Input.camShake = 0.5;       // Start camera shake
-                                
-                                                            // RECOIL (DD2 style): Small pushback for the attacker on heavy impact
-                                                            const recoilDir = sweep.playerForward.clone().negate();
-                                                            window.GameCore.playerObj.body.applyImpulse({ 
-                                                                x: recoilDir.x * 5, 
-                                                                y: 0, 
-                                                                z: recoilDir.z * 5 
-                                                            }, true);
-                                                        } else {
-                                                            window.Input.hitPauseTimer = 0.03; // Light hit-pause
-                                                        }
-
-                            
-                            if(en.def.faction !== 'monster' && en.def.faction !== 'forest' && en.name !== 'Blight Root') {
-                                window.GameCore.adjustFactionStanding(en.def.faction, -20, `assaulted ${en.name}`);
-                                window.GameCore.recordRenown({ infamy: 5, faction: en.def.faction, reason: `assaulted ${en.name}` });
-                                if(window.GameState.factionRelations.player[en.def.faction === 'village' ? 'kingdom' : en.def.faction] <= -50) window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "HOSTILE!", pos: en.visual.position, color: '#ff0000'});
-                            }
-
-                                        if(en.hp <= 0) {
-                playEntityAnimation(en, 'die');
-                window.AdventurerManager?.markDefeated(en);
-                if (en.def.type === 'npc') spawnGroundLoot(en.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', en.visual.position);
-                awardMonsterKill(en);
-                setTimeout(() => {
-                    window.GameCore.releaseEntityIndex(en.memoryIndex); // Recycle memory
-                    window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e.id !== en.id);
-                }, 2000);
-                if (en.name === 'Blight Root') { window.EventBus.emit('UI_LOG', `Destroyed the Blight Root! Safe zone restored.`); } 
-                else { window.GameState.inventory.gold += (en.def.faction === 'monster' ? 10 : 50); window.EventBus.emit('UI_UPDATE_HUD'); window.EventBus.emit('UI_LOG', `Killed ${en.name}. Looted gold.`); }
-            } else if (en.poise <= 0) {
-                                en.poise = en.maxPoise;
-                                en.staggeredUntil = performance.now() + 800;
-                                playEntityAnimation(en, 'hit');
-                                window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: 'STAGGERED', pos: en.visual.position, color: '#fbbf24'});
-                            } else {
-                                playEntityAnimation(en, 'hit');
-                            }
-                        }
-                    }
-                }
-            }
-            if (window.Input.activeSweep.timer <= 0) window.Input.activeSweep = null;
-        }
-
-        if (window.Input.guardbreakerCooldown > 0) window.Input.guardbreakerCooldown -= delta;
-        if (window.Input.rationCooldown > 0) window.Input.rationCooldown -= delta;
-        if (window.Input.runeShotCooldown > 0) window.Input.runeShotCooldown -= delta;
-        if (window.Input.fireShotCooldown > 0) window.Input.fireShotCooldown -= delta;
-        
-        window.GameCore.playerObj.visual.position.set(p.x, p.y, p.z); const target = window.GameCore.playerObj.visual.position.clone();
-        if(isNaN(target.x) || isNaN(target.y) || isNaN(target.z)) { target.set(0, 15, 0); }
-        
-        window.GameCore.camera.position.set(target.x + Math.sin(window.Input.camAngle)*Math.cos(window.Input.camPitch)*window.Input.camDistance, target.y + Math.sin(window.Input.camPitch)*window.Input.camDistance, target.z + Math.cos(window.Input.camAngle)*Math.cos(window.Input.camPitch)*window.Input.camDistance);
-        window.GameCore.camera.lookAt(target);
     }
 }
 
-// MATH POOLING (Prevents GC Stutter)
-const _v1 = new THREE.Vector3();
-const _v2 = new THREE.Vector3();
-const _m1 = new THREE.Matrix4();
-const _q1 = new THREE.Quaternion();
-
-function animate() {
-    requestAnimationFrame(animate);
-    const rawDelta = clock.getDelta(); const delta = Math.min(rawDelta, 0.1) * window.EngineParams.timeScale;
-
-    if (window.EngineParams.playMode && window.GameCore.engineState === 'running') {
-        accumulator += delta;
-        
-        let updatePhysics = true;
-        if (window.Input.hitPauseTimer > 0) {
-            window.Input.hitPauseTimer -= delta;
-            updatePhysics = false;
+function processEntityStatusEffects(entity, delta) {
+    for (let j = entity.statusEffects.length - 1; j >= 0; j--) {
+        const effect = entity.statusEffects[j];
+        effect.remaining -= delta; effect.tickTimer -= delta;
+        if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
+            effect.tickTimer = 1;
+            entity.hp = Math.max(0, entity.hp - effect.tickDamage);
+            window.EventBus.emit('ENTITY_DAMAGED', { damage: effect.tickDamage, position: entity.visual.position, isPlayer: false });
+            window.EventBus.emit('SPAWN_HIT_VFX', { type: effect.type === 'burning' ? 'Fire' : 'Void', pos: entity.visual.position });
+            
+            if (entity.hp <= 0) {
+                handleEntityDeath(entity);
+                break;
+            }
         }
+        if (effect.remaining <= 0) entity.statusEffects.splice(j, 1);
+    }
+}
+
+function alignEntityToGround(entity, delta, raycaster, downVector) {
+    const ePos = entity.visual.position;
+    raycaster.set(_v1.set(ePos.x, ePos.y + 2, ePos.z), downVector);
+    const activeMeshes = [];
+    for (const chunk of ChunkManager.activeChunks.values()) {
+        if (chunk.mesh) activeMeshes.push(chunk.mesh);
+    }
+    
+    const intersects = raycaster.intersectObjects(activeMeshes, false);
+    if (intersects.length > 0) {
+        const hitNormal = intersects[0].face.normal;
+        const targetQuaternion = _q1.setFromUnitVectors(_v2.set(0, 1, 0), hitNormal);
+        const currentYRotation = _e1.setFromQuaternion(entity.visual.quaternion, 'YXZ').y;
+        const yQuat = _q1.setFromAxisAngle(_v2.set(0, 1, 0), currentYRotation);
         
-                if (updatePhysics) {
-            if (!window.EngineParams.editMode) {
-                while (accumulator >= fixedTimeStep) { window.GameCore.world.step(); fixedUpdateLogic(fixedTimeStep); accumulator -= fixedTimeStep; }
+        targetQuaternion.multiply(yQuat);
+        entity.visual.quaternion.slerp(targetQuaternion, delta * 5.0);
+    }
+}
+
+function handleEntityDeath(entity) {
+    playEntityAnimation(entity, 'die');
+    window.AdventurerManager?.markDefeated(entity);
+    spawnGroundLoot(entity.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', entity.visual.position);
+    awardMonsterKill(entity);
+    window.GameState.inventory.gold += entity.def.faction === 'monster' ? 10 : 50;
+    window.EventBus.emit('UI_UPDATE_HUD');
+    setTimeout(() => {
+        if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(entity.id);
+        window.GameCore.releaseEntityIndex(entity.memoryIndex);
+        window.GameCore.scene.remove(entity.visual);
+        window.GameCore.world.removeRigidBody(entity.body);
+        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(candidate => candidate.id !== entity.id);
+    }, 2000);
+}
+
+function updatePlayerMovement(delta) {
+    if (!window.GameCore.playerObj || !window.GameCore.playerObj.visual) return;
+    
+    const moveDir = _v1.set(0, 0, 0); 
+    if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') {
+        if (window.Input.keys.w) moveDir.z -= 1; 
+        if (window.Input.keys.s) moveDir.z += 1; 
+        if (window.Input.keys.a) moveDir.x -= 1; 
+        if (window.Input.keys.d) moveDir.x += 1;
+    }
+
+    window.Input.isBlocking = window.Input.keys.shift && window.GameState.pStats.stamina > 0 && performance.now() >= window.GameState.pStats.guardBrokenUntil; 
+    window.Input.isMoving = moveDir.lengthSq() > 0;
+
+    if (window.Input.isMoving) {
+        moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle); 
+        let accelerationForce = 35 + ((window.GameState.pStats.athletics.level + window.GameCore.getBuffBonus('athletics')) * 0.5);
+
+        if (window.Input.isBlocking) {
+            accelerationForce *= 0.2; 
+            window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 8 * delta);
+        } else {
+            window.GameCore.addXP('athletics', 0.1 * delta); 
+            if (window.Input.keys[' '] && window.Input.dashTimer <= 0 && window.GameState.pStats.stamina >= 25) { 
+                window.GameState.pStats.stamina -= 25;
+                window.Input.dashTimer = Math.max(0.25, 2.0 - ((window.GameState.pStats.dodge.level + window.GameCore.getBuffBonus('dodge')) * 0.05)); 
+                window.Input.isDashing = true; 
+                window.GameCore.addXP('dodge', 15); 
+                window.GameCore.playerObj.body.applyImpulse(_v2.set(moveDir.x * 30, 0, moveDir.z * 30), true);
+                playEntityAnimation(window.GameCore.playerObj, 'dash');
+                setTimeout(() => window.Input.isDashing = false, 200); 
+                window.EventBus.emit('PLAY_SOUND', {url:'https://tonejs.github.io/audio/drum-samples/hihat-analog.mp3', pos: window.GameCore.playerObj.visual.position}); 
+            }
+        }
+
+        window.GameCore.playerObj.body.applyImpulse(_v2.set(moveDir.x * accelerationForce * delta, 0, moveDir.z * accelerationForce * delta), true);
+
+        const currentVel = window.GameCore.playerObj.body.linvel();
+        const maxSpeed = (window.Input.isBlocking ? 2.0 : 6.0) * window.GameCore.getCombatInjuryMultiplier();
+        const flatVelLenSq = currentVel.x * currentVel.x + currentVel.z * currentVel.z;
+
+        if (flatVelLenSq > maxSpeed * maxSpeed && !window.Input.isDashing) {
+            const multiplier = maxSpeed / Math.sqrt(flatVelLenSq);
+            window.GameCore.playerObj.body.setLinvel(_v2.set(currentVel.x * multiplier, currentVel.y, currentVel.z * multiplier), true);
+        }
+
+        if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
+            if (window.Input.isBlocking) {
+                playEntityAnimation(window.GameCore.playerObj, 'block');
             } else {
-                // If in Edit Mode, do not step physics, but still call Editor Update for free-cam
-                window.EditorManager?.update(delta);
-                accumulator = 0; // Prevent death spiral buildup
-            }
-            
-            // ANIMATION OPTIMIZATION: Only update visible or nearby mixers
-            if (!window.EngineParams.editMode && window.GameCore.playerObj && window.GameCore.playerObj.mixer) {
-                window.GameCore.playerObj.mixer.update(delta);
-            }
-
-            
-            const playerPos = window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : null;
-            const frustum = new THREE.Frustum();
-            frustum.setFromProjectionMatrix(_m1.multiplyMatrices(window.GameCore.camera.projectionMatrix, window.GameCore.camera.matrixWorldInverse));
-
-            for (let i = 0; i < window.GameCore.activeEntities.length; i++) {
-                const en = window.GameCore.activeEntities[i];
-                if (!en.mixer) continue;
+                const targetFacing = _v2.copy(window.GameCore.playerObj.visual.position).add(moveDir);
+                _m1.lookAt(window.GameCore.playerObj.visual.position, targetFacing, _v3.set(0,1,0));
+                const targetYRot = _e1.setFromRotationMatrix(_m1).y;
                 
-                // Only update if within 60 units OR visible in camera
-                const distSq = playerPos ? en.visual.position.distanceToSquared(playerPos) : 0;
-                if (distSq < 3600 || frustum.containsPoint(en.visual.position)) {
-                    en.mixer.update(delta);
-                    en.visual.visible = true; // Optimization: Toggle visibility for GPU
-                } else {
-                    en.visual.visible = false;
+                const euler = _e1.setFromQuaternion(window.GameCore.playerObj.visual.quaternion, 'YXZ');
+                euler.y = targetYRot;
+                window.GameCore.playerObj.visual.quaternion.setFromEuler(euler);
+                playEntityAnimation(window.GameCore.playerObj, 'walk'); 
+            }
+        }
+    } else if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
+        if (window.Input.isBlocking) {
+            playEntityAnimation(window.GameCore.playerObj, 'block');
+        } else {
+            playEntityAnimation(window.GameCore.playerObj, 'idle'); 
+        }
+    }
+
+    if (window.Input.dashTimer > 0) window.Input.dashTimer -= delta; 
+    if (window.Input.attackCooldown > 0) window.Input.attackCooldown -= delta; 
+    else window.Input.isAttacking = false;
+}
+
+function updateCombatHitboxes(delta) {
+    if (!window.Input.activeSweep) return;
+    
+    window.Input.activeSweep.timer -= delta;
+    
+    if (window.Input.activeSweep.timer <= window.Input.activeSweep.activeAt) {
+        const sweep = window.Input.activeSweep;
+        const pTrans = window.GameCore.playerObj.body.translation();
+        sweep.playerPos.set(pTrans.x, pTrans.y, pTrans.z);
+        sweep.playerForward.set(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
+        
+        const nearbyEntities = window.GameCore.SpatialGrid.getNearbyEntities(sweep.playerPos.x, sweep.playerPos.z, sweep.profile.reach);
+        
+        for (let i = nearbyEntities.length - 1; i >= 0; i--) {
+            const en = nearbyEntities[i];
+            if (!en || en.hp <= 0 || sweep.alreadyHit.has(en.id)) continue;
+            if (en.def.type !== 'npc' && en.name !== 'Blight Root') continue;
+            
+            const eTrans = en.body.translation();
+            const distSq = (eTrans.x - sweep.playerPos.x)**2 + (eTrans.z - sweep.playerPos.z)**2;
+            
+            if (distSq <= sweep.profile.reach * sweep.profile.reach) {
+                _v1.set(eTrans.x - sweep.playerPos.x, 0, eTrans.z - sweep.playerPos.z).normalize();
+                if (sweep.playerForward.angleTo(_v1) <= sweep.profile.angle / 2) {
+                    sweep.alreadyHit.add(en.id);
+                    
+                    let damageMultiplier = sweep.profile.multiplier;
+                    if (window.Input.isStealth && sweep.isHeavy) {
+                        damageMultiplier *= 5.0;
+                        window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "ASSASSINATION!", pos: en.visual.position, color: '#ff0000'});
+                        window.EventBus.emit('UI_LOG', `[CRITICAL] You assassinated ${en.name}!`);
+                        window.EventBus.emit('TOGGLE_STEALTH');
+                    }
+
+                    const rawDamage = window.GameState.derivedStats.weaponDamage + ((window.GameState.pStats.strength.level + window.GameCore.getBuffBonus('strength')) * 2) + window.GameCore.getBuffBonus('meleeAtt');
+                    const damage = Math.max(1, Math.floor(rawDamage * damageMultiplier * window.GameCore.getCombatInjuryMultiplier()) - (en.def.armor || 0)); 
+                    
+                    en.hp -= damage; 
+                    en.poise = Math.max(0, en.poise - (sweep.profile.poise || 10));
+
+                    window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: en.visual.position, isPlayer: false });
+                    window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(_v1.set(0, 1, 0)) });
+                    window.EventBus.emit('PLAY_SOUND', {url: sweep.isHeavy ? 'https://tonejs.github.io/audio/drum-samples/CRASH_1.mp3' : 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: en.visual.position, vol: -5});
+                    
+                    if (sweep.isHeavy || sweep.profile.isGuardbreaker) {
+                        window.Input.hitPauseTimer = 0.08; 
+                        window.Input.camShake = 0.5;
+                        const recoilDir = sweep.playerForward.clone().negate();
+                        window.GameCore.playerObj.body.applyImpulse(_v2.set(recoilDir.x * 5, 0, recoilDir.z * 5), true);
+                    } else {
+                        window.Input.hitPauseTimer = 0.03;
+                    }
                 }
             }
         }
-        
-                window.VFXManager.update(delta);
-        if (!window.EngineParams.editMode) {
-            window.EventBus.emit('AI_TICK', { delta, isPlayerSafe: window.EngineParams.isPlayerSafe });
-        }
-        window.EventBus.emit('UI_TICK', { delta, camera: window.GameCore.camera });
-
-        
-        if (window.Input.camShake > 0) {
-            window.GameCore.camera.position.x += (Math.random() - 0.5) * window.Input.camShake;
-            window.GameCore.camera.position.y += (Math.random() - 0.5) * window.Input.camShake;
-            window.GameCore.camera.position.z += (Math.random() - 0.5) * window.Input.camShake;
-            window.Input.camShake *= 0.9;
-            if (window.Input.camShake < 0.01) window.Input.camShake = 0;
-        }
     }
-    if (composer) composer.render();
 }
 
 
-document.getElementById('btn-start').addEventListener('click', async () => {
-    try { if(window.Tone) await window.Tone.start(); } catch(e) { console.warn("Audio Context blocked, proceeding silently."); }
-    document.getElementById('start-screen').classList.add('hidden'); document.getElementById('hud').classList.remove('hidden'); document.getElementById('hud').classList.add('flex');
-    window.GameCore.engineState = 'running'; window.EventBus.emit('UI_UPDATE_HUD'); animate();
-});
-
-window.addEventListener('resize', () => { 
-    if (window.GameCore.camera && renderer) { window.GameCore.camera.aspect = window.innerWidth/window.innerHeight; window.GameCore.camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); if(composer) composer.setSize(window.innerWidth, window.innerHeight); }
-});
-
-bootEngine();
+      

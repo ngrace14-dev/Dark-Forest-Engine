@@ -1,7 +1,13 @@
 window.EventBus.on('ENGINE_READY', () => {
+    
     try {
-        const gui = new window.lil.GUI({ title: 'God Mode Tools' });
-        const envFolder = gui.addFolder('🌍 World & Environment');
+            const gui = new window.lil.GUI({ title: 'God Mode Tools' });
+        
+            gui.add({
+                toggleEditor: () => window.EventBus.emit('TOGGLE_EDITOR')
+            }, 'toggleEditor').name('2️⃣ Open Animation/World Editor');
+        
+            const envFolder = gui.addFolder('🌍 World & Environment');
         envFolder.add(window.EngineParams, 'playMode').name('▶️ Play Mode');
         envFolder.add(window.EngineParams, 'timeScale', 0.1, 3).name('⏱️ Time Scale');
         envFolder.add(window.EngineParams, 'timeOfDay', 0, 24).name('☀️ Time of Day').onChange(() => window.EventBus.emit('ENV_UPDATE'));

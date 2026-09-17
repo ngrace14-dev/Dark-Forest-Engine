@@ -10,7 +10,19 @@ window.EventBus.on('PARTY_COMMAND', command => {
 
 function moveCompanion(companion, destination, speedMultiplier = 1, delta = 0) {
     const member = companion.companionId && window.GameState.party.members.find(candidate => candidate.id === companion.companionId);
+    
+    // --- BANNERLORD: GROUP FORMATION SPEED COHESION ---
+    let finalSpeedMultiplier = speedMultiplier;
+    if (member && !companion.isGathering && !companion.isAttacking) {
+        const playerSpeed = window.Input.isDashing ? 1.5 : 1.0;
+        // Adjust speed to keep formation but not zoom past the player
+        const distToDest = companion.visual.position.distanceTo(destination);
+        if (distToDest < 2) finalSpeedMultiplier *= 0.8;
+        if (distToDest > 8) finalSpeedMultiplier *= 1.2;
+    }
+
     const conditionMultiplier = member && (member.hunger >= 80 || member.injuries.length > 0) ? 0.65 : 1;
+
     const destinationChanged = !companion.routeDestination || companion.routeDestination.distanceToSquared(destination) > 9;
     companion.routeRefreshTimer = Math.max(0, (companion.routeRefreshTimer || 0) - delta);
     if (destinationChanged || companion.routeRefreshTimer === 0 || !companion.route?.length) {
@@ -66,7 +78,43 @@ function getEntitySpeed(entity) {
 
 function defeatNpc(entity) {
     window.AdventurerManager?.markDefeated(entity);
-    if (entity.expeditionId) {
+    
+    // --- TERMINUS ELITE PERMANENT DEATH HOOK ---
+    if (entity.isTerminusElite) {
+        const terminusVillage = window.VillageManager.villages.find(v => v.nobleHouse === 'House Terminus');
+        if (terminusVillage) {
+            terminusVillage.terminusEliteGuard = Math.max(0, (terminusVillage.terminusEliteGuard || 300) - 1);
+            if (terminusVillage.terminusEliteGuard === 0) {
+                window.EventBus.emit('UI_LOG', "💀 [DEVASTATION] The last of the Elite 300 has fallen. The Mountain Pass is exposed.");
+            }
+        }
+    }
+    
+    // --- WAR MASTER PROGRESSION HOOK ---
+
+    if (entity.def.faction === 'monster' || entity.def.faction === 'forest') {
+        window.GameState.party.members.forEach(member => {
+            if (member.dispatchTarget && member.recruited) {
+                member.killCount = (member.killCount || 0) + 1;
+                // Every 50 kills in a dispatched battle counts as a "successful battle lead"
+                if (member.killCount >= 50) {
+                    member.battlesLed = (member.battlesLed || 0) + 1;
+                    member.killCount = 0;
+                                        if (member.battlesLed === 100 && member.tier !== 'war_master') {
+                        member.tier = 'war_master';
+                        member.commandAuthority = 50;
+                        window.EventBus.emit('UI_LOG', `[PROMOTION] ${member.name} has achieved the rank of WAR MASTER!`);
+                        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: "WAR MASTER", pos: entity.visual.position, color: "#fbbf24" });
+                        
+                        // Equip unique gear
+                        if (window.LootEngine) window.LootEngine.equipWarMaster(member);
+                    }
+
+                }
+            }
+        });
+    }
+
         const village = window.VillageManager.villages.find(candidate => candidate.id === entity.targetVillageId);
         const expedition = village?.expeditions.find(candidate => candidate.id === entity.expeditionId);
         const alliesRemain = window.GameCore.activeEntities.some(candidate => candidate !== entity && candidate.expeditionId === entity.expeditionId && candidate.hp > 0);
@@ -113,21 +161,31 @@ function defeatNpc(entity) {
     }, 2000);
 }
 
-function attackNpc(attacker, target) {
-    if (attacker.npcAttackReadyAt && performance.now() < attacker.npcAttackReadyAt) return;
-    attacker.npcAttackReadyAt = performance.now() + 1000;
-    if (window.GameCore.forestAttackMisses(target)) {
-        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'MISSED', pos: target.visual.position, color: '#86efac' });
-        return;
     }
-    const damage = Math.max(1, (attacker.def.attackDamage || 15) - (target.def.armor || 0));
+        const damage = Math.max(1, (attacker.def.attackDamage || 15) - (target.def.armor || 0)) + (attacker.resonanceBuff?.damage || 0);
     target.hp -= damage;
+
     if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(attacker, 'attack');
     window.EventBus.emit('ENTITY_DAMAGED', { damage, position: target.visual.position, isPlayer: false });
     if (target.hp <= 0) defeatNpc(target);
 }
 
+const AISystem = {
+    update: function(delta) {
+        // AI Update logic will be migrated here in future steps
+    }
+};
+
+window.SystemRegistry.register('AISystem', AISystem);
+
 window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
+
+
+
+
+
+
+
     if(!window.GameCore || !window.GameCore.playerObj) return;
     const pPos = window.GameCore.playerObj.visual.position;
     const obstacles = window.GameCore.activeEntities.filter(e => e.def.isObstacle);
@@ -173,10 +231,23 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             return;
         }
 
-                if (en.companionId) {
+                                if (en.companionId) {
             const member = window.GameState.party.members.find(candidate => candidate.id === en.companionId);
             if (member?.downed) return;
+
+            // --- DD2 SPECIALIZATION OVERRIDE ---
+            if (en.isGathering && en.gatheringTarget) {
+                moveCompanion(en, en.gatheringTarget.visual.position, 1.2, delta);
+                // If the target is gone (picked up by player or someone else), stop gathering
+                if (!window.GameCore.groundLoot.includes(en.gatheringTarget)) {
+                    en.isGathering = false;
+                    en.gatheringTarget = null;
+                }
+                return;
+            }
+
             const command = en.groupCommand || 'follow';
+
             const escortedCaravan = window.GameCore.activeEntities.find(entity => entity.caravanId === window.GameState.party.escortCaravanId);
             const formationAnchor = escortedCaravan ? escortedCaravan.visual.position : pPos;
             
@@ -187,15 +258,60 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             
             const nearestHostile = hostileEntities.sort((a, b) => en.visual.position.distanceToSquared(a.visual.position) - en.visual.position.distanceToSquared(b.visual.position))[0];
             
-            if (command === 'hold') {
+                        if (command === 'hold') {
                 if (en.holdPosition) moveCompanion(en, en.holdPosition, 1, delta);
                 return;
             }
+
+            // --- BANNERLORD: TACTICAL ARCHER LOGIC ---
+            if (member.group === 'archers' && member.equipment.weapon === 'short_bow' && nearestHostile) {
+                const distToHostile = en.visual.position.distanceTo(nearestHostile.visual.position);
+                
+                if (distToHostile < 15 && distToHostile > 5) {
+                    // In range: Skirmish/Fire
+                    en.body.setLinvel({ x: 0, y: en.body.linvel().y, z: 0 }, true);
+                    en.visual.lookAt(nearestHostile.visual.position);
+                    
+                    if (!en.rangedAttackReadyAt || performance.now() >= en.rangedAttackReadyAt) {
+                        en.rangedAttackReadyAt = performance.now() + 2000;
+                        const origin = en.visual.position.clone().add(new window.THREE.Vector3(0, 1.5, 0));
+                        const direction = new window.THREE.Vector3().subVectors(nearestHostile.visual.position, origin).normalize();
+                        window.VFXManager.spawnProjectile({ 
+                            position: origin, direction, damage: 15, speed: 25, range: 20, color: '#ffffff' 
+                        });
+                        window.GameCore.playEntityAnimation(en, 'attack');
+                    }
+                    return;
+                } else if (distToHostile <= 5) {
+                    // Too close: Retreat to safety
+                    const retreatDir = new window.THREE.Vector3().subVectors(en.visual.position, nearestHostile.visual.position).normalize();
+                    moveCompanion(en, en.visual.position.clone().add(retreatDir.multiplyScalar(5)), 1.3, delta);
+                    return;
+                }
+            }
+
+                        // --- PAWN LEARNING OVERRIDE ---
+            const aggression = member.learningWeights?.aggression || 0.5;
+            const flanking = member.learningWeights?.flanking || 0.5;
+
             if (command === 'attack' && nearestHostile && en.visual.position.distanceTo(nearestHostile.visual.position) < 20) {
                 const distance = en.visual.position.distanceTo(nearestHostile.visual.position);
-                if (distance > 1.8) {
-                    moveCompanion(en, nearestHostile.visual.position, 1.1, delta);
+                
+                // If highly aggressive, push in closer than default
+                const minMeleeDist = aggression > 0.7 ? 1.2 : 1.8;
+
+                if (distance > minMeleeDist) {
+                    let moveTarget = nearestHostile.visual.position.clone();
+                    
+                    // If high flanking weight, move to their rear
+                    if (flanking > 0.7) {
+                        const enemyForward = new window.THREE.Vector3(0,0,1).applyQuaternion(nearestHostile.visual.quaternion);
+                        moveTarget.addScaledVector(enemyForward, -2);
+                    }
+                    
+                    moveCompanion(en, moveTarget, 1.1, delta);
                 } else if ((!en.companionAttackReadyAt || performance.now() >= en.companionAttackReadyAt) && window.GameCore.playEntityAnimation) {
+
                     en.companionAttackReadyAt = performance.now() + 900;
                     const conditionPenalty = member.hunger >= 80 || member.injuries.length > 0 ? 0.6 : 1;
                     const damage = Math.max(1, Math.floor((10 + window.GameState.pStats.strength.level + (member.skills.meleeAtt || 0)) * conditionPenalty));
@@ -213,10 +329,31 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 }
                 return;
             }
-            const offset = new window.THREE.Vector3(en.companionId.length % 2 ? 2 : -2, 0, command === 'retreat' ? -5 : 3);
+                        // --- BANNERLORD: FORMATION LOGIC ---
+            const party = window.GameState.party;
+            const recruitedCount = party.members.filter(m => m.recruited).length;
+            const memberIndex = party.members.filter(m => m.recruited).findIndex(m => m.id === en.companionId);
+            
+            let formationOffset = new window.THREE.Vector3(0, 0, 0);
+            if (party.formation === 'line') {
+                const spacing = 1.5;
+                const rowWidth = Math.ceil(recruitedCount / 2);
+                const xPos = (memberIndex % rowWidth) - (rowWidth / 2) + 0.5;
+                const zPos = Math.floor(memberIndex / rowWidth) * -1.5;
+                formationOffset.set(xPos * spacing, 0, zPos - 3);
+            } else if (party.formation === 'shield_wall') {
+                const spacing = 0.8;
+                formationOffset.set((memberIndex - (recruitedCount/2)) * spacing, 0, -2);
+            } else if (party.formation === 'skirmish') {
+                const angle = (memberIndex / recruitedCount) * Math.PI * 2;
+                formationOffset.set(Math.cos(angle) * 5, 0, Math.sin(angle) * 5);
+            }
+
+            const offset = command === 'retreat' ? new window.THREE.Vector3(0, 0, -10) : formationOffset;
             if (command === 'guard' && nearestHostile && nearestHostile.visual.position.distanceTo(pPos) < 10) offset.copy(nearestHostile.visual.position).sub(pPos).multiplyScalar(0.5);
             moveCompanion(en, formationAnchor.clone().add(offset), command === 'retreat' ? 1.3 : 1, delta);
             return;
+
         }
 
                 if (en.squadId) {
@@ -367,13 +504,23 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         const inPlayerWard = hostile && base.owned && base.wardRadius && base.position && Math.hypot(en.visual.position.x - base.position.x, en.visual.position.z - base.position.z) <= base.wardRadius;
         let target = null;
 
-        if (hostile && !onProtectedPath && !inVillageBarrier && !inPlayerWard) {
+                if (hostile && !onProtectedPath && !inVillageBarrier && !inPlayerWard) {
             // --- ENHANCED PERCEPTION SYSTEM (Kenshi Style) ---
             const dist = en.visual.position.distanceTo(pPos);
             
-            // 1. Sight-based detection
-            let canSeePlayer = false;
+            // --- DD2 FORCED TARGETING (Taunts) ---
+            if (en.forcedTarget && en.forcedTarget.hp > 0) {
+                target = en.forcedTarget.visual.position;
+            } else {
+                en.forcedTarget = null;
+                
+                // --- HUNTSMAN SCORN: SIGHT PENALTY ---
+
             let detectionRange = 15;
+            if (window.EncounterDirector && window.EncounterDirector.huntsmanMarkTimer > 0) {
+                detectionRange = 1.0; // Hostiles are terrified and won't notice you unless you touch them
+            }
+
 
             // Nighttime penalty for AI sight
             const time = window.EngineParams.timeOfDay;
@@ -467,7 +614,57 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 }
             }
 
+                        if (en.name === 'Huntsman') {
+                            const dist = en.visual.position.distanceTo(pPos);
+                
+                            // --- INTERVENTION LOGIC ---
+                            if (en.isIntervening) {
+                                // Phase 1: Clear the area of other hostiles
+                                if (en.interventionPhase === 'clearing') {
+                                    const nearby = window.GameCore.SpatialGrid.getNearbyEntities(en.visual.position.x, en.visual.position.z, 20);
+                                    const otherHostiles = nearby.filter(h => h !== en && (h.def.faction === 'monster' || h.def.faction === 'forest') && h.hp > 0);
+                        
+                                    if (otherHostiles.length > 0) {
+                                        const priorityPrey = otherHostiles[0];
+                                        const pDist = en.visual.position.distanceTo(priorityPrey.visual.position);
+                                        if (pDist > 1.8) moveCompanion(en, priorityPrey.visual.position, 1.2, delta);
+                                        else attackNpc(en, priorityPrey);
+                                        return;
+                                    } else {
+                                        // Phase 2: Hostiles cleared, turn on the player
+                                        en.interventionPhase = 'the_lesson';
+                                        window.EventBus.emit('UI_LOG', `[HUNTSMAN] "Now... where were we?"`);
+                                    }
+                                }
+                            }
+
+                            // The Huntsman is only interested in you if you are healthy
+
+                            if (window.GameState.pStats.hp < 25) {
+                                if (!en.hasDisdainLogged) {
+                                    window.EventBus.emit('UI_LOG', `[HUNTSMAN] The shadowy figure looks at your broken form with pure disdain.`);
+                                    window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'WORTHLESS', pos: en.visual.position, color: '#4b5563' });
+                                    en.hasDisdainLogged = true;
+                        
+                                    // Apply the 12-hour Mark
+                                    if (window.EncounterDirector) window.EncounterDirector.applyHuntsmanMark();
+                                }
+                                en.aiMode = 'flee'; // Leave the player to rot
+
+                                en.aiTimer = 10.0;
+                                return;
+                            }
+                
+                            // If the player is a threat, the Huntsman will break them
+                            if (dist < 15) {
+                                en.aiMode = 'aggressive';
+                                en.aiTimer = 1.0;
+                                target = pPos;
+                            }
+                        }
+
                         if (en.aiMode === 'flee') {
+
                 // Run away from the target
                 dir.multiplyScalar(-1);
             } else if (en.aiMode === 'skirmish' && dist < 6) {

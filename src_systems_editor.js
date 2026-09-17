@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 
 window.EditorManager = {
@@ -327,7 +328,7 @@ window.EditorManager = {
                 this.targetEntity = editor.selectedEntity;
                 this.setupUI();
                 this.spawnGuideDots();
-                window.EventBus.emit('UI_LOG', '[ANIM STUDIO] Active. Upload a video reference and map the guide rails.');
+                window.EventBus.emit('UI_LOG', '[ANIM STUDIO] Active. Upload a video reference and set reference points.');
             } else {
                 this.cleanup();
                 window.EventBus.emit('UI_LOG', '[ANIM STUDIO] Closed.');
@@ -340,23 +341,17 @@ window.EditorManager = {
             ui.className = 'absolute top-20 right-10 z-50 bg-gray-900/95 border border-pink-600 p-4 rounded-lg shadow-2xl flex flex-col gap-3 w-80 backdrop-blur-sm';
             ui.innerHTML = `
                 <div class="text-pink-400 font-bold uppercase tracking-widest text-xs border-b border-gray-700 pb-1 mb-1 flex justify-between">
-                    <span>🎬 MoCap Studio</span>
+                    <span>MoCap Studio</span>
                     <span class="text-gray-500">SHIFT+A to Close</span>
                 </div>
-                <div class="text-[9px] text-gray-400 leading-tight mb-2">Provide a video reference. The neural tracker extracts human movement and replicates it onto your 3D skeleton.</div>
+                <div class="text-[9px] text-gray-400 leading-tight mb-2">1. Provide reference. 2. Set Points. 3. Replicate.</div>
                 
                 <div class="flex gap-2 mb-1">
                     <input type="text" id="anim-video-url" placeholder="Paste URL (YouTube, MP4, etc.)" class="flex-1 bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-2 outline-none focus:border-pink-500">
                     <button id="btn-load-url" class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-[10px] transition-colors border border-gray-600 font-bold">Load</button>
                 </div>
                 
-                <div class="flex items-center gap-2 mb-1">
-                    <div class="h-px bg-gray-700 flex-1"></div>
-                    <span class="text-[9px] text-gray-500 uppercase font-bold">OR</span>
-                    <div class="h-px bg-gray-700 flex-1"></div>
-                </div>
-
-                <input type="file" id="anim-video-upload" accept="video/*" class="text-[10px] text-gray-300 bg-gray-800 p-2 rounded cursor-pointer border border-gray-700 w-full mb-1" title="Upload local MP4/WebM">
+                <input type="file" id="anim-video-upload" accept="video/*" class="text-[10px] text-gray-300 bg-gray-800 p-1.5 rounded cursor-pointer border border-gray-700 w-full mb-1" title="Upload local MP4/WebM">
                 
                 <div class="flex flex-col gap-1">
                     <label class="text-[9px] text-gray-500 uppercase font-bold">Target Action to Replicate</label>
@@ -370,15 +365,39 @@ window.EditorManager = {
                     </select>
                 </div>
 
-                <video id="anim-video-preview" class="w-full h-32 object-cover bg-black rounded border border-gray-700 hidden" controls loop muted></video>
-                <iframe id="anim-youtube-preview" class="w-full h-32 rounded border border-gray-700 hidden" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                <div class="flex flex-col gap-1 mt-1 border border-gray-700 rounded p-2 bg-gray-800/50">
+                    <label class="text-[9px] text-gray-400 uppercase font-bold mb-1 border-b border-gray-700 pb-1">Reference Points</label>
+                    <div class="text-[8px] text-gray-400 mb-1 leading-tight">Click major joints on the 3D model to assign tracking nodes, or use auto-detect.</div>
+                    <div class="flex gap-2">
+                        <button id="btn-auto-dots" class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-[9px] flex-1">Auto-Detect</button>
+                        <button id="btn-clear-dots" class="bg-gray-700 hover:bg-red-900 text-white px-2 py-1 rounded text-[9px] flex-1">Clear Points</button>
+                    </div>
+                    <div class="flex flex-wrap gap-1 mt-2" id="ref-points-list"></div>
+                </div>
+
+                <div class="flex flex-col gap-1">
+                    <label class="text-[9px] text-gray-500 uppercase font-bold">Context / Prompt (Optional)</label>
+                    <textarea id="anim-context-prompt" class="bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-2 py-1 focus:border-pink-500 outline-none h-12 resize-none" placeholder="E.g. A heavy, sluggish swing from the right..."></textarea>
+                </div>
+
+                <video id="anim-video-preview" class="w-full h-24 object-cover bg-black rounded border border-gray-700 hidden" controls loop muted></video>
+                <iframe id="anim-youtube-preview" class="w-full h-24 rounded border border-gray-700 hidden" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
                 
                 <div class="flex gap-2 mt-1">
-                    <button id="btn-bake-mocap" class="flex-1 bg-pink-700 hover:bg-pink-600 text-white text-[10px] py-2 rounded font-bold transition-colors shadow-lg flex items-center justify-center gap-1"><span>🧠</span> Extract & Replicate</button>
+                    <button id="btn-bake-mocap" class="flex-1 bg-pink-700 hover:bg-pink-600 text-white text-[10px] py-2 rounded font-bold transition-colors shadow-lg flex items-center justify-center gap-1">Extract & Replicate</button>
                 </div>
             `;
             document.body.appendChild(ui);
             
+            document.getElementById('btn-auto-dots').addEventListener('click', () => {
+                this.clearGuideDots();
+                this.spawnGuideDots();
+            });
+
+            document.getElementById('btn-clear-dots').addEventListener('click', () => {
+                this.clearGuideDots();
+            });
+
             document.getElementById('anim-video-upload').addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -431,6 +450,67 @@ window.EditorManager = {
             document.getElementById('btn-bake-mocap').addEventListener('click', () => this.runAutonomousTracking());
         },
         
+        addGuideDot: function(bone, autoColor = null) {
+            // Check if already has a dot
+            if (this.guideDots.some(d => d.userData.targetBone === bone)) return;
+
+            let hex = autoColor;
+            if (!hex) {
+                hex = 0xffa500; // Orange for manual
+                if(bone.name.toLowerCase().includes('hand')) hex = 0xff3333; // Red for hands
+                else if(bone.name.toLowerCase().includes('foot')) hex = 0x33ff33; // Green for feet
+                else if(bone.name.toLowerCase().includes('head')) hex = 0x3333ff; // Blue for head
+            }
+
+            const geo = new THREE.SphereGeometry(0.15, 8, 8);
+            const mat = new THREE.MeshBasicMaterial({ color: hex, depthTest: false, transparent: true, opacity: 0.8, wireframe: true });
+            const dot = new THREE.Mesh(geo, mat);
+            
+            // Get absolute position of bone
+            const pos = new THREE.Vector3();
+            bone.getWorldPosition(pos);
+            dot.position.copy(pos);
+            dot.userData.targetBone = bone;
+            
+            window.GameCore.scene.add(dot);
+            this.guideDots.push(dot);
+
+            this.updateRefPointsUI();
+        },
+
+        clearGuideDots: function() {
+            this.guideDots.forEach(dot => {
+                window.GameCore.scene.remove(dot);
+                dot.geometry.dispose();
+                dot.material.dispose();
+            });
+            this.guideDots = [];
+            this.updateRefPointsUI();
+        },
+
+        updateRefPointsUI: function() {
+            const list = document.getElementById('ref-points-list');
+            if (!list) return;
+            list.innerHTML = '';
+            this.guideDots.forEach((dot, index) => {
+                const badge = document.createElement('div');
+                badge.className = 'bg-gray-900 border border-gray-600 text-[9px] text-gray-300 px-1.5 py-0.5 rounded flex items-center gap-1';
+                badge.innerHTML = `<span>${dot.userData.targetBone.name}</span><button class="text-red-400 hover:text-red-300" onclick="window.EditorManager.AnimationStudio.removeGuideDot(${index})">&times;</button>`;
+                list.appendChild(badge);
+            });
+        },
+
+        removeGuideDot: function(index) {
+            const dot = this.guideDots[index];
+            if (dot) {
+                window.GameCore.scene.remove(dot);
+                dot.geometry.dispose();
+                dot.material.dispose();
+                this.guideDots.splice(index, 1);
+                this.updateRefPointsUI();
+            }
+        },
+
         spawnGuideDots: function() {
             // Find bones
             const bones = [];
@@ -447,26 +527,8 @@ window.EditorManager = {
                 b.name.toLowerCase().includes('pelvis')
             );
 
-            const geo = new THREE.SphereGeometry(0.15, 8, 8);
-            
             majorNodes.forEach(bone => {
-                // Different colors for different parts
-                let hex = 0xff00ff;
-                if(bone.name.toLowerCase().includes('hand')) hex = 0xff3333; // Red for hands
-                if(bone.name.toLowerCase().includes('foot')) hex = 0x33ff33; // Green for feet
-                if(bone.name.toLowerCase().includes('head')) hex = 0x3333ff; // Blue for head
-
-                const mat = new THREE.MeshBasicMaterial({ color: hex, depthTest: false, transparent: true, opacity: 0.8, wireframe: true });
-                const dot = new THREE.Mesh(geo, mat);
-                
-                // Get absolute position of bone
-                const pos = new THREE.Vector3();
-                bone.getWorldPosition(pos);
-                dot.position.copy(pos);
-                dot.userData.targetBone = bone;
-                
-                window.GameCore.scene.add(dot);
-                this.guideDots.push(dot);
+                this.addGuideDot(bone);
             });
         },
         
@@ -475,7 +537,17 @@ window.EditorManager = {
                 window.EventBus.emit('UI_LOG', '[ANIM STUDIO] Load a video reference or YouTube link first.');
                 return;
             }
-            window.EventBus.emit('UI_LOG', '[ANIM STUDIO] 🧠 Initiating Neural Video Tracking... (Extracting pose data from stream)');
+            if (this.guideDots.length === 0) {
+                window.EventBus.emit('UI_LOG', '[ANIM STUDIO] No reference points set. Auto-detecting or please click on joints.');
+                this.spawnGuideDots();
+            }
+
+            const contextText = document.getElementById('anim-context-prompt').value.trim();
+            const logMsg = contextText 
+                ? `[ANIM STUDIO] Tracking with context: "${contextText.substring(0, 30)}..."` 
+                : '[ANIM STUDIO] Initiating Neural Video Tracking...';
+                
+            window.EventBus.emit('UI_LOG', logMsg);
             
             if (this.videoNode.tagName === 'VIDEO') {
                 this.videoNode.play();
@@ -651,13 +723,11 @@ window.EditorManager = {
                 
                 if (this.isSculpting) {
                     this.brushMesh.position.copy(hitPoint);
-                    this.brushMesh.position.y += 0.1; 
                     if (e.buttons === 1) this.applySculpt(hitPoint, e.altKey ? 'lower' : 'raise', chunkMeshes);
                 }
                 
                 if (this.isPainting) {
                     this.paintBrushMesh.position.copy(hitPoint);
-                    this.paintBrushMesh.position.y += 0.1;
                     if (e.buttons === 1) this.applyPaint(hitPoint, chunkMeshes);
                 }
                 
@@ -695,6 +765,35 @@ window.EditorManager = {
             if (dotIntersects.length > 0) {
                 this.AnimationStudio.bindGizmoToBone(this, dotIntersects[0].object);
                 return;
+            }
+
+            // Reference Point Creation via clicking mesh
+            if (this.AnimationStudio.targetEntity) {
+                const modelIntersects = this.raycaster.intersectObject(this.AnimationStudio.targetEntity.visual, true);
+                if (modelIntersects.length > 0) {
+                    const hit = modelIntersects[0];
+                    let nearestBone = null;
+                    let minDist = Infinity;
+                    
+                    this.AnimationStudio.targetEntity.visual.traverse(child => {
+                        if (child.isBone) {
+                            const pos = new THREE.Vector3();
+                            child.getWorldPosition(pos);
+                            const dist = pos.distanceTo(hit.point);
+                            if (dist < minDist) {
+                                minDist = dist;
+                                nearestBone = child;
+                            }
+                        }
+                    });
+
+                    // Add point if we clicked near a bone
+                    if (nearestBone && minDist < 0.6) {
+                        this.AnimationStudio.addGuideDot(nearestBone);
+                        window.EventBus.emit('UI_LOG', `[ANIM STUDIO] Assigned tracking node to ${nearestBone.name}`);
+                        return;
+                    }
+                }
             }
         }
         
