@@ -760,9 +760,13 @@ function awardMonsterKill(target) {
         const distance = Math.hypot(target.visual.position.x - village.x, target.visual.position.z - village.z);
         return !nearest || distance < nearest.distance ? { village, distance } : nearest;
     }, null)?.village;
-    if (nearestVillage) {
+        if (nearestVillage) {
         nearestVillage.stats ??= {};
         nearestVillage.stats.essence = (nearestVillage.stats.essence || 0) + essence;
+        
+        // --- PHASE 2: WARDEN XP ---
+        // Award XP to the Warden career for feeding the village barriers
+        window.CareerManager.addXP('warden', essence * 5);
     }
     const impact = target.def.boss ? 12 : (target.def.faction === 'forest' ? 4 : 2);
     window.GameCore.recordRenown({ renown: target.def.boss ? 8 : 2, faction: 'village', reason: `defeated ${target.name}` });
@@ -1839,10 +1843,23 @@ function alignEntityToGround(entity, delta, raycaster, downVector) {
 function handleEntityDeath(entity) {
     playEntityAnimation(entity, 'die');
     window.AdventurerManager?.markDefeated(entity);
-    spawnGroundLoot(entity.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', entity.visual.position);
+    
+    // --- PHASE 1: HUNTER CAREER XP ---
+    if (entity.name === 'Deer') {
+        window.CareerManager.addXP('hunter', 25);
+        window.EventBus.emit('UI_LOG', `[HUNTER] You have harvested a deer carcass.`);
+    }
+
+    if (window.GameCore.spawnGroundLoot) {
+        // Special Loot for Deer
+        const lootType = entity.name === 'Deer' ? 'food' : (entity.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones');
+        window.GameCore.spawnGroundLoot(lootType, entity.visual.position);
+    }
+
     awardMonsterKill(entity);
     window.GameState.inventory.gold += entity.def.faction === 'monster' ? 10 : 50;
     window.EventBus.emit('UI_UPDATE_HUD');
+    
     setTimeout(() => {
         if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(entity.id);
         window.GameCore.releaseEntityIndex(entity.memoryIndex);

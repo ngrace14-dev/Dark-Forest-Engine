@@ -965,7 +965,12 @@ window.EventBus.on('CRAFT_RUNE', runeId => {
         let count = cost[resource];
         for (let index = pack.length - 1; index >= 0 && count > 0; index--) if (pack[index] === resource) { pack.splice(index, 1); count--; }
     });
-    pack.push(runeId);
+        pack.push(runeId);
+    
+    // --- PHASE 2: BLACKSMITH & RUNE ENGINEER XP ---
+    window.CareerManager.addXP('blacksmith', 30);
+    window.CareerManager.addXP('rune_engineer', 15);
+    
     window.EventBus.emit('UI_LOG', `Crafted ${window.ItemDatabase[runeId].name}.`);
     openArmorerForge();
     window.EventBus.emit('UI_UPDATE_HUD');
@@ -1034,19 +1039,29 @@ window.EventBus.on('DELIVER_FETCH_QUEST', questIndex => {
     window.EventBus.emit('RENDER_INVENTORY');
 });
 
-window.EventBus.on('PICKUP_GROUND_LOOT', lootId => {
-    const lootIndex = window.GameCore.groundLoot.findIndex(entry => entry.id === lootId);
-    if (lootIndex < 0) return;
-    if (window.GameState.inventory.backpack.length >= 25) {
-        window.EventBus.emit('UI_LOG', 'Backpack is full.');
-        return;
-    }
-    const [loot] = window.GameCore.groundLoot.splice(lootIndex, 1);
-    window.GameCore.scene.remove(loot.visual);
-    window.GameState.inventory.backpack.push(loot.itemId);
-    window.EventBus.emit('UI_LOG', `Picked up ${window.ItemDatabase[loot.itemId]?.name || loot.itemId}.`);
-    window.EventBus.emit('RENDER_INVENTORY');
-});
+  window.EventBus.on('PICKUP_GROUND_LOOT', lootId => {
+      const lootIndex = window.GameCore.groundLoot.findIndex(entry => entry.id === lootId);
+      if (lootIndex < 0) return;
+        
+      const [loot] = window.GameCore.groundLoot.splice(lootIndex, 1);
+        
+      // --- PHASE 1: GATHERER CAREER XP ---
+      if (loot.itemId === 'food') {
+           // If it came from a "Berry Bush" or similar
+           window.CareerManager.addXP('gatherer', 10);
+      }
+
+      if (window.GameState.inventory.backpack.length >= 25) {
+          window.EventBus.emit('UI_LOG', 'Backpack is full.');
+          window.GameCore.groundLoot.push(loot); // Put it back
+          return;
+      }
+        
+      window.GameCore.scene.remove(loot.visual);
+      window.GameState.inventory.backpack.push(loot.itemId);
+      window.EventBus.emit('UI_LOG', `Picked up ${window.ItemDatabase[loot.itemId]?.name || loot.itemId}.`);
+      window.EventBus.emit('RENDER_INVENTORY');
+  });
 
 window.EventBus.on('DEPOSIT_BASE_ITEM', packIndex => {
     const itemId = window.GameState.inventory.backpack[packIndex];
