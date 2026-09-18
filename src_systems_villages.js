@@ -199,7 +199,13 @@ window.VillageManager = {
         village.stats.food = Math.max(0, (village.stats.food || 0) - Math.ceil(village.population.current / 24));
         this.processVillageCaravans(village);
 
+        // --- PHASE 3: DISTANT WAR RESOLUTION ---
+        if (window.WarManager && window.WarManager.resolveDistantExpeditions) {
+            window.WarManager.resolveDistantExpeditions(village);
+        }
+
         const localRaiders = window.GameCore.activeEntities.filter(entity => entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest') && Math.hypot(entity.visual.position.x - village.x, entity.visual.position.z - village.z) <= village.territory.radius);
+
         village.territory.underRaid = localRaiders.length > 0;
 
         // --- DIPLOMATIC IMPACT OF RAIDS (Shared Defense) ---

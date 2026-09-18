@@ -34,6 +34,10 @@ window.EncounterDirector = {
         if (!window.GameCore.playerObj) return;
         const pPos = window.GameCore.playerObj.visual.position;
         
+        // --- PHASE 4: SMART SPAWN CHECK ---
+        // Ensure the Huntsman isn't spawning in the void or a mountain
+        if (window.Navigation && !window.Navigation.isWalkableAt(pPos.x, pPos.z)) return;
+
         // 1. Calculate Combined Power of Hostiles nearby
         const nearby = window.GameCore.SpatialGrid.getNearbyEntities(pPos.x, pPos.z, 20);
         let hostilePower = 0;

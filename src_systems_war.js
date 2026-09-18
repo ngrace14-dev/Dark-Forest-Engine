@@ -59,6 +59,41 @@ window.WarManager = {
         window.EventBus.emit('UI_LOG', "⚠️ [CRISIS] THE PASS HAS FALLEN! The 300 are no more. The Mountain has vomited its horrors into the Kingdom!");
     },
 
+    // --- PHASE 3: ABSTRACT WAR RESOLUTION ---
+    resolveDistantExpeditions: function(village) {
+        if (!village.expeditions) return;
+        
+        village.expeditions.forEach(exp => {
+            if (exp.status !== 'raiding') return;
+            
+            // Check if player is nearby (within 300m)
+            const playerNear = window.GameCore.playerObj && 
+                               Math.hypot(window.GameCore.playerObj.visual.position.x - village.x, 
+                                          window.GameCore.playerObj.visual.position.z - village.z) < 300;
+            
+            if (playerNear) return; // Let physical combat handle it
+
+            // Abstract Calculation: Defense Power vs Raid Strength
+            const defensePower = (village.population.current / 500) + (village.barrierIntegrity / 20);
+            const raidPower = exp.strength * 2.5;
+            
+            // 5% chance per tick to resolve
+            if (Math.random() < 0.05) {
+                if (defensePower >= raidPower) {
+                    exp.status = 'defeated';
+                    village.barrierIntegrity = Math.max(0, village.barrierIntegrity - (raidPower * 2));
+                    window.EventBus.emit('UI_LOG', `[WAR] Distant report: ${village.name} successfully repelled a raid.`);
+                } else {
+                    exp.status = 'success';
+                    village.territory.control = Math.max(0, village.territory.control - 25);
+                    village.stats.prosperity = Math.max(0, village.stats.prosperity - 10);
+                    window.EventBus.emit('UI_LOG', `[WAR] Distant report: ${village.name} was pillaged by a forest raid.`);
+                }
+            }
+        });
+    },
+
+
     triggerVoidIncursion: function() {
         this.crisis = { active: true, type: 'void_incursion', strength: 1.0, daysToEruption: 7 };
         window.EventBus.emit('UI_LOG', "⚠️ [CRISIS] The sky turns a bruised purple. The Void is bleeding into our reality.");

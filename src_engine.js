@@ -736,9 +736,15 @@ function applyForestBlessing(entity, isPlayer = false) {
 window.GameCore.applyForestBlessing = applyForestBlessing;
 
 function spawnGroundLoot(itemId, position) {
-    if (!window.ItemDatabase[itemId]) return;
+    if (!window.ItemDatabase?.[itemId]) return;
+    
+    // --- PHASE 4: LOOT STABILITY ---
+    // Snap the loot to the mathematical ground height to prevent clipping or floating
+    const groundY = window.WorldGenerator.getTerrainHeight(position.x, position.z);
+    const finalPos = new THREE.Vector3(position.x, groundY + 0.4, position.z);
+    
     const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.25), new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0x8a5a00, emissiveIntensity: 1 }));
-    mesh.position.copy(position).add(new THREE.Vector3(0, 0.4, 0));
+    mesh.position.copy(finalPos);
     window.GameCore.scene.add(mesh);
     window.GameCore.groundLoot.push({ id: Math.random().toString(36).slice(2), itemId, visual: mesh });
 }
