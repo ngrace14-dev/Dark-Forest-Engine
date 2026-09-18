@@ -1506,3 +1506,4 @@ function updateCombatHitboxes(delta) {
 
       
 
+

@@ -136,3 +136,4 @@ window.EventBus.on('COOP_CONNECTED', () => window.EventBus.emit('UI_LOG', '[CO-O
 window.EventBus.on('COOP_DISCONNECTED', () => window.EventBus.emit('UI_LOG', '[CO-OP] Disconnected. The local world remains playable.'));
 window.EventBus.on('COOP_ERROR', () => window.EventBus.emit('UI_LOG', '[CO-OP] Connection error.'));
 
+

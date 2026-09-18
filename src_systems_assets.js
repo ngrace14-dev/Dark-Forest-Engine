@@ -674,3 +674,4 @@ window.addEventListener('dragleave', (e) => { e.preventDefault(); if (e.relatedT
 window.addEventListener('drop', (e) => { e.preventDefault(); overlay.classList.add('hidden'); document.getElementById('asset-file-input').files = e.dataTransfer.files; document.getElementById('asset-file-input').dispatchEvent(new Event('change')); });
 
 
+

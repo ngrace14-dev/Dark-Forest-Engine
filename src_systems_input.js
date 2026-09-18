@@ -55,3 +55,4 @@ document.addEventListener('wheel', e => { window.Input.camDistance = Math.max(5,
 document.addEventListener('contextmenu', e => e.preventDefault());
 
 
+
