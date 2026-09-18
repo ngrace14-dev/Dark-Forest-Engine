@@ -59,6 +59,26 @@ window.EncounterDirector = {
         if (hostilePower > playerPower * 3 && hostiles.length >= 2) {
             this.triggerHuntsmanIntervention(pPos, hostiles);
         }
+        
+        // --- INTEL HOOK (Encounter Director Monitoring) ---
+        // If a major threat is detected, inject a rumor into the IntelManager
+        if (hostilePower > 500 && window.IntelManager && Math.random() < 0.2) {
+            window.IntelManager.register({
+                type: window.IntelEnums.TYPES.WARNING,
+                payload: {
+                    title: "Massive Hostile Gathering",
+                    description: "A terrifying concentration of corrupted beasts was witnessed.",
+                    tags: ['monster', 'horde', 'danger'],
+                    target_coord: { x: pPos.x, z: pPos.z }
+                },
+                certainty: 0.8,
+                truth_state: window.IntelEnums.TRUTH_STATE.TRUE,
+                significance: { survival: 70, political: 10 },
+                rarity: window.IntelEnums.RARITY.UNCOMMON,
+                provenance: [{ node_id: 'world_director', timestamp: window.EngineParams?.worldDay || 0 }]
+            });
+            window.EventBus.emit('UI_LOG_DEBUG', `[INTEL] Encounter Director logged a Horde Warning.`);
+        }
     },
 
     triggerHuntsmanIntervention: function(pos, hostiles) {
@@ -82,6 +102,24 @@ window.EncounterDirector = {
             setTimeout(() => {
                 window.EventBus.emit('UI_LOG', `[HUNTSMAN] "These vermin are not fit to claim this kill."`);
             }, 2000);
+
+            // --- INTEL HOOK (Huntsman Sighting) ---
+            if (window.IntelManager) {
+                window.IntelManager.register({
+                    type: window.IntelEnums.TYPES.WARNING,
+                    payload: {
+                        title: "The Huntsman Strikes",
+                        description: "The metallic stalker of the woods was seen intervening in a battle.",
+                        tags: ['huntsman', 'stalker', 'legend'],
+                        target_coord: { x: hX, z: hZ }
+                    },
+                    certainty: 1.0,
+                    truth_state: window.IntelEnums.TRUTH_STATE.TRUE,
+                    significance: { survival: 90, crow: 50 },
+                    rarity: window.IntelEnums.RARITY.LEGENDARY,
+                    provenance: [{ node_id: 'world_director', timestamp: window.EngineParams?.worldDay || 0 }]
+                });
+            }
         }
     },
 

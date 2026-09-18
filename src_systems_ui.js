@@ -985,11 +985,19 @@ window.EventBus.on('INTERACT_NEARBY', () => {
         openArmorerForge();
         return;
     }
-    const treatmentCenter = window.GameCore.activeEntities.find(entity => entity.def.serviceType === 'plagueTreatment' && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 5);
+        const treatmentCenter = window.GameCore.activeEntities.find(entity => entity.def.serviceType === 'plagueTreatment' && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 5);
     if (treatmentCenter) {
         openTreatmentCenter();
         return;
     }
+    
+    // --- PHASE 6.4B: BROKER INTERACTION HOOK ---
+    const broker = window.GameCore.activeEntities.find(entity => entity.def.serviceType === 'broker' && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 5);
+    if (broker) {
+        openIntelBroker(broker);
+        return;
+    }
+
     const villageHub = window.GameCore.activeEntities.find(entity => entity.def.type === 'hub' && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 4);
     if (villageHub) {
         openVillageQuestBoard(villageHub);
@@ -1071,33 +1079,132 @@ window.EventBus.on('TAKE_COMPANION_ITEM', ({ memberId, index }) => {
 });
 
   window.EventBus.on('BUY_MERCHANT_ITEM', ({ chestId, index }) => {
-      const chest = window.GameCore.activeEntities.find(entity => entity.id === chestId);
-      const stock = chest?.merchantInventory?.[index];
-      if (!stock || stock.quantity <= 0) return;
-      const price = window.GameCore.getMerchantPrice(stock.price, 'kingdom');
+        const chest = window.GameCore.activeEntities.find(entity => entity.id === chestId);
+        const stock = chest?.merchantInventory?.[index];
+        if (!stock || stock.quantity <= 0) return;
+        const price = window.GameCore.getMerchantPrice(stock.price, 'kingdom');
         
+        if (window.GameState.inventory.gold < price) {
+            window.EventBus.emit('UI_LOG', 'Not enough gold.');
+            return;
+        }
+        if (window.GameState.inventory.backpack.length >= 25) {
+            window.EventBus.emit('UI_LOG', 'Backpack is full.');
+            return;
+        }
+        
+        window.GameState.inventory.gold -= price;
+        stock.quantity--;
+        window.GameState.inventory.backpack.push(stock.itemId);
+        
+        // --- PHASE 3: MERCHANT XP ---
+        // Award XP for participating in the economy
+        window.CareerManager.addXP('merchant', 15);
+        
+        if (stock.itemId === 'food') window.GameState.inventory.food++;
+        window.EventBus.emit('UI_LOG', `Purchased ${window.ItemDatabase[stock.itemId]?.name || stock.itemId}.`);
+        openMerchantShop(chest);
+        window.EventBus.emit('UI_UPDATE_HUD');
+        window.EventBus.emit('RENDER_INVENTORY');
+    });
+
+  // ==========================================
+  // PHASE 6.4B: INFORMATION BROKER TRADING
+  // ==========================================
+  function openIntelBroker(broker) {
+      const dialogue = document.getElementById('companion-dialogue');
+      const brokerIntel = window.IntelManager.getIntelForNode(broker.id) || [];
+      const playerIntel = window.IntelManager.getIntelForNode('player_node') || [];
+    
+      // Auto-generate some mock intel for testing if the broker is empty
+      if (brokerIntel.length === 0 && Math.random() > 0.5) {
+          const mockId = window.IntelManager.register({
+              type: window.IntelEnums.TYPES.RUMOR,
+              payload: { title: "Whispers of the Deep Woods", description: "A hunter saw strange lights to the North.", tags: ['rumor', 'forest'] },
+              certainty: 0.3,
+              truth_state: window.IntelEnums.TRUTH_STATE.TRUE,
+              significance: { survival: 10, economic: 5 },
+              rarity: window.IntelEnums.RARITY.COMMON,
+              provenance: [{ node_id: 'unknown', timestamp: window.EngineParams?.worldDay || 0, origin_type: 'HUNTER' }]
+          });
+          window.IntelManager.grantOwnership(mockId, broker.id);
+          brokerIntel.push(window.IntelManager.lookup(mockId));
+      }
+    
+      const brokerRows = brokerIntel.map(intel => {
+          const price = window.IntelEconomy.calculateValue(intel, { id: 'player_node' });
+          if (price <= 0) return ''; // Player already knows it
+          return `<button class="border border-purple-700 bg-gray-900 p-2 text-left hover:border-purple-300 w-full mb-1 flex flex-col gap-1 transition-colors" onclick="window.EventBus.emit('BUY_INTEL', { brokerId: '${broker.id}', intelId: '${intel.intel_id}', price: ${price} })">
+              <div class="flex justify-between items-center"><span class="font-bold text-white text-[10px]">${intel.payload.title}</span><span class="text-amber-300 text-[10px] font-bold">${price}g</span></div>
+              <div class="flex justify-between items-center text-[8px] text-gray-500"><span>${intel.type} | Cert: ${Math.floor(intel.certainty*100)}%</span><span>Gen ${intel.spread_generation}</span></div>
+          </button>`;
+      }).join('') || '<div class="text-gray-500 text-[10px] py-2">No new secrets to share.</div>';
+
+      const playerRows = playerIntel.map(intel => {
+          const price = window.IntelEconomy.calculateValue(intel, broker);
+          if (price <= 0) return ''; // Broker already knows it
+          return `<button class="border border-gray-700 bg-gray-900 p-2 text-left hover:border-blue-300 w-full mb-1 flex flex-col gap-1 transition-colors" onclick="window.EventBus.emit('SELL_INTEL', { brokerId: '${broker.id}', intelId: '${intel.intel_id}', price: ${price} })">
+              <div class="flex justify-between items-center"><span class="font-bold text-white text-[10px]">${intel.payload.title}</span><span class="text-amber-300 text-[10px] font-bold">${price}g</span></div>
+              <div class="flex justify-between items-center text-[8px] text-gray-500"><span>${intel.type} | Cert: ${Math.floor(intel.certainty*100)}%</span><span>Gen ${intel.spread_generation}</span></div>
+          </button>`;
+      }).join('') || '<div class="text-gray-500 text-[10px] py-2">You possess no secrets of value to me.</div>';
+
+      dialogue.innerHTML = `
+          <div class="mb-4 border-b border-purple-700 pb-3">
+              <div class="text-purple-400 font-bold tracking-widest uppercase">Information Broker</div>
+              <div class="text-[10px] text-gray-500 mt-1">Gold: <span class="text-amber-300">${window.GameState.inventory.gold}</span></div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2 mb-4">
+              <div>
+                  <div class="text-[10px] text-purple-400 font-bold mb-2 uppercase border-b border-purple-900/50 pb-1">Buy Secrets</div>
+                  ${brokerRows}
+              </div>
+              <div>
+                  <div class="text-[10px] text-blue-400 font-bold mb-2 uppercase border-b border-blue-900/50 pb-1">Sell Secrets</div>
+                  ${playerRows}
+              </div>
+          </div>
+          <button id="btn-close-broker" class="border border-gray-600 px-3 py-2 text-xs hover:border-purple-400 w-full transition-colors">Step Away</button>
+      `;
+      dialogue.classList.remove('hidden');
+      dialogue.querySelector('#btn-close-broker').addEventListener('click', closeCompanionDialogue);
+  }
+
+  window.EventBus.on('BUY_INTEL', ({ brokerId, intelId, price }) => {
       if (window.GameState.inventory.gold < price) {
-          window.EventBus.emit('UI_LOG', 'Not enough gold.');
+          window.EventBus.emit('UI_LOG', 'Not enough gold to purchase this secret.');
           return;
       }
-      if (window.GameState.inventory.backpack.length >= 25) {
-          window.EventBus.emit('UI_LOG', 'Backpack is full.');
-          return;
-      }
-        
+      const broker = window.GameCore.activeEntities.find(e => e.id === brokerId);
+      if (!broker) return;
+
       window.GameState.inventory.gold -= price;
-      stock.quantity--;
-      window.GameState.inventory.backpack.push(stock.itemId);
-        
-      // --- PHASE 3: MERCHANT XP ---
-      // Award XP for participating in the economy
-      window.CareerManager.addXP('merchant', 15);
-        
-      if (stock.itemId === 'food') window.GameState.inventory.food++;
-      window.EventBus.emit('UI_LOG', `Purchased ${window.ItemDatabase[stock.itemId]?.name || stock.itemId}.`);
-      openMerchantShop(chest);
+      // Execute sync (Perfect fidelity for direct purchases)
+      window.IntelPropagation.sync(broker, { id: 'player_node', memory_limit: 100, faction: 'Player', type: 'PLAYER' }, intelId, 1.0);
+    
+      // Career XP
+      window.CareerManager?.addXP('broker', 10);
+
+      window.EventBus.emit('UI_LOG', `[BROKER] Purchased intelligence for ${price} gold.`);
       window.EventBus.emit('UI_UPDATE_HUD');
-      window.EventBus.emit('RENDER_INVENTORY');
+      window.EventBus.emit('RENDER_INTEL_BAG'); // Refresh ledger if open
+      openIntelBroker(broker); // Refresh UI
+  });
+
+  window.EventBus.on('SELL_INTEL', ({ brokerId, intelId, price }) => {
+      const broker = window.GameCore.activeEntities.find(e => e.id === brokerId);
+      if (!broker) return;
+
+      window.GameState.inventory.gold += price;
+      // Execute sync
+      window.IntelPropagation.sync({ id: 'player_node', faction: 'Player', type: 'PLAYER' }, broker, intelId, 1.0);
+    
+      // Career XP
+      window.CareerManager?.addXP('broker', Math.min(50, price));
+
+      window.EventBus.emit('UI_LOG', `[BROKER] Sold intelligence for ${price} gold.`);
+      window.EventBus.emit('UI_UPDATE_HUD');
+      openIntelBroker(broker); // Refresh UI
   });
 
 window.EventBus.on('ESCORT_CARAVAN', caravanId => {

@@ -1726,6 +1726,24 @@ function launchHostileExpedition(village) {
         if (raider) { raider.expeditionId = expedition.id; raider.targetVillageId = village.id; }
     }
     window.EventBus.emit('UI_LOG', isTerminus ? '[MOUNTAIN INCURSION] Terminus calls its martial houses to the gate.' : `[RAID] A forest expedition advances on ${village.name}.`);
+
+    // --- INTEL HOOK (Raid Declaration) ---
+    if (window.IntelManager) {
+        window.IntelManager.register({
+            type: window.IntelEnums.TYPES.WARNING,
+            payload: {
+                title: isTerminus ? "Mountain Incursion" : "Forest Raid",
+                description: `Hostiles are massing to strike ${village.name}.`,
+                tags: ['raid', 'war', 'danger'],
+                target_coord: { x: village.x, z: village.z }
+            },
+            certainty: 0.9,
+            truth_state: window.IntelEnums.TRUTH_STATE.TRUE,
+            significance: { survival: 85, political: 40 },
+            rarity: window.IntelEnums.RARITY.RARE,
+            provenance: [{ node_id: village.id, timestamp: window.EngineParams.worldDay, origin_type: 'VILLAGE' }]
+        });
+    }
 }
 
 function simulateVillage(village) {
@@ -1762,13 +1780,31 @@ function simulateVillage(village) {
     if (village.territory.underRaid) window.EventBus.emit('UI_LOG', `[RAID] ${village.name} is under attack by ${localRaiders.length} hostile creature${localRaiders.length === 1 ? '' : 's'}.`);
     const activeExpedition = village.expeditions.some(expedition => expedition.status === 'raiding');
     if (!village.territory.underRaid && !activeExpedition && Math.random() < (village.industry?.mountainGatekeeper ? 0.03 : 0.01)) launchHostileExpedition(village);
-    if (village.territory.control === 0 && village.territory.faction === 'kingdom') {
+        if (village.territory.control === 0 && village.territory.faction === 'kingdom') {
         village.territory.faction = 'forest';
         village.territory.reclamation = { wood: 0, stone: 0, requiredWood: 50, requiredStone: 30 };
         village.stats.prosperity = Math.max(0, village.stats.prosperity - 25);
         postVillageNeed(village, 'wood', 50, 'reclaiming occupied territory');
         postVillageNeed(village, 'stone', 30, 'reclaiming occupied territory');
         window.EventBus.emit('UI_LOG', `[OCCUPIED] ${village.name} has fallen under forest control.`);
+
+        // --- INTEL HOOK (Settlement Fall) ---
+        if (window.IntelManager) {
+            window.IntelManager.register({
+                type: window.IntelEnums.TYPES.FACT,
+                payload: {
+                    title: "Settlement Lost",
+                    description: `${village.name} has been overrun by the forest.`,
+                    tags: ['disaster', 'political', 'occupation'],
+                    target_coord: { x: village.x, z: village.z }
+                },
+                certainty: 1.0,
+                truth_state: window.IntelEnums.TRUTH_STATE.TRUE,
+                significance: { survival: 100, political: 100, economic: 80, historical: 50 },
+                rarity: window.IntelEnums.RARITY.LEGENDARY,
+                provenance: [{ node_id: village.id, timestamp: window.EngineParams.worldDay, origin_type: 'VILLAGE' }]
+            });
+        }
     }
 
     const importGoal = Math.ceil(village.population.current * 0.5);
