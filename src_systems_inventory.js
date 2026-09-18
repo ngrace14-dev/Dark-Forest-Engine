@@ -37,7 +37,11 @@ window.ItemDatabase = {
     'void_leg': { id: 'void_leg', name: 'Void-Infused Leg', type: 'prosthetic', slot: 'rightLeg_prosthetic', stats: { hpBonus: 50, athletics: 5, resistances: { void: 10 } }, icon: '🌑', color: 'text-purple-500' }
 };
 
-function recalculateStats() {
+    if (!window.GameState || !window.GameState.inventory) {
+        console.warn("[Inventory] Stats recalculation skipped: GameState not ready.");
+        return;
+    }
+
     let totalArmor = 0; let totalDamage = 0;
     const eq = window.GameState.inventory.equipment;
     
