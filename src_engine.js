@@ -799,7 +799,12 @@ function processCompanionNeeds() {
         // We track 'starvationDays' in GameState
         window.GameState.starvationDays = (window.GameState.starvationDays || 0) + (1/6); // Called every 4 in-game hours
         
-        const weakness = Math.min(0.9, window.GameState.starvationDays / 7);
+                // --- PHASE 5: SMOOTH STARVATION CURVE ---
+        // Instead of linear, use a curve that accelerates at the end
+        // First 3 days: Minor debuff. Last 4 days: Rapid decline.
+        const dayT = window.GameState.starvationDays / 7;
+        const weakness = Math.min(0.9, Math.pow(dayT, 1.5)); // Exponential curve
+        
         pStats.maxHp = 100 * (1 - weakness);
         pStats.hp = Math.min(pStats.hp, pStats.maxHp);
         

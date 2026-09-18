@@ -87,10 +87,20 @@ window.EncounterDirector = {
 
     applyHuntsmanMark: function() {
         // 12 hours in game time (seconds = 12 * (dayLength / 24))
+        // With 12h IRL day, this is 6h IRL. We will keep it long but allow clearing.
         const duration = (window.EngineParams.dayLengthSeconds / 24) * 12;
         this.huntsmanMarkTimer = duration;
-        window.EventBus.emit('UI_LOG', `[DEBUFF] You bear the 'Huntsman's Scorn'. Hostiles avoid you in fear, but civilization shuns you.`);
+        window.EventBus.emit('UI_LOG', `[DEBUFF] You bear the 'Huntsman's Scorn'. Monsters fear you, but civilization shuns you.`);
+        window.EventBus.emit('UI_LOG', `[STATUS] Perform a 'Noteworthy Deed' to prove your worth and clear the mark.`);
         window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: "HUNTSMAN'S SCORN", pos: window.GameCore.playerObj.visual.position, color: '#4b5563' });
+    },
+
+    clearHuntsmanMark: function() {
+        if (this.huntsmanMarkTimer > 0) {
+            this.huntsmanMarkTimer = 0;
+            window.EventBus.emit('UI_LOG', `[STATUS] Your deed has reached the Huntsman's ears. The mark is lifted.`);
+            window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: "SCORN LIFTED", pos: window.GameCore.playerObj.visual.position, color: '#fcd34d' });
+        }
     }
 };
 

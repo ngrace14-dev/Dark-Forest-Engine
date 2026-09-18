@@ -485,9 +485,16 @@ window.GameCore = {
             narrator.targetName = 'The Wanderer';
             if (window.GameCore.applyForestBlessing) window.GameCore.applyForestBlessing(window.GameCore.playerObj, true);
             window.EventBus.emit('UI_LOG', '[THE CROW] The eye leaves its chosen hero. It follows you now.');
-        } else if (narrator.playerClaimed) {
+        } else         if (narrator.playerClaimed) {
             window.EventBus.emit('UI_LOG', `[THE CROW] ${label}.`);
         }
+        
+        // --- PHASE 5: NARRATIVE PACING ---
+        // Clearing the Huntsman's Mark via Feats
+        if (impact >= 5 && window.EncounterDirector && window.EncounterDirector.huntsmanMarkTimer > 0) {
+            window.EncounterDirector.clearHuntsmanMark();
+        }
+
         window.EventBus.emit('UI_UPDATE_HUD');
     },
     loseCrowInterest: function(amount = 1, reason = 'The story grows quiet.') {
