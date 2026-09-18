@@ -47,35 +47,42 @@ window.VillageManager = {
         { itemId: 'terminus_war_brew', name: 'Terminus War Brew', heal: 90, buff: 'strength', amount: 7, duration: 240 }
     ],
     generateWeb: function() {
-        this.villages = []; let currentRadius = 0; let currentAngle = Math.random() * Math.PI * 2;
+        this.villages = []; 
         const capitalPopulation = Math.floor(this.kingdomPopulation * this.capitalPopulationShare);
         const settlementPopulation = Math.floor((this.kingdomPopulation - capitalPopulation) / 19);
         let remainingPopulation = this.kingdomPopulation - capitalPopulation;
+        
         for (let i = 0; i < 20; i++) {
-            let x = 0, z = 0;
-            if (i > 0) {
-                const distanceStep = 10000 + (Math.random() * 10000); currentRadius += distanceStep; currentAngle += (Math.random() - 0.5) * (Math.PI / 1.5); 
-                x = Math.cos(currentAngle) * currentRadius; z = Math.sin(currentAngle) * currentRadius;
-            }
-            let connections = []; if (i > 0) connections.push(i - 1); if (i < 19) connections.push(i + 1); 
+            let connections = []; 
+            if (i > 0) connections.push(i - 1); 
+            if (i < 19) connections.push(i + 1); 
+            
             const population = i === 0 ? capitalPopulation : (i === 19 ? remainingPopulation : settlementPopulation);
             if (i > 0) remainingPopulation -= population;
             const profile = this.settlementProfiles[i];
             const provision = this.provisionProfiles[i];
+            
             this.villages.push({ 
-                id: i, name: i === 0 ? 'The Capital' : this.names[i - 1], x: Math.round(x), z: Math.round(z), 
-                connections: connections, capital: i === 0, nobleHouse: profile.house, nobleLeader: profile.leader,
-                nobleTitle: profile.title, industry: profile, provision, 
+                id: i, 
+                name: i === 0 ? 'The Capital' : this.names[i - 1], 
+                x: 0, z: 0, // Placeholder, set by shiftLocations
+                connections: connections, 
+                capital: i === 0, 
+                nobleHouse: profile.house, 
+                nobleLeader: profile.leader,
+                nobleTitle: profile.title, 
+                industry: profile, 
+                provision, 
                 provisionStock: { [provision.itemId]: Math.max(10, Math.floor(population / 100)) }, 
                 territory: { faction: 'kingdom', radius: i === 0 ? 140 : 90, barrierRadius: i === 0 ? 140 : 90, control: 100, underRaid: false }, 
-                barrierIntegrity: 100, expeditions: [], 
+                barrierIntegrity: 100, 
+                expeditions: [], 
                 stats: { ap: 50 + Math.floor(Math.random() * 50), food: population * 20, wood: population * 8, stone: population * 5, gold: population * 4, essence: 0, prosperity: 55 }, 
                 population: { current: population, capacity: Math.ceil(population * 1.2) }, 
                 expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [],
-                // --- EMERGENT DIPLOMACY ---
-                relations: {}, // targetVillageId -> opinion score (-100 to 100)
-                diplomaticState: {}, // targetVillageId -> 'allied' | 'neutral' | 'hostile'
-                tensions: 0 // Overall house unrest (leads to Civil War)
+                relations: {}, 
+                diplomaticState: {}, 
+                tensions: 0
             });
         }
         
@@ -88,9 +95,65 @@ window.VillageManager = {
                 }
             });
         });
-        window.RoadManager.generateRoads(this.villages);
-        window.EventBus.emit('UI_LOG', "🌲 20 Settlements generated. Road Network integrated.");
-        if(window.EngineState.currentAssetTab === 'villages' || window.EngineState.currentAssetTab === 'world') window.EventBus.emit('RENDER_ASSETS');
+        
+        // Use the new repositioning logic to place them
+        this.shiftLocations();
+    },
+    
+    // --- PHASE 1.5: VILLAGE CHAIN REPOSITIONING ---
+    shiftLocations: function() {
+        if (this.villages.length < 2) return;
+        
+        // 1. Capital (Index 0) is always locked at 0,0
+        const capital = this.villages[0];
+        capital.x = 0;
+        capital.z = 0;
+        
+        // 2. Terminus (Index 19) is pushed to the edge of the mountain ring
+        // We use the Epoch Manager's PRNG to determine the angle so it's consistent for the seed
+        const prng = window.EpochManagerInstance ? window.EpochManagerInstance.prng : Math.random;
+        const mountainRadius = (window.WorldGenConfig ? window.WorldGenConfig.darkForestSideMeters / 2 : 287921.6) - 5000;
+        const terminusAngle = prng() * Math.PI * 2;
+        
+        const terminus = this.villages[this.villages.length - 1];
+        terminus.x = Math.cos(terminusAngle) * mountainRadius;
+        terminus.z = Math.sin(terminusAngle) * mountainRadius;
+        
+        // 3. Space out the remaining 18 villages (Index 1 to 18) along a jagged path between Capital and Terminus
+        const totalMiddleNodes = this.villages.length - 2;
+        
+        for (let i = 1; i <= totalMiddleNodes; i++) {
+            const village = this.villages[i];
+            
+            // t is how far along the chain we are (0.0 to 1.0)
+            const t = i / (totalMiddleNodes + 1);
+            
+            // Linear interpolation between Capital (0,0) and Terminus
+            const baseX = terminus.x * t;
+            const baseZ = terminus.z * t;
+            
+            // Add procedural perpendicular offset to make it a jagged chain rather than a straight line
+            // Maximum deviation is 20% of the total distance to Terminus
+            const maxDeviation = mountainRadius * 0.2;
+            const deviationDirX = -Math.sin(terminusAngle);
+            const deviationDirZ = Math.cos(terminusAngle);
+            const deviationAmount = (prng() * 2 - 1) * maxDeviation;
+            
+            village.x = baseX + (deviationDirX * deviationAmount);
+            village.z = baseZ + (deviationDirZ * deviationAmount);
+            
+            // Optional: Snap to the nearest "good terrain" here if you wanted, but for now exact math coordinates are fine
+        }
+        
+        // 4. Regenerate the road network to match the new coordinates
+        if (window.RoadManager && window.RoadManager.generateRoads) {
+            window.RoadManager.generateRoads(this.villages);
+        }
+        
+        window.EventBus.emit('UI_LOG', "🌲 The Village Chain has repositioned.");
+        if(window.EngineState && (window.EngineState.currentAssetTab === 'villages' || window.EngineState.currentAssetTab === 'world')) {
+            window.EventBus.emit('RENDER_ASSETS');
+        }
     },
     // --- SIMULATION SLICING (Kenshi Style) ---
     // Instead of simulating all 20 villages at once, we do 1 per logic tick

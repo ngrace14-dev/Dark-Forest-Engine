@@ -82,15 +82,59 @@ export class EpochManager {
     }
 
     _calculateNaturalHeight(x, z) {
-        let height = this.noise2D(x * 0.005, z * 0.005) * 8; 
+        const halfForestSide = this.config.darkForestSideMeters / 2;
+        const mountainWidth = this.config.mountainRingWidthMeters;
+        const dist = Math.max(Math.abs(x), Math.abs(z));
+
+        // BASE NOISE (Rolling terrain)
+        let height = this.noise2D(x * 0.005, z * 0.005) * 8;
+        height += this.noise2D(x * 0.05, z * 0.05) * 1.5; // Roughness
+
+        // 1. THE MOUNTAIN RING (100 MILES THICK)
+        if (dist > halfForestSide && dist <= halfForestSide + mountainWidth) {
+            // Distance from the inner forest edge to the mountain peak
+            const mountainT = (dist - halfForestSide) / mountainWidth; 
+            
+            // Generate a massive jagged mountain shape
+            // Peaks at the middle of the 100-mile range
+            const profile = Math.sin(mountainT * Math.PI); 
+            const jaggedness = this.noise2D(x * 0.01, z * 0.01) * 0.5 + 0.5;
+            
+            // Mountains reach up to 2,500 meters
+            height += profile * 2500 * jaggedness;
+
+            // THE MOUNTAIN PASS (Terminus Gate)
+            // We carve a hole in the mountains near the Terminus Noble House
+            if (window.VillageManager) {
+                const terminus = window.VillageManager.villages[window.VillageManager.villages.length - 1];
+                if (terminus) {
+                    const dx = x - terminus.x;
+                    const dz = z - terminus.z;
+                    const distToPassSq = dx*dx + dz*dz;
+                    const passRadius = 800; // 800 meter wide canyon pass
+                    
+                    if (distToPassSq < passRadius * passRadius) {
+                        const passDist = Math.sqrt(distToPassSq);
+                        const passMask = Math.pow(passDist / passRadius, 2);
+                        // Blend the height down to road level
+                        height *= passMask;
+                    }
+                }
+            }
+        }
+
+        // 2. THE INFINITE DUNES (PAST THE MOUNTAINS)
+        if (dist > halfForestSide + mountainWidth) {
+            // High frequency, low amplitude rolling sand dunes
+            const duneNoise = Math.sin(x * 0.02) * Math.cos(z * 0.02) * 15;
+            height = duneNoise + (this.noise2D(x * 0.001, z * 0.001) * 10);
+        }
+
+        // BIOME SPECIFIC HEIGHT MODIFIERS
         const biomeKey = this.getBiome(x, z);
-        
-        if (biomeKey === 'alpine' || biomeKey === 'sierra') {
+        if (biomeKey === 'alpine') {
             height += Math.max(0, this.noise2D(x * 0.01, z * 0.01) * 20);
         }
-        
-        // Add Micro-noise (Roughness)
-        height += this.noise2D(x * 0.05, z * 0.05) * 1.5;
 
         return height;
     }

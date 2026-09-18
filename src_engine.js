@@ -83,69 +83,168 @@ const ChunkManager = {
         const collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.trimesh(physicsVertices, indicesU32), groundBody);
         this.activeChunks.set(key, { mesh, body: groundBody, collider });
         
-        const rng = alea(`${window.EngineParams.worldSeed}_${cx}_${cz}`);
+                const rng = alea(`${window.EngineParams.worldSeed}_${cx}_${cz}`);
         
-        // --- INSTANCING PREPARATION ---
+        // --- PHASE 2: POISSON DISK SCENERY INSTANCING ---
+        // Instead of random loops, we generate evenly spaced points using Poisson Disk Sampling.
+        // We do this per chunk. Since chunks are 60x60, we use a custom lightweight Poisson function here
+        // to avoid web worker boundary sync issues, using the seeded RNG.
+        
+        function getPoissonPoints(width, height, radius, rngFunc) {
+            const k = 30; // maximum limit of samples before rejection
+            const cellSize = radius / Math.sqrt(2);
+            const gridWidth = Math.ceil(width / cellSize);
+            const gridHeight = Math.ceil(height / cellSize);
+            const grid = new Array(gridWidth * gridHeight).fill(undefined);
+            const activeList = [];
+            const points = [];
+
+            const p0 = { x: rngFunc() * width, z: rngFunc() * height };
+            insertPoint(p0);
+            activeList.push(p0);
+
+            function insertPoint(p) {
+                const gx = Math.floor(p.x / cellSize);
+                const gz = Math.floor(p.z / cellSize);
+                grid[gx + gz * gridWidth] = p;
+                points.push(p);
+            }
+
+            function isValidPoint(p) {
+                if (p.x < 0 || p.x >= width || p.z < 0 || p.z >= height) return false;
+                const gx = Math.floor(p.x / cellSize);
+                const gz = Math.floor(p.z / cellSize);
+                const searchRadius = 2;
+
+                for (let i = Math.max(0, gx - searchRadius); i <= Math.min(gridWidth - 1, gx + searchRadius); i++) {
+                    for (let j = Math.max(0, gz - searchRadius); j <= Math.min(gridHeight - 1, gz + searchRadius); j++) {
+                        const neighbor = grid[i + j * gridWidth];
+                        if (neighbor) {
+                            const dx = p.x - neighbor.x;
+                            const dz = p.z - neighbor.z;
+                            if (dx * dx + dz * dz < radius * radius) return false;
+                        }
+                    }
+                }
+                return true;
+            }
+
+            while (activeList.length > 0) {
+                const randIndex = Math.floor(rngFunc() * activeList.length);
+                const p = activeList[randIndex];
+                let found = false;
+
+                for (let i = 0; i < k; i++) {
+                    const angle = rngFunc() * Math.PI * 2;
+                    const r = radius + rngFunc() * radius; // between r and 2r
+                    const candidate = { x: p.x + Math.cos(angle) * r, z: p.z + Math.sin(angle) * r };
+
+                    if (isValidPoint(candidate)) {
+                        insertPoint(candidate);
+                        activeList.push(candidate);
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    activeList.splice(randIndex, 1);
+                }
+            }
+            return points;
+        }
+
         const chunkInstances = new Map(); // prefabName -> Array of transforms
         this.instancedMeshes.set(key, chunkInstances);
-
-        const placedLightCells = new Set();
-        localRoadPoints.forEach(point => {
-            if (point.x < chunkX - 30 || point.x >= chunkX + 30 || point.z < chunkZ - 30 || point.z >= chunkZ + 30) return;
-            const cell = `${Math.floor(point.x / 30)},${Math.floor(point.z / 30)}`;
-            if (placedLightCells.has(cell)) return;
-            placedLightCells.add(cell);
-            const lightY = window.WorldGenerator.getTerrainHeight(point.x, point.z);
-            instantiatePrefab('Floating Street Light', point.x, lightY, point.z, key);
-        });
         
-        if (window.VillageManager.villages.length > 0) {
-            window.VillageManager.villages.forEach(v => {
-                if (v.x >= chunkX - 30 && v.x < chunkX + 30 && v.z >= chunkZ - 30 && v.z < chunkZ + 30) {
-                    const originalModel = window.AssetManager.prefabs['Village Hub'].customModel; window.AssetManager.prefabs['Village Hub'].customModel = v.assignedModel || originalModel;
-                    const hy = window.WorldGenerator.getTerrainHeight(v.x, v.z); const hub = instantiatePrefab('Village Hub', v.x, hy, v.z, key);
-                    if(hub) { hub.villageId = v.id; window.EventBus.emit('UI_LOG', `*** Discovered Major Settlement: ${v.name} ***`); window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: v.name, pos: new THREE.Vector3(v.x, hy + 8, v.z), color: '#ffd700'}); }
-                    if (v.layout && v.layout.length > 0) { v.layout.forEach(l => { instantiatePrefab(l.prefab, v.x + l.ox, window.WorldGenerator.getTerrainHeight(v.x + l.ox, v.z + l.oz), v.z + l.oz, key); }); }
-                    if (!v.residents) v.residents = [];
-                    if (v.residents.length === 0) v.residents.push({ prefab: 'Guard', ox: 4, oz: 4 });
-                    v.residents.forEach(resident => {
-                        const residentX = v.x + (resident.ox || 0); const residentZ = v.z + (resident.oz || 0);
-                        const residentEntity = instantiatePrefab(resident.prefab || 'Guard', residentX, window.WorldGenerator.getTerrainHeight(residentX, residentZ), residentZ, key);
-                        if (residentEntity) { 
-                            residentEntity.villageId = v.id; 
-                            residentEntity.squadId = resident.squadId || null; 
-                        
-                            // --- NOBLE HOUSE TERMINUS STAT BOOSTS ---
-                            if (v.nobleHouse === 'House Terminus') {
-                                const isLeader = resident.prefab === 'City Guard' || resident.prefab === 'Noble NPC';
-                                const baseStat = isLeader ? 85 : 65;
-                                const variance = Math.random() * 10;
-                            
-                                residentEntity.attackDamage = baseStat + variance;
-                                residentEntity.hp = (baseStat + variance) * 5;
-                                residentEntity.poise = (baseStat + variance) * 1.5;
-                                                                residentEntity.name = isLeader ? `Terminus Commander` : `Terminus Elite Guard`;
-                                residentEntity.isTerminusElite = true; 
-                            
-                                // Visual distinction for Terminus (Obsidian Steel)
+        // 1. Determine base biome to set the Poisson Radius (density)
+        const chunkCenterBiome = window.WorldGenerator.getBiome(chunkX, chunkZ);
+        const biomeData = window.WorldGenConfig.biomes[chunkCenterBiome];
+        const treeSpacing = biomeData.density || 10; // Redwoods are 12m apart, etc
+        
+        const poissonPoints = getPoissonPoints(60, 60, treeSpacing, rng);
+        const sceneryData = new Map();
 
-                                residentEntity.visual.traverse(child => {
-                                    if (child.isMesh) {
-                                        child.material.color.set(0x111827); 
-                                    }
-                                });
-                            }
-                        }
-                });
-                    window.AssetManager.prefabs['Village Hub'].customModel = originalModel;
+        // 2. Filter points and spawn scenery
+        poissonPoints.forEach(point => {
+            const vx = (chunkX - 30) + point.x;
+            const vz = (chunkZ - 30) + point.z;
+            
+            // Mask out roads
+            let nearRoad = false;
+            for(let r=0; r<localRoadPoints.length; r++) { 
+                const dx = vx - localRoadPoints[r].x;
+                const dz = vz - localRoadPoints[r].z;
+                if ((dx * dx) + (dz * dz) < 81) { // 9 meters clear around roads
+                    nearRoad = true; break; 
                 }
-            });
-        }
-        
-        // --- SCENERY INSTANCING LOGIC ---
-        const sceneryData = new Map(); // prefabName -> transform list
+            }
+            if (nearRoad) return;
+            
+            // Mask out Villages
+            let inVillage = false;
+            if (window.VillageManager) {
+                for (let v of window.VillageManager.villages) {
+                    const dx = vx - v.x;
+                    const dz = vz - v.z;
+                    if ((dx * dx) + (dz * dz) < (v.radius || 45) * (v.radius || 45)) {
+                        inVillage = true; break;
+                    }
+                }
+            }
+            if (inVillage) return;
 
-        for(let i=0; i<150; i++) {
+            // Passed all masks, place a tree/rock
+            const biomeHere = window.WorldGenerator.getBiome(vx, vz);
+            const prefabName = window.WorldGenConfig.biomes[biomeHere].prefab;
+            if (!sceneryData.has(prefabName)) sceneryData.set(prefabName, []);
+            
+            const vy = window.WorldGenerator.getTerrainHeight(vx, vz);
+            
+            // Check slope - don't spawn trees on steep cliffs
+            // (We sample slightly offset to find slope)
+            const ny = window.WorldGenerator.getTerrainHeight(vx + 1, vz);
+            if (Math.abs(vy - ny) > 1.5) return; // Too steep
+            
+            const position = new THREE.Vector3(vx, vy, vz);
+            const rotation = new THREE.Euler(0, rng() * Math.PI * 2, 0);
+            const scale = new THREE.Vector3().setScalar(0.7 + rng() * 0.6);
+            
+            // Redwoods are massive
+            if (biomeHere === 'redwoods') {
+                scale.setScalar(2.0 + rng() * 2.0);
+                scale.y *= (1.5 + rng());
+            }
+
+            sceneryData.get(prefabName).push({ position, rotation, scale });
+        });
+
+        // 3. Bake InstancedMeshes
+        sceneryData.forEach((transforms, prefabName) => {
+            const prefab = window.AssetManager.prefabs[prefabName];
+            if (!prefab || !prefab.customModel) return;
+
+            const baseMesh = prefab.customModel.clone();
+            const geometry = baseMesh.geometry.clone();
+            const material = baseMesh.material.clone();
+
+            const instancedMesh = new THREE.InstancedMesh(geometry, material, transforms.length);
+            instancedMesh.castShadow = true;
+            instancedMesh.receiveShadow = true;
+
+            const dummy = new THREE.Object3D();
+            transforms.forEach((transform, i) => {
+                dummy.position.copy(transform.position);
+                dummy.rotation.copy(transform.rotation);
+                dummy.scale.copy(transform.scale);
+                dummy.updateMatrix();
+                instancedMesh.setMatrixAt(i, dummy.matrix);
+            });
+
+            instancedMesh.instanceMatrix.needsUpdate = true;
+            window.GameCore.scene.add(instancedMesh);
+            chunkInstances.set(prefabName, instancedMesh);
+        });
             const px = chunkX + (rng() - 0.5) * 60; const pz = chunkZ + (rng() - 0.5) * 60; 
             const biomeKey = window.WorldGenerator.getBiome(px, pz); const biome = window.WorldGenConfig.biomes[biomeKey];
             
@@ -988,25 +1087,66 @@ function regenerateWorldCycle() {
                 window.VillageManager.shiftLocations();
             }
 
-            // 3. Teleport the player if they aren't in a protected zone
-            // (For now, we just randomly toss them in the valid forest bounds)
-            if (!window.EngineParams.isPlayerSafe) {
-                const forestExtent = window.WorldGenConfig.darkForestSideMeters / 2 - 1000;
-                let newX, newZ;
-                let valid = false;
-                while(!valid) {
-                    newX = (Math.random() * 2 - 1) * forestExtent;
-                    newZ = (Math.random() * 2 - 1) * forestExtent;
-                    // Don't spawn them inside the capital or terminus bounds
-                    if (Math.abs(newX) > 500 || Math.abs(newZ) > 500) valid = true;
-                }
-                const newY = window.WorldGenerator.getTerrainHeight(newX, newZ) + 15;
-                if (window.GameCore.playerObj) {
-                    window.GameCore.playerObj.body.setTranslation({x: newX, y: newY, z: newZ}, true);
-                    window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
-                    // Force the chunk manager to immediately load the new location
-                    if (typeof ChunkManager !== 'undefined') ChunkManager.update(new THREE.Vector3(newX, newY, newZ));
-                }
+                        // 3. Handle Player Teleportation / Anchoring
+            let playerShiftedSafely = false;
+            
+            if (window.GameCore.playerObj) {
+              const playerPos = window.GameCore.playerObj.visual.position;
+                
+              // Check if they are protected by a village barrier
+              const protectedVillage = window.VillageManager.villages.find(v => {
+                  const distSq = Math.pow(playerPos.x - v.x, 2) + Math.pow(playerPos.z - v.z, 2);
+                  return distSq <= Math.pow(v.territory?.barrierRadius || 90, 2);
+              });
+                
+              // Check if they have the Shift Anchor Item (e.g. 'epoch_anchor')
+              const hasAnchorItem = window.GameState.inventory.equipment.waist === 'epoch_anchor' || 
+                                    window.GameState.inventory.backpack.includes('epoch_anchor');
+                
+              if (protectedVillage) {
+                  // Player is inside a protected village. We shift them relative to the village's NEW location.
+                  // Wait, the village already moved in step 2. We need to calculate this BEFORE shifting the villages ideally.
+                  // To fix this without refactoring step 2, we can just spawn them safely at the center of the new village.
+                  const newY = window.WorldGenerator.getTerrainHeight(protectedVillage.x, protectedVillage.z) + 5;
+                  window.GameCore.playerObj.body.setTranslation({x: protectedVillage.x, y: newY, z: protectedVillage.z}, true);
+                  window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
+                  playerShiftedSafely = true;
+                  window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The ward held. You shifted safely with ${protectedVillage.name}.`);
+              } 
+              else if (hasAnchorItem) {
+                  // Player is in the wild, but has the anchor. We can snap them to the nearest road.
+                  const nearestRoadPt = window.RoadManager.getRandomPathPoint();
+                  if (nearestRoadPt) {
+                      const newY = window.WorldGenerator.getTerrainHeight(nearestRoadPt.x, nearestRoadPt.z) + 5;
+                      window.GameCore.playerObj.body.setTranslation({x: nearestRoadPt.x, y: newY, z: nearestRoadPt.z}, true);
+                      window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
+                      playerShiftedSafely = true;
+                      window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The Anchor burns in your pocket, pulling you to the nearest road.`);
+                  }
+              }
+            }
+            
+            // If they weren't protected or anchored, they get lost in the deep forest
+            if (!playerShiftedSafely && !window.EngineParams.isPlayerSafe) {
+              const forestExtent = window.WorldGenConfig.darkForestSideMeters / 2 - 1000;
+              let newX, newZ;
+              let valid = false;
+              while(!valid) {
+                  newX = (Math.random() * 2 - 1) * forestExtent;
+                  newZ = (Math.random() * 2 - 1) * forestExtent;
+                  if (Math.abs(newX) > 500 || Math.abs(newZ) > 500) valid = true;
+              }
+              const newY = window.WorldGenerator.getTerrainHeight(newX, newZ) + 15;
+              if (window.GameCore.playerObj) {
+                  window.GameCore.playerObj.body.setTranslation({x: newX, y: newY, z: newZ}, true);
+                  window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
+              }
+              window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] You were caught unprotected. You are lost in the deep forest.`);
+            }
+            
+            // Force chunk manager update
+            if (window.GameCore.playerObj && typeof ChunkManager !== 'undefined') {
+               ChunkManager.update(window.GameCore.playerObj.visual.position);
             }
 
             // Tell the rest of the systems to refresh

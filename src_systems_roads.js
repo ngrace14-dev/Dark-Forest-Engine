@@ -4,23 +4,57 @@ window.RoadManager = {
     paths: [], roadChunks: new Map(),
     generateRoads: function(villages) {
         this.paths = []; this.roadChunks.clear();
+        const prng = window.EpochManagerInstance ? window.EpochManagerInstance.prng : Math.random;
+        
         for (let i = 0; i < villages.length - 1; i++) {
-            const start = new THREE.Vector3(villages[i].x, 0, villages[i].z); const end = new THREE.Vector3(villages[i+1].x, 0, villages[i+1].z);
-            const points = [start]; const dist = start.distanceTo(end); const meanderFactor = 5.0 + Math.random() * 5.0; 
-            const numSegments = Math.max(3, Math.floor(dist / 2000)); const dir = end.clone().sub(start).normalize(); const perp = new THREE.Vector3(-dir.z, 0, dir.x);
+            const start = new THREE.Vector3(villages[i].x, 0, villages[i].z); 
+            const end = new THREE.Vector3(villages[i+1].x, 0, villages[i+1].z);
+            const dist = start.distanceTo(end); 
             
+            // To ensure the road is ~10x longer than the straight-line vector, 
+            // we heavily meander the path with wide, sweeping arcs and loops.
+            // A straight line is dist. To reach 10x dist, we need extreme perpendicular offsets.
+            const targetLength = dist * 10.0;
+            const numSegments = Math.max(10, Math.floor(targetLength / 5000)); // Lots of nodes to make it twisty
+            const dir = end.clone().sub(start).normalize(); 
+            const perp = new THREE.Vector3(-dir.z, 0, dir.x);
+            
+            const points = [start]; 
+            
+            // Instead of just zigzagging, we generate a highly spiraled/winding path
+            // by using sine waves of varying frequencies.
             for (let j = 1; j < numSegments; j++) {
-                const t = j / numSegments; const basePt = start.clone().lerp(end, t); const sign = (j % 2 === 0) ? 1 : -1;
-                const offsetMag = dist * meanderFactor * 0.1 * (0.5 + Math.random() * 0.5); 
-                points.push(basePt.add(perp.clone().multiplyScalar(sign * offsetMag)));
+                const t = j / numSegments; 
+                
+                // base point along the straight line
+                const basePt = start.clone().lerp(end, t); 
+                
+                // Low frequency massive sweep (creates the huge 10x distance detour)
+                const macroSweep = Math.sin(t * Math.PI * (3 + prng() * 4)) * (dist * 2.5);
+                
+                // Medium frequency zigzag
+                const mesoZigzag = Math.cos(t * Math.PI * (10 + prng() * 5)) * (dist * 0.8);
+                
+                // Add the offsets to the perpendicular vector
+                const offsetMag = macroSweep + mesoZigzag;
+                
+                points.push(basePt.add(perp.clone().multiplyScalar(offsetMag)));
             }
             points.push(end);
-            const curve = new THREE.CatmullRomCurve3(points); this.paths.push({ startVillage: villages[i].id, endVillage: villages[i+1].id, curve: curve });
             
-            const curveLength = curve.getLength(); const numSamples = Math.floor(curveLength / 5); 
+            // Use chordal curve type to prevent the splines from creating tight knots when meandering wildly
+            const curve = new THREE.CatmullRomCurve3(points, false, 'chordal'); 
+            this.paths.push({ startVillage: villages[i].id, endVillage: villages[i+1].id, curve: curve });
+            
+            const curveLength = curve.getLength(); 
+            const numSamples = Math.floor(curveLength / 5); 
             for(let k=0; k<=numSamples; k++) {
-                const pt = curve.getPoint(k / numSamples); const cx = Math.floor(pt.x / 60); const cz = Math.floor(pt.z / 60);
-                const key = `${cx},${cz}`; if(!this.roadChunks.has(key)) this.roadChunks.set(key, []); this.roadChunks.get(key).push({x: pt.x, z: pt.z});
+                const pt = curve.getPoint(k / numSamples); 
+                const cx = Math.floor(pt.x / 60); 
+                const cz = Math.floor(pt.z / 60);
+                const key = `${cx},${cz}`; 
+                if(!this.roadChunks.has(key)) this.roadChunks.set(key, []); 
+                this.roadChunks.get(key).push({x: pt.x, z: pt.z});
             }
         }
         window.EventBus.emit('UI_LOG', `Road network generated between ${villages.length} settlements.`);
