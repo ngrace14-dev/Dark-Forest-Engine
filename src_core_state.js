@@ -26,8 +26,9 @@ function rollRunPotential() {
 }
 
 window.GameState = {
-    pStats: {
+        pStats: {
         hp: 100, maxHp: 100, stamina: 100, maxStamina: 100, poise: 60, maxPoise: 60, guardBrokenUntil: 0,
+        hunger: 100, maxHunger: 100, // 100 = Full, 0 = Starving
         strength: { level: 1, xp: 0, next: 100 }, toughness: { level: 1, xp: 0, next: 100 },
         athletics: { level: 1, xp: 0, next: 100 }, dodge: { level: 1, xp: 0, next: 100 },
         meleeAtt: { level: 1, xp: 0, next: 100 }, meleeDef: { level: 1, xp: 0, next: 100 }
@@ -158,10 +159,12 @@ window.Input = {
 window.EngineParams = {
     playMode: true, brushActive: false, selectedPrefab: 'Village Hub', isPlayerHidden: false,
     bloom: 0.35, vignette: 1.1, filterColor: '#2b4461', filterIntensity: 0.65,
-    timeOfDay: 14.0, worldDay: 0, dayLengthSeconds: 120, offPathCaptureCooldown: 0,
+    timeOfDay: 14.0, worldDay: 0,         dayLengthSeconds: 43200, // 24 in-game hours = 12 real-life hours (12 * 60 * 60)
+    offPathCaptureCooldown: 0,
     mapTileSizeMeters: 8046.72, visitedMapTiles: [], currentMapTile: null, sandReaverEncountered: false,
-    fogDensity: 0.03, timeScale: 1.0, godMode: false,
-    globalBrightness: 1.5, worldSeed: 'dark_forests_1337', isPlayerSafe: false,
+    fogDensity: 0.005, // Much clearer fog to let the brightness through
+    timeScale: 1.0, godMode: false,
+    globalBrightness: 2.0, // Double the base global brightness
     cycleLengthDays: 14, lastCycleDay: 0,
     arenaMode: false, arenaWave: 0, suppressWorldRegenerate: false
 };

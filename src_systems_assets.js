@@ -101,7 +101,10 @@ window.AssetManager = {
             animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, 
             vfx: { aura: 'Void', onHit: 'Sparks' } 
         },
-        'Iron Sword': { type: 'weapon', category: 'weapons', radius: 0.2, height: 1, modelScale: 1.0, color: 0xcccccc, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Sparks' } }
+        'Iron Sword': { type: 'weapon', category: 'weapons', radius: 0.2, height: 1, modelScale: 1.0, color: 0xcccccc, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Sparks' } },
+        'Berry Bush': { type: 'structure', category: 'terrain', radius: 1.5, height: 1.2, modelScale: 1.0, color: 0x1e3a1e, gatherable: 'food', gatherAmount: 5, gatherCooldown: 300, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
+        'Deer': { type: 'npc', category: 'npcs', radius: 0.6, height: 1.8, modelScale: 1.0, color: 0x8b4513, faction: 'forest', behavior: 'flee', hp: 40, loot: 'food', lootAmount: 15, speed: 7.0, customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'None', onHit: 'Blood' } }
+
 
     }
 };

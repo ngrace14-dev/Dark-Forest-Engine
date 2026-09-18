@@ -206,7 +206,7 @@ const ChunkManager = {
         const poissonPoints = getPoissonPoints(60, 60, treeSpacing, rng);
         const sceneryData = new Map();
 
-        // 2. Filter points and spawn scenery
+                // 2. Filter points and spawn scenery
         poissonPoints.forEach(point => {
             const vx = (chunkX - 30) + point.x;
             const vz = (chunkZ - 30) + point.z;
@@ -237,7 +237,21 @@ const ChunkManager = {
 
             // Passed all masks, place a tree/rock
             const biomeHere = window.WorldGenerator.getBiome(vx, vz);
-            const prefabName = window.WorldGenConfig.biomes[biomeHere].prefab;
+            let prefabName = window.WorldGenConfig.biomes[biomeHere].prefab;
+            
+            // --- HARVESTABLE SCENERY LOGIC ---
+            // 20% chance to replace a biome prefab with a Berry Bush
+            if (rng() < 0.20 && biomeHere !== 'desert' && biomeHere !== 'sierra') {
+                prefabName = 'Berry Bush';
+            }
+
+            // 5% chance to spawn a Deer in this spot instead of scenery
+            if (rng() < 0.05 && (biomeHere === 'redwoods' || biomeHere === 'valley')) {
+                const dy = window.WorldGenerator.getTerrainHeight(vx, vz);
+                instantiatePrefab('Deer', vx, dy, vz, key);
+                return; // Skip tree instancing for this point
+            }
+
             if (!sceneryData.has(prefabName)) sceneryData.set(prefabName, []);
             
             const vy = window.WorldGenerator.getTerrainHeight(vx, vz);
@@ -282,63 +296,71 @@ const ChunkManager = {
                 instancedMesh.setMatrixAt(i, dummy.matrix);
             });
 
-            instancedMesh.instanceMatrix.needsUpdate = true;
+                        instancedMesh.instanceMatrix.needsUpdate = true;
             window.GameCore.scene.add(instancedMesh);
             chunkInstances.set(prefabName, instancedMesh);
         });
-            const px = chunkX + (rng() - 0.5) * 60; const pz = chunkZ + (rng() - 0.5) * 60; 
-            const biomeKey = window.WorldGenerator.getBiome(px, pz); const biome = window.WorldGenConfig.biomes[biomeKey];
-            
-            if (biome.prefab !== 'None' && window.AssetManager.prefabs[biome.prefab]) {
-                const def = window.AssetManager.prefabs[biome.prefab];
-                // Only instance static non-animated structures/mountains
-                if ((def.type === 'structure' || def.type === 'mountain') && !def.customModel) {
-                    if (!sceneryData.has(biome.prefab)) sceneryData.set(biome.prefab, []);
-                    const py = window.WorldGenerator.getTerrainHeight(px, pz);
-                    sceneryData.get(biome.prefab).push({ x: px, y: py, z: pz, scale: 0.8 + rng() * 0.4, rot: rng() * Math.PI * 2 });
-                } else {
-                    // Dynamic or custom models still use normal instantiation
-                    instantiatePrefab(biome.prefab, px, window.WorldGenerator.getTerrainHeight(px, pz), pz, key);
-                }
-            }
-        }
 
-        // Finalize Instanced Meshes
-        sceneryData.forEach((transforms, prefabName) => {
-            const def = window.AssetManager.prefabs[prefabName];
-            let geometry;
-            if(def.type === 'structure') geometry = new THREE.BoxGeometry(def.radius*2, def.height, def.radius*2);
-            else if(def.type === 'mountain') geometry = new THREE.ConeGeometry(def.radius, def.height, 16);
-            
-            const material = new THREE.MeshStandardMaterial({ color: def.color });
-            const imesh = new THREE.InstancedMesh(geometry, material, transforms.length);
-            imesh.receiveShadow = true; imesh.castShadow = true;
-            
-            const dummy = new THREE.Object3D();
-            transforms.forEach((t, i) => {
-                dummy.position.set(t.x, t.y + def.height/2, t.z);
-                dummy.rotation.y = t.rot;
-                dummy.scale.setScalar(t.scale);
-                dummy.updateMatrix();
-                imesh.setMatrixAt(i, dummy.matrix);
-                
-                // Create physical colliders for instances
-                const rbDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(t.x, t.y + def.height/2, t.z);
-                const body = window.GameCore.world.createRigidBody(rbDesc);
-                let colDesc;
-                if(def.type === 'structure') colDesc = RAPIER.ColliderDesc.cuboid(def.radius * t.scale, def.height/2 * t.scale, def.radius * t.scale);
-                else colDesc = RAPIER.ColliderDesc.cone(def.height/2 * t.scale, def.radius * t.scale);
-                window.GameCore.world.createCollider(colDesc, body);
-                
-                // Track these for cleanup
-                if (!this.activeChunks.get(key).instanceBodies) this.activeChunks.get(key).instanceBodies = [];
-                this.activeChunks.get(key).instanceBodies.push(body);
-            });
-            
-                        window.GameCore.scene.add(imesh);
-            chunkInstances.set(prefabName, imesh);
+        // --- VILLAGES & STREET LIGHTS ---
+        const placedLightCells = new Set();
+        localRoadPoints.forEach(point => {
+            if (point.x < chunkX - 30 || point.x >= chunkX + 30 || point.z < chunkZ - 30 || point.z >= chunkZ + 30) return;
+            const cell = `${Math.floor(point.x / 30)},${Math.floor(point.z / 30)}`;
+            if (placedLightCells.has(cell)) return;
+            placedLightCells.add(cell);
+            const lightY = window.WorldGenerator.getTerrainHeight(point.x, point.z);
+            instantiatePrefab('Floating Street Light', point.x, lightY, point.z, key);
         });
         
+        if (window.VillageManager.villages.length > 0) {
+            window.VillageManager.villages.forEach(v => {
+                if (v.x >= chunkX - 30 && v.x < chunkX + 30 && v.z >= chunkZ - 30 && v.z < chunkZ + 30) {
+                    const originalModel = window.AssetManager.prefabs['Village Hub'].customModel; 
+                    window.AssetManager.prefabs['Village Hub'].customModel = v.assignedModel || originalModel;
+                    const hy = window.WorldGenerator.getTerrainHeight(v.x, v.z); 
+                    const hub = instantiatePrefab('Village Hub', v.x, hy, v.z, key);
+                    if(hub) { 
+                        hub.villageId = v.id; 
+                        window.EventBus.emit('UI_LOG', `*** Discovered Major Settlement: ${v.name} ***`); 
+                        window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: v.name, pos: new THREE.Vector3(v.x, hy + 8, v.z), color: '#ffd700'}); 
+                    }
+                    if (v.layout && v.layout.length > 0) { 
+                        v.layout.forEach(l => { 
+                            instantiatePrefab(l.prefab, v.x + l.ox, window.WorldGenerator.getTerrainHeight(v.x + l.ox, v.z + l.oz), v.z + l.oz, key); 
+                        }); 
+                    }
+                    if (!v.residents) v.residents = [];
+                    if (v.residents.length === 0) v.residents.push({ prefab: 'Guard', ox: 4, oz: 4 });
+                    v.residents.forEach(resident => {
+                        const residentX = v.x + (resident.ox || 0); const residentZ = v.z + (resident.oz || 0);
+                        const residentEntity = instantiatePrefab(resident.prefab || 'Guard', residentX, window.WorldGenerator.getTerrainHeight(residentX, residentZ), residentZ, key);
+                        if (residentEntity) { 
+                            residentEntity.villageId = v.id; 
+                            residentEntity.squadId = resident.squadId || null; 
+                        
+                            if (v.nobleHouse === 'House Terminus') {
+                                const isLeader = resident.prefab === 'City Guard' || resident.prefab === 'Noble NPC';
+                                const baseStat = isLeader ? 85 : 65;
+                                const variance = Math.random() * 10;
+                            
+                                residentEntity.attackDamage = baseStat + variance;
+                                residentEntity.hp = (baseStat + variance) * 5;
+                                residentEntity.poise = (baseStat + variance) * 1.5;
+                                residentEntity.name = isLeader ? `Terminus Commander` : `Terminus Elite Guard`;
+                                residentEntity.isTerminusElite = true; 
+                            
+                                residentEntity.visual.traverse(child => {
+                                    if (child.isMesh) {
+                                        child.material.color.set(0x111827); 
+                                    }
+                                });
+                            }
+                        }
+                    });
+                                        window.AssetManager.prefabs['Village Hub'].customModel = originalModel;
+                }
+            });
+        }
         window.EventBus.emit('CHUNK_GENERATED');
     },
         unloadChunk: function(key) {
@@ -758,19 +780,57 @@ function spawnPartyMembers() {
 window.GameCore.spawnPartyMembers = spawnPartyMembers;
 
 function processCompanionNeeds() {
+    const hoursPerSecond = 24 / window.EngineParams.dayLengthSeconds;
+    const hungerPerSecond = 100 / (24 * 60 * 60 / hoursPerSecond); // 100 points per 24 in-game hours
+    
+    // Player Hunger Logic
+    const pStats = window.GameState.pStats;
+    pStats.hunger = Math.max(0, pStats.hunger - (hungerPerSecond * 60)); // Check every minute or so
+    
+    // Starvation debuffs for player
+    if (pStats.hunger <= 0) {
+        // Starving for 7 days logic: 
+        // We track 'starvationDays' in GameState
+        window.GameState.starvationDays = (window.GameState.starvationDays || 0) + (1/6); // Called every 4 in-game hours
+        
+        const weakness = Math.min(0.9, window.GameState.starvationDays / 7);
+        pStats.maxHp = 100 * (1 - weakness);
+        pStats.hp = Math.min(pStats.hp, pStats.maxHp);
+        
+        if (window.GameState.starvationDays >= 7) {
+            pStats.hp = 0; // Starved to death
+            window.EventBus.emit('UI_LOG', "You have starved to death.");
+        } else {
+            window.EventBus.emit('UI_LOG', `Starvation: You are growing weak (${Math.floor(weakness*100)}% debuff)`);
+        }
+    } else {
+        window.GameState.starvationDays = 0;
+    }
+
+    // NPC Hunger Logic
     window.GameState.party.members.filter(member => member.recruited).forEach(member => {
-        member.hunger = Math.min(100, (member.hunger || 0) + 15);
+        member.hunger = Math.max(0, (member.hunger || 100) - 25); // Loses 25% every 4 in-game hours
+        
         const rationIndex = member.inventory.indexOf('food');
-        if (member.hunger >= 40 && rationIndex >= 0) {
+        if (member.hunger <= 60 && rationIndex >= 0) {
             member.inventory.splice(rationIndex, 1);
-            member.hunger = Math.max(0, member.hunger - 45);
+            member.hunger = 100;
             member.loyalty = Math.min(100, (member.loyalty || 0) + 1);
         }
-        if (member.hunger >= 80) {
-            member.hp = Math.max(1, member.hp - 10);
-            if (!member.injuries.includes('starvation')) member.injuries.push('starvation');
-            member.loyalty = Math.max(0, (member.loyalty || 0) - 5);
+        
+        if (member.hunger <= 0) {
+            member.starvationDays = (member.starvationDays || 0) + (1/6);
+            if (member.starvationDays >= 7) {
+                member.hp = 0;
+                member.downed = true;
+                window.EventBus.emit('UI_LOG', `${member.name} has starved to death.`);
+            } else {
+                member.hp = Math.max(1, member.hp - (member.maxHp * 0.1)); // Lose 10% HP per check
+            }
+        } else {
+            member.starvationDays = 0;
         }
+        
         const entity = window.GameCore.activeEntities.find(candidate => candidate.companionId === member.id);
         if (entity) entity.hp = member.hp;
     });
@@ -1217,8 +1277,20 @@ async function bootEngine() {
         renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); renderer.setSize(window.innerWidth || 800, window.innerHeight || 600); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25; document.body.appendChild(renderer.domElement);
         clock = new THREE.Clock(); window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
 
-        ambientLight = new THREE.AmbientLight(0x506070, 0.8); window.GameCore.scene.add(ambientLight);
-        dirLight = new THREE.DirectionalLight(0xaaccff, 1.2); dirLight.position.set(20, 40, 20); dirLight.castShadow = true; dirLight.shadow.camera.left = -50; dirLight.shadow.camera.right = 50; dirLight.shadow.camera.top = 50; dirLight.shadow.camera.bottom = -50; window.GameCore.scene.add(dirLight);
+                ambientLight = new THREE.AmbientLight(0xffffff, 1.5); window.GameCore.scene.add(ambientLight);
+        dirLight = new THREE.DirectionalLight(0xffffff, 2.5); 
+        dirLight.position.set(20, 60, 20); 
+        dirLight.castShadow = true; 
+        
+        // Boost Shadow Resolution for 1:1 scale
+        dirLight.shadow.mapSize.width = 4096;
+        dirLight.shadow.mapSize.height = 4096;
+        dirLight.shadow.camera.left = -150; 
+        dirLight.shadow.camera.right = 150; 
+        dirLight.shadow.camera.top = 150; 
+        dirLight.shadow.camera.bottom = -150; 
+        dirLight.shadow.bias = -0.0005;
+        window.GameCore.scene.add(dirLight);
 
         composer = new EffectComposer(renderer); composer.addPass(new RenderPass(window.GameCore.scene, window.GameCore.camera));
         window.GameCore.passes.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), window.EngineParams.bloom, 0.25, 0.9); composer.addPass(window.GameCore.passes.bloom);
@@ -1232,13 +1304,53 @@ async function bootEngine() {
         const startY = window.WorldGenerator.getTerrainHeight(0, 0); const safeY = isNaN(startY) ? 10 : startY;
         spawnPlayer(0, safeY + 15, 0); spawnPartyMembers(); ChunkManager.update(new THREE.Vector3(0, safeY + 15, 0));
         
-        window.EventBus.on('ENV_UPDATE', () => {
-            const angle = ((window.EngineParams.timeOfDay - 6) / 24) * Math.PI * 2; dirLight.position.x = Math.cos(angle) * 50; dirLight.position.y = Math.sin(angle) * 50; dirLight.position.z = Math.cos(angle) * 20;
-            const sunHeight = Math.sin(angle); let baseDirIntensity = 1.55; let baseAmbientIntensity = 1.25;
-            if (sunHeight > 0.2) { baseDirIntensity = 1.55; dirLight.color.setHex(0xffffff); ambientLight.color.setHex(0x8090a0); window.GameCore.scene.fog.color.setHex(0x182028); window.GameCore.scene.background = new THREE.Color(0x182028); }
-            else if (sunHeight > 0.0) { baseDirIntensity = 1.15; baseAmbientIntensity = 1.05; dirLight.color.setHex(0xffbb77); ambientLight.color.setHex(0x6a5660); window.GameCore.scene.fog.color.setHex(0x2a1710); window.GameCore.scene.background = new THREE.Color(0x2a1710); }
-            else { baseDirIntensity = 0.8; baseAmbientIntensity = 0.95; dirLight.color.setHex(0x7590b5); ambientLight.color.setHex(0x58687a); window.GameCore.scene.fog.color.setHex(0x101820); window.GameCore.scene.background = new THREE.Color(0x101820); }
-            dirLight.intensity = baseDirIntensity * window.EngineParams.globalBrightness; ambientLight.intensity = baseAmbientIntensity * window.EngineParams.globalBrightness; renderer.toneMappingExposure = Math.max(0.8, window.EngineParams.globalBrightness); window.GameCore.scene.fog.density = window.EngineParams.fogDensity;
+                window.EventBus.on('ENV_UPDATE', () => {
+            // Sun angle logic: 0 is dawn, PI/2 is noon, PI is dusk
+            const hourNormalized = (window.EngineParams.timeOfDay % 24) / 24;
+            const angle = hourNormalized * Math.PI * 2 - (Math.PI / 2); // Offset so noon is top
+            
+            // Move light in a massive arc around the player
+            const sunRadius = 200;
+            dirLight.position.x = Math.cos(angle) * sunRadius;
+            dirLight.position.y = Math.sin(angle) * sunRadius;
+            dirLight.position.z = Math.cos(angle) * 100; // Slight tilt
+            
+            const sunHeight = Math.sin(angle); 
+            let baseDirIntensity = 2.5; 
+            let baseAmbientIntensity = 1.8;
+            
+            // High-Noon / Bright Day (Sun is high)
+            if (sunHeight > 0.3) { 
+                baseDirIntensity = 3.0; 
+                baseAmbientIntensity = 2.0;
+                dirLight.color.setHex(0xffffff); 
+                ambientLight.color.setHex(0xffffff); 
+                window.GameCore.scene.fog.color.setHex(0x94a3b8); // Bright blue-gray fog
+                window.GameCore.scene.background = new THREE.Color(0x94a3b8);
+            }
+            // Dawn / Dusk (Golden Hour)
+            else if (sunHeight > -0.1) { 
+                baseDirIntensity = 1.8; 
+                baseAmbientIntensity = 1.4; 
+                dirLight.color.setHex(0xffccaa); 
+                ambientLight.color.setHex(0x7c2d12); 
+                window.GameCore.scene.fog.color.setHex(0x451a03); 
+                window.GameCore.scene.background = new THREE.Color(0x451a03);
+            }
+            // Night
+            else { 
+                baseDirIntensity = 0.5; 
+                baseAmbientIntensity = 0.6; 
+                dirLight.color.setHex(0x1e293b); 
+                ambientLight.color.setHex(0x0f172a); 
+                window.GameCore.scene.fog.color.setHex(0x020617); 
+                window.GameCore.scene.background = new THREE.Color(0x020617);
+            }
+            
+            dirLight.intensity = baseDirIntensity * window.EngineParams.globalBrightness; 
+            ambientLight.intensity = baseAmbientIntensity * window.EngineParams.globalBrightness; 
+            renderer.toneMappingExposure = Math.max(1.0, window.EngineParams.globalBrightness * 1.5); 
+            window.GameCore.scene.fog.density = window.EngineParams.fogDensity * (sunHeight < 0 ? 1.5 : 1.0);
         });
         
         window.EventBus.emit('ENGINE_READY'); window.EventBus.emit('ENV_UPDATE');
@@ -1468,11 +1580,23 @@ function fixedUpdateLogic(delta) {
 
     updateWorldClock(delta);
     
-    // Sliced Systems Updates
+        // Sliced Systems Updates
     if(window.GameCore.worldTimer > 0.25) { 
         updatePeriodicSystems();
+        
+        // --- NPC & PLAYER NEEDS (Every 4 In-Game Hours) ---
+        // 4 in-game hours = (4 / 24) * dayLengthSeconds
+        const checkInterval = (4 / 24) * window.EngineParams.dayLengthSeconds; 
+        if (!window.GameCore.lastNeedsCheck || window.GameCore.worldTimerAbsolute > window.GameCore.lastNeedsCheck + checkInterval) {
+             processCompanionNeeds();
+             window.GameCore.lastNeedsCheck = window.GameCore.worldTimerAbsolute || 0;
+        }
+
         window.GameCore.worldTimer = 0; 
     }
+
+    window.GameCore.worldTimerAbsolute = (window.GameCore.worldTimerAbsolute || 0) + delta;
+
 
     // Direct Module Updates
     window.ArenaTestManager?.update(delta);
