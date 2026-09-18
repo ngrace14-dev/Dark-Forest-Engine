@@ -1272,9 +1272,16 @@ function regenerateWorldCycle() {
                ChunkManager.update(window.GameCore.playerObj.visual.position);
             }
 
-            // Tell the rest of the systems to refresh
+                        // Tell the rest of the systems to refresh
             window.EventBus.emit('WORLD_REGENERATE');
+            
+            // --- PHASE 6: WORLD-SHAPER XP ---
+            // Award XP for witnessing and surviving the Epoch shift
+            window.CareerManager.addXP('navigator', 100);
+            window.CareerManager.addXP('archivist', 50);
+            
             window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The white wave passed. The forest has shifted.`);
+
 
             // 4. Fade back in
             setTimeout(() => {

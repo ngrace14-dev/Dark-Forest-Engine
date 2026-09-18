@@ -499,8 +499,14 @@ window.GameCore = {
         
         // --- PHASE 5: NARRATIVE PACING ---
         // Clearing the Huntsman's Mark via Feats
-        if (impact >= 5 && window.EncounterDirector && window.EncounterDirector.huntsmanMarkTimer > 0) {
+                if (impact >= 5 && window.EncounterDirector && window.EncounterDirector.huntsmanMarkTimer > 0) {
             window.EncounterDirector.clearHuntsmanMark();
+        }
+
+        // --- PHASE 6: CHRONICLER XP ---
+        // Chroniclers gain XP for performing noteworthy deeds that catch the Crow's eye
+        if (narrator.playerClaimed) {
+            window.CareerManager.addXP('chronicler', impact * 5);
         }
 
         window.EventBus.emit('UI_UPDATE_HUD');
