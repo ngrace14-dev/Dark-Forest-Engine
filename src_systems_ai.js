@@ -1,4 +1,5 @@
 window.EventBus.on('PARTY_COMMAND', command => {
+    
     window.GameState.party.command = command;
     window.GameCore.activeEntities.filter(entity => entity.companionId).forEach(entity => {
         const selected = window.GameState.party.selectedMembers.includes(entity.companionId);
@@ -861,10 +862,10 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                     en.visual.lookAt(en.visual.position.clone().add(randomDir));
                     if(window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(en, 'walk');
                 }
-            } else if (en.body.linvel().x === 0 && en.body.linvel().z === 0) {
+                        } else if (en.body.linvel().x === 0 && en.body.linvel().z === 0) {
                 if(window.GameCore.playEntityAnimation && en.currentAnimState !== 'hit' && en.currentAnimState !== 'die') window.GameCore.playEntityAnimation(en, 'idle');
             }
         }
-});
+    });
 });
 
