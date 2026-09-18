@@ -228,9 +228,15 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             if (!caravan || caravan.status !== 'traveling' || !destination) return;
             caravan.position = { x: en.visual.position.x, z: en.visual.position.z };
             const destinationPosition = new window.THREE.Vector3(destination.x, en.visual.position.y, destination.z);
-            if (en.visual.position.distanceTo(destinationPosition) <= 8) {
+                        if (en.visual.position.distanceTo(destinationPosition) <= 8) {
                 caravan.status = 'arrived';
-                if (window.GameState.party.escortCaravanId === caravan.id) window.GameState.party.escortCaravanId = null;
+                if (window.GameState.party.escortCaravanId === caravan.id) {
+                    window.GameState.party.escortCaravanId = null;
+                    // --- PHASE 3: CARAVAN MASTER XP ---
+                    // Award XP for successful escort delivery
+                    window.CareerManager.addXP('caravan_master', 100);
+                    window.EventBus.emit('UI_LOG', `[COMMERCE] Escort complete. You earned 100 Caravan Master XP.`);
+                }
                 en.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
                 window.EventBus.emit('UI_LOG', `Merchant caravan reached ${destination.name}.`);
                         } else {

@@ -54,6 +54,10 @@ window.EstablishmentManager = {
         this.rumors = [];
         const villages = window.VillageManager.villages;
         
+        // --- PHASE 3: INFO BROKER XP ---
+        // Award XP for updating your network's knowledge
+        window.CareerManager.addXP('info_broker', 20);
+        
         // 1. Economic Rumors (Shortages)
         villages.forEach(v => {
             if (v.stats.food < v.population.current * 3) {

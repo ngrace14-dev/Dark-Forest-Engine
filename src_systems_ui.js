@@ -917,28 +917,35 @@ window.EventBus.on('TAKE_COMPANION_ITEM', ({ memberId, index }) => {
     window.EventBus.emit('RENDER_INVENTORY');
 });
 
-window.EventBus.on('BUY_MERCHANT_ITEM', ({ chestId, index }) => {
-    const chest = window.GameCore.activeEntities.find(entity => entity.id === chestId);
-    const stock = chest?.merchantInventory?.[index];
-    if (!stock || stock.quantity <= 0) return;
-    const price = window.GameCore.getMerchantPrice(stock.price, 'kingdom');
-    if (window.GameState.inventory.gold < price) {
-        window.EventBus.emit('UI_LOG', 'Not enough gold.');
-        return;
-    }
-    if (window.GameState.inventory.backpack.length >= 25) {
-        window.EventBus.emit('UI_LOG', 'Backpack is full.');
-        return;
-    }
-    window.GameState.inventory.gold -= price;
-    stock.quantity--;
-    window.GameState.inventory.backpack.push(stock.itemId);
-    if (stock.itemId === 'food') window.GameState.inventory.food++;
-    window.EventBus.emit('UI_LOG', `Purchased ${window.ItemDatabase[stock.itemId]?.name || stock.itemId}.`);
-    openMerchantShop(chest);
-    window.EventBus.emit('UI_UPDATE_HUD');
-    window.EventBus.emit('RENDER_INVENTORY');
-});
+  window.EventBus.on('BUY_MERCHANT_ITEM', ({ chestId, index }) => {
+      const chest = window.GameCore.activeEntities.find(entity => entity.id === chestId);
+      const stock = chest?.merchantInventory?.[index];
+      if (!stock || stock.quantity <= 0) return;
+      const price = window.GameCore.getMerchantPrice(stock.price, 'kingdom');
+        
+      if (window.GameState.inventory.gold < price) {
+          window.EventBus.emit('UI_LOG', 'Not enough gold.');
+          return;
+      }
+      if (window.GameState.inventory.backpack.length >= 25) {
+          window.EventBus.emit('UI_LOG', 'Backpack is full.');
+          return;
+      }
+        
+      window.GameState.inventory.gold -= price;
+      stock.quantity--;
+      window.GameState.inventory.backpack.push(stock.itemId);
+        
+      // --- PHASE 3: MERCHANT XP ---
+      // Award XP for participating in the economy
+      window.CareerManager.addXP('merchant', 15);
+        
+      if (stock.itemId === 'food') window.GameState.inventory.food++;
+      window.EventBus.emit('UI_LOG', `Purchased ${window.ItemDatabase[stock.itemId]?.name || stock.itemId}.`);
+      openMerchantShop(chest);
+      window.EventBus.emit('UI_UPDATE_HUD');
+      window.EventBus.emit('RENDER_INVENTORY');
+  });
 
 window.EventBus.on('ESCORT_CARAVAN', caravanId => {
     window.GameState.party.escortCaravanId = caravanId;
