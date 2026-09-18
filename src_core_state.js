@@ -196,13 +196,16 @@ window.GameCore = {
                 body.setTranslation({ x: trans.x - shift.x, y: trans.y, z: trans.z - shift.z }, true);
             });
             
-            // 2. Shift all Three.js Scene Objects (that aren't parented to player)
+                        // 2. Shift all Three.js Scene Objects (that aren't parented to player)
             this.scene.children.forEach(child => {
-                if (child !== this.camera) {
+                if (child !== this.camera && !child.isLight) {
                     child.position.x -= shift.x;
                     child.position.z -= shift.z;
                 }
             });
+
+            // 2.1 Re-orient the global Sun/Light to follow the player's new local [0,0,0]
+            if (window.EventBus) window.EventBus.emit('ENV_UPDATE');
 
             // 3. Update the Chunk Manager's origin-tracking
             if (typeof ChunkManager !== 'undefined') {
@@ -549,8 +552,27 @@ window.EventBus.on('GAME_SAVE', () => {
             const member = window.GameState.party.members.find(candidate => candidate.id === entity.companionId);
             if (member) member.hp = entity.hp;
         });
-        localStorage.setItem('dark-forest-save', JSON.stringify({ gameState: window.GameState, engineParams: window.EngineParams, villages: window.VillageManager ? window.VillageManager.villages : [], adventurers: window.AdventurerManager ? window.AdventurerManager.records : [] }));
-        window.EventBus.emit('UI_LOG', 'Game saved locally.');
+
+        // --- PHASE 1: ABSOLUTE COORDINATE SAVING ---
+        // Save player and companion positions as absolute values
+        if (window.GameCore.playerObj) {
+            window.GameState.savedAbsPos = window.GameCore.getAbsolutePos(window.GameCore.playerObj.visual.position);
+        }
+        
+        window.GameState.companionsAbsPos = {};
+        window.GameCore.activeEntities.filter(en => en.companionId).forEach(en => {
+            window.GameState.companionsAbsPos[en.companionId] = window.GameCore.getAbsolutePos(en.visual.position);
+        });
+
+        localStorage.setItem('dark-forest-save', JSON.stringify({ 
+            gameState: window.GameState, 
+            engineParams: window.EngineParams, 
+            worldOffset: window.GameCore.worldOffset, // Save the origin shift
+            villages: window.VillageManager ? window.VillageManager.villages : [], 
+            adventurers: window.AdventurerManager ? window.AdventurerManager.records : [] 
+        }));
+        
+        window.EventBus.emit('UI_LOG', 'Game saved locally (Origin-Aware).');
     } catch (error) {
         console.error('GAME_SAVE failed', error);
         window.EventBus.emit('UI_LOG', 'Unable to save the game.');
@@ -565,18 +587,37 @@ window.EventBus.on('GAME_LOAD', () => {
             return;
         }
         const save = JSON.parse(rawSave);
+        
+        // --- PHASE 1: ORIGIN-AWARE LOADING ---
         if (save.gameState) Object.assign(window.GameState, save.gameState);
         if (save.engineParams) Object.assign(window.EngineParams, save.engineParams);
+        
+        // Restore the World Offset first so future coordinate math is correct
+        if (save.worldOffset) {
+            window.GameCore.worldOffset.copy(save.worldOffset);
+        }
+
         if (Array.isArray(save.villages) && window.VillageManager) {
             window.VillageManager.villages = save.villages;
             window.RoadManager.generateRoads(window.VillageManager.villages);
         }
         if (Array.isArray(save.adventurers) && window.AdventurerManager) window.AdventurerManager.records = save.adventurers;
+        
         window.EventBus.emit('UI_UPDATE_HUD');
         window.EventBus.emit('UI_UPDATE_STATS');
         window.EventBus.emit('RENDER_INVENTORY');
+        
+        // IMPORTANT: We emit WORLD_REGENERATE, which triggers chunk generation.
+        // The player and companions must be placed AFTER this to ensure they don't fall through ground.
         window.EventBus.emit('WORLD_REGENERATE');
-        window.EventBus.emit('UI_LOG', 'Game loaded from local storage.');
+        
+        // Restore Player to Local space based on saved Absolute position
+        if (window.GameState.savedAbsPos && window.GameCore.playerObj) {
+            const localPos = window.GameCore.getLocalPos(window.GameState.savedAbsPos);
+            window.GameCore.playerObj.body.setTranslation(localPos, true);
+        }
+
+        window.EventBus.emit('UI_LOG', 'Game loaded (Coordinates Synced).');
     } catch (error) {
         console.error('GAME_LOAD failed', error);
         window.EventBus.emit('UI_LOG', 'Unable to load the game save.');
