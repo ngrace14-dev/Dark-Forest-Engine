@@ -40,6 +40,7 @@ const ChunkManager = {
     instancedMeshes: new Map(),
 
     update: function(playerPos) {
+        if (window.EngineParams.suppressChunkLoading) return;
         const cx = Math.floor(playerPos.x / 60); const cz = Math.floor(playerPos.z / 60);
         if (cx !== this.currentChunkX || cz !== this.currentChunkZ) { this.currentChunkX = cx; this.currentChunkZ = cz; this.loadChunksAround(cx, cz); }
     },
@@ -1330,7 +1331,40 @@ async function bootEngine() {
         dirLight.shadow.bias = -0.0005;
         window.GameCore.scene.add(dirLight);
 
-        composer = new EffectComposer(renderer); composer.addPass(new RenderPass(window.GameCore.scene, window.GameCore.camera));
+        composer = new EffectComposer(renderer); 
+        const worldPass = new RenderPass(window.GameCore.scene, window.GameCore.camera);
+        const pocketPass = new RenderPass(window.GameCore.pocketScene, window.GameCore.camera);
+        composer.addPass(worldPass);
+
+        // --- PHASE 2: SCENE SWAP LOGIC ---
+        window.EventBus.on('SCENE_SWAP', ({ target, pos }) => {
+            if (target === 'establishment') {
+                composer.removePass(worldPass);
+                composer.insertPass(pocketPass, 0);
+                  
+                // Move player to pocket center
+                if (window.GameCore.playerObj) {
+                    window.GameCore.playerObj.body.setTranslation({ x: 0, y: 5, z: 0 }, true);
+                    window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                    // Disable Chunk loading while in pocket
+                    window.EngineParams.suppressChunkLoading = true;
+                }
+            } else if (target === 'world') {
+                composer.removePass(pocketPass);
+                composer.insertPass(worldPass, 0);
+                  
+                if (window.GameCore.playerObj && pos) {
+                    const groundY = window.WorldGenerator.getTerrainHeight(pos.x, pos.z) + 2;
+                    window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: groundY, z: pos.z }, true);
+                    window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                    window.EngineParams.suppressChunkLoading = false;
+                    // Force immediate chunk update
+                    ChunkManager.update(new THREE.Vector3(pos.x, groundY, pos.z));
+                }
+            }
+            window.EventBus.emit('ENV_UPDATE');
+        });
+
         window.GameCore.passes.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), window.EngineParams.bloom, 0.25, 0.9); composer.addPass(window.GameCore.passes.bloom);
         
         const VignetteShader = { uniforms: { "tDiffuse": { value: null }, "darkness": { value: 0.35 } }, vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`, fragmentShader: `uniform float darkness; uniform sampler2D tDiffuse; varying vec2 vUv; void main() { vec4 texel = texture2D( tDiffuse, vUv ); float dist = distance(vUv, vec2(0.5)); float edge = smoothstep(0.25, 0.75, dist); texel.rgb *= 1.0 - edge * clamp(darkness, 0.0, 0.85); gl_FragColor = texel; }` };

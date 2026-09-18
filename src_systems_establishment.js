@@ -12,20 +12,31 @@ window.EstablishmentManager = {
     // Rule: Doors do not teleport between cities. You leave where you entered.
     
     enterEstablishment: function(villageId, x, z) {
-        this.currentEntryPoint = { x, z, villageId };
+        if (this.active) return;
+        
+        // 1. Record Physical World return point (Absolute)
+        const localPos = new THREE.Vector3(x, 0, z);
+        const absPos = window.GameCore.getAbsolutePos(localPos);
+        this.currentEntryPoint = { x: absPos.x, y: 0, z: absPos.z, villageId };
+        
         this.active = true;
-        window.EventBus.emit('UI_LOG', `[ARCANE] You step through the shimmering door...`);
-        // Logic to swap Three.js scene to the "Pocket Dimension" scene
+        window.EventBus.emit('UI_LOG', `[ARCANE] Reality folds. You step into your pocket dimension.`);
+        
+        // 2. Trigger Scene Swap in Engine
         window.EventBus.emit('SCENE_SWAP', { target: 'establishment' });
     },
     
     exitEstablishment: function() {
-        if (!this.currentEntryPoint) return;
+        if (!this.active || !this.currentEntryPoint) return;
+        
         this.active = false;
         const entry = this.currentEntryPoint;
-        window.EventBus.emit('UI_LOG', `[ARCANE] Leaving the pocket dimension, you return to the village.`);
-        // Logic to return player to original coordinates
-        window.EventBus.emit('SCENE_SWAP', { target: 'world', pos: { x: entry.x, z: entry.z } });
+        
+        // 3. Convert Absolute Entry Point back to Local space (in case origin shifted while inside)
+        const localPos = window.GameCore.getLocalPos(new THREE.Vector3(entry.x, 0, entry.z));
+        
+        window.EventBus.emit('UI_LOG', `[ARCANE] You return to ${window.VillageManager.villages[entry.villageId]?.name || 'the forest'}.`);
+        window.EventBus.emit('SCENE_SWAP', { target: 'world', pos: localPos });
     },
     
     unlockDoor: function(villageId) {
