@@ -25,28 +25,32 @@ export class ForestSystem {
     generateChunk(chunkX, chunkZ) {
         // 1. Macro-Density Check
         const density = window.WorldGenerator.getNoise(chunkX, chunkZ);
-        if (density < 0.4) return []; // "Meadow" - no spawn
+        if (density < 0.4) return { tierA: [], tierB: [], tierC: [] };
 
         // 2. Kill Buffer (Check against Road/Village data)
-        if (this.isNearProtectedArea(chunkX, chunkZ)) return [];
+        if (this.isNearProtectedArea(chunkX, chunkZ)) return { tierA: [], tierB: [], tierC: [] };
+
         // 3. Micro-Placement (Simplified Poisson Disk)
-        return this.generatePoissonPoints(chunkX, chunkZ, density);
+        const points = this.generatePoissonPoints(chunkX, chunkZ, density);
+        
+        return {
+            tierA: points.filter(p => p.type === 'redwood'),
+            tierB: points.filter(p => p.type === 'pine'),
+            tierC: []
+        };
     }
 
     /**
      * Checks if a point is within 50m of a village or 10m of a road.
      */
     isNearProtectedArea(x, z) {
-        // Check Villages
-        if (window.VillageManager && window.VillageManager.villages) {
-            for (const v of window.VillageManager.villages) {
-                const dist = Math.hypot(x - v.x, z - v.z);
-                if (dist < 50) return true;
-            }
+        try {
+            if (!window.VillageManager?.villages) return false;
+            return window.VillageManager.villages.some(v => Math.hypot(x - v.x, z - v.z) < 50);
+        } catch(e) {
+            console.error("Forest System: Error checking protected areas", e);
+            return false;
         }
-
-        // Note: Road check would go here once RoadManager is integrated
-        return false;
     }
 
     /**

@@ -322,31 +322,24 @@ const ChunkManager = {
             sceneryData.get(prefabName).push({ position, rotation, scale });
         });
 
-        // 3. Bake InstancedMeshes
-        sceneryData.forEach((transforms, prefabName) => {
-            const prefab = window.AssetManager.prefabs[prefabName];
-            if (!prefab || !prefab.customModel) return;
+                // 3. Bake InstancedMeshes
+        // Use our new ForestSystem & ForestRenderer instead of old loop
+        const chunkData = window.ForestManager.generateChunk(cx, cz);
+        const sceneryData = new Map();
 
-            const baseMesh = prefab.customModel.clone();
-            const geometry = baseMesh.geometry.clone();
-            const material = baseMesh.material.clone();
-
-            const instancedMesh = new THREE.InstancedMesh(geometry, material, transforms.length);
-            instancedMesh.castShadow = true;
-            instancedMesh.receiveShadow = true;
-
-            const dummy = new THREE.Object3D();
-            transforms.forEach((transform, i) => {
-                dummy.position.copy(transform.position);
-                dummy.rotation.copy(transform.rotation);
-                dummy.scale.copy(transform.scale);
-                dummy.updateMatrix();
-                instancedMesh.setMatrixAt(i, dummy.matrix);
+        ['tierA', 'tierB'].forEach(tier => {
+            chunkData[tier].forEach(point => {
+                const prefabName = point.type === 'redwood' ? 'Oak Tree' : 'Bramble Bush'; 
+                if (!sceneryData.has(prefabName)) sceneryData.set(prefabName, []);
+                sceneryData.get(prefabName).push({ x: (chunkX - 30) + (point.x - cx*60), z: (chunkZ - 30) + (point.z - cz*60) });
             });
+        });
 
-                        instancedMesh.instanceMatrix.needsUpdate = true;
-            window.GameCore.scene.add(instancedMesh);
-            chunkInstances.set(prefabName, instancedMesh);
+        sceneryData.forEach((points, prefabName) => {
+            if (!window.ForestRenderer.instances.has(prefabName)) {
+                window.ForestRenderer.initInstancedMesh(prefabName, 500);
+            }
+            window.ForestRenderer.updateInstances(prefabName, points);
         });
 
         // --- VILLAGES & STREET LIGHTS ---
@@ -1370,6 +1363,7 @@ async function bootEngine() {
         window.GameCore.pocketScene.add(pPoint);
 
         // Initial pocket room (10x10m Tavern)
+        window.GameCore.scene.add(window.ForestRenderer.group);
         const roomGeo = new THREE.BoxGeometry(20, 10, 20);
         const roomMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, side: THREE.BackSide });
         const roomMesh = new THREE.Mesh(roomGeo, roomMat);
