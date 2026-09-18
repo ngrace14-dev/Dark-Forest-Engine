@@ -19,6 +19,11 @@ import './src_systems_adventurers.js';
 import './src_systems_ai.js';
 import './src_systems_assets.js';
 import './src_systems_careers.js';
+import './src_systems_establishment.js';
+import './src_systems_relationships.js';
+import './src_systems_warden.js';
+import './src_systems_chronicle.js';
+import './src_systems_navigation_careers.js';
 // 3. Mod Tools / Overlays
 import './src/animation_tools/MixamoRetargeting.js';
 import './src_firebase.js';
