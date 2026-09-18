@@ -797,7 +797,7 @@ function spawnPlayer(x, y, z) {
     window.GameCore.bindEntityToBuffer(window.GameCore.playerObj, window.GameState.pStats.maxHp, window.GameState.pStats.maxPoise);
     
     // Proxy the global GameState.pStats to the memory buffer as well so existing UI code works
-    const pMemIdx = window.GameCore.playerObj.memoryIndex * 4;
+        const pMemIdx = window.GameCore.playerObj.memoryIndex * 4;
     Object.defineProperties(window.GameState.pStats, {
         'hp': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 0], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 0] = v; } },
         'maxHp': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 1], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 1] = v; } },
@@ -807,6 +807,10 @@ function spawnPlayer(x, y, z) {
 
     const p = body.translation(); window.GameCore.playerObj.visual.position.set(p.x, p.y, p.z); window.GameCore.scene.add(window.GameCore.playerObj.visual);
     setupEntityAnimations(window.GameCore.playerObj, true); window.VFXManager.applyAura(window.GameCore.playerObj, def);
+    
+    // --- PHASE 6: INTEL OWNERSHIP ---
+    // Ensure the player node exists in the ownership registry
+    window.GameCore.playerObj.node_id = 'player_node';
 }
 
 function applyForestBlessing(entity, isPlayer = false) {

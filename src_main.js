@@ -6,6 +6,7 @@ import './src_core_registry.js';
 import './src_core_state.js';
 // 2. Systems (Must load before Engine boot)
 import './src_epoch_manager.js';
+import './src_systems_intel.js';
 import './src_systems_world.js';
 import './src_systems_inventory.js';
 import './src_systems_ui.js';

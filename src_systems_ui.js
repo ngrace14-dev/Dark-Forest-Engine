@@ -1,8 +1,161 @@
 let floatingTexts = [];
 
 // ==========================================
-// SQUAD & FACTION MANAGEMENT UI
+// INTEL UI (Phase 6.4)
 // ==========================================
+
+window.EventBus.on('TOGGLE_INTEL_BAG', () => {
+    const panel = document.getElementById('intel-bag-panel');
+    if (!panel) return;
+    if (panel.classList.contains('hidden')) {
+        panel.classList.remove('hidden');
+        panel.classList.add('flex');
+        window.EventBus.emit('RENDER_INTEL_BAG');
+    } else {
+        panel.classList.add('hidden');
+        panel.classList.remove('flex');
+    }
+});
+
+window.EventBus.on('RENDER_INTEL_BAG', () => {
+    const panel = document.getElementById('intel-bag-panel');
+    if (!panel || !window.IntelManager) return;
+    
+    // Assumes 'player_node' is the physical owner
+    const playerIntel = window.IntelManager.getIntelForNode('player_node');
+    
+    let html = `
+        <div class="flex justify-between items-center mb-4 border-b border-blue-700 pb-2">
+            <h2 class="text-blue-400 font-bold tracking-widest text-sm uppercase">📜 Personal Ledger</h2>
+            <div class="text-[10px] text-gray-400">Total Records: ${playerIntel.length}</div>
+        </div>
+        <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-2">
+    `;
+
+    if (playerIntel.length === 0) {
+        html += `<div class="text-gray-500 text-center text-xs py-4">Your ledger is empty. Speak to the world.</div>`;
+    } else {
+        playerIntel.forEach(intel => {
+            const isFact = intel.type === window.IntelEnums.TYPES.FACT;
+            const borderClass = isFact ? 'border-green-700/50' : 'border-gray-700 hover:border-blue-500/50';
+            const rarityColors = {
+                COMMON: 'text-gray-400', UNCOMMON: 'text-green-400', RARE: 'text-blue-400',
+                RESTRICTED: 'text-purple-400', SECRET: 'text-red-400', LEGENDARY: 'text-yellow-400'
+            };
+            const rColor = rarityColors[intel.rarity] || 'text-gray-400';
+            const age = (window.EngineParams?.worldDay || 0) - (intel.provenance[0]?.timestamp || 0);
+
+            html += `
+                <div class="bg-gray-800/80 p-3 border ${borderClass} rounded flex flex-col gap-2">
+                    <div class="flex justify-between items-start">
+                        <div class="font-bold text-white text-xs">${intel.payload.title}</div>
+                        <div class="text-[9px] px-1 py-0.5 rounded bg-gray-900 border border-gray-700 ${rColor}">${intel.rarity}</div>
+                    </div>
+                    <div class="text-[10px] text-gray-400 leading-snug">${intel.payload.description}</div>
+                    
+                    <div class="grid grid-cols-4 gap-2 mt-2 pt-2 border-t border-gray-700/50">
+                        <div class="flex flex-col">
+                            <span class="text-[8px] uppercase text-gray-500">Type</span>
+                            <span class="text-[10px] ${isFact ? 'text-green-400' : 'text-yellow-400'} font-bold">${intel.type}</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-[8px] uppercase text-gray-500">Certainty</span>
+                            <span class="text-[10px] text-white">${Math.floor(intel.certainty * 100)}%</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-[8px] uppercase text-gray-500">Age / Gen</span>
+                            <span class="text-[10px] text-white">${age}d / G${intel.spread_generation}</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-[8px] uppercase text-gray-500">Base Value</span>
+                            <span class="text-[10px] text-amber-300 font-bold">${window.IntelEconomy.calculateValue(intel, {id: 'null_buyer'})}g</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    html += `</div>
+        <button onclick="window.EventBus.emit('TOGGLE_INTEL_BAG')" class="mt-4 border border-gray-600 px-3 py-2 text-xs hover:border-blue-400 transition-colors w-full text-center">Close Ledger</button>
+    `;
+
+    panel.innerHTML = html;
+});
+
+// ==========================================
+// INTEL DEBUG VIEW (Developer Only)
+// ==========================================
+
+window.EventBus.on('TOGGLE_INTEL_DEBUG', () => {
+    const panel = document.getElementById('intel-debug-panel');
+    if (!panel) return;
+    if (panel.classList.contains('hidden')) {
+        panel.classList.remove('hidden');
+        panel.classList.add('flex');
+        window.EventBus.emit('RENDER_INTEL_DEBUG');
+    } else {
+        panel.classList.add('hidden');
+        panel.classList.remove('flex');
+    }
+});
+
+window.EventBus.on('RENDER_INTEL_DEBUG', () => {
+    const panel = document.getElementById('intel-debug-panel');
+    if (!panel || !window.IntelManager) return;
+
+    const allRecords = Array.from(window.IntelManager.registry.values());
+    const archiveRecords = Array.from(window.IntelManager.archive.values());
+    
+    let html = `
+        <div class="flex justify-between items-center mb-4 border-b border-red-700 pb-2">
+            <h2 class="text-red-400 font-bold tracking-widest text-sm uppercase">⚠️ IntelManager Diagnostic Terminal</h2>
+            <div class="text-[10px] text-gray-400">Active: ${allRecords.length} | Archive: ${archiveRecords.length}</div>
+        </div>
+        <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="text-gray-500 border-b border-gray-800">
+                        <th class="py-2">ID / Version</th>
+                        <th class="py-2">Title</th>
+                        <th class="py-2">Holders</th>
+                        <th class="py-2">Gen</th>
+                        <th class="py-2">Cert / Truth</th>
+                        <th class="py-2">Supp</th>
+                        <th class="py-2">Lineage Depth</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800">
+    `;
+
+    allRecords.forEach(intel => {
+        const holders = window.IntelManager.ownershipRegistry.get(intel.intel_id);
+        const holderCount = holders ? holders.size : 0;
+        const lineage = window.IntelManager.resolveLineage(intel.intel_id);
+        
+        const truthColor = intel.truth_state === 'TRUE' ? 'text-green-500' : (intel.truth_state === 'FALSE' ? 'text-red-500' : 'text-yellow-500');
+
+        html += `
+            <tr class="hover:bg-gray-900 transition-colors">
+                <td class="py-2 text-gray-500 truncate max-w-[100px]" title="${intel.intel_id}">${intel.intel_id.substring(0,12)} (v${intel.version})</td>
+                <td class="py-2 text-blue-300 truncate max-w-[150px]">${intel.payload.title}</td>
+                <td class="py-2 ${holderCount === 0 ? 'text-red-400 font-bold' : 'text-white'}">${holderCount}</td>
+                <td class="py-2 text-gray-400">G${intel.spread_generation}</td>
+                <td class="py-2"><span class="text-white">${intel.certainty.toFixed(2)}</span> / <span class="font-bold ${truthColor}">${intel.truth_state.substring(0,1)}</span></td>
+                <td class="py-2 text-purple-400">${intel.suppression_level}</td>
+                <td class="py-2 text-gray-400">${lineage.length}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+        <button onclick="window.EventBus.emit('TOGGLE_INTEL_DEBUG')" class="mt-4 border border-gray-800 px-3 py-2 text-xs hover:border-red-400 transition-colors w-full text-center text-red-500">Close Diagnostic</button>
+    `;
+    panel.innerHTML = html;
+});
 
 function openSquadManager() {
     const panel = document.getElementById('squad-manager-panel');
@@ -1105,7 +1258,19 @@ window.EventBus.on('DEV_TOOLS_TOGGLE_ASSETS', () => {
 document.getElementById('btn-close-asset')?.addEventListener('click', () => { document.getElementById('asset-manager-panel').classList.add('hidden'); document.getElementById('asset-manager-panel').classList.remove('flex'); });
 document.getElementById('btn-stats')?.addEventListener('click', () => document.getElementById('stats-panel').classList.toggle('hidden'));
 document.getElementById('btn-inv')?.addEventListener('click', () => { document.getElementById('inventory-panel').classList.toggle('hidden'); if(!document.getElementById('inventory-panel').classList.contains('hidden')) window.EventBus.emit('RENDER_INVENTORY'); });
+document.getElementById('btn-intel')?.addEventListener('click', () => window.EventBus.emit('TOGGLE_INTEL_BAG'));
 document.getElementById('btn-asset')?.addEventListener('click', () => { window.EventBus.emit('DEV_TOOLS_TOGGLE_ASSETS'); });
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'F9') {
+        window.EventBus.emit('TOGGLE_INTEL_DEBUG');
+    }
+    if (e.key === 'k' || e.key === 'K') {
+        // Prevent toggle if typing in an input
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+        window.EventBus.emit('TOGGLE_INTEL_BAG');
+    }
+});
 
 // Add Squad Button to HUD if it exists
 window.addEventListener('DOMContentLoaded', () => {
