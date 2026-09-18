@@ -1098,3 +1098,4 @@ window.addEventListener('DOMContentLoaded', () => {
         squadBtn.addEventListener('click', () => window.EventBus.emit('TOGGLE_SQUAD_MANAGER'));
     }
 });
+

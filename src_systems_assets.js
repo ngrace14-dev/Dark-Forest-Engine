@@ -1,5 +1,5 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
 window.AssetManager = {
     models: {}, animations: {}, modelMeta: {}, textures: {}, globalAnimations: [],
@@ -672,3 +672,4 @@ const overlay = document.getElementById('dnd-overlay');
 window.addEventListener('dragover', (e) => { e.preventDefault(); overlay.classList.remove('hidden'); });
 window.addEventListener('dragleave', (e) => { e.preventDefault(); if (e.relatedTarget === null) overlay.classList.add('hidden'); });
 window.addEventListener('drop', (e) => { e.preventDefault(); overlay.classList.add('hidden'); document.getElementById('asset-file-input').files = e.dataTransfer.files; document.getElementById('asset-file-input').dispatchEvent(new Event('change')); });
+

@@ -51,3 +51,4 @@ window.RoadManager = {
         return points[Math.floor(Math.random() * points.length)];
     }
 };
+

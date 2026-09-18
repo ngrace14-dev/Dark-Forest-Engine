@@ -206,3 +206,4 @@ window.VFXManager = {
         mesh.geometry.attributes.position.needsUpdate = true;
     }
 };
+

@@ -75,3 +75,4 @@ window.EventBus.on('ENGINE_READY', () => {
         } }, 'ledger').name('📊 Dump Hidden Ledger');
     } catch(e) { console.warn("LIL-GUI failed.", e); }
 });
+

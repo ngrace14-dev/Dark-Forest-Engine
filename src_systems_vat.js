@@ -317,3 +317,4 @@ window.VATManager = {
         });
     }
 };
+

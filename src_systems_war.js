@@ -163,3 +163,4 @@ window.EventBus.on('AI_TICK', ({ delta }) => {
     window.WarManager.update(delta);
     if (Math.random() < 0.0001) window.WarManager.evaluateCrisis();
 });
+

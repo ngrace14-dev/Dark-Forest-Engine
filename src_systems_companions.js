@@ -173,3 +173,4 @@ window.CompanionManager = {
 window.EventBus.on('AI_TICK', ({ delta }) => {
     window.CompanionManager.update(delta);
 });
+

@@ -1,6 +1,6 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
-import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import { TransformControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/TransformControls.js';
 
 window.EditorManager = {
     isActive: false,
@@ -1053,3 +1053,4 @@ window.EditorManager = {
 window.EventBus.on('ENGINE_READY', () => {
     window.EditorManager.init();
 });
+

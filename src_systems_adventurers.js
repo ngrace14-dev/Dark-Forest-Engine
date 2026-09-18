@@ -149,3 +149,4 @@ window.AdventurerManager = {
     }
 };
 window.AdventurerManager.generate();
+

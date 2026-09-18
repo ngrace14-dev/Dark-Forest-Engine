@@ -38,3 +38,4 @@ window.WorldGenerator = class {
         return height;
     }
 };
+

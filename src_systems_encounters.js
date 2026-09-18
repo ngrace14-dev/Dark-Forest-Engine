@@ -89,3 +89,4 @@ window.EncounterDirector = {
         window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: "HUNTSMAN'S SCORN", pos: window.GameCore.playerObj.visual.position, color: '#4b5563' });
     }
 };
+
