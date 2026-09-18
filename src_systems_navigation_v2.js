@@ -1,5 +1,5 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-import { Pathfinding } from 'three-pathfinding';
+import { Pathfinding } from 'https://esm.sh/three-pathfinding@1.3.0';
 
 /**
  * File: src_systems_navigation.js
