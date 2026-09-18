@@ -16,9 +16,10 @@ import './src_systems_vat.js';
 import './src_systems_health.js';
 import './src_systems_encounters.js';
 
+export { ForestSystem } from './src_systems_forest.js';
 
+window.ForestManager = new ForestSystem();
 
 // Engine Boot and Render Loop (Runs Last)
 import './src_engine.js';
-
 

@@ -44,15 +44,62 @@ const ChunkManager = {
         const cx = Math.floor(playerPos.x / 60); const cz = Math.floor(playerPos.z / 60);
         if (cx !== this.currentChunkX || cz !== this.currentChunkZ) { this.currentChunkX = cx; this.currentChunkZ = cz; this.loadChunksAround(cx, cz); }
     },
-    loadChunksAround: function(cx, cz) {
+        loadChunksAround: function(cx, cz) {
         const expectedChunks = new Set();
-        for (let x = cx - 1; x <= cx + 1; x++) { for (let z = cz - 1; z <= cz + 1; z++) { const key = `${x},${z}`; expectedChunks.add(key); if (!this.activeChunks.has(key)) this.generateChunk(x, z); } }
-        const toRemove = []; for (const key of this.activeChunks.keys()) if (!expectedChunks.has(key)) toRemove.push(key);
+        
+        // --- PHASE 1.5: HIERARCHICAL LOD RANGES ---
+        // Tier A (Near): 1-chunk radius (Collision/High-Res)
+        // Tier B (Mid): 3-chunk radius (Instanced-No-Collision)
+        // Tier C (Far): 10-chunk radius (Billboards)
+        
+        for (let x = cx - 10; x <= cx + 10; x++) { 
+            for (let z = cz - 10; z <= cz + 10; z++) { 
+                const dist = Math.max(Math.abs(x - cx), Math.abs(z - cz));
+                const key = `${x},${z}`; 
+                
+                // Only process chunks within a 10-unit square radius
+                if (dist <= 10) {
+                    expectedChunks.add(key);
+                    
+                    if (!this.activeChunks.has(key)) {
+                        // Determine LOD Tier based on distance
+                        let lod = 'C';
+                        if (dist <= 1) lod = 'A';
+                        else if (dist <= 3) lod = 'B';
+                        
+                        this.generateChunk(x, z, lod); 
+                    } else {
+                        // Dynamic LOD Switching: If an existing chunk's tier should change
+                        const chunk = this.activeChunks.get(key);
+                        let targetLod = 'C';
+                        if (dist <= 1) targetLod = 'A';
+                        else if (dist <= 3) targetLod = 'B';
+                        
+                        if (chunk.lod !== targetLod) {
+                            this.unloadChunk(key);
+                            this.generateChunk(x, z, targetLod);
+                        }
+                    }
+                }
+            } 
+        }
+        
+        const toRemove = []; 
+        for (const key of this.activeChunks.keys()) {
+            if (!expectedChunks.has(key)) toRemove.push(key);
+        }
         toRemove.forEach(k => this.unloadChunk(k));
     },
-    generateChunk: function(cx, cz) {
-        const key = `${cx},${cz}`; const chunkX = cx * 60 + 30; const chunkZ = cz * 60 + 30;
-        const geo = new THREE.PlaneGeometry(60, 60, 30, 30); geo.rotateX(-Math.PI / 2);
+    generateChunk: function(cx, cz, lod = 'A') {
+        const key = `${cx},${cz}`; 
+        const chunkX = cx * 60 + 30; 
+        const chunkZ = cz * 60 + 30;
+        
+        // --- PERFORMANCE: REDUCE GEOMETRY IN FAR CHUNKS ---
+        const segments = lod === 'A' ? 30 : (lod === 'B' ? 10 : 2);
+        const geo = new THREE.PlaneGeometry(60, 60, segments, segments); 
+        geo.rotateX(-Math.PI / 2);
+
         const vertices = geo.attributes.position.array; const colors = [];
         
         const localRoadPoints = window.RoadManager.getRoadPointsNear(cx, cz); const ROAD_WIDTH = 5;
@@ -1301,7 +1348,8 @@ async function bootEngine() {
         document.getElementById('loading-bar').style.width = "100%"; document.getElementById('loading-container').classList.add('hidden'); document.getElementById('btn-start').classList.remove('hidden');
         
         window.GameCore.scene = new THREE.Scene(); window.GameCore.scene.fog = new THREE.FogExp2(0x040608, 0.03); window.GameCore.scene.background = new THREE.Color(0x040608);
-        window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 1000);
+        window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 1000000); // Massive Far Clip for Horizon
+
         
         renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); 
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); 
@@ -1329,9 +1377,72 @@ async function bootEngine() {
         window.GameCore.pocketScene.add(roomMesh);
           
         clock = new THREE.Clock(); window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
+  
+        // --- LAYER 1: THE CELESTIAL HORIZON (Shader-Only Mountains) ---
+        const horizonGeo = new THREE.PlaneGeometry(100000, 100000, 512, 512); // Huge resolution but only 1 draw call
+        horizonGeo.rotateX(-Math.PI / 2);
+          
+        const horizonMat = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                worldSeed: { value: 1337.0 },
+                sunPos: { value: new THREE.Vector3(0, 1, 0) },
+                fogColor: { value: new THREE.Color(0x94a3b8) }
+            },
+            vertexShader: `
+                varying float vHeight;
+                varying vec3 vWorldPos;
+                  
+                // Optimized GPU noise function
+                float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+                float noise(vec2 p) {
+                    vec2 i = floor(p); vec2 f = fract(p);
+                    vec2 u = f*f*(3.0-2.0*f);
+                    return mix(mix(hash(i + vec2(0,0)), hash(i + vec2(1,0)), u.x),
+                               mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), u.x), u.y);
+                }
 
+                void main() {
+                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                    vWorldPos = worldPosition.xyz;
+                      
+                    float dist = length(worldPosition.xz);
+                    float mountainMask = smoothstep(50000.0, 70000.0, dist); // Only swell at 50km+
+                      
+                    float h = noise(worldPosition.xz * 0.0001) * 2500.0;
+                    h += noise(worldPosition.xz * 0.001) * 200.0;
+                      
+                    worldPosition.y += h * mountainMask;
+                    vHeight = h * mountainMask;
+                      
+                    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+                }
+            `,
+            fragmentShader: `
+                varying float vHeight;
+                varying vec3 vWorldPos;
+                uniform vec3 sunPos;
+                uniform vec3 fogColor;
 
-                ambientLight = new THREE.AmbientLight(0xffffff, 1.5); window.GameCore.scene.add(ambientLight);
+                void main() {
+                    vec3 color = mix(vec3(0.05, 0.08, 0.1), vec3(0.2, 0.25, 0.3), vHeight / 2500.0);
+                      
+                    // Simple distance-based atmosphere
+                    float dist = length(vWorldPos.xz);
+                    float fogFactor = smoothstep(1000.0, 80000.0, dist);
+                      
+                    gl_FragColor = vec4(mix(color, fogColor, fogFactor), 1.0);
+                }
+            `
+        });
+          
+        const horizonMesh = new THREE.Mesh(horizonGeo, horizonMat);
+        horizonMesh.position.y = -5; // Slightly below local terrain
+        window.GameCore.scene.add(horizonMesh);
+        window.GameCore.horizonMaterial = horizonMat;
+
+        ambientLight = new THREE.AmbientLight(0xffffff, 1.5); window.GameCore.scene.add(ambientLight);
+
         dirLight = new THREE.DirectionalLight(0xffffff, 2.5); 
         dirLight.position.set(20, 60, 20); 
         dirLight.castShadow = true; 
@@ -1436,8 +1547,14 @@ async function bootEngine() {
             
             dirLight.intensity = baseDirIntensity * window.EngineParams.globalBrightness; 
             ambientLight.intensity = baseAmbientIntensity * window.EngineParams.globalBrightness; 
-            renderer.toneMappingExposure = Math.max(1.0, window.EngineParams.globalBrightness * 1.5); 
+                        renderer.toneMappingExposure = Math.max(1.0, window.EngineParams.globalBrightness * 1.5); 
             window.GameCore.scene.fog.density = window.EngineParams.fogDensity * (sunHeight < 0 ? 1.5 : 1.0);
+
+            // --- PHASE 1: SHADER UNIFORM SYNC ---
+            if (window.GameCore.horizonMaterial) {
+                window.GameCore.horizonMaterial.uniforms.sunPos.value.copy(dirLight.position);
+                window.GameCore.horizonMaterial.uniforms.fogColor.value.copy(window.GameCore.scene.fog.color);
+            }
         });
         
         window.EventBus.emit('ENGINE_READY'); window.EventBus.emit('ENV_UPDATE');
