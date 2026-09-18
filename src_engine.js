@@ -56,11 +56,16 @@ const ChunkManager = {
         
         const localRoadPoints = window.RoadManager.getRoadPointsNear(cx, cz); const ROAD_WIDTH = 5;
         
-        for (let i = 0; i < vertices.length; i += 3) {
-            const vx = vertices[i] + chunkX; const vz = vertices[i+2] + chunkZ;
-            const biomeKey = window.WorldGenerator.getBiome(vx, vz); const biome = window.WorldGenConfig.biomes[biomeKey]; let c = new THREE.Color(biome.color);
+                for (let i = 0; i < vertices.length; i += 3) {
+            const vx = vertices[i] + chunkX; 
+            const vz = vertices[i+2] + chunkZ;
             
-                        let minRoadDistSq = 999999;
+            const biomeKey = window.WorldGenerator.getBiome(vx, vz); 
+            const biome = window.WorldGenConfig.biomes[biomeKey]; 
+            let c = new THREE.Color(biome.color);
+            
+            // Mask out roads for coloring
+            let minRoadDistSq = 999999;
             for(let r=0; r<localRoadPoints.length; r++) { 
                 const dx = vx - localRoadPoints[r].x;
                 const dz = vz - localRoadPoints[r].z;
@@ -68,13 +73,49 @@ const ChunkManager = {
                 if(distSq < minRoadDistSq) minRoadDistSq = distSq; 
             }
             const minRoadDist = Math.sqrt(minRoadDistSq);
-            if(minRoadDist < ROAD_WIDTH + 2) { const dirtInfluence = Math.max(0, 1.0 - (minRoadDist / (ROAD_WIDTH + 2))); c.lerp(new THREE.Color('#38281d'), dirtInfluence); }
+            if(minRoadDist < ROAD_WIDTH + 2) { 
+                const dirtInfluence = Math.max(0, 1.0 - (minRoadDist / (ROAD_WIDTH + 2))); 
+                c.lerp(new THREE.Color('#38281d'), dirtInfluence); 
+            }
 
             vertices[i+1] = window.WorldGenerator.getTerrainHeight(vx, vz); 
-            const colorNoise = window.currentNoise2D(vx * 0.1, vz * 0.1) * 0.05; c.r += colorNoise; c.g += colorNoise; c.b += colorNoise;
+            
+            // --- SMOOTH NORMAL MATH (Sampling neighbors for lighting) ---
+            // To ensure light doesn't "break" at chunk edges, we calculate a custom normal 
+            // by sampling the mathematical height function.
+            const hL = window.WorldGenerator.getTerrainHeight(vx - 0.5, vz);
+            const hR = window.WorldGenerator.getTerrainHeight(vx + 0.5, vz);
+            const hD = window.WorldGenerator.getTerrainHeight(vx, vz - 0.5);
+            const hU = window.WorldGenerator.getTerrainHeight(vx, vz + 0.5);
+            const normal = new THREE.Vector3(hL - hR, 1.0, hD - hU).normalize();
+            
+            // We use the color buffer to store slight variations, but Three.js will use 
+            // computeVertexNormals later. For infinite scale, this mathematical normal 
+            // is more reliable than geometric ones.
+            
+            const colorNoise = window.currentNoise2D ? window.currentNoise2D(vx * 0.1, vz * 0.1) * 0.05 : 0; 
+            c.r += colorNoise; c.g += colorNoise; c.b += colorNoise;
             colors.push(c.r, c.g, c.b);
         }
-                geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geo.attributes.position.needsUpdate = true; geo.computeVertexNormals();
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); 
+        geo.attributes.position.needsUpdate = true; 
+        geo.computeVertexNormals();
+        
+        // Final Normal Smoothing across boundaries
+        const normalArray = geo.attributes.normal.array;
+        for (let i = 0; i < vertices.length; i += 3) {
+            const vx = vertices[i] + chunkX; 
+            const vz = vertices[i+2] + chunkZ;
+            const hL = window.WorldGenerator.getTerrainHeight(vx - 0.1, vz);
+            const hR = window.WorldGenerator.getTerrainHeight(vx + 0.1, vz);
+            const hD = window.WorldGenerator.getTerrainHeight(vx, vz - 0.1);
+            const hU = window.WorldGenerator.getTerrainHeight(vx, vz + 0.1);
+            const n = new THREE.Vector3(hL - hR, 0.2, hD - hU).normalize();
+            normalArray[i] = n.x;
+            normalArray[i+1] = n.y;
+            normalArray[i+2] = n.z;
+        }
+        geo.attributes.normal.needsUpdate = true;
         const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 }); const mesh = new THREE.Mesh(geo, mat); mesh.position.set(chunkX, 0, chunkZ); mesh.receiveShadow = true; mesh.userData.isTerrain = true; mesh.userData.chunkKey = key; window.GameCore.scene.add(mesh);
 
         const physicsVertices = new Float32Array(vertices); const indicesU32 = new Uint32Array(geo.index.array); 
@@ -1235,9 +1276,14 @@ async function bootEngine() {
             
                 while (accumulator >= fixedTimeStep) { 
                     if(window.GameCore.world) window.GameCore.world.step(); 
+        
+                    // --- PHASE 4: FLOATING ORIGIN CHECK ---
+                    window.GameCore.checkFloatingOrigin();
+        
                     fixedUpdateLogic(fixedTimeStep); 
                     accumulator -= fixedTimeStep; 
                 } 
+ 
             
                 if(composer) composer.render(); 
             }

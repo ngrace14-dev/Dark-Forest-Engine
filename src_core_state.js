@@ -170,6 +170,48 @@ window.GameCore = {
     playerObj: null, activeEntities: [], groundLoot: [], engineState: 'menu', worldTimer: 0,
     scene: null, world: null, camera: null, passes: {}, playEntityAnimation: null, swapPlayerModel: null,
     
+    // --- PHASE 4: FLOATING ORIGIN ---
+    worldOffset: new THREE.Vector3(0, 0, 0),
+    getAbsolutePos: function(localPos) {
+        return new THREE.Vector3(localPos.x + this.worldOffset.x, localPos.y + this.worldOffset.y, localPos.z + this.worldOffset.z);
+    },
+    getLocalPos: function(absPos) {
+        return new THREE.Vector3(absPos.x - this.worldOffset.x, absPos.y - this.worldOffset.y, absPos.z - this.worldOffset.z);
+    },
+    checkFloatingOrigin: function() {
+        if (!this.playerObj) return;
+        const pPos = this.playerObj.visual.position;
+        const threshold = 2000; // 2km threshold before snapping
+        
+        if (Math.abs(pPos.x) > threshold || Math.abs(pPos.z) > threshold) {
+            const shift = new THREE.Vector3(pPos.x, 0, pPos.z);
+            this.worldOffset.add(shift);
+            
+            // 1. Shift all Physics RigidBodies
+            this.world.forEachRigidBody(body => {
+                const trans = body.translation();
+                body.setTranslation({ x: trans.x - shift.x, y: trans.y, z: trans.z - shift.z }, true);
+            });
+            
+            // 2. Shift all Three.js Scene Objects (that aren't parented to player)
+            this.scene.children.forEach(child => {
+                if (child !== this.camera) {
+                    child.position.x -= shift.x;
+                    child.position.z -= shift.z;
+                }
+            });
+
+            // 3. Update the Chunk Manager's origin-tracking
+            if (typeof ChunkManager !== 'undefined') {
+                ChunkManager.currentChunkX = null; // Force a reload/re-alignment of chunks
+                ChunkManager.update(this.playerObj.visual.position);
+            }
+            
+            window.EventBus.emit('UI_LOG', "[SYSTEM] Floating origin shifted. Precision restored.");
+        }
+    },
+
+    
     // DATA-ORIENTED DESIGN (DOD) OPTIMIZATION
     // Flat memory buffer for all entity combat stats (HP, MaxHP, Poise, MaxPoise)
     // Allows 10,000 entities. Layout: [Index * 4 + 0] = HP, [1] = MaxHP, [2] = Poise, [3] = MaxPoise
