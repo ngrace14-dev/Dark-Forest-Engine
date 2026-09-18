@@ -31,16 +31,7 @@ const _q1 = new THREE.Quaternion();
 const _e1 = new THREE.Euler();
 const _m1 = new THREE.Matrix4();
 
-
-
-// Reusable math objects to prevent GC
-const _v1 = new THREE.Vector3();
-const _v2 = new THREE.Vector3();
-const _v3 = new THREE.Vector3();
-const _q1 = new THREE.Quaternion();
-const _e1 = new THREE.Euler();
-const _m1 = new THREE.Matrix4();
-
+const ChunkManager = {
     activeChunks: new Map(), currentChunkX: null, currentChunkZ: null,
     
     // --- INSTANCED SCENERY (Diablo 4 Style Batching) ---

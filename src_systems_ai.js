@@ -866,6 +866,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 if(window.GameCore.playEntityAnimation && en.currentAnimState !== 'hit' && en.currentAnimState !== 'die') window.GameCore.playEntityAnimation(en, 'idle');
             }
         }
+            }
     });
 });
 

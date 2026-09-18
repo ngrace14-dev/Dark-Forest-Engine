@@ -72,6 +72,7 @@ window.LootEngine = {
             window.EventBus.emit('SPAWN_HIT_VFX', { type: 'Nature', pos: entity.visual.position });
         }
     },
+    generateWarMasterGear: function(level) {
         const slots = ['weapon', 'chest', 'head'];
         const gear = {};
         slots.forEach(slot => {
