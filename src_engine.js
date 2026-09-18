@@ -61,30 +61,25 @@ const ChunkManager = {
                 if (dist <= 10) {
                     expectedChunks.add(key);
                     
+                    // Determine Target LOD Tier
+                    let targetLod = 'C';
+                    if (dist <= 1) targetLod = 'A';
+                    else if (dist <= 3) targetLod = 'B';
+                        
                     if (!this.activeChunks.has(key)) {
-                        // Determine LOD Tier based on distance
-                        let lod = 'C';
-                        if (dist <= 1) lod = 'A';
-                        else if (dist <= 3) lod = 'B';
-                        
-                        this.generateChunk(x, z, lod); 
+                            this.generateChunk(x, z, targetLod);
                     } else {
-                        // Dynamic LOD Switching: If an existing chunk's tier should change
                         const chunk = this.activeChunks.get(key);
-                        let targetLod = 'C';
-                        if (dist <= 1) targetLod = 'A';
-                        else if (dist <= 3) targetLod = 'B';
-                        
                         if (chunk.lod !== targetLod) {
                             this.unloadChunk(key);
                             this.generateChunk(x, z, targetLod);
-                        }
                     }
                 }
             } 
         }
-        
-        const toRemove = []; 
+        }
+
+        const toRemove = [];
         for (const key of this.activeChunks.keys()) {
             if (!expectedChunks.has(key)) toRemove.push(key);
         }
@@ -149,11 +144,18 @@ const ChunkManager = {
         geo.attributes.position.needsUpdate = true; 
         geo.computeVertexNormals();
         
-        // Final Normal Smoothing across boundaries
+                // Final Normal Smoothing across boundaries
         const normalArray = geo.attributes.normal.array;
+        
+        // --- LAYER 4: MICRO-CLUTTER DENSITY DATA ---
+        // We create an attribute to pass to the shader for procedural blending
+        const clutterData = new Float32Array(geo.attributes.position.count);
         for (let i = 0; i < vertices.length; i += 3) {
             const vx = vertices[i] + chunkX; 
             const vz = vertices[i+2] + chunkZ;
+            // Generate a simple 0.0 - 1.0 density value based on noise
+            clutterData[i/3] = window.WorldGenerator.getNoise(vx * 0.5, vz * 0.5); 
+            
             const hL = window.WorldGenerator.getTerrainHeight(vx - 0.1, vz);
             const hR = window.WorldGenerator.getTerrainHeight(vx + 0.1, vz);
             const hD = window.WorldGenerator.getTerrainHeight(vx, vz - 0.1);
@@ -163,8 +165,39 @@ const ChunkManager = {
             normalArray[i+1] = n.y;
             normalArray[i+2] = n.z;
         }
+        geo.setAttribute('clutter', new THREE.BufferAttribute(clutterData, 1));
         geo.attributes.normal.needsUpdate = true;
-        const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 }); const mesh = new THREE.Mesh(geo, mat); mesh.position.set(chunkX, 0, chunkZ); mesh.receiveShadow = true; mesh.userData.isTerrain = true; mesh.userData.chunkKey = key; window.GameCore.scene.add(mesh);
+
+        const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
+        
+        // --- CUSTOM SHADER INJECTION FOR CLUTTER ---
+        mat.onBeforeCompile = (shader) => {
+            shader.vertexShader = shader.vertexShader.replace(
+                `#include <common>`,
+                `#include <common>
+                 attribute float clutter;
+                 varying float vClutter;`
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                `#include <begin_vertex>`,
+                `#include <begin_vertex>
+                 vClutter = clutter;`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                `#include <common>`,
+                `#include <common>
+                 varying float vClutter;`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                `#include <color_fragment>`,
+                `#include <color_fragment>
+                 // Blend in a "grass" color based on density
+                 vec3 grassColor = vec3(0.1, 0.3, 0.1);
+                 diffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);`
+            );
+        };
+        
+        const mesh = new THREE.Mesh(geo, mat);  mesh.position.set(chunkX, 0, chunkZ); mesh.receiveShadow = true; mesh.userData.isTerrain = true; mesh.userData.chunkKey = key; window.GameCore.scene.add(mesh);
 
         const physicsVertices = new Float32Array(vertices); const indicesU32 = new Uint32Array(geo.index.array); 
  
@@ -317,30 +350,53 @@ const ChunkManager = {
 
         });
 
-        // Use our new ForestSystem & ForestRenderer instead of old loop
+                // Use our new ForestSystem & ForestRenderer instead of old loop
         const chunkData = window.ForestManager.generateChunk(cx, cz);
-        const sceneryData = new Map();
-
-        ['tierA', 'tierB'].forEach(tier => {
-            chunkData[tier].forEach(point => {
-                const prefabName = point.type === 'redwood' ? 'Oak Tree' : 'Bramble Bush'; 
-                if (!sceneryData.has(prefabName)) sceneryData.set(prefabName, []);
-                sceneryData.get(prefabName).push({ x: (chunkX - 30) + (point.x - cx*60), z: (chunkZ - 30) + (point.z - cz*60) });
+        
+        // --- LOD IMPLEMENTATION: SCENERY RENDERING ---
+        // Tier A: Collision + InstancedMesh
+        // Tier B: InstancedMesh Only
+        // Tier C: Billboards Only
+        
+        if (lod === 'A' || lod === 'B') {
+            const sceneryData = new Map();
+            ['tierA', 'tierB'].forEach(tier => {
+                chunkData[tier].forEach(point => {
+                    const prefabName = point.type === 'redwood' ? 'Oak Tree' : 'Bramble Bush'; 
+                    if (!sceneryData.has(prefabName)) sceneryData.set(prefabName, []);
+                    sceneryData.get(prefabName).push({ x: (chunkX - 30) + (point.x - cx*60), z: (chunkZ - 30) + (point.z - cz*60) });
+                });
             });
-        });
 
-        // 3. Batch render through the new Renderer
-        sceneryData.forEach((points, prefabName) => {
-            // LOD Handoff: If we are in Tier C, we use billboards, otherwise renderer
-            if (lod === 'C') {
-                window.BillboardManager.updateBillboards(points);
-            } else {
+            sceneryData.forEach((points, prefabName) => {
                 if (!window.ForestRenderer.instances.has(prefabName)) {
-                    window.ForestRenderer.initInstancedMesh(prefabName, 500);
+                    window.ForestRenderer.initInstancedMesh(prefabName, 1000);
                 }
                 window.ForestRenderer.updateInstances(prefabName, points);
+            });
+
+            // Tier A: Enable Physics Colliders for Trees
+            if (lod === 'A') {
+                chunkData.tierA.forEach(point => {
+                    const px = (chunkX - 30) + (point.x - cx*60);
+                    const pz = (chunkZ - 30) + (point.z - cz*60);
+                    const py = window.WorldGenerator.getTerrainHeight(px, pz);
+                    // Add physical collision here using RAPIER
+                    const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(px, py, pz));
+                    window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(1.0, 0.5), body);
+                    if (!this.activeChunks.get(key).instanceBodies) this.activeChunks.get(key).instanceBodies = [];
+                    this.activeChunks.get(key).instanceBodies.push(body);
+                });
             }
-        });
+        } else if (lod === 'C') {
+            // Tier C: Billboard Impostors only
+            const billboardPoints = [...chunkData.tierA, ...chunkData.tierB];
+            const billboardData = billboardPoints.map(p => ({ 
+                x: (chunkX - 30) + (p.x - cx*60), 
+                z: (chunkZ - 30) + (p.z - cz*60) 
+            }));
+            window.BillboardManager.updateBillboards(billboardData);
+        }
 
         // --- VILLAGES & STREET LIGHTS ---
         const placedLightCells = new Set();
@@ -2125,4 +2181,5 @@ function updateCombatHitboxes(delta) {
         }
     }
 }
+
 

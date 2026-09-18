@@ -5,7 +5,7 @@
  * and LOD management for efficient rendering of the 128k sq mile wilderness.
  */
 
-export class ForestSystem {
+class ForestSystem {
     constructor() {
         this.config = {
             tierA: 150, // Full Collision/VAT
@@ -101,3 +101,4 @@ export class ForestSystem {
     }
 }
 
+window.ForestManager = new ForestSystem();

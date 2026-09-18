@@ -47,7 +47,13 @@ import './src_systems_blacksmith.js';
 // 4. Main Loop & Boot
 
 
+import './src_systems_forest.js';
+import './src_systems_forest_renderer.js';
+import './src_systems_forest_billboards.js';
+import './src_systems_vat.js';
+
 import './src_engine.js';
+
 
 
 

@@ -4,7 +4,7 @@
  * Implements low-cost 2D billboard impostors for distant forest rendering (600m - 5000m).
  */
 
-export class BillboardSystem {
+class BillboardSystem {
     constructor() {
         this.group = new THREE.Group();
         this.impostorTexture = null; // Needs a 1024px Texture Atlas
@@ -62,3 +62,6 @@ export class BillboardSystem {
         this.imesh.instanceMatrix.needsUpdate = true;
     }
 }
+
+window.BillboardManager = new BillboardSystem();
+

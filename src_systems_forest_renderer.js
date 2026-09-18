@@ -4,7 +4,7 @@
  * Handles the efficient drawing of thousands of trees using InstancedMesh.
  */
 
-export class ForestRenderer {
+class ForestRenderer {
     constructor() {
         this.instances = new Map(); // Store InstancedMesh by type
         this.group = new THREE.Group();
@@ -52,3 +52,6 @@ export class ForestRenderer {
         imesh.instanceMatrix.needsUpdate = true;
     }
 }
+
+window.ForestRenderer = new ForestRenderer();
+
