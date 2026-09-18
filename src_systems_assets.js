@@ -93,6 +93,8 @@ window.AssetManager = {
         'Decorative Bench': { type: 'structure', category: 'terrain', radius: 1.2, height: 1.2, modelScale: 1.0, color: 0x4a3024, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Rune Tower': { type: 'runeTower', category: 'terrain', radius: 2, height: 12, modelScale: 1.0, color: 0x64748b, isObstacle: true, active: true, protectionRadius: 18, customModel: null, animMap: {}, vfx: { aura: 'Holy', onHit: 'Sparks' } },
                 'Blight Root': { type: 'structure', category: 'terrain', radius: 1.5, height: 6, modelScale: 1.0, color: 0x8b5cf6, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'Void', onHit: 'Blood' } },
+        'Arcane Door': { type: 'arcaneDoor', category: 'terrain', radius: 1.5, height: 3.5, modelScale: 1.0, color: 0x6366f1, isObstacle: true, emitsLight: true, customModel: null, animMap: {}, vfx: { aura: 'Holy', onHit: 'Sparks' } },
+
         'Huntsman': { 
             type: 'npc', category: 'npcs', radius: 0.6, height: 2.2, modelScale: 1.0, color: 0x111111, faction: 'monster', 
             behavior: 'stalking', speed: 9.0, hp: 1200, armor: 40, attackDamage: 65, poiseDamage: 80,

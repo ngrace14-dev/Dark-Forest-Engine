@@ -527,6 +527,8 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     body.userData = { entityId: entity.id };
     
     if(def.type === 'hub') { const light = new THREE.PointLight(def.color, 2, 15); light.position.y = def.height/2; mesh.add(light); entity.ap = 0; entity.food = 100; }
+    if(def.type === 'arcaneDoor') { const light = new THREE.PointLight(0x6366f1, 3, 10); light.position.y = 1; mesh.add(light); }
+
     if(def.type === 'merchantChest') entity.merchantInventory = def.merchantInventory.map(item => ({ ...item }));
     if(def.type === 'powerStone') { const light = new THREE.PointLight(0x7dd3fc, def.active === false ? 0.2 : 3, 25); light.position.y = def.height / 2; mesh.add(light); }
     if(def.type === 'firePit') { const light = new THREE.PointLight(0xff8a32, def.active === false ? 0 : 2.5, 12); light.position.y = def.height; mesh.add(light); }
@@ -1285,8 +1287,33 @@ async function bootEngine() {
         window.GameCore.scene = new THREE.Scene(); window.GameCore.scene.fog = new THREE.FogExp2(0x040608, 0.03); window.GameCore.scene.background = new THREE.Color(0x040608);
         window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 1000);
         
-        renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); renderer.setSize(window.innerWidth || 800, window.innerHeight || 600); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25; document.body.appendChild(renderer.domElement);
+        renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); 
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); 
+        renderer.setSize(window.innerWidth || 800, window.innerHeight || 600); 
+        renderer.shadowMap.enabled = true; 
+        renderer.shadowMap.type = THREE.PCFShadowMap; 
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; 
+        renderer.toneMappingExposure = 1.25; 
+        document.body.appendChild(renderer.domElement);
+
+        // --- PHASE 1: POCKET DIMENSION SCENE ---
+        window.GameCore.pocketScene = new THREE.Scene();
+        window.GameCore.pocketScene.background = new THREE.Color(0x020617);
+        const pAmbient = new THREE.AmbientLight(0xffffff, 0.8);
+        window.GameCore.pocketScene.add(pAmbient);
+        const pPoint = new THREE.PointLight(0x6366f1, 5, 50);
+        pPoint.position.set(0, 10, 0);
+        window.GameCore.pocketScene.add(pPoint);
+
+        // Initial pocket room (10x10m Tavern)
+        const roomGeo = new THREE.BoxGeometry(20, 10, 20);
+        const roomMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, side: THREE.BackSide });
+        const roomMesh = new THREE.Mesh(roomGeo, roomMat);
+        roomMesh.position.y = 5;
+        window.GameCore.pocketScene.add(roomMesh);
+          
         clock = new THREE.Clock(); window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
+
 
                 ambientLight = new THREE.AmbientLight(0xffffff, 1.5); window.GameCore.scene.add(ambientLight);
         dirLight = new THREE.DirectionalLight(0xffffff, 2.5); 

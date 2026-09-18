@@ -18,6 +18,7 @@ import './src_systems_villages.js';
 import './src_systems_adventurers.js';
 import './src_systems_ai.js';
 import './src_systems_assets.js';
+import './src_systems_careers.js';
 // 3. Mod Tools / Overlays
 import './src/animation_tools/MixamoRetargeting.js';
 import './src_firebase.js';
