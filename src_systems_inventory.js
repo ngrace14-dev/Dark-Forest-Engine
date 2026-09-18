@@ -37,6 +37,7 @@ window.ItemDatabase = {
     'void_leg': { id: 'void_leg', name: 'Void-Infused Leg', type: 'prosthetic', slot: 'rightLeg_prosthetic', stats: { hpBonus: 50, athletics: 5, resistances: { void: 10 } }, icon: '🌑', color: 'text-purple-500' }
 };
 
+function recalculateStats() {
     if (!window.GameState || !window.GameState.inventory) {
         console.warn("[Inventory] Stats recalculation skipped: GameState not ready.");
         return;
@@ -63,10 +64,10 @@ window.ItemDatabase = {
         });
 
         // --- RUNE STATS ---
-
-
-        const rune = window.ItemDatabase[runeId];
-        if (!rune) return;
+        Object.values(window.GameState.inventory.runes).forEach(runeId => {
+            if (!runeId) return;
+            const rune = window.ItemDatabase[runeId];
+            if (!rune) return;
         totalArmor += rune.stats.defense || 0;
         totalDamage += rune.stats.damage || 0;
     });
@@ -293,3 +294,4 @@ window.EventBus.on('ENGINE_READY', () => {
     });
     recalculateStats();
 });
+
