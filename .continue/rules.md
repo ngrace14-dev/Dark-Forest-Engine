@@ -1,83 +1,199 @@
-# Dark Forest Engine Rules
+536
+No implementation begins until approval is granted.
+537
+ 
+538
+---
+539
+ 
+540
+# Stability & Recovery Policy
+541
+ 
+542
+Protecting a working build takes priority over completing a refactor.
+543
+ 
+544
+## Before Medium or High Risk Work
+545
+ 
+546
+The AI must:
+547
+ 
+548
+1. Identify the last known working state.
+549
+2. Identify rollback options.
+550
+3. Explain recovery strategy.
+551
+4. Verify startup functionality.
+552
+5. Identify failure scenarios.
+553
+ 
+554
+## Known Working State
+555
+ 
+556
+- Never intentionally overwrite a known working implementation without a recovery path.
+557
+- Preserve recoverable versions whenever practical.
+558
+- Establish a rollback strategy before major changes.
+559
+- Prefer multiple small successful commits over one large risky change.
+560
+ 
+561
+## Error Recovery
+562
+ 
+563
+If changes introduce:
+564
+ 
+565
+- Build failures
+566
+- Startup failures
+567
+- Save corruption
+568
+- Runtime exceptions
+569
+- Initialization failures
+570
+- Multiplayer synchronization failures
+571
+ 
+572
+The AI must prioritize:
+573
+ 
+574
+Restoring Stability
+575
+ 
+576
+before continuing feature work.
+577
+ 
+578
+## Refactor Safety Rules
+579
+ 
+580
+For architectural refactors:
+581
+ 
+582
+1. Establish a stable baseline.
+583
+2. Make the smallest viable change.
+584
+3. Validate startup.
+585
+4. Validate affected systems.
+586
+5. Validate save compatibility.
+587
+6. Continue incrementally.
+588
+ 
+589
+Avoid large chained refactors.
+590
+ 
+591
+---
+592
+ 
+593
+# Operational Rule
+594
+ 
+595
+A known-working engine is more valuable than a partially completed refactor.
+596
+ 
+597
+When unsure:
+598
+ 
+599
+Protect Stability First.
+---
 
-## Project Overview
+# Execution Protocols (Flash & High-Speed Models)
 
-Dark Forest Engine is a survival horror RPG simulation.
+To ensure senior-level reliability, the AI must strictly adhere to process-driven execution to prevent assumptions, hallucinations, and error loops.
 
-Core systems:
+## 1. Execution Planning (Chain of Thought)
 
-- Combat
-- AI
-- Encounters
-- Perception
-- Status Effects
-- Crafting
-- Procedural Events
-- World Simulation
+Before executing code changes, writing scripts, or beginning a refactor, the AI MUST explicitly output a plan:
 
-## Development Standards
+1. Restate the exact objective.
+2. List the specific files that must be read or modified.
+3. Outline the step-by-step logical changes required.
+4. Identify potential side effects.
 
-- **Preserve functionality:** Do not remove functionality without explicit approval.
-- **Extend before replace:** Always extend existing systems before introducing new ones.
-- **Maintain consistency:** Follow existing coding patterns (e.g., if a system uses a specific object-oriented approach, maintain it).
-- **Avoid Duplication:** Do not introduce duplicate systems.
-- **Document as you go:** All new functions must include JSDoc comments describing parameters and purpose. Update existing JSDoc if the logic changes.
-- **Dependency Check:** Before modifying a function, grep the codebase for its usage to ensure compatibility across modules.
+Do not write any implementation code until this planning phase is output.
 
-## System Interaction & Scope
+## 2. Zero-Assumption File Verification
 
-- **Event Bus Usage:** Prefer `window.EventBus` for cross-system communication. Avoid direct function calls between decoupled systems (e.g., `src_systems_ai.js` should not call `src_systems_ui.js` directly; emit an event instead).
-- **Global Namespace:** Be cautious when adding to the `window` object. If adding a new manager, attach it to an existing namespace if possible, or ensure it is documented in the architecture overview.
-- **Data-Oriented Approach:** Favor data-oriented structures (like the current entity/component buffer logic) over deep object nesting to ensure scalability and performance in the update loop.
+- NEVER assume the contents, structure, or current state of a file based on memory or filenames.
+- You MUST read the exact, up-to-date contents of a file immediately before proposing or using tools to make edits.
+- If an edit fails, do not guess the fix. Re-read the file to verify its current state before trying again.
 
-## AI Workflow
+## 3. Anti-Looping (The 2-Strike Rule)
 
-Before making changes:
+If a compilation error, test failure, or bug persists after the second attempt to fix it:
 
-1. Identify impacted systems.
-2. **Dependency Check:** Search the codebase for usage of any affected functions to ensure compatibility across modules.
-3. Explain implementation plan.
-4. List expected file modifications.
+1. STOP making automated changes.
+2. Revert to the last known working state (as defined in Stability & Recovery).
+3. Output a detailed analysis of why the previous attempts failed.
+4. Await user input or approval before attempting a completely new approach.
 
-After making changes:
+Do not brute-force solutions.
 
-1. List modified files.
-2. Explain side effects.
-3. Suggest testing steps, **prioritizing edge cases relevant to the specific module (e.g., combat behavior vs. exploration).**
+## 4. Scope Containment & Sequential Pacing
 
-## Architecture Rules
+- Execute complex tasks strictly sequentially. Complete and verify ONE file or logical component at a time before moving to the next.
+- Modify ONLY the code strictly necessary to achieve the current objective.
+- Do NOT reformat unrelated code, update unrelated dependencies, or change unrelated function signatures.
+- Ignore unrelated messy code, formatting quirks, or typos unless they directly block the current task.
 
-- Maintain compatibility with existing save data when possible.
-- Maintain existing event systems.
-- Preserve AI state machine behavior.
-- Preserve perception and threat evaluation systems.
+---
 
-## Performance Rules
+# Non-Negotiable Code Quality & Mandatory Self-Review
 
-- **Minimal Allocations:** Minimize object creation/garbage collection in update loops (e.g., reuse vectors/matrices).
-- **Spatial Optimization:** Always leverage `SpatialGrid` for proximity-based checks. Avoid `O(N^2)` loops.
-- **Lazy Evaluation:** If a system check is expensive, use a timer or frequency limit (e.g., `if (worldTimer > 0.25)`).
+Speed must NEVER come at the expense of code quality. To prevent regressions and debugging black-holes, all models MUST perform mandatory self-review and apply defensive programming standards.
 
-## Refactoring Rules
+## 1. Mandatory Self-Review ("Measure Twice, Cut Once")
+Before submitting any code implementation as "complete," you MUST output a <self_review> block where you critique your own work.
+- Check explicitly for: Off-by-one errors, null pointer exceptions, unhandled edge cases, asynchronous race conditions, and memory leaks.
+- If your self-review uncovers a potential flaw, you must iterate and fix it immediately before asking for user approval.
+- It is expected that you might rewrite your own code 2-3 times internally before presenting the final version.
 
-- Refactor incrementally.
-- Do not remove functionality without approval.
-- Explain risks before architectural changes.
+## 2. Strict Defensive Programming
+- NEVER assume inputs are perfectly formatted, state is always valid, or API calls will succeed.
+- Validate parameters, guard against null/undefined, and handle missing data gracefully.
+- Use early returns (guard clauses) to reduce nesting and cognitive load.
+- Add descriptive error logging (with context) for any failure state. Do not swallow errors silently.
 
-## Change Budget
-- Modify the smallest number of files necessary.
-- Prefer targeted fixes over broad rewrites.
-- Do not rewrite entire systems unless explicitly requested.
-- Preserve public APIs whenever possible.
-- When a change affects more than 5 files, explain why each file must be modified.
+## 3. Implementation Standard Checklist
+For every function or class modified or created, you must ensure:
+- [ ] Logic is explicitly clear and easy to follow.
+- [ ] Variables are named explicitly and descriptively (no 	emp, data, x, obj).
+- [ ] Potential side-effects on other systems have been identified and mitigated.
+- [ ] The change strictly respects the existing architecture and patterns.
+- [ ] There is proper error catching/bubbling to the caller.
 
-## Risk Assessment
-Before implementing any architectural change, classify risk:
-- **LOW:** Single module, no save impact.
-- **MEDIUM:** Multiple modules, event flow changes.
-- **HIGH:** Save format changes, core AI changes, combat logic changes, world simulation changes.
-
-For HIGH risk changes:
-- Explain rollback strategy.
-- Explain migration strategy.
-- Wait for approval before implementation.
+## 4. The "Worst-Case Scenario" Check
+For any logic involving core engine systems (State, Multiplayer, Saves, Initialization):
+- Ask yourself: "How could this fail? What happens if the network drops? What if the entity is destroyed mid-frame? What if the save data is from an older version?"
+- Implement explicit safeguards against your own worst-case answers before finalizing the code.

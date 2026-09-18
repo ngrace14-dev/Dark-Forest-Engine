@@ -1,6 +1,5 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-import { createNoise2D } from 'https://esm.sh/simplex-noise@4.0.1';
-import alea from 'https://esm.sh/alea@1.0.1';
+import { EpochManager } from './src_epoch_manager.js';
 
 window.WorldGenConfig = {
     noiseScale: 0.003,
@@ -16,26 +15,28 @@ window.WorldGenConfig = {
     }
 };
 
-window.createNoise2D = createNoise2D;
-
-
-window.currentPrng = alea(window.EngineParams.worldSeed);
-window.currentNoise2D = createNoise2D(window.currentPrng);
+window.EpochManagerInstance = new EpochManager();
 
 window.WorldGenerator = class {
-    static getNoise(x, z) { return window.currentNoise2D(x * window.WorldGenConfig.noiseScale, z * window.WorldGenConfig.noiseScale); }
-    static getBiome(x, z) {
-        const halfForestSide = window.WorldGenConfig.darkForestSideMeters / 2;
-        const furthestAxisDistance = Math.max(Math.abs(x), Math.abs(z));
-        if (furthestAxisDistance > halfForestSide + window.WorldGenConfig.mountainRingWidthMeters) return 'desert';
-        if (furthestAxisDistance > halfForestSide) return 'sierra';
-        const val = this.getNoise(x, z);
-        if (val > 0.45) return 'alpine'; if (val < -0.3) return 'coastal'; if (val > -0.3 && val < 0.1) return 'valley'; return 'redwoods';
-    }
+    static getNoise(x, z) { return window.EpochManagerInstance.getNoise(x, z); }
+    static getBiome(x, z) { return window.EpochManagerInstance.getBiome(x, z); }
     static getTerrainHeight(x, z) {
-        let height = window.currentNoise2D(x * 0.005, z * 0.005) * 8; const biomeKey = this.getBiome(x, z);
-        if(biomeKey === 'alpine' || biomeKey === 'sierra') height += Math.max(0, window.currentNoise2D(x * 0.01, z * 0.01) * 20);
-        return height;
+        // Collect Shielded POIs (Capital at 0,0, Terminus, etc)
+        const shieldedPOIs = [
+            { x: 0, z: 0, y: 0, radius: 200 } // Example Capital at 0,0
+        ];
+        
+        if (window.VillageManager) {
+            for (const v of window.VillageManager.villages) {
+                if (v.position && v.radius) {
+                    // Estimate village Y based on natural height if it doesn't have a strict forced Y
+                    const vY = v.position.y || window.EpochManagerInstance._calculateNaturalHeight(v.position.x, v.position.z);
+                    shieldedPOIs.push({ x: v.position.x, z: v.position.z, y: vY, radius: v.radius });
+                }
+            }
+        }
+        
+        return window.EpochManagerInstance.getTerrainHeight(x, z, shieldedPOIs);
     }
 };
 

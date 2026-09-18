@@ -6,7 +6,9 @@
     "coop-server": "node server/coop-server.mjs"
   },
   "dependencies": {
+    "alea": "^1.0.1",
     "recast-navigation": "^0.43.1",
+    "simplex-noise": "^4.0.3",
     "three-pathfinding": "^1.3.0",
     "ws": "^8.18.0"
   }

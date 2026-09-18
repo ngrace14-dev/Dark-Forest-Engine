@@ -5,6 +5,7 @@ import './src_core_registry.js';
 // 1. Core Data
 import './src_core_state.js';
 // 2. Systems (Must load before Engine boot)
+import './src_epoch_manager.js';
 import './src_systems_world.js';
 import './src_systems_inventory.js';
 import './src_systems_ui.js';
@@ -18,6 +19,7 @@ import './src_systems_adventurers.js';
 import './src_systems_ai.js';
 import './src_systems_assets.js';
 // 3. Mod Tools / Overlays
+import './src/animation_tools/MixamoRetargeting.js';
 import './src_firebase.js';
 import './src_multiplayer.js';
 import './src_systems_editor.js';

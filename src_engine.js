@@ -955,12 +955,72 @@ function punishExposedActors() {
 }
 
 function regenerateWorldCycle() {
-    punishExposedActors();
-    if (window.VillageManager.villages.length > 0) window.VillageManager.shiftLocations();
-    window.EngineParams.worldSeed = `${window.EngineParams.worldSeed.split('_cycle_')[0]}_cycle_${window.EngineParams.worldDay}`;
-    window.EventBus.emit('WORLD_REGENERATE');
-    window.EngineParams.lastCycleDay = window.EngineParams.worldDay;
-    window.EventBus.emit('UI_LOG', `Day ${window.EngineParams.worldDay}: settlements shifted and the world regenerated at midnight.`);
+    if (window.EngineParams.suppressWorldRegenerate) return;
+    
+    // 1. Fire the cinematic "Wave of White" transition
+    const uiOverlay = document.createElement('div');
+    uiOverlay.style.position = 'fixed';
+    uiOverlay.style.top = '0'; uiOverlay.style.left = '0';
+    uiOverlay.style.width = '100vw'; uiOverlay.style.height = '100vh';
+    uiOverlay.style.backgroundColor = 'white';
+    uiOverlay.style.opacity = '0';
+    uiOverlay.style.transition = 'opacity 3s ease-in-out';
+    uiOverlay.style.zIndex = '9999';
+    uiOverlay.style.pointerEvents = 'none';
+    document.body.appendChild(uiOverlay);
+
+    setTimeout(() => {
+        uiOverlay.style.opacity = '1';
+        
+        setTimeout(() => {
+            // 2. The screen is completely white. Now we do the heavy logic.
+            punishExposedActors();
+            
+            // Advance the Epoch Manager mathematically
+            const newEpoch = window.EpochManagerInstance.advanceEpoch();
+            
+            // Update Engine params for saving
+            window.EngineParams.worldSeed = window.EpochManagerInstance.currentSeed;
+            window.EngineParams.lastCycleDay = window.EngineParams.worldDay;
+            
+            // Shift Villages to new safe locations (Village Manager handles finding flat ground based on new noise)
+            if (window.VillageManager && window.VillageManager.villages.length > 0) {
+                window.VillageManager.shiftLocations();
+            }
+
+            // 3. Teleport the player if they aren't in a protected zone
+            // (For now, we just randomly toss them in the valid forest bounds)
+            if (!window.EngineParams.isPlayerSafe) {
+                const forestExtent = window.WorldGenConfig.darkForestSideMeters / 2 - 1000;
+                let newX, newZ;
+                let valid = false;
+                while(!valid) {
+                    newX = (Math.random() * 2 - 1) * forestExtent;
+                    newZ = (Math.random() * 2 - 1) * forestExtent;
+                    // Don't spawn them inside the capital or terminus bounds
+                    if (Math.abs(newX) > 500 || Math.abs(newZ) > 500) valid = true;
+                }
+                const newY = window.WorldGenerator.getTerrainHeight(newX, newZ) + 15;
+                if (window.GameCore.playerObj) {
+                    window.GameCore.playerObj.body.setTranslation({x: newX, y: newY, z: newZ}, true);
+                    window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
+                    // Force the chunk manager to immediately load the new location
+                    if (typeof ChunkManager !== 'undefined') ChunkManager.update(new THREE.Vector3(newX, newY, newZ));
+                }
+            }
+
+            // Tell the rest of the systems to refresh
+            window.EventBus.emit('WORLD_REGENERATE');
+            window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The white wave passed. The forest has shifted.`);
+
+            // 4. Fade back in
+            setTimeout(() => {
+                uiOverlay.style.opacity = '0';
+                setTimeout(() => { document.body.removeChild(uiOverlay); }, 3000);
+            }, 1000); // 1 second of holding the white screen
+
+        }, 3000); // Wait 3s for fade to white
+    }, 100);
 }
 window.EventBus.on('CMD_TELEPORT', (pos) => { const vy = window.WorldGenerator.getTerrainHeight(pos.x, pos.z) + 15; window.GameCore.playerObj.body.setTranslation({x:pos.x, y:vy, z:pos.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); ChunkManager.update(new THREE.Vector3(pos.x, vy, pos.z)); });
 window.EventBus.on('PLAYER_RESPAWN', () => { if (!window.EngineParams.arenaMode && window.GameState.pStats.hp <= 0) window.GameCore.recordCombatDefeat({ source: 'open-world', injury: `open-world defeat on day ${window.EngineParams.worldDay}` }); const respawnY = window.WorldGenerator.getTerrainHeight(0,0) + 15; window.GameCore.playerObj.body.setTranslation({x:0, y:respawnY, z:0}, true); window.GameState.pStats.hp = window.GameState.pStats.maxHp; window.GameState.inventory.gold = Math.floor(window.GameState.inventory.gold / 2); playEntityAnimation(window.GameCore.playerObj, 'idle'); window.EventBus.emit('UI_UPDATE_HUD'); });
