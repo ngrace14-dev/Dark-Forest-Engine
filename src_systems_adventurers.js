@@ -32,50 +32,53 @@ window.AdventurerManager = {
     },
     advanceDay: function() {
         this.generate();
+        const deltaSeconds = 43200 / 24; // 1 in-game hour in real seconds
+        
         this.records.forEach(record => {
             if (record.activeEntityId) return;
             record.morale ??= 70;
             record.supplies ??= 8;
             record.party ??= [];
             record.quest ??= { type: 'hunt', progress: 0, goal: 4 };
-            record.lastUpdateDay = window.EngineParams.worldDay;
+            
+            // --- PHASE 2: ABSTRACT HERO TRAVEL ---
+            // If they are unloaded, they move 10x faster mathematically
             const recordIndex = Math.max(0, Number(record.id.split('-').pop()) - 1);
             const destination = window.VillageManager.villages[recordIndex % Math.max(1, window.VillageManager.villages.length)];
-            const targetX = destination?.x || 0; const targetZ = destination?.z || 0;
-            const directionX = targetX - record.position.x; const directionZ = targetZ - record.position.z;
+            
+            const targetX = destination?.x || 0; 
+            const targetZ = destination?.z || 0;
+            const directionX = targetX - record.position.x; 
+            const directionZ = targetZ - record.position.z;
             const distance = Math.hypot(directionX, directionZ);
+
             if (distance > 6) {
-                record.position.x += directionX / distance * 12;
-                record.position.z += directionZ / distance * 12;
+                // Heroes move at ~5m/s physically. 
+                // Abstract speed = 50m/s (10x)
+                const moveAmount = 50 * 60; // 60 seconds of abstract time per tick
+                const t = Math.min(1.0, moveAmount / distance);
+                record.position.x += directionX * t;
+                record.position.z += directionZ * t;
             }
+            
             record.destination = { x: targetX, z: targetZ };
-            const threat = 3 + Math.floor(distance / 120) + (record.quest.type === 'rescue' ? 2 : 0);
+            
+            // Story Heat rewards for traveling large distances
+            if (distance > 5000) record.storyHeat = Math.min(100, (record.storyHeat || 0) + 0.5);
+
+            // Simulation of questing while unloaded
+            const threat = 3 + Math.floor(distance / 1000) + (record.quest.type === 'rescue' ? 2 : 0);
             const suppliesBonus = Math.min(3, record.supplies / 3);
             const success = Math.random() * 10 + this.partyPower(record) + suppliesBonus >= threat + 4;
-            record.supplies = Math.max(0, record.supplies - 1);
+            
             if (success) {
                 record.xp += 20 + record.level * 5;
-                record.morale = Math.min(100, record.morale + 4);
-                record.storyHeat = Math.min(100, record.storyHeat + 2);
+                record.morale = Math.min(100, record.morale + 1);
                 record.quest.progress = Math.min(record.quest.goal, record.quest.progress + 1);
-                this.recordEvent(record, 'quest_progress', `${record.quest.type} progress ${record.quest.progress}/${record.quest.goal}`);
                 if (record.quest.progress >= record.quest.goal) {
                     record.level++;
                     record.supplies += 4;
-                    record.morale = Math.min(100, record.morale + 10);
-                    this.recordEvent(record, 'quest_complete', `completed a ${record.quest.type} quest`);
                     this.chooseQuest(record);
-                }
-            } else {
-                record.hp = Math.max(1, record.hp - (10 + Math.floor(Math.random() * 12)));
-                record.morale = Math.max(0, record.morale - 12);
-                record.storyHeat = Math.max(0, record.storyHeat - 2);
-                this.recordEvent(record, 'party_injury', `failed a ${record.quest.type} attempt and suffered injuries`);
-                if (record.supplies === 0) this.recordEvent(record, 'supplies_depleted', 'ran out of supplies');
-                if (record.morale === 0) {
-                    this.recordEvent(record, 'quest_abandoned', 'abandoned the quest after morale collapsed');
-                    this.chooseQuest(record);
-                    record.morale = 45;
                 }
             }
         });

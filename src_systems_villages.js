@@ -355,15 +355,46 @@ window.VillageManager = {
     },
     processVillageCaravans: function(village) {
         village.caravans.forEach(caravan => {
+            // --- PHASE 2: GHOST CARAVAN TRAVEL ---
+            // If the caravan is far away from the player, move it mathematically
+            const agent = window.GameCore.activeEntities.find(en => en.caravanId === caravan.id);
+            if (!agent) {
+                // If it doesn't exist in 3D, simulate it!
+                const dest = this.villages.find(v => v.id === caravan.targetVillageId);
+                if (dest && caravan.status === 'traveling') {
+                    // Update its abstract position
+                    const dx = dest.x - (caravan.position?.x || village.x);
+                    const dz = dest.z - (caravan.position?.z || village.z);
+                    const dist = Math.hypot(dx, dz);
+                    
+                    if (dist < 20) {
+                        caravan.status = 'arrived';
+                    } else {
+                        // Caravans move at ~4m/s, abstract speed = 40m/s
+                        const speed = 40 * 60; // Distance moved per simulation tick
+                        const t = Math.min(1.0, speed / dist);
+                        caravan.position = {
+                            x: (caravan.position?.x || village.x) + dx * t,
+                            z: (caravan.position?.z || village.z) + dz * t
+                        };
+                    }
+                }
+            }
+
             if (caravan.status !== 'arrived') return;
             const destination = this.villages.find(candidate => candidate.id === caravan.targetVillageId);
             if (!destination) return;
             destination.stats = { ap: 0, food: 0, wood: 0, stone: 0, gold: 0, prosperity: 0, ...destination.stats };
+            
+            // --- PHASE 2: PAYLOAD BUFF ---
+            // Because distance is 1:1 scale, increase cargo per trip
             const cargo = caravan.cargo || village.industry.produces;
-            const amount = caravan.amount || Math.max(1, Math.floor(village.population.current / 1000));
+            const amount = (caravan.amount || 1) * 10; 
+            
             if ((village.stats[cargo] || 0) < amount) return;
             village.stats[cargo] -= amount;
             destination.stats[cargo] += amount;
+            
             if (village.provision && (village.provisionStock?.[village.provision.itemId] || 0) > 0) {
                 const provisionAmount = Math.min(amount, village.provisionStock[village.provision.itemId]);
                 destination.provisionStock ??= {};
