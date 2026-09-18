@@ -17,8 +17,12 @@ import './src_systems_health.js';
 import './src_systems_encounters.js';
 
 export { ForestSystem } from './src_systems_forest.js';
+export { ForestRenderer } from './src_systems_forest_renderer.js';
+export { BillboardSystem } from './src_systems_forest_billboards.js';
 
 window.ForestManager = new ForestSystem();
+window.ForestRenderer = new ForestRenderer();
+window.BillboardManager = new BillboardSystem();
 
 // Engine Boot and Render Loop (Runs Last)
 import './src_engine.js';

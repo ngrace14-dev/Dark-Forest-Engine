@@ -170,7 +170,7 @@ const ChunkManager = {
  
         const groundBody = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(chunkX, 0, chunkZ));
         const collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.trimesh(physicsVertices, indicesU32), groundBody);
-        this.activeChunks.set(key, { mesh, body: groundBody, collider });
+        this.activeChunks.set(key, { mesh, body: groundBody, collider, lod });
         
                 const rng = alea(`${window.EngineParams.worldSeed}_${cx}_${cz}`);
         
@@ -252,8 +252,6 @@ const ChunkManager = {
         const treeSpacing = biomeData.density || 10; // Redwoods are 12m apart, etc
         
         const poissonPoints = getPoissonPoints(60, 60, treeSpacing, rng);
-        const sceneryData = new Map();
-
                 // 2. Filter points and spawn scenery
         poissonPoints.forEach(point => {
             const vx = (chunkX - 30) + point.x;
@@ -300,8 +298,6 @@ const ChunkManager = {
                 return; // Skip tree instancing for this point
             }
 
-            if (!sceneryData.has(prefabName)) sceneryData.set(prefabName, []);
-            
             const vy = window.WorldGenerator.getTerrainHeight(vx, vz);
             
             // Check slope - don't spawn trees on steep cliffs
@@ -319,10 +315,8 @@ const ChunkManager = {
                 scale.y *= (1.5 + rng());
             }
 
-            sceneryData.get(prefabName).push({ position, rotation, scale });
         });
 
-                // 3. Bake InstancedMeshes
         // Use our new ForestSystem & ForestRenderer instead of old loop
         const chunkData = window.ForestManager.generateChunk(cx, cz);
         const sceneryData = new Map();
@@ -335,11 +329,17 @@ const ChunkManager = {
             });
         });
 
+        // 3. Batch render through the new Renderer
         sceneryData.forEach((points, prefabName) => {
-            if (!window.ForestRenderer.instances.has(prefabName)) {
-                window.ForestRenderer.initInstancedMesh(prefabName, 500);
+            // LOD Handoff: If we are in Tier C, we use billboards, otherwise renderer
+            if (lod === 'C') {
+                window.BillboardManager.updateBillboards(points);
+            } else {
+                if (!window.ForestRenderer.instances.has(prefabName)) {
+                    window.ForestRenderer.initInstancedMesh(prefabName, 500);
+                }
+                window.ForestRenderer.updateInstances(prefabName, points);
             }
-            window.ForestRenderer.updateInstances(prefabName, points);
         });
 
         // --- VILLAGES & STREET LIGHTS ---
@@ -1363,7 +1363,11 @@ async function bootEngine() {
         window.GameCore.pocketScene.add(pPoint);
 
         // Initial pocket room (10x10m Tavern)
+                // Add Forest Renderer
         window.GameCore.scene.add(window.ForestRenderer.group);
+        window.GameCore.scene.add(window.BillboardManager.group);
+
+        // Initial pocket room (10x10m Tavern)
         const roomGeo = new THREE.BoxGeometry(20, 10, 20);
         const roomMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, side: THREE.BackSide });
         const roomMesh = new THREE.Mesh(roomGeo, roomMat);
@@ -2121,8 +2125,4 @@ function updateCombatHitboxes(delta) {
         }
     }
 }
-
-
-      
-
 
