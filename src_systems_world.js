@@ -1,6 +1,6 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-import { createNoise2D } from 'simplex-noise';
-import alea from 'alea';
+import { createNoise2D } from 'https://esm.sh/simplex-noise@4.0.1';
+import alea from 'https://esm.sh/alea@1.0.1';
 
 window.WorldGenConfig = {
     noiseScale: 0.003,
@@ -38,4 +38,5 @@ window.WorldGenerator = class {
         return height;
     }
 };
+
 

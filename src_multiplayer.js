@@ -135,3 +135,4 @@ if (coopUrl) window.NetworkSession.connect(coopUrl);
 window.EventBus.on('COOP_CONNECTED', () => window.EventBus.emit('UI_LOG', '[CO-OP] Connected to the shared forest session.'));
 window.EventBus.on('COOP_DISCONNECTED', () => window.EventBus.emit('UI_LOG', '[CO-OP] Disconnected. The local world remains playable.'));
 window.EventBus.on('COOP_ERROR', () => window.EventBus.emit('UI_LOG', '[CO-OP] Connection error.'));
+

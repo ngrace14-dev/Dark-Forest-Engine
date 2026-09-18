@@ -444,3 +444,4 @@ if (onPointerDownBlockStart > -1 && onPointerDownBlockEnd > -1) {
     fs.writeFileSync('src_systems_editor.js', content, 'utf8');
     console.log("Replaced block 2");
 }
+

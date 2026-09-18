@@ -54,3 +54,4 @@ document.addEventListener('mousemove', e => {
 document.addEventListener('wheel', e => { window.Input.camDistance = Math.max(5, Math.min(30, window.Input.camDistance + e.deltaY * 0.01)); });
 document.addEventListener('contextmenu', e => e.preventDefault());
 
+

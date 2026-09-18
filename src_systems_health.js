@@ -234,3 +234,4 @@ window.GameCore.applyCombatInjury = function(entity, damage, sourceName = 'Enemy
 };
 
 
+

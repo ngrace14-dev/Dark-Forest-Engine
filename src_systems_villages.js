@@ -326,3 +326,4 @@ window.VillageManager = {
     }
 };
 
+

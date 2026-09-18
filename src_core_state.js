@@ -538,3 +538,4 @@ window.EventBus.on('GAME_LOAD', () => {
     }
 });
 console.log("%c🟢 Core Hub: State & EventBus Restored", "color: #4ade80; font-weight: bold; font-size: 11px;");
+
