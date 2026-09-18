@@ -97,22 +97,79 @@ window.EstablishmentManager = {
         window.EventBus.emit('RUMORS_UPDATED', this.rumors);
     },
 
-    // --- PHASE 3: THE GLOBAL MAP UI ---
-    // This provides a high-level overview of the 128k sq mile world 
-    // accessible only from within the Establishment
-    getGlobalIntel: function() {
-        return {
-            unlockedVillages: this.unlockedDoors.length,
-            totalPopulation: window.VillageManager.villages.reduce((sum, v) => sum + v.population.current, 0),
-            activeWars: window.VillageManager.villages.filter(v => v.tensions > 70).length,
-            nextShiftDay: Math.ceil(window.EngineParams.worldDay / 14) * 14
+    // --- PHASE 4: SOCIAL HUB SIMULATION ---
+    populateHub: function() {
+        if (!this.active || !window.GameCore.pocketScene) return;
+
+        // Clear existing NPCs in the hub first
+        this.clearHubNPCs();
+
+        // Spawn a representative for each village with an unlocked door
+        this.unlockedDoors.forEach((villageId, index) => {
+            const village = window.VillageManager.villages[villageId];
+            if (!village) return;
+
+            // Spacing them around the tavern walls
+            const angle = (index / Math.max(1, this.unlockedDoors.length)) * Math.PI * 2;
+            const x = Math.cos(angle) * 8;
+            const z = Math.sin(angle) * 8;
+
+            // Determine which type of NPC to spawn based on village industry
+            let prefab = 'Adventurer';
+            if (village.capital) prefab = 'Noble NPC';
+            else if (village.industry.mountainGatekeeper) prefab = 'City Guard';
+            else if (village.industry.produces === 'wood') prefab = 'Village Scout';
+            
+            // Physical instantiation in the pocket dimension
+            this.spawnHubNPC(prefab, x, z, village);
+        });
+    },
+
+    spawnHubNPC: function(prefabName, x, z, village) {
+        const def = window.AssetManager.prefabs[prefabName];
+        if (!def) return;
+
+        // Note: Hub NPCs are non-physics visual representations
+        const group = new THREE.Group();
+        const visual = window.GameCore.getVisualMesh(def);
+        group.add(visual);
+        group.position.set(x, 0.5, z);
+        
+        // Face the center of the room
+        group.lookAt(0, 0.5, 0);
+
+        // Metadata for interaction
+        group.userData = {
+            isHubNPC: true,
+            villageId: village.id,
+            villageName: village.name,
+            rank: 'Representative'
         };
+
+        window.GameCore.pocketScene.add(group);
+        
+        // Add a small spotlight on the representative
+        const spot = new THREE.SpotLight(0xffffff, 2, 10, Math.PI/4);
+        spot.position.set(x, 5, z);
+        spot.target = group;
+        window.GameCore.pocketScene.add(spot);
+    },
+
+    clearHubNPCs: function() {
+        if (!window.GameCore.pocketScene) return;
+        const toRemove = [];
+        window.GameCore.pocketScene.traverse(child => {
+            if (child.userData && child.userData.isHubNPC) toRemove.push(child);
+            if (child.isSpotLight) toRemove.push(child);
+        });
+        toRemove.forEach(obj => window.GameCore.pocketScene.remove(obj));
     }
 };
 
-// Auto-refresh rumors when entering
+// Update: Hub population triggers on entry
 window.EventBus.on('SCENE_SWAP', ({ target }) => {
     if (target === 'establishment') {
         window.EstablishmentManager.refreshRumors();
+        window.EstablishmentManager.populateHub();
     }
 });
