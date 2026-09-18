@@ -1002,7 +1002,54 @@ async function bootEngine() {
         
         window.EventBus.emit('ENGINE_READY'); window.EventBus.emit('ENV_UPDATE');
     } catch(e) { console.error("CRITICAL BOOT ERROR", e); }
-}
+    }
+
+    window.bootEngine = bootEngine;
+
+    // Attach to button directly in here for safety
+    window.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('btn-start')?.addEventListener('click', () => {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+        
+            // Finalize setup
+            window.EventBus.emit('UI_UPDATE_HUD');
+            // Re-attach resize listener to be sure
+            window.addEventListener('resize', () => { 
+                if(window.GameCore.camera) {
+                    window.GameCore.camera.aspect = window.innerWidth / window.innerHeight; 
+                    window.GameCore.camera.updateProjectionMatrix(); 
+                }
+                if(renderer) {
+                    renderer.setSize(window.innerWidth, window.innerHeight); 
+                    composer.setSize(window.innerWidth, window.innerHeight); 
+                }
+            });
+        
+            // Start Loop
+            function animate() { 
+                requestAnimationFrame(animate); 
+                let delta = clock.getDelta(); 
+                if (delta > 0.1) delta = 0.1; 
+                accumulator += delta; 
+            
+                while (accumulator >= fixedTimeStep) { 
+                    if(window.GameCore.world) window.GameCore.world.step(); 
+                    fixedUpdateLogic(fixedTimeStep); 
+                    accumulator -= fixedTimeStep; 
+                } 
+            
+                if(composer) composer.render(); 
+            }
+        
+            animate();
+        
+            // Spawn UI Log message
+            window.EventBus.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
+        });
+    });
+
+    bootEngine();
 
 function postVillageNeed(village, resource, amount, purpose) {
     const existing = window.GameState.questBoard.find(quest => quest.issuer === village.id && quest.resource === resource && quest.purpose === purpose);
