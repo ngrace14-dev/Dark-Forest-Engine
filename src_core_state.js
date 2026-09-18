@@ -383,7 +383,15 @@ window.GameCore = {
         record.history.push({ day: window.EngineParams.worldDay, renown, infamy, faction, reason });
         if (record.history.length > 100) record.history.shift();
         const standingChange = Math.floor((renown - infamy) / 5);
-        if (standingChange !== 0) this.adjustFactionStanding(faction, standingChange, reason);
+        if (standingChange !== 0) {
+            this.adjustFactionStanding(faction, standingChange, reason);
+            
+            // --- PHASE 5: NOBLE RETAINER XP ---
+            // Award XP for improving relations with any Noble House
+            if (standingChange > 0 && (faction === 'kingdom' || faction === 'adventurer')) {
+                window.CareerManager.addXP('noble_retainer', standingChange * 10);
+            }
+        }
         window.EventBus.emit('RENOWN_CHANGED', { renown, infamy, faction, reason });
     },
     getRenownDiscount: function(faction = 'kingdom') {

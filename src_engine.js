@@ -1142,8 +1142,12 @@ window.EventBus.on('BUILD_BASE_STRUCTURE', prefab => {
     if (!entity) return;
     entity.playerBase = true;
     base.structures.push({ prefab, x, z });
-    if (prefab === 'Camp Farm Plot') base.farms.push({ x, z });
+        if (prefab === 'Camp Farm Plot') base.farms.push({ x, z });
     if (prefab === 'Rune Tower') base.wardRadius = 30;
+    
+    // --- PHASE 5: BUILDER XP ---
+    window.CareerManager.addXP('builder', 50);
+    
     window.EventBus.emit('UI_LOG', `[CAMP] Built ${prefab}.`);
 });
 window.EventBus.on('WORLD_REGENERATE', () => {
