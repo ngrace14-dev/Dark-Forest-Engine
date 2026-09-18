@@ -19,6 +19,10 @@ window.RelationshipManager = {
         
         if (Math.random() * 100 < chance) {
             window.EventBus.emit('UI_LOG', `[HISTORY] A marriage alliance has been signed between ${houseA} and ${houseB}!`);
+            
+            // --- PHASE 4: MATCHMAKER XP ---
+            window.CareerManager.addXP('matchmaker', 250);
+            
             // Adjust global house relations
             return true;
         } else {

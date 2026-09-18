@@ -21,6 +21,11 @@ window.EstablishmentManager = {
         this.currentEntryPoint = { x: absPos.x, y: 0, z: absPos.z, villageId };
         
         this.active = true;
+        
+        // --- PHASE 4: ARCANE PROPRIETOR XP ---
+        // Award XP for opening the interdimensional gates
+        window.CareerManager.addXP('arcane_proprietor', 50);
+        
         window.EventBus.emit('UI_LOG', `[ARCANE] Reality folds. You step into your pocket dimension.`);
         
         // 2. Trigger Scene Swap in Engine
