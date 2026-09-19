@@ -796,7 +796,7 @@ function updateInvestigationHUD() {
     
     const intel = window.IntelManager.lookup(state.activeIntelId);
     if (!intel || intel.certainty >= 1.0 || intel.persistence !== window.IntelEnums.PERSISTENCE.ACTIVE) {
-        // Abandon investigation if verified or lost
+        // Abandon focus if verified or lost
         window.GameState.investigation.activeIntelId = null;
         return;
     }
@@ -807,45 +807,37 @@ function updateInvestigationHUD() {
         const target = intel.payload.target_coord;
         
         // Calculate Distance
-        const dist = Math.floor(Math.hypot(pPos.x - target.x, pPos.z - target.z));
+        const distSq = (pPos.x - target.x)**2 + (pPos.z - target.z)**2;
         
         document.getElementById('inv-title').innerText = intel.payload.title;
-        document.getElementById('inv-dist').innerText = dist > 500 ? '> 500m' : `${dist}m`;
+        // DISTANCE UI REMOVED - The player must navigate using landmarks and lore, not a GPS.
         
         // --- VERIFICATION TRIGGERS ---
         // If within 30 meters of the target coordinate, attempt verification
-        if (dist <= 30) {
+        if (distSq <= 900) {
             // Check Complexity Cost
             let canVerify = true;
             if (intel.verification_complexity === 'HARD' || intel.verification_complexity === 'EXPERT' || intel.verification_complexity === 'LEGENDARY') {
-                // If it's a hard secret, simple proximity isn't enough. We assume it requires 
-                // specialized investigation. For simulation purposes, we check if the player has 
-                // a specific artifact or if there's an Archivist in the party.
-                // For now, we simulate this by requiring a "Lore Tool" or an Archivist.
                 const hasArchivist = window.GameState.party.members.some(m => m.recruited && m.role === 'Archivist' && !m.downed);
                 if (!hasArchivist && intel.verification_complexity === 'LEGENDARY') {
                     canVerify = false;
-                    if (Math.random() < 0.05) window.EventBus.emit('UI_LOG', `[INVESTIGATION] This secret is too complex. You need an Archivist.`);
+                    if (Math.random() < 0.05) window.EventBus.emit('UI_LOG', `[FOCUS] The truth here is obscured. You require an Archivist's eyes.`);
                 }
             }
 
             if (canVerify && !state.verifying) {
                 state.verifying = true; // Prevent spam
                 
-                // Actual truth check: Since our engine determines truth objectively at spawn, 
-                // we just check the intel's inherent truth_state. 
-                // In a deeper simulation, we would raycast to see if the Wendigo is ACTUALLY there.
-                // For now, we assume the intel's truth_state is the objective reality.
                 const truthConditionMet = intel.truth_state === window.IntelEnums.TRUTH_STATE.TRUE;
                 
-                window.EventBus.emit('UI_LOG', `[INVESTIGATION] You have arrived at the coordinates...`);
+                window.EventBus.emit('UI_LOG', `[FOCUS] The culmination of your search is at hand...`);
                 
                 setTimeout(() => {
                     const newId = window.IntelEconomy.verifyIntel(intel.intel_id, {id: 'player_node', faction: 'Player'}, truthConditionMet);
                     if (newId) {
                         // Investigation complete, reward XP
                         window.CareerManager?.addXP('archivist', 50);
-                        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'SECRET VERIFIED', pos: pPos, color: '#06b6d4' });
+                        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'TRUTH REVEALED', pos: pPos, color: '#a855f7' });
                         window.GameState.investigation.activeIntelId = null;
                         state.verifying = false;
                     }
@@ -860,7 +852,7 @@ function updateInvestigationHUD() {
 window.EventBus.on('START_INVESTIGATION', (intelId) => {
     const intel = window.IntelManager.lookup(intelId);
     if (!intel || intel.certainty >= 1.0) {
-        window.EventBus.emit('UI_LOG', 'Cannot investigate. Record is either already verified or corrupted.');
+        window.EventBus.emit('UI_LOG', 'Cannot focus. Record is either already verified or corrupted.');
         return;
     }
     
@@ -869,7 +861,7 @@ window.EventBus.on('START_INVESTIGATION', (intelId) => {
         verifying: false
     };
     
-    window.EventBus.emit('UI_LOG', `[INVESTIGATION] You begin tracking the truth of: ${intel.payload.title}`);
+    window.EventBus.emit('UI_LOG', `[FOCUS] Your mind locks onto the possibility of: ${intel.payload.title}`);
     closeCompanionDialogue();
 });
 
@@ -1228,8 +1220,8 @@ function renderOracleBoardContent(hub) {
                     </div>
 
                                         <div class="mt-auto">
-                        ${intel.certainty < 1.0 ? `<button class="w-full bg-cyan-900/50 border border-cyan-700 hover:bg-cyan-800 hover:text-white text-cyan-200 px-2 py-1.5 text-[10px] uppercase font-bold tracking-widest transition-colors shadow-[0_0_10px_rgba(6,182,212,0.15)]" onclick="window.EventBus.emit('START_INVESTIGATION', '${intel.intel_id}')">Investigate</button>` : `<div class="w-full bg-gray-800 border border-gray-700 text-gray-500 px-2 py-1.5 text-[10px] uppercase font-bold tracking-widest text-center cursor-not-allowed">Verified</div>`}
-                    </div>
+                                            ${intel.certainty < 1.0 ? `<button class="w-full bg-purple-900/50 border border-purple-700 hover:bg-purple-800 hover:text-white text-purple-200 px-2 py-1.5 text-[10px] uppercase font-bold tracking-widest transition-colors shadow-[0_0_10px_rgba(168,85,247,0.15)]" onclick="window.EventBus.emit('START_INVESTIGATION', '${intel.intel_id}')">Focus (Active Tracking)</button>` : `<div class="w-full bg-gray-800 border border-gray-700 text-gray-500 px-2 py-1.5 text-[10px] uppercase font-bold tracking-widest text-center cursor-not-allowed">Verified</div>`}
+                                        </div>
                 </div>
             `;
         }
