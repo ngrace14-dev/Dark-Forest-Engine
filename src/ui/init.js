@@ -13,6 +13,8 @@ import { CaravanDialogueComponent } from './components/CaravanDialogueComponent.
 import { ArmorerForgeComponent } from './components/ArmorerForgeComponent.js';
 import { TreatmentCenterComponent } from './components/TreatmentCenterComponent.js';
 import { RuneSocketMenuComponent } from './components/RuneSocketMenuComponent.js';
+import { SquadManagerComponent } from './components/SquadManagerComponent.js';
+import { FactionMapComponent } from './components/FactionMapComponent.js';
 
 export function initializeUIEngine(eventBus) {
     const engine = new UIEngine(eventBus);
@@ -32,6 +34,8 @@ export function initializeUIEngine(eventBus) {
     engine.registerComponent('armorer-forge', new ArmorerForgeComponent());
     engine.registerComponent('treatment-center', new TreatmentCenterComponent());
     engine.registerComponent('rune-socket-menu', new RuneSocketMenuComponent());
+    engine.registerComponent('squad-manager', new SquadManagerComponent());
+    engine.registerComponent('faction-map', new FactionMapComponent());
     
     window.UIEngineInstance = engine;
     return engine;
