@@ -839,30 +839,11 @@ window.EventBus.on('START_INVESTIGATION', (intelId) => {
         verifying: false
     };
     
-    window.EventBus.emit('UI_LOG', `[FOCUS] Your mind locks onto the possibility of: ${intel.payload.title}`);
+        window.EventBus.emit('UI_LOG', `[FOCUS] Your mind locks onto the possibility of: ${intel.payload.title}`);
     closeCompanionDialogue();
 });
 
 window.EventBus.on('PLAYER_LEVEL_UP', ({ statName, level }) => { window.EventBus.emit('UI_LOG', `Level Up! ${statName.toUpperCase()} is now ${level}`); });
-
-
-
-    dialogue.querySelector('#btn-treat-gladiator').addEventListener('click', () => { window.GameCore.treatCombatInjuries(); openGladiatorProfile(); });
-    dialogue.querySelector('#btn-close-gladiator-profile').addEventListener('click', closeCompanionDialogue);
-}
-
-
-
-
-}
-
-
-
-
-    dialogue.querySelector('#btn-close-treatment').addEventListener('click', closeCompanionDialogue);
-}
-
-
 
 // ==========================================
 // PHASE 6.4C: ORACLE BOARD (Public Knowledge Terminal)
@@ -990,7 +971,7 @@ window.EventBus.on('PLAYER_LEVEL_UP', ({ statName, level }) => { window.EventBus
         <button id="btn-close-oracle" class="mt-4 border border-gray-600 px-3 py-2 text-xs hover:border-cyan-400 w-full transition-colors text-gray-300">Leave Terminal</button>
     `;
 
-    // Make dialogue wider for Oracle Board
+        // Make dialogue wider for Oracle Board
     dialogue.style.width = '600px';
     dialogue.classList.remove('hidden');
     
@@ -1000,10 +981,18 @@ window.EventBus.on('PLAYER_LEVEL_UP', ({ statName, level }) => { window.EventBus
     });
 }
 
-
-
-
-            return; // Block interaction in villages
+function handleInteract() {
+    if (!window.GameCore || !window.GameCore.playerObj || !window.GameCore.activeEntities) return;
+    
+    // Check if player is on a horse or inside a caravan
+    if (window.GameCore.playerObj.mountId || window.GameCore.playerObj.caravanId) return; // Cannot interact while mounted/riding
+    
+    // Check if player is near a village and blocked
+    const nearbyVillages = window.VillageManager ? window.VillageManager.villages.filter(v => Math.hypot(v.x - window.GameCore.playerObj.visual.position.x, v.z - window.GameCore.playerObj.visual.position.z) <= v.territory.radius) : [];
+    if (nearbyVillages.length > 0) {
+        const canInteract = window.GameCore.activeEntities.some(e => e.def.type === 'hub' && Math.hypot(e.visual.position.x - window.GameCore.playerObj.visual.position.x, e.visual.position.z - window.GameCore.playerObj.visual.position.z) <= 4);
+        if (!canInteract) {
+            return; // Block interaction in villages unless near hub
         }
     }
 
