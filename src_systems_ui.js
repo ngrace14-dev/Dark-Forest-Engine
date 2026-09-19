@@ -919,17 +919,172 @@ window.EventBus.on('SOCKET_RUNE', ({ packIndex, slot }) => {
     window.EventBus.emit('RENDER_INVENTORY');
 });
 
-function openVillageQuestBoard(hub) {
-    const village = window.VillageManager.villages.find(candidate => candidate.id === hub.villageId);
-    if (!village) return;
+// ==========================================
+// PHASE 6.4C: ORACLE BOARD (Public Knowledge Terminal)
+// ==========================================
+function openOracleBoard(hub) {
     const dialogue = document.getElementById('companion-dialogue');
-    const quests = window.GameState.questBoard.filter(quest => quest.issuer === village.id);
-    const rows = quests.length ? quests.map((quest, index) => `<button class="quest-delivery border border-green-800 bg-gray-900 p-2 text-left hover:border-green-300" data-quest-index="${window.GameState.questBoard.indexOf(quest)}">Deliver ${quest.amount} ${quest.resource} <span class="float-right text-amber-300">${quest.reward}g</span><span class="block text-[10px] text-gray-500">${quest.purpose}</span></button>`).join('') : '<div class="text-gray-500">No outstanding settlement requests.</div>';
-    dialogue.innerHTML = `<div class="mb-4 border-b border-green-700 pb-3"><div class="text-green-300 font-bold tracking-widest">${village.name.toUpperCase()} REQUESTS</div><div class="text-xs text-gray-500 mt-1">${village.nobleHouse}</div></div><div class="grid gap-2 mb-4">${rows}</div><button id="btn-close-quest-board" class="border border-gray-600 px-3 py-2 text-xs hover:border-green-400">Leave</button>`;
-    dialogue.classList.remove('hidden');
-    dialogue.querySelectorAll('.quest-delivery').forEach(button => button.addEventListener('click', () => window.EventBus.emit('DELIVER_FETCH_QUEST', Number(button.dataset.questIndex))));
-    dialogue.querySelector('#btn-close-quest-board').addEventListener('click', closeCompanionDialogue);
+    // For Oracle Board, we want a wider view. We'll reuse the dialogue box but style it via classes.
+    
+    // Default Filter View
+    window.OracleBoardState = window.OracleBoardState || { filter: 'ALL', tab: 'BOARD', selectedIntelId: null };
+    
+    renderOracleBoardContent(hub);
 }
+
+function renderOracleBoardContent(hub) {
+    const dialogue = document.getElementById('companion-dialogue');
+    const state = window.OracleBoardState;
+    
+    // Get Intel for this specific Village Hub
+    const hubIntel = window.IntelManager.getIntelForNode(hub.villageId || hub.id) || [];
+    
+    // Also include Player Intel for cross-referencing capabilities (Optional, but good for Disputes)
+    const playerIntel = window.IntelManager.getIntelForNode('player_node') || [];
+
+    // Filter Logic
+    let displayIntel = hubIntel.filter(intel => {
+        if (state.tab === 'BOARD') return intel.historical_status === 'NONE' && intel.persistence === 'ACTIVE';
+        if (state.tab === 'ARCHIVE') return intel.historical_status !== 'NONE' || intel.persistence === 'ARCHIVED';
+        if (state.tab === 'DISPUTES') return intel.dispute_state === 'ACTIVE_DISPUTE';
+        return true;
+    });
+
+    if (state.filter !== 'ALL') {
+        displayIntel = displayIntel.filter(intel => intel.payload.tags.includes(state.filter.toLowerCase()));
+    }
+
+    // Sort by Priority (Significance)
+    displayIntel.sort((a, b) => window.IntelPropagation._calculatePriority(b) - window.IntelPropagation._calculatePriority(a));
+
+    const tabs = ['BOARD', 'ARCHIVE', 'DISPUTES'].map(t => 
+        `<button class="px-3 py-1 text-[10px] font-bold border-b-2 ${state.tab === t ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-gray-500 hover:text-gray-300'} transition-colors" onclick="window.OracleBoardState.tab='${t}'; window.OracleBoardState.selectedIntelId=null; window.EventBus.emit('RENDER_ORACLE_BOARD', '${hub.id}');">${t}</button>`
+    ).join('');
+
+    const filters = ['ALL', 'MONSTER', 'TRADE', 'POLITICAL', 'WAR'].map(f => 
+        `<button class="px-2 py-0.5 text-[9px] rounded border ${state.filter === f ? 'bg-cyan-900 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500'} transition-colors" onclick="window.OracleBoardState.filter='${f}'; window.OracleBoardState.selectedIntelId=null; window.EventBus.emit('RENDER_ORACLE_BOARD', '${hub.id}');">${f}</button>`
+    ).join('');
+
+    // List Generation
+    const listRows = displayIntel.map(intel => {
+        const age = (window.EngineParams?.worldDay || 0) - (intel.provenance[0]?.timestamp || 0);
+        const certColor = intel.certainty > 0.8 ? 'text-green-400' : (intel.certainty > 0.4 ? 'text-yellow-400' : 'text-red-400');
+        const isSelected = state.selectedIntelId === intel.intel_id;
+        
+        return `
+            <div class="border ${isSelected ? 'border-cyan-500 bg-gray-800' : 'border-gray-700 bg-gray-900'} p-2 cursor-pointer hover:border-cyan-400 transition-colors mb-1" onclick="window.OracleBoardState.selectedIntelId='${intel.intel_id}'; window.EventBus.emit('RENDER_ORACLE_BOARD', '${hub.id}');">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-white font-bold text-[10px] truncate max-w-[150px]">${intel.payload.title}</span>
+                    <span class="text-[8px] uppercase px-1 rounded bg-gray-800 border border-gray-600 ${certColor}">Cert: ${Math.floor(intel.certainty*100)}%</span>
+                </div>
+                <div class="flex justify-between items-center text-[8px] text-gray-500">
+                    <span>${intel.payload.tags[0] ? '[' + intel.payload.tags[0].toUpperCase() + ']' : ''} ${intel.type}</span>
+                    <span>Age: ${age}d | Src: ${intel.provenance[0]?.origin_type || 'Unknown'}</span>
+                </div>
+            </div>
+        `;
+    }).join('') || `<div class="text-gray-500 text-[10px] text-center mt-4">No records found.</div>`;
+
+    // Inspection Panel (Phase 6.4D / 6.4E)
+    let inspectionHtml = `<div class="h-full flex items-center justify-center text-gray-600 text-[10px]">Select a record to inspect</div>`;
+    
+    if (state.selectedIntelId) {
+        const intel = window.IntelManager.lookup(state.selectedIntelId);
+        if (intel) {
+            const age = (window.EngineParams?.worldDay || 0) - (intel.provenance[0]?.timestamp || 0);
+            const value = window.IntelEconomy.calculateValue(intel, {id: 'null'}); // Base value
+            
+            // Provenance Chain UI
+            const lineagePath = intel.provenance.map((p, i) => `
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-gray-600 text-[8px] w-4 text-right">${i===0 ? 'Orig' : 'L'+i}</span>
+                    <span class="text-cyan-600 text-[10px] font-bold">↓</span>
+                    <span class="text-[9px] text-gray-300"><span class="text-cyan-200">${p.origin_type}</span> on Day ${p.timestamp}</span>
+                </div>
+            `).join('');
+
+            inspectionHtml = `
+                <div class="flex flex-col h-full">
+                    <div class="border-b border-gray-700 pb-2 mb-2">
+                        <div class="flex justify-between items-start mb-1">
+                            <h3 class="text-cyan-300 font-bold text-xs uppercase tracking-wider">${intel.payload.title}</h3>
+                            <span class="text-[8px] px-1 rounded border border-gray-600 text-gray-400">${intel.rarity}</span>
+                        </div>
+                        <p class="text-[10px] text-gray-300 leading-snug">${intel.payload.description}</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-2 text-[9px] mb-3">
+                        <div class="bg-gray-900 p-1.5 border border-gray-800 rounded">
+                            <span class="text-gray-500 block mb-0.5">Status</span>
+                            <span class="text-white">${intel.type} | Gen ${intel.spread_generation}</span>
+                        </div>
+                        <div class="bg-gray-900 p-1.5 border border-gray-800 rounded">
+                            <span class="text-gray-500 block mb-0.5">Metrics</span>
+                            <span class="text-white">Age ${age}d | Val ${value}g</span>
+                        </div>
+                        <div class="bg-gray-900 p-1.5 border border-gray-800 rounded">
+                            <span class="text-gray-500 block mb-0.5">Certainty</span>
+                            <span class="${intel.certainty >= 1.0 ? 'text-green-400' : 'text-yellow-400'}">${Math.floor(intel.certainty*100)}%</span>
+                        </div>
+                        <div class="bg-gray-900 p-1.5 border border-gray-800 rounded">
+                            <span class="text-gray-500 block mb-0.5">Dispute</span>
+                            <span class="${intel.dispute_state !== 'NONE' ? 'text-red-400 font-bold' : 'text-gray-400'}">${intel.dispute_state}</span>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto custom-scrollbar bg-gray-950 border border-gray-800 p-2 rounded mb-3">
+                        <div class="text-[9px] text-gray-500 uppercase font-bold mb-2 tracking-widest border-b border-gray-800 pb-1">Provenance Chain</div>
+                        ${lineagePath}
+                    </div>
+
+                    <div class="mt-auto">
+                        <button class="w-full bg-cyan-900/50 border border-cyan-700 hover:bg-cyan-800 hover:text-white text-cyan-200 px-2 py-1.5 text-[10px] uppercase font-bold tracking-widest transition-colors shadow-[0_0_10px_rgba(6,182,212,0.15)]" onclick="window.EventBus.emit('UI_LOG', '[ORACLE] Investigation marker added to map. (Feature Pending)')">Investigate</button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    dialogue.innerHTML = `
+        <div class="mb-3 border-b border-cyan-700 pb-2">
+            <div class="text-cyan-400 font-bold tracking-widest uppercase text-sm">Oracle Board</div>
+            <div class="text-[10px] text-gray-500 mt-0.5">Public Intelligence Terminal</div>
+        </div>
+        
+        <div class="flex gap-2 mb-3 border-b border-gray-800 pb-2">
+            ${tabs}
+        </div>
+
+        <div class="flex gap-1 mb-2">
+            ${filters}
+        </div>
+
+        <div class="flex gap-3 h-[350px]">
+            <div class="w-1/2 overflow-y-auto custom-scrollbar pr-1">
+                ${listRows}
+            </div>
+            <div class="w-1/2 bg-gray-900 border border-gray-700 p-3 rounded">
+                ${inspectionHtml}
+            </div>
+        </div>
+        
+        <button id="btn-close-oracle" class="mt-4 border border-gray-600 px-3 py-2 text-xs hover:border-cyan-400 w-full transition-colors text-gray-300">Leave Terminal</button>
+    `;
+
+    // Make dialogue wider for Oracle Board
+    dialogue.style.width = '600px';
+    dialogue.classList.remove('hidden');
+    
+    dialogue.querySelector('#btn-close-oracle').addEventListener('click', () => {
+        dialogue.style.width = ''; // Reset width
+        closeCompanionDialogue();
+    });
+}
+
+window.EventBus.on('RENDER_ORACLE_BOARD', (hubId) => {
+    const hub = window.GameCore.activeEntities.find(e => e.id === hubId);
+    if (hub) renderOracleBoardContent(hub);
+});
 
 function openCompanionInventory(member) {
     const dialogue = document.getElementById('companion-dialogue');
@@ -998,9 +1153,10 @@ window.EventBus.on('INTERACT_NEARBY', () => {
         return;
     }
 
-    const villageHub = window.GameCore.activeEntities.find(entity => entity.def.type === 'hub' && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 4);
+        const villageHub = window.GameCore.activeEntities.find(entity => entity.def.type === 'hub' && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 4);
     if (villageHub) {
-        openVillageQuestBoard(villageHub);
+        // --- PHASE 6.4C: ORACLE BOARD REPLACES QUEST BOARD ---
+        openOracleBoard(villageHub);
         return;
     }
     const companion = window.GameCore.activeEntities.find(entity => (entity.companionId || entity.recruitId) && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 3.5);
