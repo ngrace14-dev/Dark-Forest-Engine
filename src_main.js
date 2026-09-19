@@ -9,7 +9,11 @@ import './src_epoch_manager.js';
 import './src_systems_intel.js';
 import './src_systems_world.js';
 import './src_systems_inventory.js';
+import { initializeUIEngine } from './src/ui/init.js';
 import './src_systems_ui.js';
+
+// Init UI Engine before main logic
+initializeUIEngine(window.EventBus);
 import './src_systems_input.js';
 import './src_systems_audio.js';
 import './src_systems_vfx.js';

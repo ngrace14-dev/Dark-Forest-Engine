@@ -4,18 +4,7 @@ let floatingTexts = [];
 // INTEL UI (Phase 6.4)
 // ==========================================
 
-window.EventBus.on('TOGGLE_INTEL_BAG', () => {
-    const panel = document.getElementById('intel-bag-panel');
-    if (!panel) return;
-    if (panel.classList.contains('hidden')) {
-        panel.classList.remove('hidden');
-        panel.classList.add('flex');
-        window.EventBus.emit('RENDER_INTEL_BAG');
-    } else {
-        panel.classList.add('hidden');
-        panel.classList.remove('flex');
-    }
-});
+window.EventBus.on('TOGGLE_INTEL_BAG', () => { if (window.UIEngineInstance) { window.UIEngineInstance.components.get('intel-bag').toggle(); } });
 
 window.EventBus.on('RENDER_INTEL_BAG', () => {
     const panel = document.getElementById('intel-bag-panel');
@@ -87,18 +76,7 @@ window.EventBus.on('RENDER_INTEL_BAG', () => {
 // INTEL DEBUG VIEW (Developer Only)
 // ==========================================
 
-window.EventBus.on('TOGGLE_INTEL_DEBUG', () => {
-    const panel = document.getElementById('intel-debug-panel');
-    if (!panel) return;
-    if (panel.classList.contains('hidden')) {
-        panel.classList.remove('hidden');
-        panel.classList.add('flex');
-        window.EventBus.emit('RENDER_INTEL_DEBUG');
-    } else {
-        panel.classList.add('hidden');
-        panel.classList.remove('flex');
-    }
-});
+window.EventBus.on('TOGGLE_INTEL_DEBUG', () => { if (window.UIEngineInstance) { window.UIEngineInstance.components.get('intel-debug').toggle(); } });
 
 window.EventBus.on('RENDER_INTEL_DEBUG', () => {
     const panel = document.getElementById('intel-debug-panel');
@@ -866,48 +844,9 @@ window.EventBus.on('START_INVESTIGATION', (intelId) => {
 });
 
 window.EventBus.on('PLAYER_LEVEL_UP', ({ statName, level }) => { window.EventBus.emit('UI_LOG', `Level Up! ${statName.toUpperCase()} is now ${level}`); });
-function closeCompanionDialogue() {
-    document.getElementById('companion-dialogue').classList.add('hidden');
-}
 
-function openMerchantShop(chest) {
-    const dialogue = document.getElementById('companion-dialogue');
-    const stock = chest.merchantInventory || [];
-    const rows = stock.map((entry, index) => {
-        const item = window.ItemDatabase[entry.itemId];
-        const price = window.GameCore.getMerchantPrice(entry.price, 'kingdom');
-        return `<button class="merchant-buy-item border border-amber-700 bg-gray-900 p-2 text-left hover:border-amber-300 disabled:opacity-40" data-chest="${chest.id}" data-index="${index}" ${entry.quantity <= 0 ? 'disabled' : ''}>${item ? item.icon : '•'} ${item?.name || entry.itemId} <span class="float-right text-amber-300">${price}g | ${entry.quantity}</span></button>`;
-    }).join('') || '<div class="text-gray-500">Sold out.</div>';
-    dialogue.innerHTML = `<div class="mb-4 border-b border-amber-700 pb-3"><div class="text-amber-300 font-bold tracking-widest">PLAGUE DOCTOR MERCHANT</div><div class="text-xs text-gray-500 mt-1">Gold: ${window.GameState.inventory.gold}</div></div><div class="grid gap-2 mb-4">${rows}</div><button id="btn-close-merchant" class="border border-gray-600 px-3 py-2 text-xs hover:border-amber-400">Leave</button>`;
-    dialogue.classList.remove('hidden');
-    dialogue.querySelectorAll('.merchant-buy-item').forEach(button => button.addEventListener('click', () => window.EventBus.emit('BUY_MERCHANT_ITEM', { chestId: button.dataset.chest, index: Number(button.dataset.index) })));
-    dialogue.querySelector('#btn-close-merchant').addEventListener('click', closeCompanionDialogue);
-}
 
-function openPlayerCamp() {
-    const dialogue = document.getElementById('companion-dialogue');
-    const base = window.GameState.base;
-    const stored = base.storage.length ? base.storage.map((itemId, index) => `<button class="withdraw-base-item border border-amber-700 bg-gray-900 p-2 text-left hover:border-amber-300" data-index="${index}">Withdraw ${window.ItemDatabase[itemId]?.name || itemId}</button>`).join('') : '<div class="text-gray-500">Storage is empty.</div>';
-    const carried = window.GameState.inventory.backpack.map((itemId, index) => `<button class="deposit-base-item border border-gray-700 bg-gray-900 p-2 text-left hover:border-amber-300" data-index="${index}">Store ${window.ItemDatabase[itemId]?.name || itemId}</button>`).join('') || '<div class="text-gray-500">Nothing to store.</div>';
-    const selectedNames = window.GameState.party.members.filter(member => member.recruited && window.GameState.party.selectedMembers.includes(member.id)).map(member => member.name).join(', ') || 'No companions selected';
-    dialogue.innerHTML = `<div class="mb-4 border-b border-amber-700 pb-3"><div class="text-amber-300 font-bold tracking-widest">${base.name.toUpperCase()}</div><div class="text-xs text-gray-500 mt-1">Storage | Structures ${base.structures.length} | Farms ${base.farms.length} | Research ${base.researchPoints || 0}${base.wardRadius ? ` | Ward ${base.wardRadius}m` : ''}</div></div><div class="grid grid-cols-2 gap-3"><div><div class="text-xs text-amber-200 mb-2">CAMP STORAGE</div><div class="grid gap-2">${stored}</div></div><div><div class="text-xs text-gray-300 mb-2">YOUR PACK</div><div class="grid gap-2">${carried}</div></div></div><div class="mt-4 border-t border-gray-700 pt-3"><div class="text-xs text-amber-200 mb-2">CONSTRUCTION</div><div class="grid grid-cols-2 gap-2"><button class="build-base-item border border-amber-700 px-2 py-2 text-xs hover:border-amber-300" data-prefab="Camp Storage Cache">Storage: 5 Wood, 2 Stone</button><button class="build-base-item border border-amber-700 px-2 py-2 text-xs hover:border-amber-300" data-prefab="Camp Farm Plot">Farm: 4 Wood, 1 Stone</button><button class="build-base-item col-span-2 border border-cyan-700 px-2 py-2 text-xs hover:border-cyan-300" data-prefab="Rune Tower">Rune Tower: 12 Wood, 10 Stone, 5 Research</button></div></div><div class="mt-4 border-t border-gray-700 pt-3"><div class="text-xs text-cyan-200 mb-1">SELECTED WORKERS</div><div class="text-[10px] text-gray-500 mb-2">${selectedNames}</div><div class="grid grid-cols-2 gap-2"><button class="assign-base-job border border-cyan-800 px-2 py-2 text-xs hover:border-cyan-300" data-job="farm">Farm</button><button class="assign-base-job border border-cyan-800 px-2 py-2 text-xs hover:border-cyan-300" data-job="research">Research</button><button class="assign-base-job border border-cyan-800 px-2 py-2 text-xs hover:border-cyan-300" data-job="guard">Guard</button><button class="assign-base-job border border-gray-600 px-2 py-2 text-xs hover:border-gray-300" data-job="idle">Idle</button></div></div><button id="btn-close-base" class="mt-4 border border-gray-600 px-3 py-2 text-xs hover:border-amber-400">Leave</button>`;
-    dialogue.classList.remove('hidden');
-    dialogue.querySelectorAll('.withdraw-base-item').forEach(button => button.addEventListener('click', () => window.EventBus.emit('WITHDRAW_BASE_ITEM', Number(button.dataset.index))));
-    dialogue.querySelectorAll('.deposit-base-item').forEach(button => button.addEventListener('click', () => window.EventBus.emit('DEPOSIT_BASE_ITEM', Number(button.dataset.index))));
-    dialogue.querySelectorAll('.build-base-item').forEach(button => button.addEventListener('click', () => { window.EventBus.emit('BUILD_BASE_STRUCTURE', button.dataset.prefab); openPlayerCamp(); }));
-    dialogue.querySelectorAll('.assign-base-job').forEach(button => button.addEventListener('click', () => window.EventBus.emit('ASSIGN_BASE_JOB', button.dataset.job)));
-    dialogue.querySelector('#btn-close-base').addEventListener('click', closeCompanionDialogue);
-}
 
-function openGladiatorProfile() {
-    const dialogue = document.getElementById('companion-dialogue');
-    const gladiator = window.GameState.gladiator;
-    const weapon = window.GameState.inventory.equipment.weapon || 'unarmed';
-    const injuries = gladiator.injuries.length ? gladiator.injuries.map(injury => `<li>${injury}</li>`).join('') : '<li>No recorded injuries</li>';
-    const injuryCost = (window.GameState.combatRecord?.injuries?.length || 0) * 10;
-    dialogue.innerHTML = `<div class="mb-4 border-b border-orange-700 pb-3"><div class="text-orange-300 font-bold tracking-widest">GLADIATOR PROFILE</div><div class="text-xs text-gray-500 mt-1">${gladiator.name} | ${gladiator.matchState.toUpperCase()}</div></div><div class="grid grid-cols-2 gap-3 mb-4 text-xs"><div><div class="text-gray-500">FAME</div><div class="text-white text-lg font-bold">${gladiator.fame}</div></div><div><div class="text-gray-500">GOLD</div><div class="text-amber-300 text-lg font-bold">${gladiator.gold}</div></div><div><div class="text-gray-500">RENOWN</div><div class="text-amber-200">${window.GameState.renown.title} ${window.GameState.renown.score}</div></div><div><div class="text-gray-500">INFAMY</div><div class="text-red-300">${window.GameState.renown.infamy}</div></div><div><div class="text-gray-500">RECORD</div><div class="text-white">${gladiator.wins}W - ${gladiator.losses}L</div></div><div><div class="text-gray-500">WEAPON</div><div class="text-white">${window.ItemDatabase[weapon]?.name || weapon}</div></div></div><div class="border-t border-gray-800 pt-3 mb-4"><div class="text-xs text-orange-200 mb-1">CURRENT OBJECTIVE</div><div class="text-gray-300">${gladiator.objective}</div></div><div class="border-t border-gray-800 pt-3 mb-4"><div class="text-xs text-red-300 mb-1">INJURIES</div><ul class="text-xs text-gray-400 list-disc list-inside">${injuries}</ul></div><div class="grid grid-cols-3 gap-2"><button id="btn-start-gladiator-match" class="border border-orange-700 px-3 py-2 text-xs text-orange-200 hover:border-orange-300">Start Match</button><button id="btn-treat-gladiator" class="border border-green-700 px-3 py-2 text-xs text-green-200 hover:border-green-300">Treat ${injuryCost}g</button><button id="btn-close-gladiator-profile" class="border border-gray-600 px-3 py-2 text-xs hover:border-gray-300">Close</button></div>`;
-    dialogue.classList.remove('hidden');
-    dialogue.querySelector('#btn-start-gladiator-match').addEventListener('click', () => { dialogue.classList.add('hidden'); window.EventBus.emit('START_ARENA_MATCH'); });
     dialogue.querySelector('#btn-treat-gladiator').addEventListener('click', () => { window.GameCore.treatCombatInjuries(); openGladiatorProfile(); });
     dialogue.querySelector('#btn-close-gladiator-profile').addEventListener('click', closeCompanionDialogue);
 }
@@ -1104,33 +1043,7 @@ window.EventBus.on('SOCKET_RUNE', ({ packIndex, slot }) => {
 // ==========================================
 // PHASE 6.4C: ORACLE BOARD (Public Knowledge Terminal)
 // ==========================================
-function openOracleBoard(hub) {
-    const dialogue = document.getElementById('companion-dialogue');
-    // For Oracle Board, we want a wider view. We'll reuse the dialogue box but style it via classes.
-    
-    // Default Filter View
-    window.OracleBoardState = window.OracleBoardState || { filter: 'ALL', tab: 'BOARD', selectedIntelId: null };
-    
-    renderOracleBoardContent(hub);
-}
 
-function renderOracleBoardContent(hub) {
-    const dialogue = document.getElementById('companion-dialogue');
-    const state = window.OracleBoardState;
-    
-    // Get Intel for this specific Village Hub
-    const hubIntel = window.IntelManager.getIntelForNode(hub.villageId || hub.id) || [];
-    
-    // Also include Player Intel for cross-referencing capabilities (Optional, but good for Disputes)
-    const playerIntel = window.IntelManager.getIntelForNode('player_node') || [];
-
-    // Filter Logic
-    let displayIntel = hubIntel.filter(intel => {
-        if (state.tab === 'BOARD') return intel.historical_status === 'NONE' && intel.persistence === 'ACTIVE';
-        if (state.tab === 'ARCHIVE') return intel.historical_status !== 'NONE' || intel.persistence === 'ARCHIVED';
-        if (state.tab === 'DISPUTES') return intel.dispute_state === 'ACTIVE_DISPUTE';
-        return true;
-    });
 
     if (state.filter !== 'ALL') {
         displayIntel = displayIntel.filter(intel => intel.payload.tags.includes(state.filter.toLowerCase()));
@@ -1263,10 +1176,7 @@ function renderOracleBoardContent(hub) {
     });
 }
 
-window.EventBus.on('RENDER_ORACLE_BOARD', (hubId) => {
-    const hub = window.GameCore.activeEntities.find(e => e.id === hubId);
-    if (hub) renderOracleBoardContent(hub);
-});
+
 
 function openCompanionInventory(member) {
     const dialogue = document.getElementById('companion-dialogue');
@@ -1328,19 +1238,23 @@ window.EventBus.on('INTERACT_NEARBY', () => {
         return;
     }
     
-    // --- PHASE 6.4B: BROKER INTERACTION HOOK ---
-    const broker = window.GameCore.activeEntities.find(entity => entity.def.serviceType === 'broker' && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 5);
+        // --- PHASE 6.4B: BROKER INTERACTION HOOK ---
+        const broker = window.GameCore.activeEntities.find(entity => entity.def.serviceType === 'broker' && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 5);
     if (broker) {
-        openIntelBroker(broker);
+        if (window.UIEngineInstance) {
+            window.UIEngineInstance.components.get('intel-broker').render(broker);
+        }
         return;
     }
 
         const villageHub = window.GameCore.activeEntities.find(entity => entity.def.type === 'hub' && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 4);
-    if (villageHub) {
-        // --- PHASE 6.4C: ORACLE BOARD REPLACES QUEST BOARD ---
-        openOracleBoard(villageHub);
-        return;
-    }
+        if (villageHub) {
+            // --- PHASE 6.4C: ORACLE BOARD REPLACES QUEST BOARD ---
+            if (window.UIEngineInstance) {
+                window.UIEngineInstance.components.get('oracle-board').render(villageHub);
+            }
+            return;
+        }
     const companion = window.GameCore.activeEntities.find(entity => (entity.companionId || entity.recruitId) && Math.hypot(entity.visual.position.x - playerPosition.x, entity.visual.position.z - playerPosition.z) <= 3.5);
     if (!companion) {
         window.EventBus.emit('GATHER_NEARBY');
@@ -1449,22 +1363,7 @@ window.EventBus.on('TAKE_COMPANION_ITEM', ({ memberId, index }) => {
   // ==========================================
   // PHASE 6.4B: INFORMATION BROKER TRADING
   // ==========================================
-  function openIntelBroker(broker) {
-      const dialogue = document.getElementById('companion-dialogue');
-      const brokerIntel = window.IntelManager.getIntelForNode(broker.id) || [];
-      const playerIntel = window.IntelManager.getIntelForNode('player_node') || [];
-    
-      // Auto-generate some mock intel for testing if the broker is empty
-      if (brokerIntel.length === 0 && Math.random() > 0.5) {
-          const mockId = window.IntelManager.register({
-              type: window.IntelEnums.TYPES.RUMOR,
-              payload: { title: "Whispers of the Deep Woods", description: "A hunter saw strange lights to the North.", tags: ['rumor', 'forest'] },
-              certainty: 0.3,
-              truth_state: window.IntelEnums.TRUTH_STATE.TRUE,
-              significance: { survival: 10, economic: 5 },
-              rarity: window.IntelEnums.RARITY.COMMON,
-              provenance: [{ node_id: 'unknown', timestamp: window.EngineParams?.worldDay || 0, origin_type: 'HUNTER' }]
-          });
+  
           window.IntelManager.grantOwnership(mockId, broker.id);
           brokerIntel.push(window.IntelManager.lookup(mockId));
       }
@@ -1508,42 +1407,9 @@ window.EventBus.on('TAKE_COMPANION_ITEM', ({ memberId, index }) => {
       dialogue.querySelector('#btn-close-broker').addEventListener('click', closeCompanionDialogue);
   }
 
-  window.EventBus.on('BUY_INTEL', ({ brokerId, intelId, price }) => {
-      if (window.GameState.inventory.gold < price) {
-          window.EventBus.emit('UI_LOG', 'Not enough gold to purchase this secret.');
-          return;
-      }
-      const broker = window.GameCore.activeEntities.find(e => e.id === brokerId);
-      if (!broker) return;
+  
 
-      window.GameState.inventory.gold -= price;
-      // Execute sync (Perfect fidelity for direct purchases)
-      window.IntelPropagation.sync(broker, { id: 'player_node', memory_limit: 100, faction: 'Player', type: 'PLAYER' }, intelId, 1.0);
-    
-      // Career XP
-      window.CareerManager?.addXP('broker', 10);
-
-      window.EventBus.emit('UI_LOG', `[BROKER] Purchased intelligence for ${price} gold.`);
-      window.EventBus.emit('UI_UPDATE_HUD');
-      window.EventBus.emit('RENDER_INTEL_BAG'); // Refresh ledger if open
-      openIntelBroker(broker); // Refresh UI
-  });
-
-  window.EventBus.on('SELL_INTEL', ({ brokerId, intelId, price }) => {
-      const broker = window.GameCore.activeEntities.find(e => e.id === brokerId);
-      if (!broker) return;
-
-      window.GameState.inventory.gold += price;
-      // Execute sync
-      window.IntelPropagation.sync({ id: 'player_node', faction: 'Player', type: 'PLAYER' }, broker, intelId, 1.0);
-    
-      // Career XP
-      window.CareerManager?.addXP('broker', Math.min(50, price));
-
-      window.EventBus.emit('UI_LOG', `[BROKER] Sold intelligence for ${price} gold.`);
-      window.EventBus.emit('UI_UPDATE_HUD');
-      openIntelBroker(broker); // Refresh UI
-  });
+  
 
 window.EventBus.on('ESCORT_CARAVAN', caravanId => {
     window.GameState.party.escortCaravanId = caravanId;
