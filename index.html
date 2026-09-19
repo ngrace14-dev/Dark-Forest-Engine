@@ -152,7 +152,13 @@
         <div id="asset-content" class="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-3 bg-[#0a0c10]"></div>
     </div>
 
+    <div id="intel-tags-layer" class="absolute inset-0 pointer-events-none z-30 overflow-hidden"></div>
     <div id="damage-overlay" class="absolute inset-0 pointer-events-none z-20 overflow-hidden"></div>
+    
+        <div id="investigation-tracker" class="hidden absolute top-24 left-1/2 -translate-x-1/2 bg-gray-900/95 border border-purple-500/50 px-8 py-2 rounded shadow-[0_0_20px_rgba(168,85,247,0.15)] backdrop-blur-md flex flex-col items-center pointer-events-none z-20">
+        <span class="text-[8px] text-purple-400 font-bold uppercase tracking-widest border-b border-purple-900/50 pb-0.5 mb-1">Active Focus</span>
+        <span id="inv-title" class="text-white text-[11px] font-bold text-center w-48 truncate">Title</span>
+    </div>
     <div id="dnd-overlay" class="fixed inset-0 z-[100] hidden flex flex-col items-center justify-center bg-black/90 border-[16px] border-dashed border-green-500 backdrop-blur-md pointer-events-none transition-all">
         <h1 class="text-6xl font-black text-green-400 tracking-widest uppercase mb-4" style="text-shadow: 0 0 20px #10b981;">Drop Asset Files Here</h1>
         <p class="text-green-200 font-mono text-xl tracking-widest uppercase">Supports 3D Models & 2D Textures</p>

@@ -662,9 +662,16 @@ window.EventBus.on('SPAWN_FLOATING_TEXT', ({ text, pos, color }) => {
     floatingTexts.push({ el: el, pos: {x: pos.x, y: pos.y + 1.5, z: pos.z}, life: 1.0, velocity: {x:0, y:1, z:0} });
 });
 
+// ==========================================
+// PHASE 6.4E: INTEL TAGS (World Intelligence Overlays)
+// ==========================================
+const intelTags = new Map(); // entity_id -> DOM Element
+
 window.EventBus.on('UI_TICK', ({ delta, camera }) => {
     window.EventBus.emit('UI_UPDATE_HUD');
     if(!camera) return;
+
+    // 1. Floating Text updates
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
         let ft = floatingTexts[i]; ft.life -= delta * 1.5;
         if (ft.life <= 0) { ft.el.remove(); floatingTexts.splice(i, 1); continue; }
@@ -677,10 +684,193 @@ window.EventBus.on('UI_TICK', ({ delta, camera }) => {
             }
         }
     }
+
+    // 2. Intel Tags (Phase 6.4E) Updates
+    if (window.IntelManager && window.GameCore?.activeEntities) {
+        const tagLayer = document.getElementById('intel-tags-layer');
+        if (tagLayer) {
+            window.GameCore.activeEntities.forEach(entity => {
+                if (!entity.visual || !entity.id) return;
+                
+                // Only evaluate Brokers, Hubs, or specific marked NPCs for now to save performance
+                if (entity.def.serviceType !== 'broker' && entity.def.type !== 'hub') return;
+                
+                // Distance cull (Only show tags if within 40 meters)
+                const distSq = entity.visual.position.distanceToSquared(window.GameCore.playerObj.visual.position);
+                if (distSq > 1600) {
+                    if (intelTags.has(entity.id)) {
+                        intelTags.get(entity.id).style.display = 'none';
+                    }
+                    return;
+                }
+
+                // Check if they hold any intelligence the player DOESN'T know
+                const theirIntel = window.IntelManager.getIntelForNode(entity.id);
+                const myIntel = window.IntelManager.getIntelForNode('player_node');
+                
+                // Find highest value secret they hold that player lacks
+                let topSecret = null;
+                let topVal = 0;
+                
+                for (const intel of theirIntel) {
+                    if (!myIntel.some(m => m.intel_id === intel.intel_id || m.parent_intel_id === intel.intel_id)) {
+                        const val = window.IntelEconomy.calculateValue(intel, {id: 'player_node'});
+                        if (val > topVal) {
+                            topVal = val;
+                            topSecret = intel;
+                        }
+                    }
+                }
+
+                let el = intelTags.get(entity.id);
+                
+                if (!topSecret) {
+                    // Hide tag if they have nothing to say
+                    if (el) el.style.display = 'none';
+                    return;
+                }
+
+                // Create element if it doesn't exist
+                if (!el) {
+                    el = document.createElement('div');
+                    el.className = 'absolute flex flex-col items-center pointer-events-none transition-opacity duration-300';
+                    tagLayer.appendChild(el);
+                    intelTags.set(entity.id, el);
+                }
+
+                // Update icon based on Rarity/Type
+                let icon = '📜';
+                if (topSecret.type === window.IntelEnums.TYPES.WARNING) icon = '⚠️';
+                if (topSecret.type === window.IntelEnums.TYPES.FACT) icon = '👁️';
+                
+                let colorClass = 'text-gray-300';
+                if (topSecret.rarity === window.IntelEnums.RARITY.RARE) colorClass = 'text-blue-400';
+                if (topSecret.rarity === window.IntelEnums.RARITY.RESTRICTED) colorClass = 'text-purple-400';
+                if (topSecret.rarity === window.IntelEnums.RARITY.SECRET) colorClass = 'text-red-400';
+                if (topSecret.rarity === window.IntelEnums.RARITY.LEGENDARY) colorClass = 'text-yellow-400';
+
+                el.innerHTML = `
+                    <span class="text-sm shadow-black drop-shadow-md filter ${colorClass}">${icon}</span>
+                    <span class="text-[8px] font-bold bg-black/60 px-1 rounded border border-gray-700 ${colorClass}">${topSecret.type}</span>
+                `;
+
+                // Project to screen
+                const pVec = entity.visual.position.clone();
+                pVec.y += (entity.def.height || 2) + 1.5; // Hover above head
+                pVec.project(camera);
+                
+                if (pVec.z > 1) { 
+                    el.style.display = 'none'; 
+                } else {
+                    el.style.display = 'flex'; 
+                    el.style.left = `${(pVec.x * 0.5 + 0.5) * window.innerWidth}px`; 
+                    el.style.top = `${-(pVec.y * 0.5 - 0.5) * window.innerHeight}px`; 
+                    // Fade out based on distance
+                    const opacity = Math.max(0, 1.0 - (distSq / 1600));
+                    el.style.opacity = opacity;
+                }
+            });
+        }
+    }
+
     const safeUI = document.getElementById('safe-zone-indicator');
     if(safeUI && window.GameCore.playerObj) {
         if(window.EngineParams.isPlayerSafe) safeUI.classList.remove('hidden'); else safeUI.classList.add('hidden');
     }
+    
+    // --- PHASE 6.5: INVESTIGATION TRACKER UPDATE ---
+    updateInvestigationHUD();
+});
+
+// ==========================================
+// PHASE 6.5: VERIFICATION INPUT WIRING
+// ==========================================
+function updateInvestigationHUD() {
+    const tracker = document.getElementById('investigation-tracker');
+    const state = window.GameState.investigation;
+    
+    if (!state || !state.activeIntelId || !window.GameCore.playerObj) {
+        if (tracker && !tracker.classList.contains('hidden')) tracker.classList.add('hidden');
+        return;
+    }
+    
+    const intel = window.IntelManager.lookup(state.activeIntelId);
+    if (!intel || intel.certainty >= 1.0 || intel.persistence !== window.IntelEnums.PERSISTENCE.ACTIVE) {
+        // Abandon investigation if verified or lost
+        window.GameState.investigation.activeIntelId = null;
+        return;
+    }
+    
+    if (tracker) {
+        tracker.classList.remove('hidden');
+        const pPos = window.GameCore.playerObj.visual.position;
+        const target = intel.payload.target_coord;
+        
+        // Calculate Distance
+        const dist = Math.floor(Math.hypot(pPos.x - target.x, pPos.z - target.z));
+        
+        document.getElementById('inv-title').innerText = intel.payload.title;
+        document.getElementById('inv-dist').innerText = dist > 500 ? '> 500m' : `${dist}m`;
+        
+        // --- VERIFICATION TRIGGERS ---
+        // If within 30 meters of the target coordinate, attempt verification
+        if (dist <= 30) {
+            // Check Complexity Cost
+            let canVerify = true;
+            if (intel.verification_complexity === 'HARD' || intel.verification_complexity === 'EXPERT' || intel.verification_complexity === 'LEGENDARY') {
+                // If it's a hard secret, simple proximity isn't enough. We assume it requires 
+                // specialized investigation. For simulation purposes, we check if the player has 
+                // a specific artifact or if there's an Archivist in the party.
+                // For now, we simulate this by requiring a "Lore Tool" or an Archivist.
+                const hasArchivist = window.GameState.party.members.some(m => m.recruited && m.role === 'Archivist' && !m.downed);
+                if (!hasArchivist && intel.verification_complexity === 'LEGENDARY') {
+                    canVerify = false;
+                    if (Math.random() < 0.05) window.EventBus.emit('UI_LOG', `[INVESTIGATION] This secret is too complex. You need an Archivist.`);
+                }
+            }
+
+            if (canVerify && !state.verifying) {
+                state.verifying = true; // Prevent spam
+                
+                // Actual truth check: Since our engine determines truth objectively at spawn, 
+                // we just check the intel's inherent truth_state. 
+                // In a deeper simulation, we would raycast to see if the Wendigo is ACTUALLY there.
+                // For now, we assume the intel's truth_state is the objective reality.
+                const truthConditionMet = intel.truth_state === window.IntelEnums.TRUTH_STATE.TRUE;
+                
+                window.EventBus.emit('UI_LOG', `[INVESTIGATION] You have arrived at the coordinates...`);
+                
+                setTimeout(() => {
+                    const newId = window.IntelEconomy.verifyIntel(intel.intel_id, {id: 'player_node', faction: 'Player'}, truthConditionMet);
+                    if (newId) {
+                        // Investigation complete, reward XP
+                        window.CareerManager?.addXP('archivist', 50);
+                        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'SECRET VERIFIED', pos: pPos, color: '#06b6d4' });
+                        window.GameState.investigation.activeIntelId = null;
+                        state.verifying = false;
+                    }
+                }, 2000);
+            }
+        } else {
+            state.verifying = false;
+        }
+    }
+}
+
+window.EventBus.on('START_INVESTIGATION', (intelId) => {
+    const intel = window.IntelManager.lookup(intelId);
+    if (!intel || intel.certainty >= 1.0) {
+        window.EventBus.emit('UI_LOG', 'Cannot investigate. Record is either already verified or corrupted.');
+        return;
+    }
+    
+    window.GameState.investigation = {
+        activeIntelId: intelId,
+        verifying: false
+    };
+    
+    window.EventBus.emit('UI_LOG', `[INVESTIGATION] You begin tracking the truth of: ${intel.payload.title}`);
+    closeCompanionDialogue();
 });
 
 window.EventBus.on('PLAYER_LEVEL_UP', ({ statName, level }) => { window.EventBus.emit('UI_LOG', `Level Up! ${statName.toUpperCase()} is now ${level}`); });
@@ -1037,8 +1227,8 @@ function renderOracleBoardContent(hub) {
                         ${lineagePath}
                     </div>
 
-                    <div class="mt-auto">
-                        <button class="w-full bg-cyan-900/50 border border-cyan-700 hover:bg-cyan-800 hover:text-white text-cyan-200 px-2 py-1.5 text-[10px] uppercase font-bold tracking-widest transition-colors shadow-[0_0_10px_rgba(6,182,212,0.15)]" onclick="window.EventBus.emit('UI_LOG', '[ORACLE] Investigation marker added to map. (Feature Pending)')">Investigate</button>
+                                        <div class="mt-auto">
+                        ${intel.certainty < 1.0 ? `<button class="w-full bg-cyan-900/50 border border-cyan-700 hover:bg-cyan-800 hover:text-white text-cyan-200 px-2 py-1.5 text-[10px] uppercase font-bold tracking-widest transition-colors shadow-[0_0_10px_rgba(6,182,212,0.15)]" onclick="window.EventBus.emit('START_INVESTIGATION', '${intel.intel_id}')">Investigate</button>` : `<div class="w-full bg-gray-800 border border-gray-700 text-gray-500 px-2 py-1.5 text-[10px] uppercase font-bold tracking-widest text-center cursor-not-allowed">Verified</div>`}
                     </div>
                 </div>
             `;
