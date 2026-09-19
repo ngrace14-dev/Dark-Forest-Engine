@@ -1151,14 +1151,10 @@ window.EventBus.on('TAKE_COMPANION_ITEM', ({ memberId, index }) => {
         window.EventBus.emit('RENDER_INVENTORY');
     });
 
-  // ==========================================
+    // ==========================================
   // PHASE 6.4B: INFORMATION BROKER TRADING
   // ==========================================
   
-          window.IntelManager.grantOwnership(mockId, broker.id);
-          brokerIntel.push(window.IntelManager.lookup(mockId));
-      }
-    
       const brokerRows = brokerIntel.map(intel => {
           const price = window.IntelEconomy.calculateValue(intel, { id: 'player_node' });
           if (price <= 0) return ''; // Player already knows it
