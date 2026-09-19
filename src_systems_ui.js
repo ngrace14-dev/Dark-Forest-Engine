@@ -851,194 +851,18 @@ window.EventBus.on('PLAYER_LEVEL_UP', ({ statName, level }) => { window.EventBus
     dialogue.querySelector('#btn-close-gladiator-profile').addEventListener('click', closeCompanionDialogue);
 }
 
-window.EventBus.on('OPEN_GLADIATOR_PROFILE', openGladiatorProfile);
 
-function openArenaResult({ result, reward = 0 }) {
-    const dialogue = document.getElementById('companion-dialogue');
-    const gladiator = window.GameState.gladiator;
-    const victory = result === 'victory';
-    const injuries = gladiator.injuries.length ? gladiator.injuries[gladiator.injuries.length - 1] : 'No new injuries';
-    dialogue.innerHTML = `<div class="mb-4 border-b ${victory ? 'border-amber-700' : 'border-red-700'} pb-3"><div class="${victory ? 'text-amber-300' : 'text-red-300'} font-bold tracking-widest">${victory ? 'ARENA VICTORY' : 'ARENA DEFEAT'}</div><div class="text-xs text-gray-500 mt-1">${gladiator.name}</div></div><div class="grid grid-cols-2 gap-3 mb-4 text-xs"><div><div class="text-gray-500">REWARD</div><div class="text-amber-300 text-lg font-bold">${reward} GOLD</div></div><div><div class="text-gray-500">FAME</div><div class="text-white text-lg font-bold">${gladiator.fame}</div></div><div><div class="text-gray-500">RECORD</div><div class="text-white">${gladiator.wins}W - ${gladiator.losses}L</div></div><div><div class="text-gray-500">INJURY</div><div class="text-red-300">${injuries}</div></div></div><div class="grid grid-cols-2 gap-2"><button id="btn-result-profile" class="border border-orange-700 px-3 py-2 text-xs text-orange-200 hover:border-orange-300">Gladiator Profile</button><button id="btn-result-exit" class="border border-gray-600 px-3 py-2 text-xs hover:border-gray-300">Return to World</button></div>`;
-    dialogue.classList.remove('hidden');
-    dialogue.querySelector('#btn-result-profile').addEventListener('click', openGladiatorProfile);
-    dialogue.querySelector('#btn-result-exit').addEventListener('click', () => { dialogue.classList.add('hidden'); window.EventBus.emit('EXIT_ARENA_TEST'); });
-}
 
-window.EventBus.on('OPEN_ARENA_RESULT', openArenaResult);
 
-function openCaravanDialogue(caravanEntity) {
-    const dialogue = document.getElementById('companion-dialogue');
-    const village = window.VillageManager.villages.find(candidate => candidate.id === caravanEntity.villageId);
-    const caravan = village?.caravans.find(candidate => candidate.id === caravanEntity.caravanId);
-    const destination = caravan && window.VillageManager.villages.find(candidate => candidate.id === caravan.targetVillageId);
-    if (!caravan || !destination) return;
-    const isEscorting = window.GameState.party.escortCaravanId === caravan.id;
-    dialogue.innerHTML = `<div class="mb-4 border-b border-amber-700 pb-3"><div class="text-amber-300 font-bold tracking-widest">MERCHANT CARAVAN</div><div class="text-xs text-gray-500 mt-1">${village.name} to ${destination.name}</div></div><p class="mb-4 text-gray-300">Cargo: ${caravan.amount} ${caravan.cargo}</p><button id="btn-escort-caravan" class="w-full border border-amber-700 px-3 py-2 text-xs text-amber-200 hover:border-amber-300">${isEscorting ? 'Abandon Escort' : 'Escort Caravan'}</button><button id="btn-close-caravan" class="mt-3 border border-gray-600 px-3 py-2 text-xs hover:border-amber-400">Leave</button>`;
-    dialogue.classList.remove('hidden');
-    dialogue.querySelector('#btn-escort-caravan').addEventListener('click', () => window.EventBus.emit(isEscorting ? 'ABANDON_CARAVAN_ESCORT' : 'ESCORT_CARAVAN', caravan.id));
-    dialogue.querySelector('#btn-close-caravan').addEventListener('click', closeCompanionDialogue);
-}
-
-const runeRecipes = {
-    ember_rune: { gold: 10, wood: 1, stone: 1 },
-    ward_rune: { gold: 15, wood: 1, stone: 2 },
-    swift_rune: { gold: 20, wood: 2, stone: 1 }
-};
-
-function openArmorerForge() {
-    const dialogue = document.getElementById('companion-dialogue');
-    const pack = window.GameState.inventory.backpack;
-    const gold = window.GameState.inventory.gold;
-
-    const runeRows = Object.entries(runeRecipes).map(([runeId, cost]) => {
-        const rune = window.ItemDatabase[runeId];
-        const canAfford = gold >= cost.gold && pack.filter(id => id === 'wood').length >= cost.wood && pack.filter(id => id === 'stone').length >= cost.stone;
-        return `<button class="craft-rune border border-orange-700 bg-gray-900 p-2 text-left hover:border-orange-300 disabled:opacity-50" data-rune="${runeId}" ${!canAfford ? 'disabled' : ''}>
-            ${rune.icon} Craft ${rune.name}
-            <span class="float-right text-amber-300 text-[9px]">${cost.gold}g, ${cost.wood}w, ${cost.stone}s</span>
-        </button>`;
-    }).join('');
-
-    const prosthetics = [
-        { type: 'clockwork', side: 'leftArm', label: 'Clockwork Arm (L)' },
-        { type: 'clockwork', side: 'rightArm', label: 'Clockwork Arm (R)' },
-        { type: 'clockwork', side: 'leftLeg', label: 'Clockwork Leg (L)' },
-        { type: 'clockwork', side: 'rightLeg', label: 'Clockwork Leg (R)' },
-        { type: 'void', side: 'leftArm', label: 'Void Arm (L)' },
-        { type: 'void', side: 'rightArm', label: 'Void Arm (R)' },
-        { type: 'void', side: 'leftLeg', label: 'Void Leg (L)' },
-        { type: 'void', side: 'rightLeg', label: 'Void Leg (R)' }
-    ];
-
-    const prostheticRows = prosthetics.map(p => {
-        const type = p.type;
-        const side = p.side;
-        const costs = {
-            'clockwork': { gold: 250, wood: 10, stone: 5 },
-            'void': { gold: 1000, corrupted_resin: 15, beast_bones: 10 }
-        };
-        const cost = costs[type];
-        let canAfford = gold >= cost.gold;
-        let costLabel = `${cost.gold}g`;
-        for (const [res, amt] of Object.entries(cost)) {
-            if (res === 'gold') continue;
-            const count = pack.filter(id => id === res).length;
-            if (count < amt) canAfford = false;
-            costLabel += `, ${amt}${res[0]}`;
-        }
-
-        return `<button class="forge-prosthetic border border-orange-700 bg-gray-900 p-2 text-left hover:border-orange-300 disabled:opacity-50" data-type="${type}" data-side="${side}" ${!canAfford ? 'disabled' : ''}>
-            🛠️ Forge ${p.label}
-            <span class="float-right text-amber-300 text-[9px]">${costLabel}</span>
-        </button>`;
-    }).join('');
-
-    // Upgrade Section (Tempering & Masterworking)
-    const equippedItems = Object.entries(window.GameState.inventory.equipment)
-        .filter(([slot, id]) => id !== null)
-        .map(([slot, id]) => ({ slot, id, ...window.ItemDatabase[id] }));
-
-    const upgradeRows = equippedItems.map(item => {
-        const mwCost = (item.masterworkLevel || 0) * 100 + 100;
-        const canMW = gold >= mwCost;
-        
-        return `
-            <div class="border border-gray-700 bg-gray-900 p-2 mb-2 rounded">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-white font-bold text-xs">${item.icon} ${item.name} (Rank ${item.masterworkLevel || 0})</span>
-                    <button class="masterwork-btn bg-amber-700 hover:bg-amber-600 px-2 py-1 text-[9px] rounded disabled:opacity-50" data-id="${item.id}" ${!canMW ? 'disabled' : ''}>
-                        MASTERWORK (${mwCost}g)
-                    </button>
-                </div>
-                <div class="grid grid-cols-2 gap-1">
-                    ${Object.entries(window.BlacksmithManager.temperingRecipes).map(([key, recipe]) => {
-                        let canTemper = true;
-                        let costStr = "";
-                        for (const [res, amt] of Object.entries(recipe.cost)) {
-                            const count = pack.filter(id => id === res).length;
-                            if (count < amt) canTemper = false;
-                            costStr += `${amt}${res[0]} `;
-                        }
-                        return `<button class="temper-btn border border-gray-600 bg-gray-800 p-1 text-[9px] hover:border-orange-400 disabled:opacity-50" data-id="${item.id}" data-recipe="${key}" ${!canTemper ? 'disabled' : ''}>
-                            ${recipe.name} (${costStr})
-                        </button>`;
-                    }).join('')}
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    dialogue.innerHTML = `
-        <div class="mb-4 border-b border-orange-700 pb-3">
-            <div class="text-orange-300 font-bold tracking-widest uppercase">Ancient Runic Blacksmith</div>
-            <div class="text-[10px] text-gray-500 mt-1">Gold: ${gold} | Mastery: ${window.GameState.renown.score}</div>
-        </div>
-        
-        <div class="max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-            <div class="text-xs text-orange-200 mb-2 uppercase font-bold border-l-2 border-orange-600 pl-2">Rune Binding</div>
-            <div class="grid gap-1 mb-4">${runeRows}</div>
-
-            <div class="text-xs text-orange-200 mb-2 uppercase font-bold border-l-2 border-orange-600 pl-2">Prosthetic Forging</div>
-            <div class="grid gap-1 mb-4">${prostheticRows}</div>
-
-            <div class="text-xs text-orange-200 mb-2 uppercase font-bold border-l-2 border-orange-600 pl-2">Equipment Modification</div>
-            <div class="space-y-1 mb-4">${upgradeRows || '<div class="text-gray-500 text-[10px]">No equipment to modify.</div>'}</div>
-        </div>
-
-        <button id="btn-close-forge" class="w-full mt-4 border border-gray-600 px-3 py-2 text-xs hover:border-orange-400">Leave Forge</button>
-    `;
-
-    dialogue.classList.remove('hidden');
-
-    dialogue.querySelectorAll('.craft-rune').forEach(btn => btn.addEventListener('click', () => { window.EventBus.emit('CRAFT_RUNE', btn.dataset.rune); openArmorerForge(); }));
-    dialogue.querySelectorAll('.forge-prosthetic').forEach(btn => btn.addEventListener('click', () => { window.BlacksmithManager.forgeProsthetic(btn.dataset.type, btn.dataset.side); openArmorerForge(); }));
-    dialogue.querySelectorAll('.masterwork-btn').forEach(btn => btn.addEventListener('click', () => { window.BlacksmithManager.masterwork(btn.dataset.id); openArmorerForge(); }));
-    dialogue.querySelectorAll('.temper-btn').forEach(btn => btn.addEventListener('click', () => { window.BlacksmithManager.temperItem(btn.dataset.id, btn.dataset.recipe); openArmorerForge(); }));
-    dialogue.querySelector('#btn-close-forge').addEventListener('click', closeCompanionDialogue);
 }
 
 
-function openTreatmentCenter() {
-    const dialogue = document.getElementById('companion-dialogue');
-    const injuryCount = window.GameState.combatRecord?.injuries?.length || 0;
-    const injuryCost = injuryCount * 10;
-    dialogue.innerHTML = `<div class="mb-4 border-b border-green-700 pb-3"><div class="text-green-300 font-bold tracking-widest">PLAGUE TREATMENT</div><div class="text-xs text-gray-500 mt-1">Restore the party and tend injuries.</div></div><button id="btn-treatment" class="w-full border border-green-700 bg-gray-900 p-3 text-left hover:border-green-300">Treat Party <span class="float-right text-amber-300">10g</span></button><button id="btn-combat-treatment" class="mt-2 w-full border border-orange-700 bg-gray-900 p-3 text-left hover:border-orange-300">Treat Combat Injuries <span class="float-right text-amber-300">${injuryCost}g</span></button><button id="btn-close-treatment" class="mt-3 border border-gray-600 px-3 py-2 text-xs hover:border-green-400">Leave</button>`;
-    dialogue.classList.remove('hidden');
-    dialogue.querySelector('#btn-treatment').addEventListener('click', () => window.EventBus.emit('TREAT_PARTY'));
-    dialogue.querySelector('#btn-combat-treatment').addEventListener('click', () => { window.GameCore.treatCombatInjuries(); openTreatmentCenter(); });
+
+
     dialogue.querySelector('#btn-close-treatment').addEventListener('click', closeCompanionDialogue);
 }
 
-function openRuneSocketMenu(packIndex) {
-    const runeId = window.GameState.inventory.backpack[packIndex];
-    const rune = window.ItemDatabase[runeId];
-    if (!rune || rune.type !== 'rune') return;
-    const dialogue = document.getElementById('companion-dialogue');
-    const slots = Object.entries(window.GameState.inventory.equipment).filter(([, itemId]) => itemId).map(([slot, itemId]) => {
-        const gear = window.ItemDatabase[itemId];
-        const existingRune = window.GameState.inventory.runes[slot];
-        return `<button class="rune-socket-target border border-cyan-700 bg-gray-900 p-2 text-left hover:border-cyan-300" data-pack-index="${packIndex}" data-slot="${slot}">${gear?.icon || '•'} ${slot.toUpperCase()}${existingRune ? ` <span class="text-gray-500">(${window.ItemDatabase[existingRune]?.name})</span>` : ''}</button>`;
-    }).join('') || '<div class="text-gray-500">Equip gear before socketing a rune.</div>';
-    dialogue.innerHTML = `<div class="mb-4 border-b border-cyan-700 pb-3"><div class="text-cyan-300 font-bold tracking-widest">SOCKET ${rune.name.toUpperCase()}</div><div class="text-xs text-gray-500 mt-1">Choose equipped gear</div></div><div class="grid gap-2 mb-4">${slots}</div><button id="btn-close-runes" class="border border-gray-600 px-3 py-2 text-xs hover:border-cyan-400">Cancel</button>`;
-    dialogue.classList.remove('hidden');
-    dialogue.querySelectorAll('.rune-socket-target').forEach(button => button.addEventListener('click', () => window.EventBus.emit('SOCKET_RUNE', { packIndex: Number(button.dataset.packIndex), slot: button.dataset.slot })));
-    dialogue.querySelector('#btn-close-runes').addEventListener('click', closeCompanionDialogue);
-}
 
-window.EventBus.on('OPEN_RUNE_SOCKET', openRuneSocketMenu);
-
-window.EventBus.on('SOCKET_RUNE', ({ packIndex, slot }) => {
-    const runeId = window.GameState.inventory.backpack[packIndex];
-    if (!runeId || !window.GameState.inventory.equipment[slot] || window.ItemDatabase[runeId]?.type !== 'rune') return;
-    const replacedRune = window.GameState.inventory.runes[slot];
-    window.GameState.inventory.backpack.splice(packIndex, 1);
-    if (replacedRune) window.GameState.inventory.backpack.push(replacedRune);
-    window.GameState.inventory.runes[slot] = runeId;
-    window.EventBus.emit('UI_LOG', `Socketed ${window.ItemDatabase[runeId].name} into ${slot}.`);
-    closeCompanionDialogue();
-    window.EventBus.emit('RECALCULATE_STATS');
-    window.EventBus.emit('RENDER_INVENTORY');
-});
 
 // ==========================================
 // PHASE 6.4C: ORACLE BOARD (Public Knowledge Terminal)
@@ -1178,29 +1002,7 @@ window.EventBus.on('SOCKET_RUNE', ({ packIndex, slot }) => {
 
 
 
-function openCompanionInventory(member) {
-    const dialogue = document.getElementById('companion-dialogue');
-    const inventory = member.inventory || [];
-    const items = inventory.length ? inventory.map((itemId, index) => {
-        const item = window.ItemDatabase[itemId];
-        return `<button class="companion-take-item border border-gray-700 bg-gray-900 p-2 text-left hover:border-cyan-500" data-member="${member.id}" data-index="${index}">${item ? `${item.icon} ${item.name}` : itemId}</button>`;
-    }).join('') : '<div class="text-gray-500">No items carried.</div>';
-    dialogue.innerHTML = `<div class="mb-4 border-b border-gray-700 pb-3"><div class="text-cyan-300 font-bold tracking-widest">${member.name}'S PACK</div><div class="text-xs text-gray-500 mt-1">Role: ${member.role}</div></div><div class="grid gap-2 mb-4">${items}</div><button id="btn-close-companion" class="border border-gray-600 px-3 py-2 text-xs hover:border-cyan-400">Back</button>`;
-    dialogue.querySelectorAll('.companion-take-item').forEach(button => button.addEventListener('click', () => window.EventBus.emit('TAKE_COMPANION_ITEM', { memberId: button.dataset.member, index: Number(button.dataset.index) })));
-    dialogue.querySelector('#btn-close-companion').addEventListener('click', closeCompanionDialogue);
-}
 
-window.EventBus.on('INTERACT_NEARBY', () => {
-    if (!window.GameCore.playerObj) return;
-    
-    // Check for Huntsman Scorn (Village Outcast)
-    if (window.EncounterDirector && window.EncounterDirector.huntsmanMarkTimer > 0) {
-        const playerPosition = window.GameCore.playerObj.visual.position;
-        const inVillage = window.RoadManager.isVillageProtected(playerPosition);
-        
-        if (inVillage) {
-            window.EventBus.emit('UI_LOG', `[OUTCAST] The villagers recoil at the Huntsman's mark. "Away with you, cursed one!"`);
-            window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'SHUNNED', pos: playerPosition, color: '#f87171' });
             return; // Block interaction in villages
         }
     }
