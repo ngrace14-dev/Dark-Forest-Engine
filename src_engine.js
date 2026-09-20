@@ -192,7 +192,9 @@ function updateEntities(delta) {
         
         try {
             const eTrans = entity.body.translation();
-            entity.visual.position.set(eTrans.x, eTrans.y, eTrans.z);
+            // Align feet with the terrain surface (bottom of the capsule collider)
+            const halfHeight = (entity.def?.height || 2.0) / 2.0;
+            entity.visual.position.set(eTrans.x, eTrans.y - halfHeight, eTrans.z);
         } catch (e) {
             entity.body = null;
             continue;
@@ -336,7 +338,10 @@ function updatePlayerMovement(delta) {
         return;
     }
 
-    window.GameCore.playerObj.visual.position.set(p.x, p.y, p.z);
+    // Align feet with the terrain surface (bottom of the player capsule collider)
+    const pDef = window.GameCore.playerObj.def || { height: 2 };
+    const pHalfHeight = (pDef.height || 2) / 2;
+    window.GameCore.playerObj.visual.position.set(p.x, p.y - pHalfHeight, p.z);
 
     const moveDir = _v1.set(0, 0, 0); 
     if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') {
@@ -349,12 +354,15 @@ function updatePlayerMovement(delta) {
     window.Input.isBlocking = window.Input.keys.shift && window.GameState.pStats.stamina > 0 && performance.now() >= window.GameState.pStats.guardBrokenUntil; 
     window.Input.isMoving = moveDir.lengthSq() > 0;
 
+    const currentVel = window.GameCore.playerObj.body.linvel();
+
     if (window.Input.isMoving) {
         moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle || Math.PI); 
         
+        // BASE WALK SPEED CALCULATION: 1 mile (1609.344 meters) / 32 minutes (1920 seconds) = ~0.8382 m/s
         const BASE_STARTING_SPEED = 1609.344 / 1920.0; 
         
-        const athleticsLvl = window.GameState.pStats.athletics.level || 0;
+        const athleticsLvl = window.GameState.pStats?.athletics?.level || 0;
         const athleticsBonus = window.GameCore.getBuffBonus('athletics') || 0;
         
         const speedMultiplier = 1.0 + (athleticsLvl * 0.05) + (athleticsBonus * 0.05);
@@ -367,7 +375,7 @@ function updatePlayerMovement(delta) {
             window.GameCore.addXP('athletics', 0.1 * delta); 
             if (window.Input.keys[' '] && window.Input.dashTimer <= 0 && window.GameState.pStats.stamina >= 25) { 
                 window.GameState.pStats.stamina -= 25;
-                window.Input.dashTimer = Math.max(0.25, 2.0 - ((window.GameState.pStats.dodge.level + window.GameCore.getBuffBonus('dodge')) * 0.05)); 
+                window.Input.dashTimer = Math.max(0.25, 2.0 - (((window.GameState.pStats?.dodge?.level || 0) + window.GameCore.getBuffBonus('dodge')) * 0.05)); 
                 window.Input.isDashing = true; 
                 window.GameCore.addXP('dodge', 15); 
                 window.GameCore.playerObj.body.applyImpulse(_v2.set(moveDir.x * 12, 0, moveDir.z * 12), true);
@@ -377,16 +385,14 @@ function updatePlayerMovement(delta) {
         }
 
         maxSpeed *= window.GameCore.getCombatInjuryMultiplier();
-        const accelerationForce = maxSpeed * 15.0; 
 
-        window.GameCore.playerObj.body.applyImpulse(_v2.set(moveDir.x * accelerationForce * delta, 0, moveDir.z * accelerationForce * delta), true);
-
-        const currentVel = window.GameCore.playerObj.body.linvel();
-        const flatVelLenSq = currentVel.x * currentVel.x + currentVel.z * currentVel.z;
-
-        if (flatVelLenSq > maxSpeed * maxSpeed && !window.Input.isDashing) {
-            const multiplier = maxSpeed / Math.sqrt(flatVelLenSq);
-            window.GameCore.playerObj.body.setLinvel(_v2.set(currentVel.x * multiplier, currentVel.y, currentVel.z * multiplier), true);
+        // Direct Velocity Control (prevents calibrated speeds from getting swallowed by friction/damping)
+        if (!window.Input.isDashing) {
+            window.GameCore.playerObj.body.setLinvel({
+                x: moveDir.x * maxSpeed,
+                y: currentVel.y,
+                z: moveDir.z * maxSpeed
+            }, true);
         }
 
         if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
@@ -404,6 +410,12 @@ function updatePlayerMovement(delta) {
             }
         }
     } else if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
+        window.GameCore.playerObj.body.setLinvel({
+            x: currentVel.x * 0.8,
+            y: currentVel.y,
+            z: currentVel.z * 0.8
+        }, true);
+
         if (window.Input.isBlocking) {
             playEntityAnimation(window.GameCore.playerObj, 'block');
         } else {
@@ -726,21 +738,20 @@ const ChunkManager = {
 
         const chunkData = window.ForestManager?.generateChunk(cx, cz) || { tierA: [], tierB: [] };
         
-        // Populate ForestRenderer Instanced Meshes for this Chunk
         if (window.ForestRenderer) {
             const redwoodPoints = [];
             const bushPoints = [];
 
             chunkData.tierA.forEach(point => {
-                const px = (chunkX - 30) + (point.x - cx * 60);
-                const pz = (chunkZ - 30) + (point.z - cz * 60);
+                const px = point.x;
+                const pz = point.z;
                 const py = window.WorldGenerator.getTerrainHeight(px, pz);
                 redwoodPoints.push({ x: px, y: py, z: pz, scale: 0.8 + Math.random() * 0.4, rotation: Math.random() * Math.PI * 2 });
             });
 
             chunkData.tierB.forEach(point => {
-                const px = (chunkX - 30) + (point.x - cx * 60);
-                const pz = (chunkZ - 30) + (point.z - cz * 60);
+                const px = point.x;
+                const pz = point.z;
                 const py = window.WorldGenerator.getTerrainHeight(px, pz);
                 bushPoints.push({ x: px, y: py, z: pz, scale: 0.7 + Math.random() * 0.5, rotation: Math.random() * Math.PI * 2 });
             });
@@ -748,11 +759,10 @@ const ChunkManager = {
             window.ForestRenderer.setChunkInstances(key, 'Redwood Tree', redwoodPoints);
             window.ForestRenderer.setChunkInstances(key, 'Bramble Bush', bushPoints);
 
-            // Add physics colliders for close-proximity Redwood trunks (LOD A)
             if (lod === 'A') {
                 redwoodPoints.forEach(pt => {
-                    const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(pt.x, pt.y, pt.z));
-                    window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(10.0, 1.8), body);
+                    const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(pt.x, pt.y + 15.0, pt.z));
+                    window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(15.0, 1.8), body);
                     if (!this.activeChunks.get(key).instanceBodies) this.activeChunks.get(key).instanceBodies = [];
                     this.activeChunks.get(key).instanceBodies.push(body);
                 });
@@ -953,14 +963,22 @@ function setupEntityAnimations(entity, isPlayer = false) {
 
 function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     const def = window.AssetManager.prefabs[name]; if(!def) return;
-    let mesh = getVisualMesh(def); mesh.position.set(x, y, z); window.GameCore.scene.add(mesh);
+    let mesh = getVisualMesh(def);
+    
+    const height = def.height || 2.0;
+    const halfHeight = height / 2.0;
+    const spawnY = y + halfHeight + 0.5;
+
+    mesh.position.set(x, spawnY - halfHeight, z); 
+    window.GameCore.scene.add(mesh);
+
     let rigidBodyDesc = (def.type === 'structure' || def.type === 'hub' || def.type === 'mountain' || def.type === 'runeTower' || def.type === 'powerStone' || def.type === 'firePit' || def.type === 'streetLight' || def.type === 'merchantChest') ? RAPIER.RigidBodyDesc.fixed() : RAPIER.RigidBodyDesc.dynamic().lockRotations();
     
     if(def.type !== 'structure' && def.type !== 'hub' && def.type !== 'mountain' && def.type !== 'runeTower' && def.type !== 'powerStone' && def.type !== 'firePit' && def.type !== 'streetLight' && def.type !== 'merchantChest') {
         rigidBodyDesc.setLinearDamping(4.0);
     }
     
-    rigidBodyDesc.setTranslation(x, y, z); let body = window.GameCore.world.createRigidBody(rigidBodyDesc);
+    rigidBodyDesc.setTranslation(x, spawnY, z); let body = window.GameCore.world.createRigidBody(rigidBodyDesc);
     
     let collider = null;
     if (def.isObstacle !== false) {
@@ -1150,10 +1168,12 @@ window.EventBus.on('EXIT_ARENA_TEST', () => window.ArenaTestManager.exit());
 
 function spawnPlayer(x, y, z) {
     const def = window.AssetManager?.prefabs?.['Player'] || { height: 2, radius: 0.5 };
-    
+    const halfHeight = (def.height || 2) / 2;
+    const spawnY = y + halfHeight + 2.0;
+
     let rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
         .lockRotations()
-        .setTranslation(x, y + 3.0, z)
+        .setTranslation(x, spawnY, z)
         .setCcdEnabled(true)
         .setLinearDamping(2.0);
     
@@ -1172,7 +1192,7 @@ function spawnPlayer(x, y, z) {
     });
 
     const p = body.translation(); 
-    window.GameCore.playerObj.visual.position.set(p.x, p.y, p.z); 
+    window.GameCore.playerObj.visual.position.set(p.x, p.y - halfHeight, p.z); 
     window.GameCore.scene.add(window.GameCore.playerObj.visual);
     setupEntityAnimations(window.GameCore.playerObj, true); window.VFXManager.applyAura(window.GameCore.playerObj, def);
     
@@ -1966,7 +1986,6 @@ async function bootEngine() {
         const startY = window.WorldGenerator.getTerrainHeight(0, 0); const safeY = isNaN(startY) ? 1 : startY;
         spawnPlayer(0, safeY + 3.0, 0); spawnPartyMembers(); ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
 
-        // Initialize Aethelgard Capital City geometry at (0,0)
         if (window.CapitalCityManager) {
             window.CapitalCityManager.generateCapital();
         }
