@@ -1,0 +1,93 @@
+import * as THREE from 'three';
+
+class RenderOptimizer {
+    constructor() {
+        this.shadowDistanceSq = 35 * 35; // 35m distance cutoff for shadow casting
+        this.animDistanceSq = 40 * 40;   // 40m distance cutoff for NPC animation updates
+    }
+
+    /**
+     * Compiles custom GLSL terrain shader variants during boot to prevent chunk loading hitches.
+     */
+    prewarmShaders(renderer, scene, camera) {
+        if (!renderer || !scene || !camera) return;
+
+        const dummyGeo = new THREE.PlaneGeometry(1, 1);
+        const dummyMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
+
+        dummyMat.onBeforeCompile = (shader) => {
+            shader.vertexShader = shader.vertexShader.replace(
+                `#include <common>`,
+                `#include <common>\nattribute float clutter;\nvarying float vClutter;`
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                `#include <begin_vertex>`,
+                `#include <begin_vertex>\nvClutter = clutter;`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                `#include <common>`,
+                `#include <common>\nvarying float vClutter;`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                `#include <color_fragment>`,
+                `#include <color_fragment>\nvec3 grassColor = vec3(0.1, 0.3, 0.1);\ndiffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);`
+            );
+        };
+
+        const dummyMesh = new THREE.Mesh(dummyGeo, dummyMat);
+        scene.add(dummyMesh);
+        renderer.compile(scene, camera);
+        scene.remove(dummyMesh);
+
+        dummyGeo.dispose();
+        dummyMat.dispose();
+        console.log("⚡ [RenderOptimizer] Shaders pre-warmed successfully.");
+    }
+
+    /**
+     * Toggles shadow passes and throttles distant NPC animation mixers based on player proximity.
+     */
+    updateEntityLOD(entities, cameraPosition) {
+        if (!cameraPosition || !entities) return;
+
+        for (let i = entities.length - 1; i >= 0; i--) {
+            const entity = entities[i];
+            if (!entity || !entity.visual) continue;
+
+            const distSq = entity.visual.position.distanceToSquared(cameraPosition);
+            const shouldShadow = distSq <= this.shadowDistanceSq;
+
+            // 1. Distance-based shadow pass toggle
+            if (entity.visual.userData.isCastingShadow !== shouldShadow) {
+                entity.visual.userData.isCastingShadow = shouldShadow;
+                entity.visual.traverse(child => {
+                    if (child.isMesh) child.castShadow = shouldShadow;
+                });
+            }
+
+            // 2. Throttle animation mixer ticks for distant entities (skip 2 out of 3 frames)
+            if (entity.mixer && distSq > this.animDistanceSq) {
+                entity.skipAnimFrame = (entity.skipAnimFrame || 0) + 1;
+                entity.shouldSkipAnim = (entity.skipAnimFrame % 3 !== 0);
+            } else {
+                entity.shouldSkipAnim = false;
+            }
+        }
+    }
+
+    /**
+     * Returns real-time WebGL pipeline statistics.
+     */
+    getMetrics(renderer) {
+        if (!renderer) return {};
+        const info = renderer.info;
+        return {
+            drawCalls: info.render.calls,
+            triangles: info.render.triangles,
+            geometries: info.memory.geometries,
+            textures: info.memory.textures
+        };
+    }
+}
+
+window.RenderOptimizer = new RenderOptimizer();
