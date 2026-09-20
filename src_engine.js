@@ -1,27 +1,20 @@
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-
-import { EffectComposer } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { ShaderPass } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/ShaderPass.js';
-import * as SkeletonUtils from 'https://unpkg.com/three@0.160.0/examples/jsm/utils/SkeletonUtils.js';
-import * as BufferGeometryUtils from 'https://unpkg.com/three@0.160.0/examples/jsm/utils/BufferGeometryUtils.js';
-import RAPIER from 'https://cdn.skypack.dev/@dimforge/rapier3d-compat';
-
-import alea from 'https://esm.sh/alea@1.0.1';
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+import RAPIER from 'rapier';
+import alea from 'alea'; // FIXED: Pulling directly from the import map
 
 window.THREE = THREE; 
 window.SkeletonUtils = SkeletonUtils;
 window.BufferGeometryUtils = BufferGeometryUtils;
 window.RAPIER = RAPIER;
 
-
-window.RAPIER = RAPIER;
-
-
 let renderer, clock, composer, ambientLight, dirLight;
 const fixedTimeStep = 1.0 / 60.0; let accumulator = 0.0;
-
 
 // Reusable math objects to prevent GC
 const _v1 = new THREE.Vector3();
@@ -35,8 +28,6 @@ const ChunkManager = {
     activeChunks: new Map(), currentChunkX: null, currentChunkZ: null,
     
     // --- INSTANCED SCENERY (Diablo 4 Style Batching) ---
-    // Stores InstancedMesh objects for each prefab type per chunk
-    // Structure: key -> Map(prefabName -> InstancedMesh)
     instancedMeshes: new Map(),
 
     update: function(playerPos) {
@@ -44,39 +35,32 @@ const ChunkManager = {
         const cx = Math.floor(playerPos.x / 60); const cz = Math.floor(playerPos.z / 60);
         if (cx !== this.currentChunkX || cz !== this.currentChunkZ) { this.currentChunkX = cx; this.currentChunkZ = cz; this.loadChunksAround(cx, cz); }
     },
-        loadChunksAround: function(cx, cz) {
+    loadChunksAround: function(cx, cz) {
         const expectedChunks = new Set();
-        
-        // --- PHASE 1.5: HIERARCHICAL LOD RANGES ---
-        // Tier A (Near): 1-chunk radius (Collision/High-Res)
-        // Tier B (Mid): 3-chunk radius (Instanced-No-Collision)
-        // Tier C (Far): 10-chunk radius (Billboards)
         
         for (let x = cx - 10; x <= cx + 10; x++) { 
             for (let z = cz - 10; z <= cz + 10; z++) { 
                 const dist = Math.max(Math.abs(x - cx), Math.abs(z - cz));
                 const key = `${x},${z}`; 
                 
-                // Only process chunks within a 10-unit square radius
                 if (dist <= 10) {
                     expectedChunks.add(key);
                     
-                    // Determine Target LOD Tier
                     let targetLod = 'C';
                     if (dist <= 1) targetLod = 'A';
                     else if (dist <= 3) targetLod = 'B';
                         
                     if (!this.activeChunks.has(key)) {
-                            this.generateChunk(x, z, targetLod);
+                        this.generateChunk(x, z, targetLod);
                     } else {
                         const chunk = this.activeChunks.get(key);
                         if (chunk.lod !== targetLod) {
                             this.unloadChunk(key);
                             this.generateChunk(x, z, targetLod);
+                        }
                     }
-                }
+                } 
             } 
-        }
         }
 
         const toRemove = [];
@@ -90,16 +74,14 @@ const ChunkManager = {
         const chunkX = cx * 60 + 30; 
         const chunkZ = cz * 60 + 30;
         
-        // --- PERFORMANCE: REDUCE GEOMETRY IN FAR CHUNKS ---
         const segments = lod === 'A' ? 30 : (lod === 'B' ? 10 : 2);
         const geo = new THREE.PlaneGeometry(60, 60, segments, segments); 
         geo.rotateX(-Math.PI / 2);
 
         const vertices = geo.attributes.position.array; const colors = [];
-        
         const localRoadPoints = window.RoadManager.getRoadPointsNear(cx, cz); const ROAD_WIDTH = 5;
         
-                for (let i = 0; i < vertices.length; i += 3) {
+        for (let i = 0; i < vertices.length; i += 3) {
             const vx = vertices[i] + chunkX; 
             const vz = vertices[i+2] + chunkZ;
             
@@ -107,7 +89,6 @@ const ChunkManager = {
             const biome = window.WorldGenConfig.biomes[biomeKey]; 
             let c = new THREE.Color(biome.color);
             
-            // Mask out roads for coloring
             let minRoadDistSq = 999999;
             for(let r=0; r<localRoadPoints.length; r++) { 
                 const dx = vx - localRoadPoints[r].x;
@@ -123,18 +104,11 @@ const ChunkManager = {
 
             vertices[i+1] = window.WorldGenerator.getTerrainHeight(vx, vz); 
             
-            // --- SMOOTH NORMAL MATH (Sampling neighbors for lighting) ---
-            // To ensure light doesn't "break" at chunk edges, we calculate a custom normal 
-            // by sampling the mathematical height function.
             const hL = window.WorldGenerator.getTerrainHeight(vx - 0.5, vz);
             const hR = window.WorldGenerator.getTerrainHeight(vx + 0.5, vz);
             const hD = window.WorldGenerator.getTerrainHeight(vx, vz - 0.5);
             const hU = window.WorldGenerator.getTerrainHeight(vx, vz + 0.5);
             const normal = new THREE.Vector3(hL - hR, 1.0, hD - hU).normalize();
-            
-            // We use the color buffer to store slight variations, but Three.js will use 
-            // computeVertexNormals later. For infinite scale, this mathematical normal 
-            // is more reliable than geometric ones.
             
             const colorNoise = window.currentNoise2D ? window.currentNoise2D(vx * 0.1, vz * 0.1) * 0.05 : 0; 
             c.r += colorNoise; c.g += colorNoise; c.b += colorNoise;
@@ -144,16 +118,12 @@ const ChunkManager = {
         geo.attributes.position.needsUpdate = true; 
         geo.computeVertexNormals();
         
-                // Final Normal Smoothing across boundaries
         const normalArray = geo.attributes.normal.array;
         
-        // --- LAYER 4: MICRO-CLUTTER DENSITY DATA ---
-        // We create an attribute to pass to the shader for procedural blending
         const clutterData = new Float32Array(geo.attributes.position.count);
         for (let i = 0; i < vertices.length; i += 3) {
             const vx = vertices[i] + chunkX; 
             const vz = vertices[i+2] + chunkZ;
-            // Generate a simple 0.0 - 1.0 density value based on noise
             clutterData[i/3] = window.WorldGenerator.getNoise(vx * 0.5, vz * 0.5); 
             
             const hL = window.WorldGenerator.getTerrainHeight(vx - 0.1, vz);
@@ -170,7 +140,6 @@ const ChunkManager = {
 
         const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
         
-        // --- CUSTOM SHADER INJECTION FOR CLUTTER ---
         mat.onBeforeCompile = (shader) => {
             shader.vertexShader = shader.vertexShader.replace(
                 `#include <common>`,
@@ -191,7 +160,6 @@ const ChunkManager = {
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <color_fragment>`,
                 `#include <color_fragment>
-                 // Blend in a "grass" color based on density
                  vec3 grassColor = vec3(0.1, 0.3, 0.1);
                  diffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);`
             );
@@ -205,15 +173,12 @@ const ChunkManager = {
         const collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.trimesh(physicsVertices, indicesU32), groundBody);
         this.activeChunks.set(key, { mesh, body: groundBody, collider, lod });
         
-                const rng = alea(`${window.EngineParams.worldSeed}_${cx}_${cz}`);
-        
-        // --- PHASE 2: POISSON DISK SCENERY INSTANCING ---
-        // Instead of random loops, we generate evenly spaced points using Poisson Disk Sampling.
-        // We do this per chunk. Since chunks are 60x60, we use a custom lightweight Poisson function here
-        // to avoid web worker boundary sync issues, using the seeded RNG.
+        // FIXED ALEA INSTANTIATION
+        const seedValue = window.EngineParams.worldSeed ? window.EngineParams.worldSeed.toString() : "1337";
+        const rng = alea(`${seedValue}_${cx}_${cz}`);
         
         function getPoissonPoints(width, height, radius, rngFunc) {
-            const k = 30; // maximum limit of samples before rejection
+            const k = 30;
             const cellSize = radius / Math.sqrt(2);
             const gridWidth = Math.ceil(width / cellSize);
             const gridHeight = Math.ceil(height / cellSize);
@@ -258,7 +223,7 @@ const ChunkManager = {
 
                 for (let i = 0; i < k; i++) {
                     const angle = rngFunc() * Math.PI * 2;
-                    const r = radius + rngFunc() * radius; // between r and 2r
+                    const r = radius + rngFunc() * radius;
                     const candidate = { x: p.x + Math.cos(angle) * r, z: p.z + Math.sin(angle) * r };
 
                     if (isValidPoint(candidate)) {
@@ -276,32 +241,28 @@ const ChunkManager = {
             return points;
         }
 
-        const chunkInstances = new Map(); // prefabName -> Array of transforms
+        const chunkInstances = new Map();
         this.instancedMeshes.set(key, chunkInstances);
         
-        // 1. Determine base biome to set the Poisson Radius (density)
         const chunkCenterBiome = window.WorldGenerator.getBiome(chunkX, chunkZ);
         const biomeData = window.WorldGenConfig.biomes[chunkCenterBiome];
-        const treeSpacing = biomeData.density || 10; // Redwoods are 12m apart, etc
+        const treeSpacing = biomeData.density || 10;
         
         const poissonPoints = getPoissonPoints(60, 60, treeSpacing, rng);
-                // 2. Filter points and spawn scenery
         poissonPoints.forEach(point => {
             const vx = (chunkX - 30) + point.x;
             const vz = (chunkZ - 30) + point.z;
             
-            // Mask out roads
             let nearRoad = false;
             for(let r=0; r<localRoadPoints.length; r++) { 
                 const dx = vx - localRoadPoints[r].x;
                 const dz = vz - localRoadPoints[r].z;
-                if ((dx * dx) + (dz * dz) < 81) { // 9 meters clear around roads
+                if ((dx * dx) + (dz * dz) < 81) { 
                     nearRoad = true; break; 
                 }
             }
             if (nearRoad) return;
             
-            // Mask out Villages
             let inVillage = false;
             if (window.VillageManager) {
                 for (let v of window.VillageManager.villages) {
@@ -314,49 +275,34 @@ const ChunkManager = {
             }
             if (inVillage) return;
 
-            // Passed all masks, place a tree/rock
             const biomeHere = window.WorldGenerator.getBiome(vx, vz);
             let prefabName = window.WorldGenConfig.biomes[biomeHere].prefab;
             
-            // --- HARVESTABLE SCENERY LOGIC ---
-            // 20% chance to replace a biome prefab with a Berry Bush
             if (rng() < 0.20 && biomeHere !== 'desert' && biomeHere !== 'sierra') {
                 prefabName = 'Berry Bush';
             }
 
-            // 5% chance to spawn a Deer in this spot instead of scenery
             if (rng() < 0.05 && (biomeHere === 'redwoods' || biomeHere === 'valley')) {
                 const dy = window.WorldGenerator.getTerrainHeight(vx, vz);
                 instantiatePrefab('Deer', vx, dy, vz, key);
-                return; // Skip tree instancing for this point
+                return;
             }
 
             const vy = window.WorldGenerator.getTerrainHeight(vx, vz);
-            
-            // Check slope - don't spawn trees on steep cliffs
-            // (We sample slightly offset to find slope)
             const ny = window.WorldGenerator.getTerrainHeight(vx + 1, vz);
-            if (Math.abs(vy - ny) > 1.5) return; // Too steep
+            if (Math.abs(vy - ny) > 1.5) return; 
             
             const position = new THREE.Vector3(vx, vy, vz);
             const rotation = new THREE.Euler(0, rng() * Math.PI * 2, 0);
             const scale = new THREE.Vector3().setScalar(0.7 + rng() * 0.6);
             
-            // Redwoods are massive
             if (biomeHere === 'redwoods') {
                 scale.setScalar(2.0 + rng() * 2.0);
                 scale.y *= (1.5 + rng());
             }
-
         });
 
-                // Use our new ForestSystem & ForestRenderer instead of old loop
         const chunkData = window.ForestManager.generateChunk(cx, cz);
-        
-        // --- LOD IMPLEMENTATION: SCENERY RENDERING ---
-        // Tier A: Collision + InstancedMesh
-        // Tier B: InstancedMesh Only
-        // Tier C: Billboards Only
         
         if (lod === 'A' || lod === 'B') {
             const sceneryData = new Map();
@@ -375,13 +321,11 @@ const ChunkManager = {
                 window.ForestRenderer.updateInstances(prefabName, points);
             });
 
-            // Tier A: Enable Physics Colliders for Trees
             if (lod === 'A') {
                 chunkData.tierA.forEach(point => {
                     const px = (chunkX - 30) + (point.x - cx*60);
                     const pz = (chunkZ - 30) + (point.z - cz*60);
                     const py = window.WorldGenerator.getTerrainHeight(px, pz);
-                    // Add physical collision here using RAPIER
                     const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(px, py, pz));
                     window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(1.0, 0.5), body);
                     if (!this.activeChunks.get(key).instanceBodies) this.activeChunks.get(key).instanceBodies = [];
@@ -389,7 +333,6 @@ const ChunkManager = {
                 });
             }
         } else if (lod === 'C') {
-            // Tier C: Billboard Impostors only
             const billboardPoints = [...chunkData.tierA, ...chunkData.tierB];
             const billboardData = billboardPoints.map(p => ({ 
                 x: (chunkX - 30) + (p.x - cx*60), 
@@ -398,7 +341,6 @@ const ChunkManager = {
             window.BillboardManager.updateBillboards(billboardData);
         }
 
-        // --- VILLAGES & STREET LIGHTS ---
         const placedLightCells = new Set();
         localRoadPoints.forEach(point => {
             if (point.x < chunkX - 30 || point.x >= chunkX + 30 || point.z < chunkZ - 30 || point.z >= chunkZ + 30) return;
@@ -454,17 +396,16 @@ const ChunkManager = {
                             }
                         }
                     });
-                                        window.AssetManager.prefabs['Village Hub'].customModel = originalModel;
+                    window.AssetManager.prefabs['Village Hub'].customModel = originalModel;
                 }
             });
         }
         window.EventBus.emit('CHUNK_GENERATED');
     },
-        unloadChunk: function(key) {
+    unloadChunk: function(key) {
         const chunk = this.activeChunks.get(key); if(!chunk) return;
         chunk.mesh.geometry.dispose(); chunk.mesh.material.dispose(); window.GameCore.scene.remove(chunk.mesh); window.GameCore.world.removeRigidBody(chunk.body);
         
-        // Cleanup Instances
         const instances = this.instancedMeshes.get(key);
         if (instances) {
             instances.forEach(imesh => {
@@ -476,7 +417,7 @@ const ChunkManager = {
             chunk.instanceBodies.forEach(body => window.GameCore.world.removeRigidBody(body));
         }
 
-                window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
+        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
             if(en.chunkKey === key) { 
                 if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(en.id);
                 window.GameCore.releaseEntityIndex(en.memoryIndex);
@@ -491,14 +432,12 @@ const ChunkManager = {
     }
 };
 
-
 function getVisualMesh(def) {
     let meshGroup = new THREE.Group();
     if (def.customModel && window.AssetManager.models[def.customModel]) {
         // ... existing code ...
     } else {
         if (def.type === 'character' || def.type === 'npc') {
-            // KENSHI-STYLE COMPOSITE PLACEHOLDER
             const legs = new THREE.Mesh(
                 new THREE.BoxGeometry(def.radius * 0.8, def.height * 0.3, def.radius * 0.8),
                 new THREE.MeshStandardMaterial({ color: def.color, roughness: 0.8 })
@@ -534,14 +473,13 @@ function getVisualMesh(def) {
     return meshGroup;
 }
 
-
 function playEntityAnimation(entity, state) {
     if (window.GameCore.AnimationSystem) {
         window.GameCore.AnimationSystem.transitionTo(entity, state);
         return;
     }
     if (!entity.mixer || !entity.actions || !entity.actions[state]) return; 
-    if (entity.currentAnimState === 'die') return; // Cannot override death
+    if (entity.currentAnimState === 'die') return;
     if (entity.currentAnimState === state) return; 
     
     const newAction = entity.actions[state]; const oldAction = entity.currentAnimState ? entity.actions[entity.currentAnimState] : null;
@@ -617,7 +555,6 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
 
     const entity = { id: Math.random().toString(36).substr(2, 9), name: name, def: def, visual: mesh, body: body, collider: collider, chunkKey: chunkKey };
     
-    // DOD Optimization: Bind NPC stats to Memory Buffer
     window.GameCore.bindEntityToBuffer(entity, def.hp || 50, def.poise || 30);
 
     if(collider) collider.handle = Math.floor(Math.random() * 1000000); 
@@ -632,13 +569,11 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     if(def.type === 'streetLight') { const light = new THREE.PointLight(0x9bdcff, def.active === false ? 0 : 2.5, 18); light.position.y = def.height; mesh.add(light); }
         setupEntityAnimations(entity); window.VFXManager.applyAura(entity, def); 
     
-    // SPATIAL GRID: Register entity on spawn
     window.GameCore.SpatialGrid.registerEntity(entity);
 
-    // --- MONSTER HUNGER TRACKING ---
     if (def.faction === 'monster' || def.faction === 'forest') {
         entity.lastFedDay = window.EngineParams.worldDay;
-        entity.hungerLevel = 0; // 0 = full, 100 = starving
+        entity.hungerLevel = 0;
         entity.isFeral = false;
     }
 
@@ -653,9 +588,6 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
 }
 window.GameCore.instantiatePrefab = instantiatePrefab;
 window.GameCore.ChunkManager = ChunkManager;
-
-window.GameCore.ChunkManager = ChunkManager;
-
 
 window.ArenaTestManager = {
     center: { x: 120, z: 120 },
@@ -755,10 +687,10 @@ window.ArenaTestManager = {
         window.EventBus.emit('OPEN_ARENA_RESULT', { result: 'defeat', reward: 0 });
         window.EventBus.emit('UI_UPDATE_HUD');
     },
-                clear: function() {
+    clear: function() {
         window.GameCore.activeEntities.filter(entity => entity.arenaEntity).forEach(entity => {
             if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(entity.id);
-            window.GameCore.releaseEntityIndex(entity.memoryIndex); // Recycle memory
+            window.GameCore.releaseEntityIndex(entity.memoryIndex);
             window.GameCore.scene.remove(entity.visual);
             window.GameCore.world.removeRigidBody(entity.body);
         });
@@ -793,11 +725,9 @@ function spawnPlayer(x, y, z) {
     let collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.capsule(Math.max(0.1, def.height/2 - def.radius), def.radius), body);
     window.GameCore.playerObj = { visual: getVisualMesh(def), body: body, collider: collider };
     
-    // DOD Optimization: Bind Player stats to Memory Buffer
     window.GameCore.bindEntityToBuffer(window.GameCore.playerObj, window.GameState.pStats.maxHp, window.GameState.pStats.maxPoise);
     
-    // Proxy the global GameState.pStats to the memory buffer as well so existing UI code works
-        const pMemIdx = window.GameCore.playerObj.memoryIndex * 4;
+    const pMemIdx = window.GameCore.playerObj.memoryIndex * 4;
     Object.defineProperties(window.GameState.pStats, {
         'hp': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 0], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 0] = v; } },
         'maxHp': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 1], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 1] = v; } },
@@ -808,8 +738,6 @@ function spawnPlayer(x, y, z) {
     const p = body.translation(); window.GameCore.playerObj.visual.position.set(p.x, p.y, p.z); window.GameCore.scene.add(window.GameCore.playerObj.visual);
     setupEntityAnimations(window.GameCore.playerObj, true); window.VFXManager.applyAura(window.GameCore.playerObj, def);
     
-    // --- PHASE 6: INTEL OWNERSHIP ---
-    // Ensure the player node exists in the ownership registry
     window.GameCore.playerObj.node_id = 'player_node';
 }
 
@@ -841,8 +769,6 @@ window.GameCore.applyForestBlessing = applyForestBlessing;
 function spawnGroundLoot(itemId, position) {
     if (!window.ItemDatabase?.[itemId]) return;
     
-    // --- PHASE 4: LOOT STABILITY ---
-    // Snap the loot to the mathematical ground height to prevent clipping or floating
     const groundY = window.WorldGenerator.getTerrainHeight(position.x, position.z);
     const finalPos = new THREE.Vector3(position.x, groundY + 0.4, position.z);
     
@@ -863,9 +789,6 @@ function awardMonsterKill(target) {
         if (nearestVillage) {
         nearestVillage.stats ??= {};
         nearestVillage.stats.essence = (nearestVillage.stats.essence || 0) + essence;
-        
-        // --- PHASE 2: WARDEN XP ---
-        // Award XP to the Warden career for feeding the village barriers
         window.CareerManager.addXP('warden', essence * 5);
     }
     const impact = target.def.boss ? 12 : (target.def.faction === 'forest' ? 4 : 2);
@@ -894,29 +817,22 @@ window.GameCore.spawnPartyMembers = spawnPartyMembers;
 
 function processCompanionNeeds() {
     const hoursPerSecond = 24 / window.EngineParams.dayLengthSeconds;
-    const hungerPerSecond = 100 / (24 * 60 * 60 / hoursPerSecond); // 100 points per 24 in-game hours
+    const hungerPerSecond = 100 / (24 * 60 * 60 / hoursPerSecond); 
     
-    // Player Hunger Logic
     const pStats = window.GameState.pStats;
-    pStats.hunger = Math.max(0, pStats.hunger - (hungerPerSecond * 60)); // Check every minute or so
+    pStats.hunger = Math.max(0, pStats.hunger - (hungerPerSecond * 60)); 
     
-    // Starvation debuffs for player
     if (pStats.hunger <= 0) {
-        // Starving for 7 days logic: 
-        // We track 'starvationDays' in GameState
-        window.GameState.starvationDays = (window.GameState.starvationDays || 0) + (1/6); // Called every 4 in-game hours
+        window.GameState.starvationDays = (window.GameState.starvationDays || 0) + (1/6); 
         
-                // --- PHASE 5: SMOOTH STARVATION CURVE ---
-        // Instead of linear, use a curve that accelerates at the end
-        // First 3 days: Minor debuff. Last 4 days: Rapid decline.
         const dayT = window.GameState.starvationDays / 7;
-        const weakness = Math.min(0.9, Math.pow(dayT, 1.5)); // Exponential curve
+        const weakness = Math.min(0.9, Math.pow(dayT, 1.5)); 
         
         pStats.maxHp = 100 * (1 - weakness);
         pStats.hp = Math.min(pStats.hp, pStats.maxHp);
         
         if (window.GameState.starvationDays >= 7) {
-            pStats.hp = 0; // Starved to death
+            pStats.hp = 0; 
             window.EventBus.emit('UI_LOG', "You have starved to death.");
         } else {
             window.EventBus.emit('UI_LOG', `Starvation: You are growing weak (${Math.floor(weakness*100)}% debuff)`);
@@ -925,9 +841,8 @@ function processCompanionNeeds() {
         window.GameState.starvationDays = 0;
     }
 
-    // NPC Hunger Logic
     window.GameState.party.members.filter(member => member.recruited).forEach(member => {
-        member.hunger = Math.max(0, (member.hunger || 100) - 25); // Loses 25% every 4 in-game hours
+        member.hunger = Math.max(0, (member.hunger || 100) - 25); 
         
         const rationIndex = member.inventory.indexOf('food');
         if (member.hunger <= 60 && rationIndex >= 0) {
@@ -943,7 +858,7 @@ function processCompanionNeeds() {
                 member.downed = true;
                 window.EventBus.emit('UI_LOG', `${member.name} has starved to death.`);
             } else {
-                member.hp = Math.max(1, member.hp - (member.maxHp * 0.1)); // Lose 10% HP per check
+                member.hp = Math.max(1, member.hp - (member.maxHp * 0.1)); 
             }
         } else {
             member.starvationDays = 0;
@@ -1022,7 +937,6 @@ function performAttack(isHeavy = false) {
     
     const isDashStrike = !isHeavy && window.Input.isDashing;
     
-        // ARC SWEEP PROFILE (AAA Style Hitboxes)
     const profile = isHeavy ? 
         { stamina: 35, cooldown: 1.2, reach: 4.5, radius: 1.5, angle: Math.PI * 0.8, multiplier: 2.2, poise: 2.5, windup: 0.25, duration: 0.3, color: 0xffaa33 } : 
         isDashStrike ? 
@@ -1039,19 +953,16 @@ function performAttack(isHeavy = false) {
     
     playEntityAnimation(window.GameCore.playerObj, 'attack');
     
-    // Register the active sweep hitbox to be evaluated during fixedUpdateLogic
     window.Input.activeSweep = {
         profile: profile,
         timer: profile.windup + profile.duration,
-        activeAt: profile.duration, // Start hitting after windup
+        activeAt: profile.duration, 
         alreadyHit: new Set(),
         isHeavy: isHeavy,
-        playerPos: new THREE.Vector3(), // Pre-allocate to avoid GC
+        playerPos: new THREE.Vector3(), 
         playerForward: new THREE.Vector3()
     };
 
-    
-    // Play sound immediately on windup to sync with character exertion
     window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: window.GameCore.playerObj.visual.position, vol: -10});
     window.GameCore.addXP('meleeAtt', isHeavy ? 4 : 2); 
 }
@@ -1060,7 +971,6 @@ function performGuardbreaker() {
     if (window.Input.isBlocking || window.Input.isAttacking || window.Input.guardbreakerCooldown > 0 || !window.GameCore.playerObj.visual) return;
     if (window.GameState.pStats.stamina < 30) { window.EventBus.emit('UI_LOG', 'Too exhausted to use Guardbreaker.'); return; }
     
-    // ARC SWEEP PROFILE FOR GUARDBREAKER
     const profile = { stamina: 30, cooldown: 0.7, reach: 3.5, radius: 1.0, angle: Math.PI * 0.4, multiplier: 0.7, poise: 999, windup: 0.2, duration: 0.2, color: '#fbbf24', isGuardbreaker: true };
     
     window.GameState.pStats.stamina -= profile.stamina;
@@ -1071,13 +981,12 @@ function performGuardbreaker() {
     playEntityAnimation(window.GameCore.playerObj, 'attack');
     window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'GUARDBREAKER', pos: window.GameCore.playerObj.visual.position, color: '#fbbf24' });
     
-    // Register the active sweep hitbox
     window.Input.activeSweep = {
         profile: profile,
         timer: profile.windup + profile.duration,
         activeAt: profile.duration,
         alreadyHit: new Set(),
-        isHeavy: true // Use heavy impact sounds
+        isHeavy: true 
     };
     
     window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: window.GameCore.playerObj.visual.position, vol: -10});
@@ -1095,7 +1004,6 @@ window.EventBus.on('TOGGLE_STEALTH', () => {
         window.EventBus.emit('UI_LOG', '[STEALTH] You blend into the surroundings.');
         window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'STEALTH', pos: player.visual.position, color: '#94a3b8' });
         
-        // Chameleon Texture Logic: Match terrain color
         const pPos = player.body.translation();
         const biomeKey = window.WorldGenerator.getBiome(pPos.x, pPos.z);
         const biomeColor = window.WorldGenConfig.biomes[biomeKey].color;
@@ -1186,7 +1094,7 @@ window.EventBus.on('CLEAR_MAP', () => {
     window.GameCore.activeEntities.forEach(en => { 
         if(en.def.faction === 'player') return; 
         if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(en.id);
-        window.GameCore.releaseEntityIndex(en.memoryIndex); // Recycle memory
+        window.GameCore.releaseEntityIndex(en.memoryIndex); 
         window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); 
     }); 
     window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => en.def.faction === 'player'); 
@@ -1245,7 +1153,6 @@ window.EventBus.on('BUILD_BASE_STRUCTURE', prefab => {
         if (prefab === 'Camp Farm Plot') base.farms.push({ x, z });
     if (prefab === 'Rune Tower') base.wardRadius = 30;
     
-    // --- PHASE 5: BUILDER XP ---
     window.CareerManager.addXP('builder', 50);
     
     window.EventBus.emit('UI_LOG', `[CAMP] Built ${prefab}.`);
@@ -1279,7 +1186,6 @@ function punishExposedActors() {
 function regenerateWorldCycle() {
     if (window.EngineParams.suppressWorldRegenerate) return;
     
-    // 1. Fire the cinematic "Wave of White" transition
     const uiOverlay = document.createElement('div');
     uiOverlay.style.position = 'fixed';
     uiOverlay.style.top = '0'; uiOverlay.style.left = '0';
@@ -1295,41 +1201,31 @@ function regenerateWorldCycle() {
         uiOverlay.style.opacity = '1';
         
         setTimeout(() => {
-            // 2. The screen is completely white. Now we do the heavy logic.
             punishExposedActors();
             
-            // Advance the Epoch Manager mathematically
             const newEpoch = window.EpochManagerInstance.advanceEpoch();
             
-            // Update Engine params for saving
             window.EngineParams.worldSeed = window.EpochManagerInstance.currentSeed;
             window.EngineParams.lastCycleDay = window.EngineParams.worldDay;
             
-            // Shift Villages to new safe locations (Village Manager handles finding flat ground based on new noise)
             if (window.VillageManager && window.VillageManager.villages.length > 0) {
                 window.VillageManager.shiftLocations();
             }
 
-                        // 3. Handle Player Teleportation / Anchoring
             let playerShiftedSafely = false;
             
             if (window.GameCore.playerObj) {
               const playerPos = window.GameCore.playerObj.visual.position;
                 
-              // Check if they are protected by a village barrier
               const protectedVillage = window.VillageManager.villages.find(v => {
                   const distSq = Math.pow(playerPos.x - v.x, 2) + Math.pow(playerPos.z - v.z, 2);
                   return distSq <= Math.pow(v.territory?.barrierRadius || 90, 2);
               });
                 
-              // Check if they have the Shift Anchor Item (e.g. 'epoch_anchor')
               const hasAnchorItem = window.GameState.inventory.equipment.waist === 'epoch_anchor' || 
                                     window.GameState.inventory.backpack.includes('epoch_anchor');
                 
               if (protectedVillage) {
-                  // Player is inside a protected village. We shift them relative to the village's NEW location.
-                  // Wait, the village already moved in step 2. We need to calculate this BEFORE shifting the villages ideally.
-                  // To fix this without refactoring step 2, we can just spawn them safely at the center of the new village.
                   const newY = window.WorldGenerator.getTerrainHeight(protectedVillage.x, protectedVillage.z) + 5;
                   window.GameCore.playerObj.body.setTranslation({x: protectedVillage.x, y: newY, z: protectedVillage.z}, true);
                   window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
@@ -1337,7 +1233,6 @@ function regenerateWorldCycle() {
                   window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The ward held. You shifted safely with ${protectedVillage.name}.`);
               } 
               else if (hasAnchorItem) {
-                  // Player is in the wild, but has the anchor. We can snap them to the nearest road.
                   const nearestRoadPt = window.RoadManager.getRandomPathPoint();
                   if (nearestRoadPt) {
                       const newY = window.WorldGenerator.getTerrainHeight(nearestRoadPt.x, nearestRoadPt.z) + 5;
@@ -1349,7 +1244,6 @@ function regenerateWorldCycle() {
               }
             }
             
-            // If they weren't protected or anchored, they get lost in the deep forest
             if (!playerShiftedSafely && !window.EngineParams.isPlayerSafe) {
               const forestExtent = window.WorldGenConfig.darkForestSideMeters / 2 - 1000;
               let newX, newZ;
@@ -1367,29 +1261,23 @@ function regenerateWorldCycle() {
               window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] You were caught unprotected. You are lost in the deep forest.`);
             }
             
-            // Force chunk manager update
             if (window.GameCore.playerObj && typeof ChunkManager !== 'undefined') {
                ChunkManager.update(window.GameCore.playerObj.visual.position);
             }
 
-                        // Tell the rest of the systems to refresh
             window.EventBus.emit('WORLD_REGENERATE');
             
-            // --- PHASE 6: WORLD-SHAPER XP ---
-            // Award XP for witnessing and surviving the Epoch shift
             window.CareerManager.addXP('navigator', 100);
             window.CareerManager.addXP('archivist', 50);
             
             window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The white wave passed. The forest has shifted.`);
 
-
-            // 4. Fade back in
             setTimeout(() => {
                 uiOverlay.style.opacity = '0';
                 setTimeout(() => { document.body.removeChild(uiOverlay); }, 3000);
-            }, 1000); // 1 second of holding the white screen
+            }, 1000); 
 
-        }, 3000); // Wait 3s for fade to white
+        }, 3000); 
     }, 100);
 }
 window.EventBus.on('CMD_TELEPORT', (pos) => { const vy = window.WorldGenerator.getTerrainHeight(pos.x, pos.z) + 15; window.GameCore.playerObj.body.setTranslation({x:pos.x, y:vy, z:pos.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); ChunkManager.update(new THREE.Vector3(pos.x, vy, pos.z)); });
@@ -1401,7 +1289,7 @@ async function bootEngine() {
         document.getElementById('loading-bar').style.width = "100%"; document.getElementById('loading-container').classList.add('hidden'); document.getElementById('btn-start').classList.remove('hidden');
         
         window.GameCore.scene = new THREE.Scene(); window.GameCore.scene.fog = new THREE.FogExp2(0x040608, 0.03); window.GameCore.scene.background = new THREE.Color(0x040608);
-        window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 1000000); // Massive Far Clip for Horizon
+        window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 1000000); 
 
         
         renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); 
@@ -1413,7 +1301,6 @@ async function bootEngine() {
         renderer.toneMappingExposure = 1.25; 
         document.body.appendChild(renderer.domElement);
 
-        // --- PHASE 1: POCKET DIMENSION SCENE ---
         window.GameCore.pocketScene = new THREE.Scene();
         window.GameCore.pocketScene.background = new THREE.Color(0x020617);
         const pAmbient = new THREE.AmbientLight(0xffffff, 0.8);
@@ -1422,12 +1309,9 @@ async function bootEngine() {
         pPoint.position.set(0, 10, 0);
         window.GameCore.pocketScene.add(pPoint);
 
-        // Initial pocket room (10x10m Tavern)
-                // Add Forest Renderer
         window.GameCore.scene.add(window.ForestRenderer.group);
         window.GameCore.scene.add(window.BillboardManager.group);
 
-        // Initial pocket room (10x10m Tavern)
         const roomGeo = new THREE.BoxGeometry(20, 10, 20);
         const roomMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, side: THREE.BackSide });
         const roomMesh = new THREE.Mesh(roomGeo, roomMat);
@@ -1436,8 +1320,7 @@ async function bootEngine() {
           
         clock = new THREE.Clock(); window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
   
-        // --- LAYER 1: THE CELESTIAL HORIZON (Shader-Only Mountains) ---
-        const horizonGeo = new THREE.PlaneGeometry(100000, 100000, 512, 512); // Huge resolution but only 1 draw call
+        const horizonGeo = new THREE.PlaneGeometry(100000, 100000, 512, 512); 
         horizonGeo.rotateX(-Math.PI / 2);
           
         const horizonMat = new THREE.ShaderMaterial({
@@ -1451,7 +1334,6 @@ async function bootEngine() {
                 varying float vHeight;
                 varying vec3 vWorldPos;
                   
-                // Optimized GPU noise function
                 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
                 float noise(vec2 p) {
                     vec2 i = floor(p); vec2 f = fract(p);
@@ -1465,7 +1347,7 @@ async function bootEngine() {
                     vWorldPos = worldPosition.xyz;
                       
                     float dist = length(worldPosition.xz);
-                    float mountainMask = smoothstep(50000.0, 70000.0, dist); // Only swell at 50km+
+                    float mountainMask = smoothstep(50000.0, 70000.0, dist); 
                       
                     float h = noise(worldPosition.xz * 0.0001) * 2500.0;
                     h += noise(worldPosition.xz * 0.001) * 200.0;
@@ -1485,7 +1367,6 @@ async function bootEngine() {
                 void main() {
                     vec3 color = mix(vec3(0.05, 0.08, 0.1), vec3(0.2, 0.25, 0.3), vHeight / 2500.0);
                       
-                    // Simple distance-based atmosphere
                     float dist = length(vWorldPos.xz);
                     float fogFactor = smoothstep(1000.0, 80000.0, dist);
                       
@@ -1495,7 +1376,7 @@ async function bootEngine() {
         });
           
         const horizonMesh = new THREE.Mesh(horizonGeo, horizonMat);
-        horizonMesh.position.y = -5; // Slightly below local terrain
+        horizonMesh.position.y = -5; 
         window.GameCore.scene.add(horizonMesh);
         window.GameCore.horizonMaterial = horizonMat;
 
@@ -1505,7 +1386,6 @@ async function bootEngine() {
         dirLight.position.set(20, 60, 20); 
         dirLight.castShadow = true; 
         
-        // Boost Shadow Resolution for 1:1 scale
         dirLight.shadow.mapSize.width = 4096;
         dirLight.shadow.mapSize.height = 4096;
         dirLight.shadow.camera.left = -150; 
@@ -1520,17 +1400,14 @@ async function bootEngine() {
         const pocketPass = new RenderPass(window.GameCore.pocketScene, window.GameCore.camera);
         composer.addPass(worldPass);
 
-        // --- PHASE 2: SCENE SWAP LOGIC ---
         window.EventBus.on('SCENE_SWAP', ({ target, pos }) => {
             if (target === 'establishment') {
                 composer.removePass(worldPass);
                 composer.insertPass(pocketPass, 0);
                   
-                // Move player to pocket center
                 if (window.GameCore.playerObj) {
                     window.GameCore.playerObj.body.setTranslation({ x: 0, y: 5, z: 0 }, true);
                     window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-                    // Disable Chunk loading while in pocket
                     window.EngineParams.suppressChunkLoading = true;
                 }
             } else if (target === 'world') {
@@ -1542,7 +1419,6 @@ async function bootEngine() {
                     window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: groundY, z: pos.z }, true);
                     window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
                     window.EngineParams.suppressChunkLoading = false;
-                    // Force immediate chunk update
                     ChunkManager.update(new THREE.Vector3(pos.x, groundY, pos.z));
                 }
             }
@@ -1561,30 +1437,26 @@ async function bootEngine() {
         spawnPlayer(0, safeY + 15, 0); spawnPartyMembers(); ChunkManager.update(new THREE.Vector3(0, safeY + 15, 0));
         
                 window.EventBus.on('ENV_UPDATE', () => {
-            // Sun angle logic: 0 is dawn, PI/2 is noon, PI is dusk
             const hourNormalized = (window.EngineParams.timeOfDay % 24) / 24;
-            const angle = hourNormalized * Math.PI * 2 - (Math.PI / 2); // Offset so noon is top
+            const angle = hourNormalized * Math.PI * 2 - (Math.PI / 2); 
             
-            // Move light in a massive arc around the player
             const sunRadius = 200;
             dirLight.position.x = Math.cos(angle) * sunRadius;
             dirLight.position.y = Math.sin(angle) * sunRadius;
-            dirLight.position.z = Math.cos(angle) * 100; // Slight tilt
+            dirLight.position.z = Math.cos(angle) * 100; 
             
             const sunHeight = Math.sin(angle); 
             let baseDirIntensity = 2.5; 
             let baseAmbientIntensity = 1.8;
             
-            // High-Noon / Bright Day (Sun is high)
             if (sunHeight > 0.3) { 
                 baseDirIntensity = 3.0; 
                 baseAmbientIntensity = 2.0;
                 dirLight.color.setHex(0xffffff); 
                 ambientLight.color.setHex(0xffffff); 
-                window.GameCore.scene.fog.color.setHex(0x94a3b8); // Bright blue-gray fog
+                window.GameCore.scene.fog.color.setHex(0x94a3b8); 
                 window.GameCore.scene.background = new THREE.Color(0x94a3b8);
             }
-            // Dawn / Dusk (Golden Hour)
             else if (sunHeight > -0.1) { 
                 baseDirIntensity = 1.8; 
                 baseAmbientIntensity = 1.4; 
@@ -1593,7 +1465,6 @@ async function bootEngine() {
                 window.GameCore.scene.fog.color.setHex(0x451a03); 
                 window.GameCore.scene.background = new THREE.Color(0x451a03);
             }
-            // Night
             else { 
                 baseDirIntensity = 0.5; 
                 baseAmbientIntensity = 0.6; 
@@ -1608,7 +1479,6 @@ async function bootEngine() {
                         renderer.toneMappingExposure = Math.max(1.0, window.EngineParams.globalBrightness * 1.5); 
             window.GameCore.scene.fog.density = window.EngineParams.fogDensity * (sunHeight < 0 ? 1.5 : 1.0);
 
-            // --- PHASE 1: SHADER UNIFORM SYNC ---
             if (window.GameCore.horizonMaterial) {
                 window.GameCore.horizonMaterial.uniforms.sunPos.value.copy(dirLight.position);
                 window.GameCore.horizonMaterial.uniforms.fogColor.value.copy(window.GameCore.scene.fog.color);
@@ -1621,15 +1491,12 @@ async function bootEngine() {
 
     window.bootEngine = bootEngine;
 
-    // Attach to button directly in here for safety
     window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btn-start')?.addEventListener('click', () => {
             document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('hud').classList.remove('hidden');
         
-            // Finalize setup
             window.EventBus.emit('UI_UPDATE_HUD');
-            // Re-attach resize listener to be sure
             window.addEventListener('resize', () => { 
                 if(window.GameCore.camera) {
                     window.GameCore.camera.aspect = window.innerWidth / window.innerHeight; 
@@ -1641,7 +1508,6 @@ async function bootEngine() {
                 }
             });
         
-            // Start Loop
             function animate() { 
                 requestAnimationFrame(animate); 
                 let delta = clock.getDelta(); 
@@ -1651,7 +1517,6 @@ async function bootEngine() {
                 while (accumulator >= fixedTimeStep) { 
                     if(window.GameCore.world) window.GameCore.world.step(); 
         
-                    // --- PHASE 4: FLOATING ORIGIN CHECK ---
                     window.GameCore.checkFloatingOrigin();
         
                     fixedUpdateLogic(fixedTimeStep); 
@@ -1664,12 +1529,9 @@ async function bootEngine() {
         
             animate();
         
-            // Spawn UI Log message
             window.EventBus.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
         });
     });
-
-    bootEngine();
 
 function postVillageNeed(village, resource, amount, purpose) {
     const existing = window.GameState.questBoard.find(quest => quest.issuer === village.id && quest.resource === resource && quest.purpose === purpose);
@@ -1727,7 +1589,6 @@ function launchHostileExpedition(village) {
     }
     window.EventBus.emit('UI_LOG', isTerminus ? '[MOUNTAIN INCURSION] Terminus calls its martial houses to the gate.' : `[RAID] A forest expedition advances on ${village.name}.`);
 
-    // --- INTEL HOOK (Raid Declaration) ---
     if (window.IntelManager) {
         window.IntelManager.register({
             type: window.IntelEnums.TYPES.WARNING,
@@ -1788,7 +1649,6 @@ function simulateVillage(village) {
         postVillageNeed(village, 'stone', 30, 'reclaiming occupied territory');
         window.EventBus.emit('UI_LOG', `[OCCUPIED] ${village.name} has fallen under forest control.`);
 
-        // --- INTEL HOOK (Settlement Fall) ---
         if (window.IntelManager) {
             window.IntelManager.register({
                 type: window.IntelEnums.TYPES.FACT,
@@ -1878,12 +1738,9 @@ function fixedUpdateLogic(delta) {
 
     updateWorldClock(delta);
     
-        // Sliced Systems Updates
-    if(window.GameCore.worldTimer > 0.25) { 
+        if(window.GameCore.worldTimer > 0.25) { 
         updatePeriodicSystems();
         
-        // --- NPC & PLAYER NEEDS (Every 4 In-Game Hours) ---
-        // 4 in-game hours = (4 / 24) * dayLengthSeconds
         const checkInterval = (4 / 24) * window.EngineParams.dayLengthSeconds; 
         if (!window.GameCore.lastNeedsCheck || window.GameCore.worldTimerAbsolute > window.GameCore.lastNeedsCheck + checkInterval) {
              processCompanionNeeds();
@@ -1896,7 +1753,6 @@ function fixedUpdateLogic(delta) {
     window.GameCore.worldTimerAbsolute = (window.GameCore.worldTimerAbsolute || 0) + delta;
 
 
-    // Direct Module Updates
     window.ArenaTestManager?.update(delta);
     window.VATManager?.update(delta);
     window.EncounterDirector?.update(delta);
@@ -2066,14 +1922,12 @@ function handleEntityDeath(entity) {
     playEntityAnimation(entity, 'die');
     window.AdventurerManager?.markDefeated(entity);
     
-    // --- PHASE 1: HUNTER CAREER XP ---
     if (entity.name === 'Deer') {
         window.CareerManager.addXP('hunter', 25);
         window.EventBus.emit('UI_LOG', `[HUNTER] You have harvested a deer carcass.`);
     }
 
     if (window.GameCore.spawnGroundLoot) {
-        // Special Loot for Deer
         const lootType = entity.name === 'Deer' ? 'food' : (entity.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones');
         window.GameCore.spawnGroundLoot(lootType, entity.visual.position);
     }
@@ -2221,5 +2075,3 @@ function updateCombatHitboxes(delta) {
         }
     }
 }
-
-
