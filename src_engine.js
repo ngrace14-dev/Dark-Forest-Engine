@@ -17,7 +17,6 @@ let renderer, clock, composer, ambientLight, dirLight;
 const fixedTimeStep = 1.0 / 60.0; 
 let accumulator = 0.0;
 
-// Reusable Scratch Objects (Zero GC in Loop)
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
@@ -27,7 +26,7 @@ const _m1 = new THREE.Matrix4();
 const _colorScratch = new THREE.Color();
 
 // ==========================================
-// LIGHT POOL SYSTEM (Smooth Interpolation)
+// LIGHT POOL SYSTEM
 // ==========================================
 const MAX_POOLED_LIGHTS = 8;
 const lightPool = [];
@@ -37,7 +36,7 @@ function initLightPool(scene) {
     lightPool.length = 0;
     for (let i = 0; i < MAX_POOLED_LIGHTS; i++) {
         const pl = new THREE.PointLight(0xffffff, 0, 10);
-        pl.castShadow = false; // Keep point lights unshadowed for max GPU performance
+        pl.castShadow = false;
         pl.visible = false;
         scene.add(pl);
         lightPool.push(pl);
@@ -57,7 +56,7 @@ function updateLightPool() {
         }
         emitter.mesh.getWorldPosition(_v1);
         const distSq = _v1.distanceToSquared(pPos);
-        if (distSq < 3600) { // 60m radius
+        if (distSq < 3600) {
             validEmitters.push({ emitter, pos: _v1.clone(), distSq });
         }
     }
@@ -73,7 +72,6 @@ function updateLightPool() {
             pLight.position.copy(item.pos);
             pLight.color.set(item.emitter.color);
             
-            // Smooth intensity falloff near edge of range
             const distRatio = Math.sqrt(item.distSq) / 60.0;
             const fade = Math.max(0, 1.0 - distRatio);
             
@@ -88,7 +86,7 @@ function updateLightPool() {
 }
 
 // ==========================================
-// SHADOW & CAMERA POSITION DRIVER
+// CAMERA & SHADOW CAMERA DRIVER
 // ==========================================
 
 function updateCameraAndShadows() {
@@ -115,7 +113,6 @@ function updateCameraAndShadows() {
     window.GameCore.camera.position.set(camX, camY, camZ);
     window.GameCore.camera.lookAt(playerPos.x, playerPos.y + 1.5, playerPos.z);
 
-    // Tighten Directional Light Shadow Box to Player Position
     if (dirLight && dirLight.castShadow) {
         dirLight.target.position.copy(playerPos);
         dirLight.target.updateMatrixWorld();
@@ -502,6 +499,12 @@ function fixedUpdateLogic(delta) {
 
     updatePlayerStats(delta);
     updateEntities(delta);
+
+    // Apply distance shadow toggles and animation throttling
+    if (window.RenderOptimizer && window.GameCore.camera) {
+        window.RenderOptimizer.updateEntityLOD(window.GameCore.activeEntities, window.GameCore.camera.position);
+    }
+
     updatePlayerMovement(delta);
     updateCombatHitboxes(delta);
 }
@@ -1849,6 +1852,9 @@ async function bootEngine() {
         renderer.toneMappingExposure = 1.25; 
         document.body.appendChild(renderer.domElement);
 
+        // Pre-warm custom GLSL shader variants during boot
+        window.RenderOptimizer?.prewarmShaders(renderer, window.GameCore.scene, window.GameCore.camera);
+
         window.GameCore.pocketScene = new THREE.Scene();
         window.GameCore.pocketScene.background = new THREE.Color(0x020617);
         const pAmbient = new THREE.AmbientLight(0xffffff, 0.8);
@@ -1974,7 +1980,7 @@ async function bootEngine() {
             window.EventBus.emit('ENV_UPDATE');
         });
 
-        // OPTIMIZED DOWNSAMPLED BLOOM (Prevents Post-Processing WebGL Bottlenecks)
+        // Downsampled Bloom Pass (halves viewport resolution for rendering pass speedup)
         window.GameCore.passes.bloom = new UnrealBloomPass(
             new THREE.Vector2((window.innerWidth || 800) * 0.5, (window.innerHeight || 600) * 0.5), 
             window.EngineParams.bloom, 
