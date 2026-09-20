@@ -788,13 +788,36 @@ const ChunkManager = {
 
 function getVisualMesh(def) {
     let meshGroup = new THREE.Group();
-    if (def.customModel && window.AssetManager.models[def.customModel]) {
-        // ... existing code ...
+    
+    // 1. LOAD CUSTOM MODELS
+    if (def.customModel && window.AssetManager && window.AssetManager.models[def.customModel]) {
+        const sourceModel = window.AssetManager.models[def.customModel];
+        
+        // Use SkeletonUtils to clone the model so animations work properly on multiple instances
+        const clone = window.SkeletonUtils.clone(sourceModel);
+        
+        // Base positioning and scaling
+        clone.position.y = -(def.height || 2) / 2;
+        if (def.scale) clone.scale.setScalar(def.scale);
+
+        // Ensure all child meshes cast and receive shadows
+        clone.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                // Important: Clone materials if you plan on changing colors (like stealth mode)
+                if (child.material) child.material = child.material.clone();
+            }
+        });
+
+        meshGroup.add(clone);
+
+    // 2. FALLBACK PRIMITIVE SHAPES (If model hasn't loaded or doesn't exist)
     } else {
         if (def.type === 'character' || def.type === 'npc') {
             const legs = new THREE.Mesh(
                 new THREE.BoxGeometry(def.radius * 0.8, def.height * 0.3, def.radius * 0.8),
-                new THREE.MeshStandardMaterial({ color: def.color, roughness: 0.8 })
+                new THREE.MeshStandardMaterial({ color: def.color || 0xcccccc, roughness: 0.8 })
             );
             legs.position.y = def.height * 0.15 - def.height/2;
             legs.castShadow = true; legs.receiveShadow = true;
@@ -802,7 +825,7 @@ function getVisualMesh(def) {
 
             const torso = new THREE.Mesh(
                 new THREE.BoxGeometry(def.radius * 1.5, def.height * 0.5, def.radius * 1.2),
-                new THREE.MeshStandardMaterial({ color: def.color, roughness: 0.8 })
+                new THREE.MeshStandardMaterial({ color: def.color || 0xcccccc, roughness: 0.8 })
             );
             torso.position.y = def.height * 0.55 - def.height/2;
             torso.castShadow = true; torso.receiveShadow = true;
@@ -810,16 +833,16 @@ function getVisualMesh(def) {
 
             const head = new THREE.Mesh(
                 new THREE.BoxGeometry(def.radius, def.radius, def.radius),
-                new THREE.MeshStandardMaterial({ color: def.color, roughness: 0.8 })
+                new THREE.MeshStandardMaterial({ color: def.color || 0xcccccc, roughness: 0.8 })
             );
             head.position.y = def.height * 0.85 - def.height/2;
             head.castShadow = true; head.receiveShadow = true;
             meshGroup.add(head);
         } else {
             let mesh; 
-            if(def.type === 'structure' || def.type === 'hub') mesh = new THREE.Mesh(new THREE.BoxGeometry(def.radius*2, def.height, def.radius*2), new THREE.MeshStandardMaterial({ color: def.color })); 
-            else if(def.type === 'mountain') mesh = new THREE.Mesh(new THREE.ConeGeometry(def.radius, def.height, 16), new THREE.MeshStandardMaterial({ color: def.color })); 
-            else mesh = new THREE.Mesh(new THREE.CylinderGeometry(def.radius, def.radius, def.height, 8), new THREE.MeshStandardMaterial({ color: def.color }));
+            if(def.type === 'structure' || def.type === 'hub') mesh = new THREE.Mesh(new THREE.BoxGeometry(def.radius*2, def.height, def.radius*2), new THREE.MeshStandardMaterial({ color: def.color || 0x888888 })); 
+            else if(def.type === 'mountain') mesh = new THREE.Mesh(new THREE.ConeGeometry(def.radius, def.height, 16), new THREE.MeshStandardMaterial({ color: def.color || 0x444444 })); 
+            else mesh = new THREE.Mesh(new THREE.CylinderGeometry(def.radius, def.radius, def.height, 8), new THREE.MeshStandardMaterial({ color: def.color || 0x666666 }));
             mesh.castShadow = true; mesh.receiveShadow = true; 
             meshGroup.add(mesh);
         }
@@ -1741,8 +1764,10 @@ async function bootEngine() {
         dirLight.position.set(20, 60, 20); 
         dirLight.castShadow = true; 
         
-        dirLight.shadow.mapSize.width = 4096;
-        dirLight.shadow.mapSize.height = 4096;
+        // REDUCED SHADOW MAP RESOLUTION TO PREVENT GPU LAG
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        
         dirLight.shadow.camera.left = -150; 
         dirLight.shadow.camera.right = 150; 
         dirLight.shadow.camera.top = 150; 
@@ -1900,7 +1925,7 @@ window.addEventListener('DOMContentLoaded', () => {
         animate();
     
         window.EventBus.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
-    });
+    }, { once: true }); // <--- Fixed the double-loop lag issue
 });
 
 bootEngine();
