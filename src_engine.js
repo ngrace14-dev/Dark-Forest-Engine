@@ -17,15 +17,17 @@ let renderer, clock, composer, ambientLight, dirLight;
 const fixedTimeStep = 1.0 / 60.0; 
 let accumulator = 0.0;
 
+// Reusable Scratch Objects (Zero GC in Loop)
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
 const _q1 = new THREE.Quaternion();
 const _e1 = new THREE.Euler();
 const _m1 = new THREE.Matrix4();
+const _colorScratch = new THREE.Color();
 
 // ==========================================
-// LIGHT POOL SYSTEM
+// LIGHT POOL SYSTEM (Smooth Interpolation)
 // ==========================================
 const MAX_POOLED_LIGHTS = 8;
 const lightPool = [];
@@ -35,6 +37,7 @@ function initLightPool(scene) {
     lightPool.length = 0;
     for (let i = 0; i < MAX_POOLED_LIGHTS; i++) {
         const pl = new THREE.PointLight(0xffffff, 0, 10);
+        pl.castShadow = false; // Keep point lights unshadowed for max GPU performance
         pl.visible = false;
         scene.add(pl);
         lightPool.push(pl);
@@ -54,7 +57,9 @@ function updateLightPool() {
         }
         emitter.mesh.getWorldPosition(_v1);
         const distSq = _v1.distanceToSquared(pPos);
-        validEmitters.push({ emitter, pos: _v1.clone(), distSq });
+        if (distSq < 3600) { // 60m radius
+            validEmitters.push({ emitter, pos: _v1.clone(), distSq });
+        }
     }
 
     validEmitters.sort((a, b) => a.distSq - b.distSq);
@@ -67,9 +72,14 @@ function updateLightPool() {
             const item = validEmitters[i];
             pLight.position.copy(item.pos);
             pLight.color.set(item.emitter.color);
-            pLight.intensity = item.emitter.intensity;
+            
+            // Smooth intensity falloff near edge of range
+            const distRatio = Math.sqrt(item.distSq) / 60.0;
+            const fade = Math.max(0, 1.0 - distRatio);
+            
+            pLight.intensity = item.emitter.intensity * fade;
             pLight.distance = item.emitter.distance;
-            pLight.visible = true;
+            pLight.visible = pLight.intensity > 0.01;
         } else {
             pLight.intensity = 0;
             pLight.visible = false;
@@ -78,10 +88,10 @@ function updateLightPool() {
 }
 
 // ==========================================
-// CAMERA & WORLD CLOCK LOGIC
+// SHADOW & CAMERA POSITION DRIVER
 // ==========================================
 
-function updateCameraPosition() {
+function updateCameraAndShadows() {
     if (!window.GameCore?.camera || !window.GameCore?.playerObj?.visual) return;
 
     const playerPos = window.GameCore.playerObj.visual.position;
@@ -104,6 +114,12 @@ function updateCameraPosition() {
 
     window.GameCore.camera.position.set(camX, camY, camZ);
     window.GameCore.camera.lookAt(playerPos.x, playerPos.y + 1.5, playerPos.z);
+
+    // Tighten Directional Light Shadow Box to Player Position
+    if (dirLight && dirLight.castShadow) {
+        dirLight.target.position.copy(playerPos);
+        dirLight.target.updateMatrixWorld();
+    }
 }
 
 function updateWorldClock(delta) {
@@ -158,7 +174,7 @@ function updateEntities(delta) {
     const playerPosition = playerAlive ? window.GameCore.playerObj.visual.position : null;
     const detectionRadiusSq = playerAlive ? Math.pow(window.GameState.forestBlessing?.dangerSense ? 18 : 15, 2) : 0;
     const nowSecs = performance.now() / 1000;
-    const camPos = window.GameCore.camera ? window.GameCore.camera.position : new THREE.Vector3();
+    const camPos = window.GameCore.camera ? window.GameCore.camera.position : _v1.set(0,0,0);
     const raycaster = new THREE.Raycaster();
     const downVector = new THREE.Vector3(0, -1, 0);
 
@@ -228,7 +244,7 @@ function updateEntities(delta) {
                 }
             }
         } catch (e) {
-            console.warn("Player rigid body translation query skipped.", e);
+            console.warn("Player translation query skipped.", e);
         }
     }
 }
@@ -555,7 +571,7 @@ const ChunkManager = {
             
             const biomeKey = window.WorldGenerator.getBiome(vx, vz); 
             const biome = window.WorldGenConfig.biomes[biomeKey]; 
-            let c = new THREE.Color(biome.color);
+            let c = _colorScratch.set(biome.color);
             
             let minRoadDistSq = 999999;
             for(let r=0; r<localRoadPoints.length; r++) { 
@@ -567,16 +583,10 @@ const ChunkManager = {
             const minRoadDist = Math.sqrt(minRoadDistSq);
             if(minRoadDist < ROAD_WIDTH + 2) { 
                 const dirtInfluence = Math.max(0, 1.0 - (minRoadDist / (ROAD_WIDTH + 2))); 
-                c.lerp(new THREE.Color('#38281d'), dirtInfluence); 
+                c.lerp(_colorScratch.set('#38281d'), dirtInfluence); 
             }
 
             vertices[i+1] = window.WorldGenerator.getTerrainHeight(vx, vz); 
-            
-            const hL = window.WorldGenerator.getTerrainHeight(vx - 0.5, vz);
-            const hR = window.WorldGenerator.getTerrainHeight(vx + 0.5, vz);
-            const hD = window.WorldGenerator.getTerrainHeight(vx, vz - 0.5);
-            const hU = window.WorldGenerator.getTerrainHeight(vx, vz + 0.5);
-            const normal = new THREE.Vector3(hL - hR, 1.0, hD - hU).normalize();
             
             const colorNoise = window.currentNoise2D ? window.currentNoise2D(vx * 0.1, vz * 0.1) * 0.05 : 0; 
             c.r += colorNoise; c.g += colorNoise; c.b += colorNoise;
@@ -598,7 +608,7 @@ const ChunkManager = {
             const hR = window.WorldGenerator.getTerrainHeight(vx + 0.1, vz);
             const hD = window.WorldGenerator.getTerrainHeight(vx, vz - 0.1);
             const hU = window.WorldGenerator.getTerrainHeight(vx, vz + 0.1);
-            const n = new THREE.Vector3(hL - hR, 0.2, hD - hU).normalize();
+            const n = _v1.set(hL - hR, 0.2, hD - hU).normalize();
             normalArray[i] = n.x;
             normalArray[i+1] = n.y;
             normalArray[i+2] = n.z;
@@ -759,15 +769,6 @@ const ChunkManager = {
             const vy = window.WorldGenerator.getTerrainHeight(vx, vz);
             const ny = window.WorldGenerator.getTerrainHeight(vx + 1, vz);
             if (Math.abs(vy - ny) > 1.5) return; 
-            
-            const position = new THREE.Vector3(vx, vy, vz);
-            const rotation = new THREE.Euler(0, rng() * Math.PI * 2, 0);
-            const scale = new THREE.Vector3().setScalar(0.7 + rng() * 0.6);
-            
-            if (biomeHere === 'redwoods') {
-                scale.setScalar(2.0 + rng() * 2.0);
-                scale.y *= (1.5 + rng());
-            }
         });
 
         const chunkData = window.ForestManager.generateChunk(cx, cz);
@@ -1973,7 +1974,14 @@ async function bootEngine() {
             window.EventBus.emit('ENV_UPDATE');
         });
 
-        window.GameCore.passes.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), window.EngineParams.bloom, 0.25, 0.9); composer.addPass(window.GameCore.passes.bloom);
+        // OPTIMIZED DOWNSAMPLED BLOOM (Prevents Post-Processing WebGL Bottlenecks)
+        window.GameCore.passes.bloom = new UnrealBloomPass(
+            new THREE.Vector2((window.innerWidth || 800) * 0.5, (window.innerHeight || 600) * 0.5), 
+            window.EngineParams.bloom, 
+            0.25, 
+            0.9
+        ); 
+        composer.addPass(window.GameCore.passes.bloom);
         
         const VignetteShader = { uniforms: { "tDiffuse": { value: null }, "darkness": { value: 0.35 } }, vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`, fragmentShader: `uniform float darkness; uniform sampler2D tDiffuse; varying vec2 vUv; void main() { vec4 texel = texture2D( tDiffuse, vUv ); float dist = distance(vUv, vec2(0.5)); float edge = smoothstep(0.25, 0.75, dist); texel.rgb *= 1.0 - edge * clamp(darkness, 0.0, 0.85); gl_FragColor = texel; }` };
         window.GameCore.passes.vignette = new ShaderPass(VignetteShader); composer.addPass(window.GameCore.passes.vignette);
@@ -2090,7 +2098,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 accumulator -= fixedTimeStep; 
             } 
 
-            updateCameraPosition();
+            updateCameraAndShadows();
 
             if(composer) composer.render(); 
         }
