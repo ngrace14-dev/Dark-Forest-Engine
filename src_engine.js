@@ -1876,6 +1876,9 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('hud').classList.remove('hidden');
 
+        // FORCE THE BROWSER TO LOCK THE MOUSE TO THE GAME
+        document.body.requestPointerLock(); 
+
         window.EventBus.emit('UI_UPDATE_HUD');
         window.EventBus.emit('GAME_STARTED');
 
@@ -1925,7 +1928,7 @@ window.addEventListener('DOMContentLoaded', () => {
         animate();
     
         window.EventBus.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
-    }, { once: true }); // <--- Fixed the double-loop lag issue
+    }, { once: true }); 
 });
 
 bootEngine();
