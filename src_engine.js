@@ -1876,9 +1876,6 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('hud').classList.remove('hidden');
 
-        // FORCE THE BROWSER TO LOCK THE MOUSE TO THE GAME
-        document.body.requestPointerLock(); 
-
         window.EventBus.emit('UI_UPDATE_HUD');
         window.EventBus.emit('GAME_STARTED');
 
