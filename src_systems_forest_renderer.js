@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 /**
  * FOREST SYSTEMS - Phase 2: Instanced Rendering
  * 
@@ -54,4 +56,3 @@ class ForestRenderer {
 }
 
 window.ForestRenderer = new ForestRenderer();
-
