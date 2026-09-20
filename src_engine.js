@@ -521,7 +521,7 @@ const ChunkManager = {
         const mesh = new THREE.Mesh(geo, mat);  mesh.position.set(chunkX, 0, chunkZ); mesh.receiveShadow = true; mesh.userData.isTerrain = true; mesh.userData.chunkKey = key; window.GameCore.scene.add(mesh);
 
         const physicsVertices = new Float32Array(vertices); const indicesU32 = new Uint32Array(geo.index.array); 
- 
+
         const groundBody = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(chunkX, 0, chunkZ));
         const collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.trimesh(physicsVertices, indicesU32), groundBody);
         this.activeChunks.set(key, { mesh, body: groundBody, collider, lod });
@@ -1640,7 +1640,8 @@ window.EventBus.on('PLAYER_RESPAWN', () => { if (!window.EngineParams.arenaMode 
 // BOOT ENGINE
 async function bootEngine() {
     try {
-        document.getElementById('loading-bar').style.width = "50%"; await RAPIER.init(); 
+        document.getElementById('loading-bar').style.width = "50%"; 
+        await RAPIER.init({}); 
         document.getElementById('loading-bar').style.width = "100%"; document.getElementById('loading-container').classList.add('hidden'); document.getElementById('btn-start').classList.remove('hidden');
         
         window.GameCore.scene = new THREE.Scene(); window.GameCore.scene.fog = new THREE.FogExp2(0x040608, 0.03); window.GameCore.scene.background = new THREE.Color(0x040608);
@@ -1846,10 +1847,22 @@ async function bootEngine() {
 window.bootEngine = bootEngine;
 
 window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('btn-start')?.addEventListener('click', () => {
+    document.getElementById('btn-start')?.addEventListener('click', async () => {
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('hud').classList.remove('hidden');
-    
+
+        try {
+            if (window.Tone) {
+                await window.Tone.start();
+                if (window.Tone.Transport.state !== 'started') {
+                    window.Tone.Transport.start();
+                }
+                console.log('🔊 WebAudio Context resumed successfully.');
+            }
+        } catch (err) {
+            console.warn('AudioContext failed to start:', err);
+        }
+
         window.EventBus.emit('UI_UPDATE_HUD');
         window.addEventListener('resize', () => { 
             if(window.GameCore.camera) {
