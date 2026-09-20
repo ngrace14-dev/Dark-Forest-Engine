@@ -14,7 +14,8 @@ window.BufferGeometryUtils = BufferGeometryUtils;
 window.RAPIER = RAPIER;
 
 let renderer, clock, composer, ambientLight, dirLight;
-const fixedTimeStep = 1.0 / 60.0; let accumulator = 0.0;
+const fixedTimeStep = 1.0 / 60.0; 
+let accumulator = 0.0;
 
 // Reusable math objects to prevent GC
 const _v1 = new THREE.Vector3();
@@ -24,10 +25,362 @@ const _q1 = new THREE.Quaternion();
 const _e1 = new THREE.Euler();
 const _m1 = new THREE.Matrix4();
 
+// ==========================================
+// CORE ENGINE LOGIC DECLARATIONS
+// ==========================================
+
+function updateWorldClock(delta) {
+    if (!window.NetworkSession?.connected) {
+        const hoursPerSecond = 24 / window.EngineParams.dayLengthSeconds;
+        window.EngineParams.timeOfDay += delta * hoursPerSecond;
+        if (window.EngineParams.timeOfDay >= 24) {
+            const elapsedDays = Math.floor(window.EngineParams.timeOfDay / 24);
+            window.EngineParams.timeOfDay %= 24;
+            window.EngineParams.worldDay += elapsedDays;
+            for (let day = 0; day < elapsedDays; day++) {
+                processCompanionNeeds(); processBaseJobs();
+                window.AdventurerManager?.advanceDay();
+                window.GameState?.processCrowDay?.();
+            }
+            if (window.EngineParams.worldDay > 0 && window.EngineParams.worldDay % window.EngineParams.cycleLengthDays === 0) regenerateWorldCycle();
+        }
+    }
+    window.EventBus.emit('ENV_UPDATE');
+}
+
+function updatePeriodicSystems() {
+    if (window.VillageManager && window.VillageManager.simulateNextVillage) {
+        window.VillageManager.simulateNextVillage();
+    }
+    window.AdventurerManager?.syncDeparted();
+    window.AdventurerManager?.syncNearby();
+}
+
+function updatePlayerStats(delta) {
+    window.EngineParams.isPlayerSafe = false; 
+    window.EngineParams.isPlayerHidden = false;
+    const staminaMultiplier = 1 + (window.GameState.forestBlessing?.staminaRegen || 0);
+    window.GameState.pStats.stamina = Math.min(window.GameState.pStats.maxStamina, window.GameState.pStats.stamina + (window.Input.isBlocking ? 3 : 12) * staminaMultiplier * delta);
+    if (performance.now() >= window.GameState.pStats.guardBrokenUntil) window.GameState.pStats.poise = Math.min(window.GameState.pStats.maxPoise, window.GameState.pStats.poise + 10 * delta);
+    
+    window.GameState.statusEffects = window.GameState.statusEffects.filter(effect => {
+        effect.remaining -= delta; effect.tickTimer -= delta;
+        if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
+            effect.tickTimer = 1;
+            const resistance = window.GameCore.getResistance(effect.type);
+            const tickDamage = Math.max(1, effect.tickDamage - resistance);
+            window.GameState.pStats.hp = Math.max(0, window.GameState.pStats.hp - tickDamage);
+            window.EventBus.emit('ENTITY_DAMAGED', { damage: tickDamage, position: window.GameCore.playerObj.visual.position, isPlayer: true });
+        }
+        return effect.remaining > 0;
+    });
+}
+
+function updateEntities(delta) {
+    const playerAlive = window.GameCore.playerObj && window.GameState.pStats.hp > 0;
+    const playerPosition = playerAlive ? window.GameCore.playerObj.visual.position : null;
+    const detectionRadiusSq = playerAlive ? Math.pow(window.GameState.forestBlessing?.dangerSense ? 18 : 15, 2) : 0;
+    const nowSecs = performance.now() / 1000;
+    const camPos = window.GameCore.camera ? window.GameCore.camera.position : new THREE.Vector3();
+    const raycaster = new THREE.Raycaster();
+    const downVector = new THREE.Vector3(0, -1, 0);
+
+    let isHidden = false;
+    let hostileNearby = false;
+
+    for (let i = window.GameCore.activeEntities.length - 1; i >= 0; i--) {
+        const entity = window.GameCore.activeEntities[i];
+        if (!entity || !entity.visual) continue;
+        
+        window.GameCore.SpatialGrid.updateEntity(entity);
+        window.VATManager?.processLOD(entity, camPos);
+
+        if (entity.def.type === 'npc' && entity.statusEffects?.length > 0 && entity.hp > 0) {
+            processEntityStatusEffects(entity, delta);
+        }
+
+        if (entity.def.type === 'npc' || entity.def.type === 'character') {
+            alignEntityToGround(entity, delta, raycaster, downVector);
+        }
+
+        if (playerAlive && entity.hp !== 0) {
+            const distSq = entity.visual.position.distanceToSquared(playerPosition);
+            if (!isHidden && entity.def.concealment) {
+                const hideRad = entity.def.hideRadius || entity.def.radius;
+                if (distSq <= hideRad * hideRad) isHidden = true;
+            }
+            if (entity.def.touchEffect && entity.def.active !== false) {
+                const touchRad = entity.def.touchRadius || entity.def.radius + 1;
+                if (distSq <= touchRad * touchRad) {
+                    if (!entity.touchEffectAvailableAt || nowSecs >= entity.touchEffectAvailableAt) {
+                        entity.touchEffectAvailableAt = nowSecs + (entity.def.touchCooldown || 4);
+                        window.EventBus.emit('SPAWN_HIT_VFX', { type: entity.def.touchEffect, pos: entity.visual.position.clone().add(_v1.set(0, 1, 0)) });
+                        if (entity.def.touchEffect === 'Poison') window.GameCore.applyStatusEffect('poison', 6, 3);
+                        window.EventBus.emit('UI_LOG', 'Poison cloud released by the flesh pods.');
+                    }
+                }
+            }
+            if (!hostileNearby && entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest')) {
+                if (distSq < detectionRadiusSq) hostileNearby = true;
+            }
+        }
+    }
+    
+    if (playerAlive) {
+        window.EngineParams.isPlayerHidden = isHidden;
+        const p = window.GameCore.playerObj.body.translation(); 
+        window.EngineParams.isPlayerSafe = window.RoadManager.isSafeZone(p);
+
+        if (!window.EngineParams.isPlayerSafe && !window.EngineParams.isPlayerHidden && hostileNearby && !window.EngineParams.godMode && window.EngineParams.offPathCaptureCooldown <= 0) {
+            const pathPoint = window.RoadManager.getRandomPathPoint();
+            if (pathPoint) {
+                const safeY = window.WorldGenerator.getTerrainHeight(pathPoint.x, pathPoint.z) + 15;
+                window.GameCore.playerObj.body.setTranslation({ x: pathPoint.x, y: safeY, z: pathPoint.z }, true);
+                window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                window.EngineParams.offPathCaptureCooldown = 10;
+                window.EventBus.emit('UI_LOG', 'The forest caught you off the safe path and dragged you back to the road.');
+            }
+        }
+    }
+}
+
+function processEntityStatusEffects(entity, delta) {
+    for (let j = entity.statusEffects.length - 1; j >= 0; j--) {
+        const effect = entity.statusEffects[j];
+        effect.remaining -= delta; effect.tickTimer -= delta;
+        if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
+            effect.tickTimer = 1;
+            entity.hp = Math.max(0, entity.hp - effect.tickDamage);
+            window.EventBus.emit('ENTITY_DAMAGED', { damage: effect.tickDamage, position: entity.visual.position, isPlayer: false });
+            window.EventBus.emit('SPAWN_HIT_VFX', { type: effect.type === 'burning' ? 'Fire' : 'Void', pos: entity.visual.position });
+            
+            if (entity.hp <= 0) {
+                handleEntityDeath(entity);
+                break;
+            }
+        }
+        if (effect.remaining <= 0) entity.statusEffects.splice(j, 1);
+    }
+}
+
+function alignEntityToGround(entity, delta, raycaster, downVector) {
+    const ePos = entity.visual.position;
+    raycaster.set(_v1.set(ePos.x, ePos.y + 2, ePos.z), downVector);
+    const activeMeshes = [];
+    for (const chunk of ChunkManager.activeChunks.values()) {
+        if (chunk.mesh) activeMeshes.push(chunk.mesh);
+    }
+    
+    const intersects = raycaster.intersectObjects(activeMeshes, false);
+    if (intersects.length > 0) {
+        const hitNormal = intersects[0].face.normal;
+        const targetQuaternion = _q1.setFromUnitVectors(_v2.set(0, 1, 0), hitNormal);
+        const currentYRotation = _e1.setFromQuaternion(entity.visual.quaternion, 'YXZ').y;
+        const yQuat = _q1.setFromAxisAngle(_v2.set(0, 1, 0), currentYRotation);
+        
+        targetQuaternion.multiply(yQuat);
+        entity.visual.quaternion.slerp(targetQuaternion, delta * 5.0);
+    }
+}
+
+function handleEntityDeath(entity) {
+    playEntityAnimation(entity, 'die');
+    window.AdventurerManager?.markDefeated(entity);
+    
+    if (entity.name === 'Deer') {
+        window.CareerManager?.addXP('hunter', 25);
+        window.EventBus.emit('UI_LOG', `[HUNTER] You have harvested a deer carcass.`);
+    }
+
+    if (window.GameCore.spawnGroundLoot) {
+        const lootType = entity.name === 'Deer' ? 'food' : (entity.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones');
+        window.GameCore.spawnGroundLoot(lootType, entity.visual.position);
+    }
+
+    awardMonsterKill(entity);
+    window.GameState.inventory.gold += entity.def.faction === 'monster' ? 10 : 50;
+    window.EventBus.emit('UI_UPDATE_HUD');
+    
+    setTimeout(() => {
+        if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(entity.id);
+        window.GameCore.releaseEntityIndex(entity.memoryIndex);
+        window.GameCore.scene.remove(entity.visual);
+        window.GameCore.world.removeRigidBody(entity.body);
+        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(candidate => candidate.id !== entity.id);
+    }, 2000);
+}
+
+function updatePlayerMovement(delta) {
+    if (!window.GameCore.playerObj || !window.GameCore.playerObj.visual) return;
+    
+    const moveDir = _v1.set(0, 0, 0); 
+    if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') {
+        if (window.Input.keys.w) moveDir.z -= 1; 
+        if (window.Input.keys.s) moveDir.z += 1; 
+        if (window.Input.keys.a) moveDir.x -= 1; 
+        if (window.Input.keys.d) moveDir.x += 1;
+    }
+
+    window.Input.isBlocking = window.Input.keys.shift && window.GameState.pStats.stamina > 0 && performance.now() >= window.GameState.pStats.guardBrokenUntil; 
+    window.Input.isMoving = moveDir.lengthSq() > 0;
+
+    if (window.Input.isMoving) {
+        moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle); 
+        let accelerationForce = 35 + ((window.GameState.pStats.athletics.level + window.GameCore.getBuffBonus('athletics')) * 0.5);
+
+        if (window.Input.isBlocking) {
+            accelerationForce *= 0.2; 
+            window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 8 * delta);
+        } else {
+            window.GameCore.addXP('athletics', 0.1 * delta); 
+            if (window.Input.keys[' '] && window.Input.dashTimer <= 0 && window.GameState.pStats.stamina >= 25) { 
+                window.GameState.pStats.stamina -= 25;
+                window.Input.dashTimer = Math.max(0.25, 2.0 - ((window.GameState.pStats.dodge.level + window.GameCore.getBuffBonus('dodge')) * 0.05)); 
+                window.Input.isDashing = true; 
+                window.GameCore.addXP('dodge', 15); 
+                window.GameCore.playerObj.body.applyImpulse(_v2.set(moveDir.x * 30, 0, moveDir.z * 30), true);
+                playEntityAnimation(window.GameCore.playerObj, 'dash');
+                setTimeout(() => window.Input.isDashing = false, 200); 
+                window.EventBus.emit('PLAY_SOUND', {url:'https://tonejs.github.io/audio/drum-samples/hihat-analog.mp3', pos: window.GameCore.playerObj.visual.position}); 
+            }
+        }
+
+        window.GameCore.playerObj.body.applyImpulse(_v2.set(moveDir.x * accelerationForce * delta, 0, moveDir.z * accelerationForce * delta), true);
+
+        const currentVel = window.GameCore.playerObj.body.linvel();
+        const maxSpeed = (window.Input.isBlocking ? 2.0 : 6.0) * window.GameCore.getCombatInjuryMultiplier();
+        const flatVelLenSq = currentVel.x * currentVel.x + currentVel.z * currentVel.z;
+
+        if (flatVelLenSq > maxSpeed * maxSpeed && !window.Input.isDashing) {
+            const multiplier = maxSpeed / Math.sqrt(flatVelLenSq);
+            window.GameCore.playerObj.body.setLinvel(_v2.set(currentVel.x * multiplier, currentVel.y, currentVel.z * multiplier), true);
+        }
+
+        if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
+            if (window.Input.isBlocking) {
+                playEntityAnimation(window.GameCore.playerObj, 'block');
+            } else {
+                const targetFacing = _v2.copy(window.GameCore.playerObj.visual.position).add(moveDir);
+                _m1.lookAt(window.GameCore.playerObj.visual.position, targetFacing, _v3.set(0,1,0));
+                const targetYRot = _e1.setFromRotationMatrix(_m1).y;
+                
+                const euler = _e1.setFromQuaternion(window.GameCore.playerObj.visual.quaternion, 'YXZ');
+                euler.y = targetYRot;
+                window.GameCore.playerObj.visual.quaternion.setFromEuler(euler);
+                playEntityAnimation(window.GameCore.playerObj, 'walk'); 
+            }
+        }
+    } else if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
+        if (window.Input.isBlocking) {
+            playEntityAnimation(window.GameCore.playerObj, 'block');
+        } else {
+            playEntityAnimation(window.GameCore.playerObj, 'idle'); 
+        }
+    }
+
+    if (window.Input.dashTimer > 0) window.Input.dashTimer -= delta; 
+    if (window.Input.attackCooldown > 0) window.Input.attackCooldown -= delta; 
+    else window.Input.isAttacking = false;
+}
+
+function updateCombatHitboxes(delta) {
+    if (!window.Input.activeSweep) return;
+    
+    window.Input.activeSweep.timer -= delta;
+    
+    if (window.Input.activeSweep.timer <= window.Input.activeSweep.activeAt) {
+        const sweep = window.Input.activeSweep;
+        const pTrans = window.GameCore.playerObj.body.translation();
+        sweep.playerPos.set(pTrans.x, pTrans.y, pTrans.z);
+        sweep.playerForward.set(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
+        
+        const nearbyEntities = window.GameCore.SpatialGrid.getNearbyEntities(sweep.playerPos.x, sweep.playerPos.z, sweep.profile.reach);
+        
+        for (let i = nearbyEntities.length - 1; i >= 0; i--) {
+            const en = nearbyEntities[i];
+            if (!en || en.hp <= 0 || sweep.alreadyHit.has(en.id)) continue;
+            if (en.def.type !== 'npc' && en.name !== 'Blight Root') continue;
+            
+            const eTrans = en.body.translation();
+            const distSq = (eTrans.x - sweep.playerPos.x)**2 + (eTrans.z - sweep.playerPos.z)**2;
+            
+            if (distSq <= sweep.profile.reach * sweep.profile.reach) {
+                _v1.set(eTrans.x - sweep.playerPos.x, 0, eTrans.z - sweep.playerPos.z).normalize();
+                if (sweep.playerForward.angleTo(_v1) <= sweep.profile.angle / 2) {
+                    sweep.alreadyHit.add(en.id);
+                    
+                    let damageMultiplier = sweep.profile.multiplier;
+                    if (window.Input.isStealth && sweep.isHeavy) {
+                        damageMultiplier *= 5.0;
+                        window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "ASSASSINATION!", pos: en.visual.position, color: '#ff0000'});
+                        window.EventBus.emit('UI_LOG', `[CRITICAL] You assassinated ${en.name}!`);
+                        window.EventBus.emit('TOGGLE_STEALTH');
+                    }
+
+                    const rawDamage = window.GameState.derivedStats.weaponDamage + ((window.GameState.pStats.strength.level + window.GameCore.getBuffBonus('strength')) * 2) + window.GameCore.getBuffBonus('meleeAtt');
+                    const damage = Math.max(1, Math.floor(rawDamage * damageMultiplier * window.GameCore.getCombatInjuryMultiplier()) - (en.def.armor || 0)); 
+                    
+                    en.hp -= damage; 
+                    en.poise = Math.max(0, en.poise - (sweep.profile.poise || 10));
+
+                    window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: en.visual.position, isPlayer: false });
+                    window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(_v1.set(0, 1, 0)) });
+                    window.EventBus.emit('PLAY_SOUND', {url: sweep.isHeavy ? 'https://tonejs.github.io/audio/drum-samples/CRASH_1.mp3' : 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: en.visual.position, vol: -5});
+                    
+                    if (sweep.isHeavy || sweep.profile.isGuardbreaker) {
+                        window.Input.hitPauseTimer = 0.08; 
+                        window.Input.camShake = 0.5;
+                        const recoilDir = sweep.playerForward.clone().negate();
+                        window.GameCore.playerObj.body.applyImpulse(_v2.set(recoilDir.x * 5, 0, recoilDir.z * 5), true);
+                    } else {
+                        window.Input.hitPauseTimer = 0.03;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MAIN TICK UPDATE - DECLARED BEFORE ANIMATE() CALLS IT
+function fixedUpdateLogic(delta) {
+    if (window.GameCore.playerObj) ChunkManager.update(window.GameCore.playerObj.visual.position);
+    if (window.EngineParams.offPathCaptureCooldown > 0) window.EngineParams.offPathCaptureCooldown = Math.max(0, window.EngineParams.offPathCaptureCooldown - delta);
+    
+    window.GameCore.worldTimer += delta;
+
+    updateWorldClock(delta);
+    
+    if (window.GameCore.worldTimer > 0.25) { 
+        updatePeriodicSystems();
+        
+        const checkInterval = (4 / 24) * window.EngineParams.dayLengthSeconds; 
+        if (!window.GameCore.lastNeedsCheck || window.GameCore.worldTimerAbsolute > window.GameCore.lastNeedsCheck + checkInterval) {
+             processCompanionNeeds();
+             window.GameCore.lastNeedsCheck = window.GameCore.worldTimerAbsolute || 0;
+        }
+
+        window.GameCore.worldTimer = 0; 
+    }
+
+    window.GameCore.worldTimerAbsolute = (window.GameCore.worldTimerAbsolute || 0) + delta;
+
+    window.ArenaTestManager?.update(delta);
+    window.VATManager?.update(delta);
+    window.EncounterDirector?.update(delta);
+    if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.update(delta);
+
+    updatePlayerStats(delta);
+    updateEntities(delta);
+    updatePlayerMovement(delta);
+    updateCombatHitboxes(delta);
+}
+
+// ==========================================
+// CHUNK & SCENERY MANAGERS
+// ==========================================
+
 const ChunkManager = {
     activeChunks: new Map(), currentChunkX: null, currentChunkZ: null,
-    
-    // --- INSTANCED SCENERY (Diablo 4 Style Batching) ---
     instancedMeshes: new Map(),
 
     update: function(playerPos) {
@@ -173,7 +526,9 @@ const ChunkManager = {
         const collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.trimesh(physicsVertices, indicesU32), groundBody);
         this.activeChunks.set(key, { mesh, body: groundBody, collider, lod });
         
-        const seedValue = window.EngineParams.worldSeed ? window.EngineParams.worldSeed.toString() : "1337";
+        // SAFE ALEA INSTANTIATION (Guarantees string input)
+        const rawSeed = window.EngineParams?.worldSeed ?? 1337;
+        const seedValue = rawSeed.toString();
         const rng = alea(`${seedValue}_${cx}_${cz}`);
         
         function getPoissonPoints(width, height, radius, rngFunc) {
@@ -1152,13 +1507,13 @@ window.EventBus.on('BUILD_BASE_STRUCTURE', prefab => {
         if (prefab === 'Camp Farm Plot') base.farms.push({ x, z });
     if (prefab === 'Rune Tower') base.wardRadius = 30;
     
-    window.CareerManager.addXP('builder', 50);
+    window.CareerManager?.addXP('builder', 50);
     
     window.EventBus.emit('UI_LOG', `[CAMP] Built ${prefab}.`);
 });
 window.EventBus.on('WORLD_REGENERATE', () => {
     window.EventBus.emit('CLEAR_MAP'); const keys = Array.from(ChunkManager.activeChunks.keys()); keys.forEach(k => ChunkManager.unloadChunk(k)); ChunkManager.currentChunkX = null; 
-    window.currentPrng = alea(window.EngineParams.worldSeed); window.currentNoise2D = window.createNoise2D(window.currentPrng);
+    window.currentPrng = alea(window.EngineParams?.worldSeed ?? 1337); window.currentNoise2D = window.createNoise2D(window.currentPrng);
     if (window.GameCore.playerObj) { const vy = window.WorldGenerator.getTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 15; window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); spawnPartyMembers(); syncCaravanAgents(); syncPlayerBase(); ChunkManager.update(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, vy, window.GameCore.playerObj.visual.position.z)); }
     window.EventBus.emit('UI_LOG', `World Math Regenerated with Seed: ${window.EngineParams.worldSeed}`);
 });
@@ -1266,8 +1621,8 @@ function regenerateWorldCycle() {
 
             window.EventBus.emit('WORLD_REGENERATE');
             
-            window.CareerManager.addXP('navigator', 100);
-            window.CareerManager.addXP('archivist', 50);
+            window.CareerManager?.addXP('navigator', 100);
+            window.CareerManager?.addXP('archivist', 50);
             
             window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The white wave passed. The forest has shifted.`);
 
@@ -1282,6 +1637,7 @@ function regenerateWorldCycle() {
 window.EventBus.on('CMD_TELEPORT', (pos) => { const vy = window.WorldGenerator.getTerrainHeight(pos.x, pos.z) + 15; window.GameCore.playerObj.body.setTranslation({x:pos.x, y:vy, z:pos.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); ChunkManager.update(new THREE.Vector3(pos.x, vy, pos.z)); });
 window.EventBus.on('PLAYER_RESPAWN', () => { if (!window.EngineParams.arenaMode && window.GameState.pStats.hp <= 0) window.GameCore.recordCombatDefeat({ source: 'open-world', injury: `open-world defeat on day ${window.EngineParams.worldDay}` }); const respawnY = window.WorldGenerator.getTerrainHeight(0,0) + 15; window.GameCore.playerObj.body.setTranslation({x:0, y:respawnY, z:0}, true); window.GameState.pStats.hp = window.GameState.pStats.maxHp; window.GameState.inventory.gold = Math.floor(window.GameState.inventory.gold / 2); playEntityAnimation(window.GameCore.playerObj, 'idle'); window.EventBus.emit('UI_UPDATE_HUD'); });
 
+// BOOT ENGINE
 async function bootEngine() {
     try {
         document.getElementById('loading-bar').style.width = "50%"; await RAPIER.init(); 
@@ -1290,7 +1646,6 @@ async function bootEngine() {
         window.GameCore.scene = new THREE.Scene(); window.GameCore.scene.fog = new THREE.FogExp2(0x040608, 0.03); window.GameCore.scene.background = new THREE.Color(0x040608);
         window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 1000000); 
 
-        
         renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); 
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); 
         renderer.setSize(window.innerWidth || 800, window.innerHeight || 600); 
@@ -1435,7 +1790,7 @@ async function bootEngine() {
         const startY = window.WorldGenerator.getTerrainHeight(0, 0); const safeY = isNaN(startY) ? 10 : startY;
         spawnPlayer(0, safeY + 15, 0); spawnPartyMembers(); ChunkManager.update(new THREE.Vector3(0, safeY + 15, 0));
         
-                window.EventBus.on('ENV_UPDATE', () => {
+        window.EventBus.on('ENV_UPDATE', () => {
             const hourNormalized = (window.EngineParams.timeOfDay % 24) / 24;
             const angle = hourNormalized * Math.PI * 2 - (Math.PI / 2); 
             
@@ -1475,7 +1830,7 @@ async function bootEngine() {
             
             dirLight.intensity = baseDirIntensity * window.EngineParams.globalBrightness; 
             ambientLight.intensity = baseAmbientIntensity * window.EngineParams.globalBrightness; 
-                        renderer.toneMappingExposure = Math.max(1.0, window.EngineParams.globalBrightness * 1.5); 
+            renderer.toneMappingExposure = Math.max(1.0, window.EngineParams.globalBrightness * 1.5); 
             window.GameCore.scene.fog.density = window.EngineParams.fogDensity * (sunHeight < 0 ? 1.5 : 1.0);
 
             if (window.GameCore.horizonMaterial) {
@@ -1515,14 +1870,13 @@ window.addEventListener('DOMContentLoaded', () => {
         
             while (accumulator >= fixedTimeStep) { 
                 if(window.GameCore.world) window.GameCore.world.step(); 
-    
+        
                 window.GameCore.checkFloatingOrigin();
-    
+        
                 fixedUpdateLogic(fixedTimeStep); 
                 accumulator -= fixedTimeStep; 
             } 
 
-        
             if(composer) composer.render(); 
         }
     
