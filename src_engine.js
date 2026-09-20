@@ -1847,23 +1847,27 @@ async function bootEngine() {
 window.bootEngine = bootEngine;
 
 window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('btn-start')?.addEventListener('click', async () => {
+    document.getElementById('btn-start')?.addEventListener('click', (e) => {
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('hud').classList.remove('hidden');
 
-        try {
-            if (window.Tone) {
-                await window.Tone.start();
-                if (window.Tone.Transport.state !== 'started') {
-                    window.Tone.Transport.start();
-                }
-                console.log('🔊 WebAudio Context resumed successfully.');
-            }
-        } catch (err) {
-            console.warn('AudioContext failed to start:', err);
-        }
-
         window.EventBus.emit('UI_UPDATE_HUD');
+        window.EventBus.emit('GAME_STARTED');
+
+        (async () => {
+            try {
+                if (window.Tone) {
+                    await window.Tone.start();
+                    if (window.Tone.Transport.state !== 'started') {
+                        window.Tone.Transport.start();
+                    }
+                    console.log('🔊 WebAudio Context resumed successfully.');
+                }
+            } catch (err) {
+                console.warn('AudioContext failed to start:', err);
+            }
+        })();
+
         window.addEventListener('resize', () => { 
             if(window.GameCore.camera) {
                 window.GameCore.camera.aspect = window.innerWidth / window.innerHeight; 
