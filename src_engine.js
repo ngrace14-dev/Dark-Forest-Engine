@@ -45,7 +45,6 @@ function updateLightPool() {
     if (!window.GameCore?.playerObj?.visual) return;
     const pPos = window.GameCore.playerObj.visual.position;
 
-    // Filter valid emitters and sort by distance to player
     const validEmitters = [];
     for (let i = activeLightEmitters.length - 1; i >= 0; i--) {
         const emitter = activeLightEmitters[i];
@@ -60,7 +59,6 @@ function updateLightPool() {
 
     validEmitters.sort((a, b) => a.distSq - b.distSq);
 
-    // Assign closest emitters to light pool
     for (let i = 0; i < MAX_POOLED_LIGHTS; i++) {
         const pLight = lightPool[i];
         if (!pLight) continue;
@@ -436,7 +434,7 @@ function fixedUpdateLogic(delta) {
     
     if (window.GameCore.worldTimer > 0.25) { 
         updatePeriodicSystems();
-        updateLightPool(); // Distribute active PointLights to closest light-emitting prefabs
+        updateLightPool(); 
         
         const checkInterval = (4 / 24) * window.EngineParams.dayLengthSeconds; 
         if (!window.GameCore.lastNeedsCheck || window.GameCore.worldTimerAbsolute > window.GameCore.lastNeedsCheck + checkInterval) {
@@ -1013,7 +1011,6 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     if(collider) collider.handle = Math.floor(Math.random() * 1000000); 
     body.userData = { entityId: entity.id };
     
-    // REGISTER LIGHT SOURCES WITH GLOBAL LIGHT POOL (No inline PointLight creation)
     if (def.type === 'hub') { 
         activeLightEmitters.push({ mesh, color: def.color || 0xffd700, intensity: 2, distance: 15 });
         entity.ap = 0; entity.food = 100; 
@@ -1970,6 +1967,9 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-start')?.addEventListener('click', (e) => {
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('hud').classList.remove('hidden');
+
+        // UNLOCK ALL INPUT HOTKEYS & SYSTEMS
+        window.GameCore.engineState = 'running';
 
         window.EventBus.emit('UI_UPDATE_HUD');
         window.EventBus.emit('GAME_STARTED');
