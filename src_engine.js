@@ -25,7 +25,7 @@ const _e1 = new THREE.Euler();
 const _m1 = new THREE.Matrix4();
 
 // ==========================================
-// LIGHT POOL SYSTEM (Prevents WebGL Uniform Overflow)
+// LIGHT POOL SYSTEM
 // ==========================================
 const MAX_POOLED_LIGHTS = 8;
 const lightPool = [];
@@ -169,8 +169,13 @@ function updateEntities(delta) {
         const entity = window.GameCore.activeEntities[i];
         if (!entity || !entity.visual || !entity.body) continue;
         
-        const eTrans = entity.body.translation();
-        entity.visual.position.set(eTrans.x, eTrans.y, eTrans.z);
+        try {
+            const eTrans = entity.body.translation();
+            entity.visual.position.set(eTrans.x, eTrans.y, eTrans.z);
+        } catch (e) {
+            entity.body = null;
+            continue;
+        }
 
         window.GameCore.SpatialGrid.updateEntity(entity);
         window.VATManager?.processLOD(entity, camPos);
@@ -183,7 +188,7 @@ function updateEntities(delta) {
             alignEntityToGround(entity, delta, raycaster, downVector);
         }
 
-        if (playerAlive && entity.hp !== 0) {
+        if (playerAlive && entity.hp > 0) {
             const distSq = entity.visual.position.distanceToSquared(playerPosition);
             if (!isHidden && entity.def.concealment) {
                 const hideRad = entity.def.hideRadius || entity.def.radius;
@@ -206,20 +211,24 @@ function updateEntities(delta) {
         }
     }
     
-    if (playerAlive) {
+    if (playerAlive && window.GameCore.playerObj.body) {
         window.EngineParams.isPlayerHidden = isHidden;
-        const p = window.GameCore.playerObj.body.translation(); 
-        window.EngineParams.isPlayerSafe = window.RoadManager.isSafeZone(p);
+        try {
+            const p = window.GameCore.playerObj.body.translation(); 
+            window.EngineParams.isPlayerSafe = window.RoadManager.isSafeZone(p);
 
-        if (!window.EngineParams.isPlayerSafe && !window.EngineParams.isPlayerHidden && hostileNearby && !window.EngineParams.godMode && window.EngineParams.offPathCaptureCooldown <= 0) {
-            const pathPoint = window.RoadManager.getRandomPathPoint();
-            if (pathPoint) {
-                const safeY = window.WorldGenerator.getTerrainHeight(pathPoint.x, pathPoint.z) + 1;
-                window.GameCore.playerObj.body.setTranslation({ x: pathPoint.x, y: safeY, z: pathPoint.z }, true);
-                window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-                window.EngineParams.offPathCaptureCooldown = 10;
-                window.EventBus.emit('UI_LOG', 'The forest caught you off the safe path and dragged you back to the road.');
+            if (!window.EngineParams.isPlayerSafe && !window.EngineParams.isPlayerHidden && hostileNearby && !window.EngineParams.godMode && window.EngineParams.offPathCaptureCooldown <= 0) {
+                const pathPoint = window.RoadManager.getRandomPathPoint();
+                if (pathPoint) {
+                    const safeY = window.WorldGenerator.getTerrainHeight(pathPoint.x, pathPoint.z) + 1;
+                    window.GameCore.playerObj.body.setTranslation({ x: pathPoint.x, y: safeY, z: pathPoint.z }, true);
+                    window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                    window.EngineParams.offPathCaptureCooldown = 10;
+                    window.EventBus.emit('UI_LOG', 'The forest caught you off the safe path and dragged you back to the road.');
+                }
             }
+        } catch (e) {
+            console.warn("Player rigid body translation query skipped.", e);
         }
     }
 }
@@ -284,8 +293,12 @@ function handleEntityDeath(entity) {
     setTimeout(() => {
         if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(entity.id);
         window.GameCore.releaseEntityIndex(entity.memoryIndex);
-        window.GameCore.scene.remove(entity.visual);
-        window.GameCore.world.removeRigidBody(entity.body);
+        window.GameCore.SpatialGrid.unregisterEntity(entity);
+        if (entity.visual) window.GameCore.scene.remove(entity.visual);
+        if (entity.body) {
+            window.GameCore.world.removeRigidBody(entity.body);
+            entity.body = null;
+        }
         window.GameCore.activeEntities = window.GameCore.activeEntities.filter(candidate => candidate.id !== entity.id);
     }, 2000);
 }
@@ -293,7 +306,13 @@ function handleEntityDeath(entity) {
 function updatePlayerMovement(delta) {
     if (!window.GameCore.playerObj || !window.GameCore.playerObj.visual || !window.GameCore.playerObj.body) return;
     
-    const p = window.GameCore.playerObj.body.translation();
+    let p;
+    try {
+        p = window.GameCore.playerObj.body.translation();
+    } catch (e) {
+        return;
+    }
+
     window.GameCore.playerObj.visual.position.set(p.x, p.y, p.z);
 
     const moveDir = _v1.set(0, 0, 0); 
@@ -324,7 +343,6 @@ function updatePlayerMovement(delta) {
                 window.GameCore.playerObj.body.applyImpulse(_v2.set(moveDir.x * 30, 0, moveDir.z * 30), true);
                 playEntityAnimation(window.GameCore.playerObj, 'dash');
                 setTimeout(() => window.Input.isDashing = false, 200); 
-                window.EventBus.emit('PLAY_SOUND', {url:'https://cdn.jsdelivr.net/gh/Tonejs/audio/drum-samples/hihat.mp3', pos: window.GameCore.playerObj.visual.position}); 
             }
         }
 
@@ -367,13 +385,19 @@ function updatePlayerMovement(delta) {
 }
 
 function updateCombatHitboxes(delta) {
-    if (!window.Input.activeSweep) return;
+    if (!window.Input.activeSweep || !window.GameCore?.playerObj?.body) return;
     
     window.Input.activeSweep.timer -= delta;
     
     if (window.Input.activeSweep.timer <= window.Input.activeSweep.activeAt) {
         const sweep = window.Input.activeSweep;
-        const pTrans = window.GameCore.playerObj.body.translation();
+        let pTrans;
+        try {
+            pTrans = window.GameCore.playerObj.body.translation();
+        } catch (e) {
+            return;
+        }
+
         sweep.playerPos.set(pTrans.x, pTrans.y, pTrans.z);
         sweep.playerForward.set(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
         
@@ -381,10 +405,17 @@ function updateCombatHitboxes(delta) {
         
         for (let i = nearbyEntities.length - 1; i >= 0; i--) {
             const en = nearbyEntities[i];
-            if (!en || en.hp <= 0 || sweep.alreadyHit.has(en.id)) continue;
+            if (!en || en.hp <= 0 || !en.body || sweep.alreadyHit.has(en.id)) continue;
             if (en.def.type !== 'npc' && en.name !== 'Blight Root') continue;
             
-            const eTrans = en.body.translation();
+            let eTrans;
+            try {
+                eTrans = en.body.translation();
+            } catch (e) {
+                en.body = null;
+                continue;
+            }
+
             const distSq = (eTrans.x - sweep.playerPos.x)**2 + (eTrans.z - sweep.playerPos.z)**2;
             
             if (distSq <= sweep.profile.reach * sweep.profile.reach) {
@@ -408,13 +439,14 @@ function updateCombatHitboxes(delta) {
 
                     window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: en.visual.position, isPlayer: false });
                     window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(_v1.set(0, 1, 0)) });
-                    window.EventBus.emit('PLAY_SOUND', {url: sweep.isHeavy ? 'https://cdn.jsdelivr.net/gh/Tonejs/audio/drum-samples/snare.mp3' : 'https://cdn.jsdelivr.net/gh/Tonejs/audio/drum-samples/kick.mp3', pos: en.visual.position, vol: -5});
                     
                     if (sweep.isHeavy || sweep.profile.isGuardbreaker) {
                         window.Input.hitPauseTimer = 0.08; 
                         window.Input.camShake = 0.5;
                         const recoilDir = sweep.playerForward.clone().negate();
-                        window.GameCore.playerObj.body.applyImpulse(_v2.set(recoilDir.x * 5, 0, recoilDir.z * 5), true);
+                        if (window.GameCore.playerObj.body) {
+                            window.GameCore.playerObj.body.applyImpulse(_v2.set(recoilDir.x * 5, 0, recoilDir.z * 5), true);
+                        }
                     } else {
                         window.Input.hitPauseTimer = 0.03;
                     }
@@ -840,7 +872,11 @@ const ChunkManager = {
     },
     unloadChunk: function(key) {
         const chunk = this.activeChunks.get(key); if(!chunk) return;
-        chunk.mesh.geometry.dispose(); chunk.mesh.material.dispose(); window.GameCore.scene.remove(chunk.mesh); window.GameCore.world.removeRigidBody(chunk.body);
+        chunk.mesh.geometry.dispose(); chunk.mesh.material.dispose(); window.GameCore.scene.remove(chunk.mesh); 
+        if (chunk.body) {
+            window.GameCore.world.removeRigidBody(chunk.body);
+            chunk.body = null;
+        }
         
         const instances = this.instancedMeshes.get(key);
         if (instances) {
@@ -850,7 +886,10 @@ const ChunkManager = {
             this.instancedMeshes.delete(key);
         }
         if (chunk.instanceBodies) {
-            chunk.instanceBodies.forEach(body => window.GameCore.world.removeRigidBody(body));
+            chunk.instanceBodies.forEach(body => {
+                if (body) window.GameCore.world.removeRigidBody(body);
+            });
+            chunk.instanceBodies = [];
         }
 
         window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
@@ -858,7 +897,11 @@ const ChunkManager = {
                 if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(en.id);
                 window.GameCore.releaseEntityIndex(en.memoryIndex);
                 window.GameCore.SpatialGrid.unregisterEntity(en);
-                window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); 
+                if (en.visual) window.GameCore.scene.remove(en.visual); 
+                if (en.body) {
+                    window.GameCore.world.removeRigidBody(en.body); 
+                    en.body = null;
+                }
                 return false; 
             } 
             return true; 
@@ -1153,15 +1196,21 @@ window.ArenaTestManager = {
         window.GameCore.activeEntities.filter(entity => entity.arenaEntity).forEach(entity => {
             if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(entity.id);
             window.GameCore.releaseEntityIndex(entity.memoryIndex);
-            window.GameCore.scene.remove(entity.visual);
-            window.GameCore.world.removeRigidBody(entity.body);
+            if (entity.visual) window.GameCore.scene.remove(entity.visual);
+            if (entity.body) {
+                window.GameCore.world.removeRigidBody(entity.body);
+                entity.body = null;
+            }
         });
         window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => !entity.arenaEntity);
         window.EventBus.emit('UI_LOG', '[ARENA] Arena monsters cleared.');
     },
     exit: function() {
         this.clear();
-        this.walls.forEach(wall => { window.GameCore.scene.remove(wall.mesh); window.GameCore.world.removeRigidBody(wall.body); });
+        this.walls.forEach(wall => { 
+            window.GameCore.scene.remove(wall.mesh); 
+            if (wall.body) window.GameCore.world.removeRigidBody(wall.body); 
+        });
         this.walls = [];
         window.EngineParams.arenaMode = false;
         window.EngineParams.arenaWave = 0;
@@ -1431,7 +1480,6 @@ function performAttack(isHeavy = false) {
         playerForward: new THREE.Vector3()
     };
 
-    window.EventBus.emit('PLAY_SOUND', {url: 'https://cdn.jsdelivr.net/gh/Tonejs/audio/drum-samples/snare.mp3', pos: window.GameCore.playerObj.visual.position});
     window.GameCore.addXP('meleeAtt', isHeavy ? 4 : 2); 
 }
 
@@ -1456,8 +1504,6 @@ function performGuardbreaker() {
         alreadyHit: new Set(),
         isHeavy: true 
     };
-    
-    window.EventBus.emit('PLAY_SOUND', {url: 'https://cdn.jsdelivr.net/gh/Tonejs/audio/drum-samples/kick.mp3', pos: window.GameCore.playerObj.visual.position});
 }
 
 window.EventBus.on('PRIMARY_CLICK_DOWN', () => { if(window.Input.attackCooldown <= 0) performAttack(); });
@@ -1472,18 +1518,20 @@ window.EventBus.on('TOGGLE_STEALTH', () => {
         window.EventBus.emit('UI_LOG', '[STEALTH] You blend into the surroundings.');
         window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'STEALTH', pos: player.visual.position, color: '#94a3b8' });
         
-        const pPos = player.body.translation();
-        const biomeKey = window.WorldGenerator.getBiome(pPos.x, pPos.z);
-        const biomeColor = window.WorldGenConfig.biomes[biomeKey].color;
-        
-        player.visual.traverse(child => {
-            if (child.isMesh) {
-                child.userData.originalColor = child.material.color.clone();
-                child.material.color.set(biomeColor);
-                child.material.transparent = true;
-                child.material.opacity = 0.5;
-            }
-        });
+        if (player.body) {
+            const pPos = player.body.translation();
+            const biomeKey = window.WorldGenerator.getBiome(pPos.x, pPos.z);
+            const biomeColor = window.WorldGenConfig.biomes[biomeKey].color;
+            
+            player.visual.traverse(child => {
+                if (child.isMesh) {
+                    child.userData.originalColor = child.material.color.clone();
+                    child.material.color.set(biomeColor);
+                    child.material.transparent = true;
+                    child.material.opacity = 0.5;
+                }
+            });
+        }
     } else {
         window.EventBus.emit('UI_LOG', '[STEALTH] You reveal yourself.');
         player.visual.traverse(child => {
@@ -1537,8 +1585,12 @@ window.EventBus.on('PLAYER_PROJECTILE_HIT', ({ target, damage, damageType, posit
         window.EventBus.emit('UI_UPDATE_HUD');
         setTimeout(() => {
             if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(target.id);
-            window.GameCore.scene.remove(target.visual);
-            window.GameCore.world.removeRigidBody(target.body);
+            window.GameCore.releaseEntityIndex(target.memoryIndex);
+            if (target.visual) window.GameCore.scene.remove(target.visual);
+            if (target.body) {
+                window.GameCore.world.removeRigidBody(target.body);
+                target.body = null;
+            }
             window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => entity.id !== target.id);
         }, 2000);
     } else if (target.poise <= 0) {
@@ -1563,7 +1615,11 @@ window.EventBus.on('CLEAR_MAP', () => {
         if(en.def.faction === 'player') return; 
         if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(en.id);
         window.GameCore.releaseEntityIndex(en.memoryIndex); 
-        window.GameCore.scene.remove(en.visual); window.GameCore.world.removeRigidBody(en.body); 
+        if (en.visual) window.GameCore.scene.remove(en.visual);
+        if (en.body) {
+            window.GameCore.world.removeRigidBody(en.body); 
+            en.body = null;
+        }
     }); 
     window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => en.def.faction === 'player'); 
     window.GameState.questBoard = []; window.EventBus.emit('UI_LOG', "World Entities Cleared."); 
@@ -1628,14 +1684,19 @@ window.EventBus.on('BUILD_BASE_STRUCTURE', prefab => {
 window.EventBus.on('WORLD_REGENERATE', () => {
     window.EventBus.emit('CLEAR_MAP'); const keys = Array.from(ChunkManager.activeChunks.keys()); keys.forEach(k => ChunkManager.unloadChunk(k)); ChunkManager.currentChunkX = null; 
     window.currentPrng = alea(window.EngineParams?.worldSeed ?? 1337); window.currentNoise2D = window.createNoise2D(window.currentPrng);
-    if (window.GameCore.playerObj) { const vy = window.WorldGenerator.getTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 1; window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); spawnPartyMembers(); syncCaravanAgents(); syncPlayerBase(); ChunkManager.update(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, vy, window.GameCore.playerObj.visual.position.z)); }
+    if (window.GameCore.playerObj && window.GameCore.playerObj.body) { 
+        const vy = window.WorldGenerator.getTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 1; 
+        window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); 
+        window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); 
+        spawnPartyMembers(); syncCaravanAgents(); syncPlayerBase(); ChunkManager.update(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, vy, window.GameCore.playerObj.visual.position.z)); 
+    }
     window.EventBus.emit('UI_LOG', `World Math Regenerated with Seed: ${window.EngineParams.worldSeed}`);
 });
 function punishExposedActors() {
     const player = window.GameCore.playerObj;
     const playerSafe = player && (window.RoadManager.isSafeZone(player.visual.position) || window.RoadManager.isVillageProtected(player.visual.position));
     const destination = () => window.RoadManager.getRandomPathPoint() || { x: 0, z: 0 };
-    if (player && !playerSafe) {
+    if (player && player.body && !playerSafe) {
         if (window.GameCore.getForestLuck() > 0 && Math.random() < (window.GameState.forestBlessing.teleportLuck || 0)) {
             window.EventBus.emit('UI_LOG', '[THE CROW] The woods reach for you, but the landing bends away.');
         } else {
@@ -1644,7 +1705,7 @@ function punishExposedActors() {
         window.EventBus.emit('UI_LOG', '[THE WOODS] The shift catches you. You are thrown across the new landscape.');
         }
     }
-    window.GameCore.activeEntities.filter(entity => entity.def.type === 'npc' && !window.RoadManager.isVillageProtected(entity.visual.position)).forEach(entity => {
+    window.GameCore.activeEntities.filter(entity => entity.body && entity.def.type === 'npc' && !window.RoadManager.isVillageProtected(entity.visual.position)).forEach(entity => {
         if (window.GameCore.getForestLuck(entity) > 0 && Math.random() < (entity.forestBlessing.teleportLuck || 0)) return;
         const point = destination(); const y = window.WorldGenerator.getTerrainHeight(point.x, point.z) + entity.def.height / 2;
         entity.body.setTranslation({ x: point.x, y, z: point.z }, true); entity.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -1682,7 +1743,7 @@ function regenerateWorldCycle() {
 
             let playerShiftedSafely = false;
             
-            if (window.GameCore.playerObj) {
+            if (window.GameCore.playerObj && window.GameCore.playerObj.body) {
               const playerPos = window.GameCore.playerObj.visual.position;
                 
               const protectedVillage = window.VillageManager.villages.find(v => {
@@ -1712,7 +1773,7 @@ function regenerateWorldCycle() {
               }
             }
             
-            if (!playerShiftedSafely && !window.EngineParams.isPlayerSafe) {
+            if (!playerShiftedSafely && !window.EngineParams.isPlayerSafe && window.GameCore.playerObj?.body) {
               const forestExtent = window.WorldGenConfig.darkForestSideMeters / 2 - 1000;
               let newX, newZ;
               let valid = false;
@@ -1722,10 +1783,8 @@ function regenerateWorldCycle() {
                   if (Math.abs(newX) > 500 || Math.abs(newZ) > 500) valid = true;
               }
               const newY = window.WorldGenerator.getTerrainHeight(newX, newZ) + 1;
-              if (window.GameCore.playerObj) {
-                  window.GameCore.playerObj.body.setTranslation({x: newX, y: newY, z: newZ}, true);
-                  window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
-              }
+              window.GameCore.playerObj.body.setTranslation({x: newX, y: newY, z: newZ}, true);
+              window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
               window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] You were caught unprotected. You are lost in the deep forest.`);
             }
             
@@ -1748,8 +1807,25 @@ function regenerateWorldCycle() {
         }, 3000); 
     }, 100);
 }
-window.EventBus.on('CMD_TELEPORT', (pos) => { const vy = window.WorldGenerator.getTerrainHeight(pos.x, pos.z) + 1; window.GameCore.playerObj.body.setTranslation({x:pos.x, y:vy, z:pos.z}, true); window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); ChunkManager.update(new THREE.Vector3(pos.x, vy, pos.z)); });
-window.EventBus.on('PLAYER_RESPAWN', () => { if (!window.EngineParams.arenaMode && window.GameState.pStats.hp <= 0) window.GameCore.recordCombatDefeat({ source: 'open-world', injury: `open-world defeat on day ${window.EngineParams.worldDay}` }); const respawnY = window.WorldGenerator.getTerrainHeight(0,0) + 1; window.GameCore.playerObj.body.setTranslation({x:0, y:respawnY, z:0}, true); window.GameState.pStats.hp = window.GameState.pStats.maxHp; window.GameState.inventory.gold = Math.floor(window.GameState.inventory.gold / 2); playEntityAnimation(window.GameCore.playerObj, 'idle'); window.EventBus.emit('UI_UPDATE_HUD'); });
+window.EventBus.on('CMD_TELEPORT', (pos) => { 
+    if (window.GameCore.playerObj?.body) {
+        const vy = window.WorldGenerator.getTerrainHeight(pos.x, pos.z) + 1; 
+        window.GameCore.playerObj.body.setTranslation({x:pos.x, y:vy, z:pos.z}, true); 
+        window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true); 
+        ChunkManager.update(new THREE.Vector3(pos.x, vy, pos.z)); 
+    }
+});
+window.EventBus.on('PLAYER_RESPAWN', () => { 
+    if (!window.EngineParams.arenaMode && window.GameState.pStats.hp <= 0) window.GameCore.recordCombatDefeat({ source: 'open-world', injury: `open-world defeat on day ${window.EngineParams.worldDay}` }); 
+    const respawnY = window.WorldGenerator.getTerrainHeight(0,0) + 1; 
+    if (window.GameCore.playerObj?.body) {
+        window.GameCore.playerObj.body.setTranslation({x:0, y:respawnY, z:0}, true); 
+    }
+    window.GameState.pStats.hp = window.GameState.pStats.maxHp; 
+    window.GameState.inventory.gold = Math.floor(window.GameState.inventory.gold / 2); 
+    playEntityAnimation(window.GameCore.playerObj, 'idle'); 
+    window.EventBus.emit('UI_UPDATE_HUD'); 
+});
 
 // BOOT ENGINE
 async function bootEngine() {
@@ -1877,7 +1953,7 @@ async function bootEngine() {
                 composer.removePass(worldPass);
                 composer.insertPass(pocketPass, 0);
                   
-                if (window.GameCore.playerObj) {
+                if (window.GameCore.playerObj && window.GameCore.playerObj.body) {
                     window.GameCore.playerObj.body.setTranslation({ x: 0, y: 1, z: 0 }, true);
                     window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
                     window.EngineParams.suppressChunkLoading = true;
@@ -1886,7 +1962,7 @@ async function bootEngine() {
                 composer.removePass(pocketPass);
                 composer.insertPass(worldPass, 0);
                   
-                if (window.GameCore.playerObj && pos) {
+                if (window.GameCore.playerObj && window.GameCore.playerObj.body && pos) {
                     const groundY = window.WorldGenerator.getTerrainHeight(pos.x, pos.z) + 1;
                     window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: groundY, z: pos.z }, true);
                     window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
