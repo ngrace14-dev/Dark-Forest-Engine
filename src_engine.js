@@ -236,7 +236,7 @@ function updateEntities(delta) {
         window.EngineParams.isPlayerHidden = isHidden;
         try {
             const p = window.GameCore.playerObj.body.translation(); 
-            window.EngineParams.isPlayerSafe = window.RoadManager.isSafeZone(p);
+            window.EngineParams.isPlayerSafe = window.RoadManager.isSafeZone(p) || window.CapitalCityManager?.isInsideCapital(p.x, p.z);
 
             if (!window.EngineParams.isPlayerSafe && !window.EngineParams.isPlayerHidden && hostileNearby && !window.EngineParams.godMode && window.EngineParams.offPathCaptureCooldown <= 0) {
                 const pathPoint = window.RoadManager.getRandomPathPoint();
@@ -352,13 +352,11 @@ function updatePlayerMovement(delta) {
     if (window.Input.isMoving) {
         moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle || Math.PI); 
         
-        // BASE WALK SPEED CALCULATION: 1 mile (1609.344 meters) / 32 minutes (1920 seconds) = ~0.8382 m/s
         const BASE_STARTING_SPEED = 1609.344 / 1920.0; 
         
         const athleticsLvl = window.GameState.pStats.athletics.level || 0;
         const athleticsBonus = window.GameCore.getBuffBonus('athletics') || 0;
         
-        // Each athletics level or buff point improves base speed by 5%
         const speedMultiplier = 1.0 + (athleticsLvl * 0.05) + (athleticsBonus * 0.05);
         let maxSpeed = BASE_STARTING_SPEED * speedMultiplier;
 
@@ -601,6 +599,8 @@ const ChunkManager = {
         const key = `${cx},${cz}`; 
         const chunkX = cx * 60 + 30; 
         const chunkZ = cz * 60 + 30;
+
+        const isInsideAethelgard = window.CapitalCityManager?.isInsideCapital(chunkX, chunkZ);
         
         const segments = lod === 'A' ? 30 : (lod === 'B' ? 10 : 2);
         const geo = new THREE.PlaneGeometry(60, 60, segments, segments); 
@@ -616,35 +616,42 @@ const ChunkManager = {
             const vx = vertices[i] + chunkX; 
             const vz = vertices[i+2] + chunkZ;
             
-            const biomeKey = window.WorldGenerator.getBiome(vx, vz); 
-            const biome = window.WorldGenConfig.biomes[biomeKey]; 
-            let c = _colorScratch.set(biome.color);
-            
-            let minRoadDistSq = 999999;
-            for(let r=0; r<localRoadPoints.length; r++) { 
-                const dx = vx - localRoadPoints[r].x;
-                const dz = vz - localRoadPoints[r].z;
-                const distSq = (dx * dx) + (dz * dz);
-                if(distSq < minRoadDistSq) minRoadDistSq = distSq; 
-            }
-            const minRoadDist = Math.sqrt(minRoadDistSq);
-            if(minRoadDist < ROAD_WIDTH + 2) { 
-                const dirtInfluence = Math.max(0, 1.0 - (minRoadDist / (ROAD_WIDTH + 2))); 
-                c.lerp(_colorScratch.set('#38281d'), dirtInfluence); 
+            let c = _colorScratch;
+
+            if (isInsideAethelgard) {
+                vertices[i+1] = 0; 
+                c.set('#1e293b'); 
+            } else {
+                const biomeKey = window.WorldGenerator.getBiome(vx, vz); 
+                const biome = window.WorldGenConfig.biomes[biomeKey]; 
+                c.set(biome.color);
+                
+                let minRoadDistSq = 999999;
+                for(let r=0; r<localRoadPoints.length; r++) { 
+                    const dx = vx - localRoadPoints[r].x;
+                    const dz = vz - localRoadPoints[r].z;
+                    const distSq = (dx * dx) + (dz * dz);
+                    if(distSq < minRoadDistSq) minRoadDistSq = distSq; 
+                }
+                const minRoadDist = Math.sqrt(minRoadDistSq);
+                if(minRoadDist < ROAD_WIDTH + 2) { 
+                    const dirtInfluence = Math.max(0, 1.0 - (minRoadDist / (ROAD_WIDTH + 2))); 
+                    c.lerp(_colorScratch.set('#38281d'), dirtInfluence); 
+                }
+
+                vertices[i+1] = window.WorldGenerator.getTerrainHeight(vx, vz); 
+                
+                let edgeGlow = 0.0;
+                const distFromEdge = Math.abs(minRoadDist - ROAD_WIDTH);
+                if (distFromEdge < 1.2) {
+                    edgeGlow = Math.pow(1.0 - (distFromEdge / 1.2), 2.0);
+                }
+                roadEdgeData[i / 3] = edgeGlow;
             }
 
-            vertices[i+1] = window.WorldGenerator.getTerrainHeight(vx, vz); 
-            
             const colorNoise = window.currentNoise2D ? window.currentNoise2D(vx * 0.1, vz * 0.1) * 0.05 : 0; 
             c.r += colorNoise; c.g += colorNoise; c.b += colorNoise;
             colors.push(c.r, c.g, c.b);
-
-            let edgeGlow = 0.0;
-            const distFromEdge = Math.abs(minRoadDist - ROAD_WIDTH);
-            if (distFromEdge < 1.2) {
-                edgeGlow = Math.pow(1.0 - (distFromEdge / 1.2), 2.0);
-            }
-            roadEdgeData[i / 3] = edgeGlow;
         }
         geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); 
         geo.setAttribute('roadEdge', new THREE.BufferAttribute(roadEdgeData, 1));
@@ -657,7 +664,7 @@ const ChunkManager = {
         for (let i = 0; i < vertices.length; i += 3) {
             const vx = vertices[i] + chunkX; 
             const vz = vertices[i+2] + chunkZ;
-            clutterData[i/3] = window.WorldGenerator.getNoise(vx * 0.5, vz * 0.5); 
+            clutterData[i/3] = isInsideAethelgard ? 0 : window.WorldGenerator.getNoise(vx * 0.5, vz * 0.5); 
             
             const hL = window.WorldGenerator.getTerrainHeight(vx - 0.1, vz);
             const hR = window.WorldGenerator.getTerrainHeight(vx + 0.1, vz);
@@ -712,224 +719,46 @@ const ChunkManager = {
         const collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.trimesh(physicsVertices, indicesU32), groundBody);
         this.activeChunks.set(key, { mesh, body: groundBody, collider, lod });
         
-        const rawSeed = window.EngineParams?.worldSeed ?? 1337;
-        const seedValue = rawSeed.toString();
-        const rng = alea(`${seedValue}_${cx}_${cz}`);
-        
-        function getPoissonPoints(width, height, radius, rngFunc) {
-            const k = 30;
-            const cellSize = radius / Math.sqrt(2);
-            const gridWidth = Math.ceil(width / cellSize);
-            const gridHeight = Math.ceil(height / cellSize);
-            const grid = new Array(gridWidth * gridHeight).fill(undefined);
-            const activeList = [];
-            const points = [];
-
-            const p0 = { x: rngFunc() * width, z: rngFunc() * height };
-            insertPoint(p0);
-            activeList.push(p0);
-
-            function insertPoint(p) {
-                const gx = Math.floor(p.x / cellSize);
-                const gz = Math.floor(p.z / cellSize);
-                grid[gx + gz * gridWidth] = p;
-                points.push(p);
-            }
-
-            function isValidPoint(p) {
-                if (p.x < 0 || p.x >= width || p.z < 0 || p.z >= height) return false;
-                const gx = Math.floor(p.x / cellSize);
-                const gz = Math.floor(p.z / cellSize);
-                const searchRadius = 2;
-
-                for (let i = Math.max(0, gx - searchRadius); i <= Math.min(gridWidth - 1, gx + searchRadius); i++) {
-                    for (let j = Math.max(0, gz - searchRadius); j <= Math.min(gridHeight - 1, gz + searchRadius); j++) {
-                        const neighbor = grid[i + j * gridWidth];
-                        if (neighbor) {
-                            const dx = p.x - neighbor.x;
-                            const dz = p.z - neighbor.z;
-                            if (dx * dx + dz * dz < radius * radius) return false;
-                        }
-                    }
-                }
-                return true;
-            }
-
-            while (activeList.length > 0) {
-                const randIndex = Math.floor(rngFunc() * activeList.length);
-                const p = activeList[randIndex];
-                let found = false;
-
-                for (let i = 0; i < k; i++) {
-                    const angle = rngFunc() * Math.PI * 2;
-                    const r = radius + rngFunc() * radius;
-                    const candidate = { x: p.x + Math.cos(angle) * r, z: p.z + Math.sin(angle) * r };
-
-                    if (isValidPoint(candidate)) {
-                        insertPoint(candidate);
-                        activeList.push(candidate);
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (!found) {
-                    activeList.splice(randIndex, 1);
-                }
-            }
-            return points;
+        if (isInsideAethelgard) {
+            window.EventBus.emit('CHUNK_GENERATED');
+            return;
         }
 
-        const chunkInstances = new Map();
-        this.instancedMeshes.set(key, chunkInstances);
+        const chunkData = window.ForestManager?.generateChunk(cx, cz) || { tierA: [], tierB: [] };
         
-        const chunkCenterBiome = window.WorldGenerator.getBiome(chunkX, chunkZ);
-        const biomeData = window.WorldGenConfig.biomes[chunkCenterBiome];
-        const treeSpacing = biomeData.density || 10;
-        
-        const poissonPoints = getPoissonPoints(60, 60, treeSpacing, rng);
-        poissonPoints.forEach(point => {
-            const vx = (chunkX - 30) + point.x;
-            const vz = (chunkZ - 30) + point.z;
-            
-            let nearRoad = false;
-            for(let r=0; r<localRoadPoints.length; r++) { 
-                const dx = vx - localRoadPoints[r].x;
-                const dz = vz - localRoadPoints[r].z;
-                if ((dx * dx) + (dz * dz) < 81) { 
-                    nearRoad = true; break; 
-                }
-            }
-            if (nearRoad) return;
-            
-            let inVillage = false;
-            if (window.VillageManager) {
-                for (let v of window.VillageManager.villages) {
-                    const dx = vx - v.x;
-                    const dz = vz - v.z;
-                    if ((dx * dx) + (dz * dz) < (v.radius || 45) * (v.radius || 45)) {
-                        inVillage = true; break;
-                    }
-                }
-            }
-            if (inVillage) return;
+        // Populate ForestRenderer Instanced Meshes for this Chunk
+        if (window.ForestRenderer) {
+            const redwoodPoints = [];
+            const bushPoints = [];
 
-            const biomeHere = window.WorldGenerator.getBiome(vx, vz);
-            let prefabName = window.WorldGenConfig.biomes[biomeHere].prefab;
-            
-            if (rng() < 0.20 && biomeHere !== 'desert' && biomeHere !== 'sierra') {
-                prefabName = 'Berry Bush';
-            }
-
-            if (rng() < 0.05 && (biomeHere === 'redwoods' || biomeHere === 'valley')) {
-                const dy = window.WorldGenerator.getTerrainHeight(vx, vz);
-                instantiatePrefab('Deer', vx, dy, vz, key);
-                return;
-            }
-
-            const vy = window.WorldGenerator.getTerrainHeight(vx, vz);
-            const ny = window.WorldGenerator.getTerrainHeight(vx + 1, vz);
-            if (Math.abs(vy - ny) > 1.5) return; 
-        });
-
-        const chunkData = window.ForestManager.generateChunk(cx, cz);
-        
-        if (lod === 'A' || lod === 'B') {
-            const sceneryData = new Map();
-            ['tierA', 'tierB'].forEach(tier => {
-                chunkData[tier].forEach(point => {
-                    const prefabName = point.type === 'redwood' ? 'Redwood Tree' : 'Bramble Bush'; 
-                    if (!sceneryData.has(prefabName)) sceneryData.set(prefabName, []);
-                    sceneryData.get(prefabName).push({ x: (chunkX - 30) + (point.x - cx*60), z: (chunkZ - 30) + (point.z - cz*60) });
-                });
+            chunkData.tierA.forEach(point => {
+                const px = (chunkX - 30) + (point.x - cx * 60);
+                const pz = (chunkZ - 30) + (point.z - cz * 60);
+                const py = window.WorldGenerator.getTerrainHeight(px, pz);
+                redwoodPoints.push({ x: px, y: py, z: pz, scale: 0.8 + Math.random() * 0.4, rotation: Math.random() * Math.PI * 2 });
             });
 
-            sceneryData.forEach((points, prefabName) => {
-                if (!window.ForestRenderer.instances.has(prefabName)) {
-                    window.ForestRenderer.initInstancedMesh(prefabName, 1000);
-                }
-                window.ForestRenderer.updateInstances(prefabName, points);
+            chunkData.tierB.forEach(point => {
+                const px = (chunkX - 30) + (point.x - cx * 60);
+                const pz = (chunkZ - 30) + (point.z - cz * 60);
+                const py = window.WorldGenerator.getTerrainHeight(px, pz);
+                bushPoints.push({ x: px, y: py, z: pz, scale: 0.7 + Math.random() * 0.5, rotation: Math.random() * Math.PI * 2 });
             });
 
+            window.ForestRenderer.setChunkInstances(key, 'Redwood Tree', redwoodPoints);
+            window.ForestRenderer.setChunkInstances(key, 'Bramble Bush', bushPoints);
+
+            // Add physics colliders for close-proximity Redwood trunks (LOD A)
             if (lod === 'A') {
-                chunkData.tierA.forEach(point => {
-                    const px = (chunkX - 30) + (point.x - cx*60);
-                    const pz = (chunkZ - 30) + (point.z - cz*60);
-                    const py = window.WorldGenerator.getTerrainHeight(px, pz);
-                    const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(px, py, pz));
-                    window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(15.0, 1.8), body);
+                redwoodPoints.forEach(pt => {
+                    const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(pt.x, pt.y, pt.z));
+                    window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(10.0, 1.8), body);
                     if (!this.activeChunks.get(key).instanceBodies) this.activeChunks.get(key).instanceBodies = [];
                     this.activeChunks.get(key).instanceBodies.push(body);
                 });
             }
-        } else if (lod === 'C') {
-            const billboardPoints = [...chunkData.tierA, ...chunkData.tierB];
-            const billboardData = billboardPoints.map(p => ({ 
-                x: (chunkX - 30) + (p.x - cx*60), 
-                z: (chunkZ - 30) + (p.z - cz*60) 
-            }));
-            window.BillboardManager.updateBillboards(billboardData);
         }
 
-        const placedLightCells = new Set();
-        localRoadPoints.forEach(point => {
-            if (point.x < chunkX - 30 || point.x >= chunkX + 30 || point.z < chunkZ - 30 || point.z >= chunkZ + 30) return;
-            const cell = `${Math.floor(point.x / 30)},${Math.floor(point.z / 30)}`;
-            if (placedLightCells.has(cell)) return;
-            placedLightCells.add(cell);
-            const lightY = window.WorldGenerator.getTerrainHeight(point.x, point.z);
-            instantiatePrefab('Floating Street Light', point.x, lightY, point.z, key);
-        });
-        
-        if (window.VillageManager.villages.length > 0) {
-            window.VillageManager.villages.forEach(v => {
-                if (v.x >= chunkX - 30 && v.x < chunkX + 30 && v.z >= chunkZ - 30 && v.z < chunkZ + 30) {
-                    const originalModel = window.AssetManager.prefabs['Village Hub'].customModel; 
-                    window.AssetManager.prefabs['Village Hub'].customModel = v.assignedModel || originalModel;
-                    const hy = window.WorldGenerator.getTerrainHeight(v.x, v.z); 
-                    const hub = instantiatePrefab('Village Hub', v.x, hy, v.z, key);
-                    if(hub) { 
-                        hub.villageId = v.id; 
-                        window.EventBus.emit('UI_LOG', `*** Discovered Major Settlement: ${v.name} ***`); 
-                        window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: v.name, pos: new THREE.Vector3(v.x, hy + 8, v.z), color: '#ffd700'}); 
-                    }
-                    if (v.layout && v.layout.length > 0) { 
-                        v.layout.forEach(l => { 
-                            instantiatePrefab(l.prefab, v.x + l.ox, window.WorldGenerator.getTerrainHeight(v.x + l.ox, v.z + l.oz), v.z + l.oz, key); 
-                        }); 
-                    }
-                    if (!v.residents) v.residents = [];
-                    if (v.residents.length === 0) v.residents.push({ prefab: 'Guard', ox: 4, oz: 4 });
-                    v.residents.forEach(resident => {
-                        const residentX = v.x + (resident.ox || 0); const residentZ = v.z + (resident.oz || 0);
-                        const residentEntity = instantiatePrefab(resident.prefab || 'Guard', residentX, window.WorldGenerator.getTerrainHeight(residentX, residentZ), residentZ, key);
-                        if (residentEntity) { 
-                            residentEntity.villageId = v.id; 
-                            residentEntity.squadId = resident.squadId || null; 
-                        
-                            if (v.nobleHouse === 'House Terminus') {
-                                const isLeader = resident.prefab === 'City Guard' || resident.prefab === 'Noble NPC';
-                                const baseStat = isLeader ? 85 : 65;
-                                const variance = Math.random() * 10;
-                            
-                                residentEntity.attackDamage = baseStat + variance;
-                                residentEntity.hp = (baseStat + variance) * 5;
-                                residentEntity.poise = (baseStat + variance) * 1.5;
-                                residentEntity.name = isLeader ? `Terminus Commander` : `Terminus Elite Guard`;
-                                residentEntity.isTerminusElite = true; 
-                            
-                                residentEntity.visual.traverse(child => {
-                                    if (child.isMesh) {
-                                        child.material.color.set(0x111827); 
-                                    }
-                                });
-                            }
-                        }
-                    });
-                    window.AssetManager.prefabs['Village Hub'].customModel = originalModel;
-                }
-            });
-        }
         window.EventBus.emit('CHUNK_GENERATED');
     },
     unloadChunk: function(key) {
@@ -938,6 +767,10 @@ const ChunkManager = {
         if (chunk.body) {
             window.GameCore.world.removeRigidBody(chunk.body);
             chunk.body = null;
+        }
+
+        if (window.ForestRenderer) {
+            window.ForestRenderer.clearChunkInstances(key);
         }
         
         const instances = this.instancedMeshes.get(key);
@@ -976,7 +809,6 @@ const ChunkManager = {
 function getVisualMesh(def) {
     let meshGroup = new THREE.Group();
     
-    // 1. LOAD CUSTOM MODELS IF AVAILABLE
     if (def.customModel && window.AssetManager && window.AssetManager.models[def.customModel]) {
         const sourceModel = window.AssetManager.models[def.customModel];
         const clone = window.SkeletonUtils.clone(sourceModel);
@@ -994,7 +826,6 @@ function getVisualMesh(def) {
 
         meshGroup.add(clone);
 
-    // 2. PROCEDURAL REDWOOD TREE PLACEHOLDER (100 Feet / 30.5 Meters Total)
     } else if (def.type === 'redwood' || def.name === 'Redwood Tree') {
         const trunkHeight = 20.0;
         const trunkRadiusBottom = 1.8;
@@ -1004,31 +835,22 @@ function getVisualMesh(def) {
         const coneRadius = 5.5;
         const overlap = 3.5;
 
-        // Trunk: Tapered Brownish-Red Cylinder
         const trunkGeo = new THREE.CylinderGeometry(trunkRadiusTop, trunkRadiusBottom, trunkHeight, 8);
-        const trunkMat = new THREE.MeshStandardMaterial({ 
-            color: 0x6a2817, 
-            roughness: 0.9 
-        });
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6a2817, roughness: 0.9 });
         const trunkMesh = new THREE.Mesh(trunkGeo, trunkMat);
         trunkMesh.position.y = trunkHeight / 2;
         trunkMesh.castShadow = true;
         trunkMesh.receiveShadow = true;
         meshGroup.add(trunkMesh);
 
-        // Canopy: Deep Evergreen Cone Top
         const coneGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 8);
-        const coneMat = new THREE.MeshStandardMaterial({ 
-            color: 0x173820, 
-            roughness: 0.8 
-        });
+        const coneMat = new THREE.MeshStandardMaterial({ color: 0x173820, roughness: 0.8 });
         const coneMesh = new THREE.Mesh(coneGeo, coneMat);
         coneMesh.position.y = trunkHeight + (coneHeight / 2) - overlap;
         coneMesh.castShadow = true;
         coneMesh.receiveShadow = true;
         meshGroup.add(coneMesh);
 
-    // 3. OTHER PRIMITIVE FALLBACKS
     } else {
         if (def.type === 'character' || def.type === 'npc') {
             const legs = new THREE.Mesh(
@@ -1993,8 +1815,12 @@ async function bootEngine() {
         pPoint.position.set(0, 10, 0);
         window.GameCore.pocketScene.add(pPoint);
 
-        window.GameCore.scene.add(window.ForestRenderer.group);
-        window.GameCore.scene.add(window.BillboardManager.group);
+        if (window.ForestRenderer) {
+            window.GameCore.scene.add(window.ForestRenderer.group);
+        }
+        if (window.BillboardManager) {
+            window.GameCore.scene.add(window.BillboardManager.group);
+        }
 
         const roomGeo = new THREE.BoxGeometry(20, 10, 20);
         const roomMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, side: THREE.BackSide });
@@ -2033,7 +1859,6 @@ async function bootEngine() {
                       
                     float dist = length(worldPosition.xz);
                     
-                    // Mountain ring starts at 315km out to 345km to enclose 128,000 sq miles
                     float mountainMask = smoothstep(315000.0, 345000.0, dist); 
                       
                     vec2 p = worldPosition.xz;
@@ -2140,6 +1965,11 @@ async function bootEngine() {
 
         const startY = window.WorldGenerator.getTerrainHeight(0, 0); const safeY = isNaN(startY) ? 1 : startY;
         spawnPlayer(0, safeY + 3.0, 0); spawnPartyMembers(); ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
+
+        // Initialize Aethelgard Capital City geometry at (0,0)
+        if (window.CapitalCityManager) {
+            window.CapitalCityManager.generateCapital();
+        }
         
         window.EventBus.on('ENV_UPDATE', () => {
             const hourNormalized = (window.EngineParams.timeOfDay % 24) / 24;
