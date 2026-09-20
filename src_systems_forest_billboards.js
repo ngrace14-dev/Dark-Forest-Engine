@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 /**
  * FOREST SYSTEMS - Phase 3: Billboard Impostors (Tier C)
  * 
@@ -64,4 +66,3 @@ class BillboardSystem {
 }
 
 window.BillboardManager = new BillboardSystem();
-
