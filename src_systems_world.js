@@ -1,5 +1,9 @@
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import * as THREE from 'three';
+import { createNoise2D } from 'simplex-noise';
 import { EpochManager } from './src_epoch_manager.js';
+
+// Attach createNoise2D globally for src_engine.js and noise initializations
+window.createNoise2D = createNoise2D;
 
 window.WorldGenConfig = {
     noiseScale: 0.003,
@@ -39,6 +43,3 @@ window.WorldGenerator = class {
         return window.EpochManagerInstance.getTerrainHeight(x, z, shieldedPOIs);
     }
 };
-
-
-
