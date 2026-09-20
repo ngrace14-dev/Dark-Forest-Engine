@@ -18,19 +18,31 @@ class RenderOptimizer {
         dummyMat.onBeforeCompile = (shader) => {
             shader.vertexShader = shader.vertexShader.replace(
                 `#include <common>`,
-                `#include <common>\nattribute float clutter;\nvarying float vClutter;`
+                `#include <common>
+                 attribute float clutter;
+                 attribute float roadEdge;
+                 varying float vClutter;
+                 varying float vRoadEdge;`
             );
             shader.vertexShader = shader.vertexShader.replace(
                 `#include <begin_vertex>`,
-                `#include <begin_vertex>\nvClutter = clutter;`
+                `#include <begin_vertex>
+                 vClutter = clutter;
+                 vRoadEdge = roadEdge;`
             );
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <common>`,
-                `#include <common>\nvarying float vClutter;`
+                `#include <common>
+                 varying float vClutter;
+                 varying float vRoadEdge;`
             );
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <color_fragment>`,
-                `#include <color_fragment>\nvec3 grassColor = vec3(0.1, 0.3, 0.1);\ndiffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);`
+                `#include <color_fragment>
+                 vec3 grassColor = vec3(0.1, 0.3, 0.1);
+                 diffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);
+                 vec3 pathGlowColor = vec3(0.1, 0.75, 1.0);
+                 diffuseColor.rgb += pathGlowColor * vRoadEdge * 2.5;`
             );
         };
 
@@ -41,7 +53,7 @@ class RenderOptimizer {
 
         dummyGeo.dispose();
         dummyMat.dispose();
-        console.log("⚡ [RenderOptimizer] Shaders pre-warmed successfully.");
+        console.log("⚡ [RenderOptimizer] Shaders pre-warmed successfully (Safe Path Glow included).");
     }
 
     /**
@@ -57,7 +69,6 @@ class RenderOptimizer {
             const distSq = entity.visual.position.distanceToSquared(cameraPosition);
             const shouldShadow = distSq <= this.shadowDistanceSq;
 
-            // 1. Distance-based shadow pass toggle
             if (entity.visual.userData.isCastingShadow !== shouldShadow) {
                 entity.visual.userData.isCastingShadow = shouldShadow;
                 entity.visual.traverse(child => {
@@ -65,7 +76,6 @@ class RenderOptimizer {
                 });
             }
 
-            // 2. Throttle animation mixer ticks for distant entities (skip 2 out of 3 frames)
             if (entity.mixer && distSq > this.animDistanceSq) {
                 entity.skipAnimFrame = (entity.skipAnimFrame || 0) + 1;
                 entity.shouldSkipAnim = (entity.skipAnimFrame % 3 !== 0);
