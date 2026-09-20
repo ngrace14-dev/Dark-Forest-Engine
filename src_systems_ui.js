@@ -217,6 +217,11 @@ class FactionMapUI {
         window.EventBus.on('TOGGLE_MAP', () => this.toggle());
         window.EventBus.on('RENDER_MAP', () => this.render());
 
+        this.panel.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-action]');
+            if (btn && btn.getAttribute('data-action') === 'close') this.toggle();
+        });
+
         this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         this.canvas.addEventListener('mouseleave', () => this.tooltip.classList.add('hidden'));
     }
@@ -447,12 +452,12 @@ class WorldOverlayUI {
         if (this.safeZoneIndicator && window.GameCore?.playerObj) {
             this.safeZoneIndicator.classList.toggle('hidden', !window.EngineParams.isPlayerSafe);
         }
-        updateInvestigationHUD();
+        if (typeof updateInvestigationHUD === 'function') updateInvestigationHUD();
     }
 }
 
 // ==========================================
-// REMAINDER OF ORIGINAL FILE (Pending Future Refactoring)
+// REMAINDER OF ORIGINAL FILE
 // ==========================================
 
 window.EventBus.on('TOGGLE_INTEL_DEBUG', () => { if (window.UIEngineInstance) window.UIEngineInstance.components.get('intel-debug').toggle(); });
@@ -850,52 +855,6 @@ window.addEventListener('keydown', (e) => {
 // INITIALIZATION BOOTSTRAP
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
-    
-    // Create base UI containers if they don't exist
-    if (!document.getElementById('squad-manager-panel')) {
-        const sm = document.createElement('div'); sm.id = 'squad-manager-panel';
-        sm.className = 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-900/95 border border-cyan-700 rounded-lg p-5 shadow-2xl z-40 hidden flex-col w-[450px] backdrop-blur-md';
-        sm.innerHTML = `<button data-action="close" class="absolute top-2 right-2 text-gray-500 hover:text-white font-bold">&times;</button><div id="squad-manager-content"></div>`;
-        document.body.appendChild(sm);
-    }
-
-    if (!document.getElementById('faction-map-panel')) {
-        const mapModal = document.createElement('div'); mapModal.id = 'faction-map-panel';
-        mapModal.className = 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-900/95 border border-indigo-700 rounded-lg p-5 shadow-2xl z-40 hidden flex-col w-[600px] h-[600px] backdrop-blur-md';
-        mapModal.innerHTML = `
-            <button data-action="close" class="absolute top-2 right-2 text-gray-500 hover:text-white font-bold">&times;</button>
-            <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
-                <h2 class="text-indigo-400 font-bold tracking-widest text-sm uppercase">🗺️ Kingdom Cartography</h2>
-                <div class="text-[10px] text-gray-400">Day <span id="map-day-counter">0</span></div>
-            </div>
-            <div id="map-canvas-container" class="relative flex-1 bg-gray-950 border border-gray-700 rounded overflow-hidden">
-                <canvas id="faction-map-canvas" class="w-full h-full"></canvas>
-                <div id="map-tooltip" class="absolute bg-gray-800 text-white text-[10px] p-2 rounded shadow-lg border border-gray-600 hidden pointer-events-none transform -translate-x-1/2 -translate-y-full mt-[-10px] z-50"></div>
-            </div>
-        `;
-        document.body.appendChild(mapModal);
-    }
-
-    // Add HUD Buttons safely
-    const hudControls = document.querySelector('#hud .flex.gap-2.pointer-events-auto');
-    if (hudControls) {
-        if (!document.getElementById('btn-map')) {
-            const mapBtn = document.createElement('button'); mapBtn.id = 'btn-map';
-            mapBtn.className = 'bg-indigo-900/60 hover:bg-indigo-700 text-indigo-200 hover:text-white px-3 py-1.5 rounded border border-indigo-800 transition-colors font-bold tracking-widest text-[10px] shadow-lg backdrop-blur-sm uppercase';
-            mapBtn.innerText = 'MAP (M)';
-            mapBtn.addEventListener('click', () => window.EventBus.emit('TOGGLE_MAP'));
-            hudControls.appendChild(mapBtn);
-        }
-        if (!document.getElementById('btn-squad')) {
-            const squadBtn = document.createElement('button'); squadBtn.id = 'btn-squad';
-            squadBtn.className = 'bg-cyan-900/60 hover:bg-cyan-700 text-cyan-200 hover:text-white px-3 py-1.5 rounded border border-cyan-800 transition-colors font-bold tracking-widest text-[10px] shadow-lg backdrop-blur-sm uppercase';
-            squadBtn.innerText = 'SQUAD (G)';
-            squadBtn.addEventListener('click', () => window.EventBus.emit('TOGGLE_SQUAD_MANAGER'));
-            hudControls.appendChild(squadBtn);
-        }
-    }
-
-    // Instantiate Refactored UI Classes
     window.UI_IntelBag = new IntelBagUI();
     window.UI_SquadManager = new SquadManagerUI();
     window.UI_FactionMap = new FactionMapUI();
