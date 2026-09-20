@@ -595,8 +595,11 @@ const ChunkManager = {
         const geo = new THREE.PlaneGeometry(60, 60, segments, segments); 
         geo.rotateX(-Math.PI / 2);
 
-        const vertices = geo.attributes.position.array; const colors = [];
-        const localRoadPoints = window.RoadManager.getRoadPointsNear(cx, cz); const ROAD_WIDTH = 5;
+        const vertices = geo.attributes.position.array; 
+        const colors = [];
+        const roadEdgeData = new Float32Array(geo.attributes.position.count);
+        const localRoadPoints = window.RoadManager.getRoadPointsNear(cx, cz); 
+        const ROAD_WIDTH = 5;
         
         for (let i = 0; i < vertices.length; i += 3) {
             const vx = vertices[i] + chunkX; 
@@ -624,8 +627,17 @@ const ChunkManager = {
             const colorNoise = window.currentNoise2D ? window.currentNoise2D(vx * 0.1, vz * 0.1) * 0.05 : 0; 
             c.r += colorNoise; c.g += colorNoise; c.b += colorNoise;
             colors.push(c.r, c.g, c.b);
+
+            // Safe Path Edge Ward Glow calculation (peaks along the road boundary)
+            let edgeGlow = 0.0;
+            const distFromEdge = Math.abs(minRoadDist - ROAD_WIDTH);
+            if (distFromEdge < 1.2) {
+                edgeGlow = Math.pow(1.0 - (distFromEdge / 1.2), 2.0);
+            }
+            roadEdgeData[i / 3] = edgeGlow;
         }
         geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); 
+        geo.setAttribute('roadEdge', new THREE.BufferAttribute(roadEdgeData, 1));
         geo.attributes.position.needsUpdate = true; 
         geo.computeVertexNormals();
         
@@ -656,23 +668,29 @@ const ChunkManager = {
                 `#include <common>`,
                 `#include <common>
                  attribute float clutter;
-                 varying float vClutter;`
+                 attribute float roadEdge;
+                 varying float vClutter;
+                 varying float vRoadEdge;`
             );
             shader.vertexShader = shader.vertexShader.replace(
                 `#include <begin_vertex>`,
                 `#include <begin_vertex>
-                 vClutter = clutter;`
+                 vClutter = clutter;
+                 vRoadEdge = roadEdge;`
             );
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <common>`,
                 `#include <common>
-                 varying float vClutter;`
+                 varying float vClutter;
+                 varying float vRoadEdge;`
             );
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <color_fragment>`,
                 `#include <color_fragment>
                  vec3 grassColor = vec3(0.1, 0.3, 0.1);
-                 diffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);`
+                 diffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);
+                 vec3 pathGlowColor = vec3(0.1, 0.75, 1.0);
+                 diffuseColor.rgb += pathGlowColor * vRoadEdge * 2.5;`
             );
         };
         
