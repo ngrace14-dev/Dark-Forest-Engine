@@ -25,7 +25,62 @@ const _e1 = new THREE.Euler();
 const _m1 = new THREE.Matrix4();
 
 // ==========================================
-// CORE ENGINE LOGIC
+// LIGHT POOL SYSTEM (Prevents WebGL Uniform Overflow)
+// ==========================================
+const MAX_POOLED_LIGHTS = 8;
+const lightPool = [];
+const activeLightEmitters = [];
+
+function initLightPool(scene) {
+    lightPool.length = 0;
+    for (let i = 0; i < MAX_POOLED_LIGHTS; i++) {
+        const pl = new THREE.PointLight(0xffffff, 0, 10);
+        pl.visible = false;
+        scene.add(pl);
+        lightPool.push(pl);
+    }
+}
+
+function updateLightPool() {
+    if (!window.GameCore?.playerObj?.visual) return;
+    const pPos = window.GameCore.playerObj.visual.position;
+
+    // Filter valid emitters and sort by distance to player
+    const validEmitters = [];
+    for (let i = activeLightEmitters.length - 1; i >= 0; i--) {
+        const emitter = activeLightEmitters[i];
+        if (!emitter || !emitter.mesh || !emitter.mesh.parent) {
+            activeLightEmitters.splice(i, 1);
+            continue;
+        }
+        emitter.mesh.getWorldPosition(_v1);
+        const distSq = _v1.distanceToSquared(pPos);
+        validEmitters.push({ emitter, pos: _v1.clone(), distSq });
+    }
+
+    validEmitters.sort((a, b) => a.distSq - b.distSq);
+
+    // Assign closest emitters to light pool
+    for (let i = 0; i < MAX_POOLED_LIGHTS; i++) {
+        const pLight = lightPool[i];
+        if (!pLight) continue;
+
+        if (i < validEmitters.length) {
+            const item = validEmitters[i];
+            pLight.position.copy(item.pos);
+            pLight.color.set(item.emitter.color);
+            pLight.intensity = item.emitter.intensity;
+            pLight.distance = item.emitter.distance;
+            pLight.visible = true;
+        } else {
+            pLight.intensity = 0;
+            pLight.visible = false;
+        }
+    }
+}
+
+// ==========================================
+// CAMERA & WORLD CLOCK LOGIC
 // ==========================================
 
 function updateCameraPosition() {
@@ -240,7 +295,6 @@ function handleEntityDeath(entity) {
 function updatePlayerMovement(delta) {
     if (!window.GameCore.playerObj || !window.GameCore.playerObj.visual || !window.GameCore.playerObj.body) return;
     
-    // Exact position lock between physics capsule and visual group
     const p = window.GameCore.playerObj.body.translation();
     window.GameCore.playerObj.visual.position.set(p.x, p.y, p.z);
 
@@ -272,7 +326,7 @@ function updatePlayerMovement(delta) {
                 window.GameCore.playerObj.body.applyImpulse(_v2.set(moveDir.x * 30, 0, moveDir.z * 30), true);
                 playEntityAnimation(window.GameCore.playerObj, 'dash');
                 setTimeout(() => window.Input.isDashing = false, 200); 
-                window.EventBus.emit('PLAY_SOUND', {url:'https://tonejs.github.io/audio/drum-samples/hihat-analog.mp3', pos: window.GameCore.playerObj.visual.position}); 
+                window.EventBus.emit('PLAY_SOUND', {url:'https://cdn.jsdelivr.net/gh/Tonejs/audio/drum-samples/hihat.mp3', pos: window.GameCore.playerObj.visual.position}); 
             }
         }
 
@@ -356,7 +410,7 @@ function updateCombatHitboxes(delta) {
 
                     window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: en.visual.position, isPlayer: false });
                     window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def.vfx.onHit, pos: en.visual.position.clone().add(_v1.set(0, 1, 0)) });
-                    window.EventBus.emit('PLAY_SOUND', {url: sweep.isHeavy ? 'https://tonejs.github.io/audio/drum-samples/CRASH_1.mp3' : 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: en.visual.position, vol: -5});
+                    window.EventBus.emit('PLAY_SOUND', {url: sweep.isHeavy ? 'https://cdn.jsdelivr.net/gh/Tonejs/audio/drum-samples/snare.mp3' : 'https://cdn.jsdelivr.net/gh/Tonejs/audio/drum-samples/kick.mp3', pos: en.visual.position, vol: -5});
                     
                     if (sweep.isHeavy || sweep.profile.isGuardbreaker) {
                         window.Input.hitPauseTimer = 0.08; 
@@ -382,6 +436,7 @@ function fixedUpdateLogic(delta) {
     
     if (window.GameCore.worldTimer > 0.25) { 
         updatePeriodicSystems();
+        updateLightPool(); // Distribute active PointLights to closest light-emitting prefabs
         
         const checkInterval = (4 / 24) * window.EngineParams.dayLengthSeconds; 
         if (!window.GameCore.lastNeedsCheck || window.GameCore.worldTimerAbsolute > window.GameCore.lastNeedsCheck + checkInterval) {
@@ -958,13 +1013,25 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     if(collider) collider.handle = Math.floor(Math.random() * 1000000); 
     body.userData = { entityId: entity.id };
     
-    if(def.type === 'hub') { const light = new THREE.PointLight(def.color, 2, 15); light.position.y = def.height/2; mesh.add(light); entity.ap = 0; entity.food = 100; }
-    if(def.type === 'arcaneDoor') { const light = new THREE.PointLight(0x6366f1, 3, 10); light.position.y = 1; mesh.add(light); }
+    // REGISTER LIGHT SOURCES WITH GLOBAL LIGHT POOL (No inline PointLight creation)
+    if (def.type === 'hub') { 
+        activeLightEmitters.push({ mesh, color: def.color || 0xffd700, intensity: 2, distance: 15 });
+        entity.ap = 0; entity.food = 100; 
+    }
+    if (def.type === 'arcaneDoor') { 
+        activeLightEmitters.push({ mesh, color: 0x6366f1, intensity: 3, distance: 10 });
+    }
+    if (def.type === 'merchantChest') entity.merchantInventory = def.merchantInventory.map(item => ({ ...item }));
+    if (def.type === 'powerStone') { 
+        activeLightEmitters.push({ mesh, color: 0x7dd3fc, intensity: def.active === false ? 0.2 : 3, distance: 25 });
+    }
+    if (def.type === 'firePit') { 
+        activeLightEmitters.push({ mesh, color: 0xff8a32, intensity: def.active === false ? 0 : 2.5, distance: 12 });
+    }
+    if (def.type === 'streetLight') { 
+        activeLightEmitters.push({ mesh, color: 0x9bdcff, intensity: def.active === false ? 0 : 2.5, distance: 18 });
+    }
 
-    if(def.type === 'merchantChest') entity.merchantInventory = def.merchantInventory.map(item => ({ ...item }));
-    if(def.type === 'powerStone') { const light = new THREE.PointLight(0x7dd3fc, def.active === false ? 0.2 : 3, 25); light.position.y = def.height / 2; mesh.add(light); }
-    if(def.type === 'firePit') { const light = new THREE.PointLight(0xff8a32, def.active === false ? 0 : 2.5, 12); light.position.y = def.height; mesh.add(light); }
-    if(def.type === 'streetLight') { const light = new THREE.PointLight(0x9bdcff, def.active === false ? 0 : 2.5, 18); light.position.y = def.height; mesh.add(light); }
     setupEntityAnimations(entity); window.VFXManager.applyAura(entity, def); 
     
     window.GameCore.SpatialGrid.registerEntity(entity);
@@ -1367,7 +1434,7 @@ function performAttack(isHeavy = false) {
         playerForward: new THREE.Vector3()
     };
 
-    window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: window.GameCore.playerObj.visual.position, vol: -10});
+    window.EventBus.emit('PLAY_SOUND', {url: 'https://cdn.jsdelivr.net/gh/Tonejs/audio/drum-samples/snare.mp3', pos: window.GameCore.playerObj.visual.position});
     window.GameCore.addXP('meleeAtt', isHeavy ? 4 : 2); 
 }
 
@@ -1393,7 +1460,7 @@ function performGuardbreaker() {
         isHeavy: true 
     };
     
-    window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: window.GameCore.playerObj.visual.position, vol: -10});
+    window.EventBus.emit('PLAY_SOUND', {url: 'https://cdn.jsdelivr.net/gh/Tonejs/audio/drum-samples/kick.mp3', pos: window.GameCore.playerObj.visual.position});
 }
 
 window.EventBus.on('PRIMARY_CLICK_DOWN', () => { if(window.Input.attackCooldown <= 0) performAttack(); });
@@ -1697,6 +1764,8 @@ async function bootEngine() {
         window.GameCore.scene = new THREE.Scene(); window.GameCore.scene.fog = new THREE.FogExp2(0x040608, 0.03); window.GameCore.scene.background = new THREE.Color(0x040608);
         window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 1000000); 
 
+        initLightPool(window.GameCore.scene);
+
         renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); 
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); 
         renderer.setSize(window.innerWidth || 800, window.innerHeight || 600); 
@@ -1945,7 +2014,6 @@ window.addEventListener('DOMContentLoaded', () => {
                 accumulator -= fixedTimeStep; 
             } 
 
-            // Camera is updated directly inside main render loop
             updateCameraPosition();
 
             if(composer) composer.render(); 
