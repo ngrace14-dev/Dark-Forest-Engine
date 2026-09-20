@@ -363,7 +363,7 @@ function updatePlayerMovement(delta) {
         let maxSpeed = BASE_STARTING_SPEED * speedMultiplier;
 
         if (window.Input.isBlocking) {
-            maxSpeed *= 0.3; // Block speed penalty
+            maxSpeed *= 0.3; 
             window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 8 * delta);
         } else {
             window.GameCore.addXP('athletics', 0.1 * delta); 
@@ -379,7 +379,7 @@ function updatePlayerMovement(delta) {
         }
 
         maxSpeed *= window.GameCore.getCombatInjuryMultiplier();
-        const accelerationForce = maxSpeed * 15.0; // Responsive force tuned to velocity cap
+        const accelerationForce = maxSpeed * 15.0; 
 
         window.GameCore.playerObj.body.applyImpulse(_v2.set(moveDir.x * accelerationForce * delta, 0, moveDir.z * accelerationForce * delta), true);
 
@@ -838,7 +838,7 @@ const ChunkManager = {
             const sceneryData = new Map();
             ['tierA', 'tierB'].forEach(tier => {
                 chunkData[tier].forEach(point => {
-                    const prefabName = point.type === 'redwood' ? 'Oak Tree' : 'Bramble Bush'; 
+                    const prefabName = point.type === 'redwood' ? 'Redwood Tree' : 'Bramble Bush'; 
                     if (!sceneryData.has(prefabName)) sceneryData.set(prefabName, []);
                     sceneryData.get(prefabName).push({ x: (chunkX - 30) + (point.x - cx*60), z: (chunkZ - 30) + (point.z - cz*60) });
                 });
@@ -857,7 +857,7 @@ const ChunkManager = {
                     const pz = (chunkZ - 30) + (point.z - cz*60);
                     const py = window.WorldGenerator.getTerrainHeight(px, pz);
                     const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(px, py, pz));
-                    window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(1.0, 0.5), body);
+                    window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(15.0, 1.8), body);
                     if (!this.activeChunks.get(key).instanceBodies) this.activeChunks.get(key).instanceBodies = [];
                     this.activeChunks.get(key).instanceBodies.push(body);
                 });
@@ -976,6 +976,7 @@ const ChunkManager = {
 function getVisualMesh(def) {
     let meshGroup = new THREE.Group();
     
+    // 1. LOAD CUSTOM MODELS IF AVAILABLE
     if (def.customModel && window.AssetManager && window.AssetManager.models[def.customModel]) {
         const sourceModel = window.AssetManager.models[def.customModel];
         const clone = window.SkeletonUtils.clone(sourceModel);
@@ -992,6 +993,42 @@ function getVisualMesh(def) {
         });
 
         meshGroup.add(clone);
+
+    // 2. PROCEDURAL REDWOOD TREE PLACEHOLDER (100 Feet / 30.5 Meters Total)
+    } else if (def.type === 'redwood' || def.name === 'Redwood Tree') {
+        const trunkHeight = 20.0;
+        const trunkRadiusBottom = 1.8;
+        const trunkRadiusTop = 1.1;
+
+        const coneHeight = 14.0;
+        const coneRadius = 5.5;
+        const overlap = 3.5;
+
+        // Trunk: Tapered Brownish-Red Cylinder
+        const trunkGeo = new THREE.CylinderGeometry(trunkRadiusTop, trunkRadiusBottom, trunkHeight, 8);
+        const trunkMat = new THREE.MeshStandardMaterial({ 
+            color: 0x6a2817, 
+            roughness: 0.9 
+        });
+        const trunkMesh = new THREE.Mesh(trunkGeo, trunkMat);
+        trunkMesh.position.y = trunkHeight / 2;
+        trunkMesh.castShadow = true;
+        trunkMesh.receiveShadow = true;
+        meshGroup.add(trunkMesh);
+
+        // Canopy: Deep Evergreen Cone Top
+        const coneGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 8);
+        const coneMat = new THREE.MeshStandardMaterial({ 
+            color: 0x173820, 
+            roughness: 0.8 
+        });
+        const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+        coneMesh.position.y = trunkHeight + (coneHeight / 2) - overlap;
+        coneMesh.castShadow = true;
+        coneMesh.receiveShadow = true;
+        meshGroup.add(coneMesh);
+
+    // 3. OTHER PRIMITIVE FALLBACKS
     } else {
         if (def.type === 'character' || def.type === 'npc') {
             const legs = new THREE.Mesh(
