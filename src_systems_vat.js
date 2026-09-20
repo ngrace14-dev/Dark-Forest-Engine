@@ -1,4 +1,4 @@
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import * as THREE from 'three';
 
 /**
  * File: src_systems_vat.js
@@ -56,7 +56,6 @@ window.VATManager = {
         headGeo.translate(0, def.height * 0.85 - def.height/2, 0);
         
         // Merge geometries using THREE.BufferGeometryUtils
-        // We'll use the static method directly since the import might be tricky in this environment
         const mergedGeo = window.BufferGeometryUtils ? 
             window.BufferGeometryUtils.mergeGeometries([legsGeo, torsoGeo, headGeo]) :
             legsGeo; // Fallback
@@ -80,6 +79,7 @@ window.VATManager = {
             vertexShader: `
                 uniform sampler2D uStateTexture;
                 uniform float uTime;
+                uniform vec3 uBaseColor; // FIX: Added missing uniform declaration
                 varying vec3 vColor;
                 varying float vFogDepth;
                 
@@ -198,11 +198,19 @@ window.VATManager = {
 
     registerInVAT: function(entity) {
         const prefabName = entity.name;
-        this.getOrCreateInfo(prefabName);
+        const imesh = this.getOrCreateInfo(prefabName);
         
-        const instances = this.instanceData.get(prefabName);
+        // FIX: Ensure prefab actually exists before proceeding
+        if (!imesh) return; 
+        
+        // FIX: Safely initialize instance array if missing
+        let instances = this.instanceData.get(prefabName);
+        if (!instances) {
+            instances = [];
+            this.instanceData.set(prefabName, instances);
+        }
+        
         const freeIdx = instances.findIndex(i => i === null);
-        
         const idx = freeIdx === -1 ? instances.length : freeIdx;
         entity.vatIndex = idx;
         
@@ -219,15 +227,19 @@ window.VATManager = {
         
         const prefabName = entity.name;
         const instances = this.instanceData.get(prefabName);
-        instances[entity.vatIndex] = null;
+        if (instances && instances[entity.vatIndex]) {
+            instances[entity.vatIndex] = null;
+        }
         
         // Move VAT instance far away so it's not rendered
         const imesh = this.instancedMeshes.get(prefabName);
-        const dummy = new THREE.Object3D();
-        dummy.position.set(0, -1000, 0);
-        dummy.updateMatrix();
-        imesh.setMatrixAt(entity.vatIndex, dummy.matrix);
-        imesh.instanceMatrix.needsUpdate = true;
+        if (imesh) {
+            const dummy = new THREE.Object3D();
+            dummy.position.set(0, -1000, 0);
+            dummy.updateMatrix();
+            imesh.setMatrixAt(entity.vatIndex, dummy.matrix);
+            imesh.instanceMatrix.needsUpdate = true;
+        }
         
         entity.vatIndex = undefined;
     },
@@ -237,6 +249,7 @@ window.VATManager = {
         
         const prefabName = entity.name;
         const imesh = this.instancedMeshes.get(prefabName);
+        if (!imesh) return;
         
         imesh.setMatrixAt(entity.vatIndex, entity.visual.matrixWorld);
         imesh.instanceMatrix.needsUpdate = true;
@@ -262,6 +275,8 @@ window.VATManager = {
 
         this.instancedMeshes.forEach((imesh, prefabName) => {
             const instances = this.instanceData.get(prefabName);
+            if (!instances) return;
+            
             const matrixAttr = imesh.instanceMatrix;
             const matrixArray = matrixAttr.array;
 
@@ -317,6 +332,3 @@ window.VATManager = {
         });
     }
 };
-
-
-
