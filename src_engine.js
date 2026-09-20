@@ -25,6 +25,9 @@ const _e1 = new THREE.Euler();
 const _m1 = new THREE.Matrix4();
 const _colorScratch = new THREE.Color();
 
+const _targetCamPos = new THREE.Vector3();
+const _currentCamTarget = new THREE.Vector3();
+
 // ==========================================
 // LIGHT POOL SYSTEM
 // ==========================================
@@ -86,10 +89,10 @@ function updateLightPool() {
 }
 
 // ==========================================
-// CAMERA & SHADOW CAMERA DRIVER
+// SMOOTH CAMERA & SHADOW DRIVER
 // ==========================================
 
-function updateCameraAndShadows() {
+function updateCameraAndShadows(delta) {
     if (!window.GameCore?.camera || !window.GameCore?.playerObj?.visual) return;
 
     const playerPos = window.GameCore.playerObj.visual.position;
@@ -106,12 +109,17 @@ function updateCameraAndShadows() {
         if (window.Input.camShake < 0.01) window.Input.camShake = 0;
     }
 
-    const camX = playerPos.x + dist * Math.sin(angle) * Math.cos(pitch) + shakeX;
-    const camY = playerPos.y + 1.5 + dist * Math.sin(pitch) + shakeY;
-    const camZ = playerPos.z + dist * Math.cos(angle) * Math.cos(pitch) + shakeZ;
+    const targetX = playerPos.x + dist * Math.sin(angle) * Math.cos(pitch) + shakeX;
+    const targetY = playerPos.y + 1.5 + dist * Math.sin(pitch) + shakeY;
+    const targetZ = playerPos.z + dist * Math.cos(angle) * Math.cos(pitch) + shakeZ;
 
-    window.GameCore.camera.position.set(camX, camY, camZ);
-    window.GameCore.camera.lookAt(playerPos.x, playerPos.y + 1.5, playerPos.z);
+    const lerpFactor = Math.min(1.0, (delta || fixedTimeStep) * 16.0);
+    _targetCamPos.set(targetX, targetY, targetZ);
+    window.GameCore.camera.position.lerp(_targetCamPos, lerpFactor);
+
+    _v1.set(playerPos.x, playerPos.y + 1.5, playerPos.z);
+    _currentCamTarget.lerp(_v1, lerpFactor);
+    window.GameCore.camera.lookAt(_currentCamTarget);
 
     if (dirLight && dirLight.castShadow) {
         dirLight.target.position.copy(playerPos);
@@ -233,7 +241,7 @@ function updateEntities(delta) {
             if (!window.EngineParams.isPlayerSafe && !window.EngineParams.isPlayerHidden && hostileNearby && !window.EngineParams.godMode && window.EngineParams.offPathCaptureCooldown <= 0) {
                 const pathPoint = window.RoadManager.getRandomPathPoint();
                 if (pathPoint) {
-                    ChunkManager.update(new THREE.Vector3(pathPoint.x, 0, pathPoint.z));
+                    ChunkManager.forceUpdatePosition(new THREE.Vector3(pathPoint.x, 0, pathPoint.z));
                     const safeY = window.WorldGenerator.getTerrainHeight(pathPoint.x, pathPoint.z) + 5.0;
                     window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
@@ -514,14 +522,35 @@ function fixedUpdateLogic(delta) {
 // CHUNK & SCENERY MANAGERS
 // ==========================================
 
+let _lastChunkCheckPos = new THREE.Vector3(Infinity, Infinity, Infinity);
+
 const ChunkManager = {
     activeChunks: new Map(), currentChunkX: null, currentChunkZ: null,
     instancedMeshes: new Map(),
 
+    forceUpdatePosition: function(playerPos) {
+        if (window.EngineParams.suppressChunkLoading || !playerPos) return;
+        _lastChunkCheckPos.copy(playerPos);
+        const cx = Math.floor(playerPos.x / 60); 
+        const cz = Math.floor(playerPos.z / 60);
+        this.currentChunkX = cx; 
+        this.currentChunkZ = cz; 
+        this.loadChunksAround(cx, cz);
+    },
+
     update: function(playerPos) {
-        if (window.EngineParams.suppressChunkLoading) return;
-        const cx = Math.floor(playerPos.x / 60); const cz = Math.floor(playerPos.z / 60);
-        if (cx !== this.currentChunkX || cz !== this.currentChunkZ) { this.currentChunkX = cx; this.currentChunkZ = cz; this.loadChunksAround(cx, cz); }
+        if (window.EngineParams.suppressChunkLoading || !playerPos) return;
+        
+        if (_lastChunkCheckPos.distanceToSquared(playerPos) < 25) return;
+        _lastChunkCheckPos.copy(playerPos);
+
+        const cx = Math.floor(playerPos.x / 60); 
+        const cz = Math.floor(playerPos.z / 60);
+        if (cx !== this.currentChunkX || cz !== this.currentChunkZ) { 
+            this.currentChunkX = cx; 
+            this.currentChunkZ = cz; 
+            this.loadChunksAround(cx, cz); 
+        }
     },
     loadChunksAround: function(cx, cz) {
         const expectedChunks = new Set();
@@ -1690,7 +1719,7 @@ window.EventBus.on('WORLD_REGENERATE', () => {
     window.EventBus.emit('CLEAR_MAP'); const keys = Array.from(ChunkManager.activeChunks.keys()); keys.forEach(k => ChunkManager.unloadChunk(k)); ChunkManager.currentChunkX = null; 
     window.currentPrng = alea(window.EngineParams?.worldSeed ?? 1337); window.currentNoise2D = window.createNoise2D(window.currentPrng);
     if (window.GameCore.playerObj && window.GameCore.playerObj.body) { 
-        ChunkManager.update(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, 0, window.GameCore.playerObj.visual.position.z));
+        ChunkManager.forceUpdatePosition(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, 0, window.GameCore.playerObj.visual.position.z));
         const vy = window.WorldGenerator.getTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 5.0; 
         window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true);
         window.GameCore.playerObj.body.setAngvel({x:0, y:0, z:0}, true);
@@ -1706,7 +1735,7 @@ window.EventBus.on('WORLD_REGENERATE', () => {
 
 window.EventBus.on('CMD_TELEPORT', (pos) => { 
     if (window.GameCore.playerObj?.body) {
-        ChunkManager.update(new THREE.Vector3(pos.x, 0, pos.z));
+        ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, 0, pos.z));
         const groundY = window.WorldGenerator.getTerrainHeight(pos.x, pos.z);
         const safeY = (isNaN(groundY) ? 10 : groundY) + 5.0; 
 
@@ -1725,7 +1754,7 @@ window.EventBus.on('PLAYER_RESPAWN', () => {
         window.GameCore.recordCombatDefeat({ source: 'open-world', injury: `open-world defeat on day ${window.EngineParams.worldDay}` });
     }
     
-    ChunkManager.update(new THREE.Vector3(0, 0, 0));
+    ChunkManager.forceUpdatePosition(new THREE.Vector3(0, 0, 0));
     const respawnY = window.WorldGenerator.getTerrainHeight(0, 0) + 5.0; 
     
     if (window.GameCore.playerObj?.body) {
@@ -1750,7 +1779,7 @@ function punishExposedActors() {
             window.EventBus.emit('UI_LOG', '[THE CROW] The woods reach for you, but the landing bends away.');
         } else {
             const point = destination(); 
-            ChunkManager.update(new THREE.Vector3(point.x, 0, point.z));
+            ChunkManager.forceUpdatePosition(new THREE.Vector3(point.x, 0, point.z));
             const y = window.WorldGenerator.getTerrainHeight(point.x, point.z) + 5.0;
             
             player.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -1813,7 +1842,7 @@ function regenerateWorldCycle() {
                                     window.GameState.inventory.backpack.includes('epoch_anchor');
                 
               if (protectedVillage) {
-                  ChunkManager.update(new THREE.Vector3(protectedVillage.x, 0, protectedVillage.z));
+                  ChunkManager.forceUpdatePosition(new THREE.Vector3(protectedVillage.x, 0, protectedVillage.z));
                   const newY = window.WorldGenerator.getTerrainHeight(protectedVillage.x, protectedVillage.z) + 5.0;
                   window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
                   window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
@@ -1824,7 +1853,7 @@ function regenerateWorldCycle() {
               else if (hasAnchorItem) {
                   const nearestRoadPt = window.RoadManager.getRandomPathPoint();
                   if (nearestRoadPt) {
-                      ChunkManager.update(new THREE.Vector3(nearestRoadPt.x, 0, nearestRoadPt.z));
+                      ChunkManager.forceUpdatePosition(new THREE.Vector3(nearestRoadPt.x, 0, nearestRoadPt.z));
                       const newY = window.WorldGenerator.getTerrainHeight(nearestRoadPt.x, nearestRoadPt.z) + 5.0;
                       window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
                       window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
@@ -1844,7 +1873,7 @@ function regenerateWorldCycle() {
                   newZ = (Math.random() * 2 - 1) * forestExtent;
                   if (Math.abs(newX) > 500 || Math.abs(newZ) > 500) valid = true;
               }
-              ChunkManager.update(new THREE.Vector3(newX, 0, newZ));
+              ChunkManager.forceUpdatePosition(new THREE.Vector3(newX, 0, newZ));
               const newY = window.WorldGenerator.getTerrainHeight(newX, newZ) + 5.0;
               window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
               window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
@@ -2007,7 +2036,7 @@ async function bootEngine() {
                 composer.insertPass(worldPass, 0);
                   
                 if (window.GameCore.playerObj && window.GameCore.playerObj.body && pos) {
-                    ChunkManager.update(new THREE.Vector3(pos.x, 0, pos.z));
+                    ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, 0, pos.z));
                     const groundY = window.WorldGenerator.getTerrainHeight(pos.x, pos.z) + 5.0;
                     window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
@@ -2033,7 +2062,7 @@ async function bootEngine() {
         window.GameCore.passes.colorTint = new ShaderPass(ColorTintShader); composer.addPass(window.GameCore.passes.colorTint);
 
         const startY = window.WorldGenerator.getTerrainHeight(0, 0); const safeY = isNaN(startY) ? 1 : startY;
-        spawnPlayer(0, safeY + 3.0, 0); spawnPartyMembers(); ChunkManager.update(new THREE.Vector3(0, safeY + 3.0, 0));
+        spawnPlayer(0, safeY + 3.0, 0); spawnPartyMembers(); ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
         
         window.EventBus.on('ENV_UPDATE', () => {
             const hourNormalized = (window.EngineParams.timeOfDay % 24) / 24;
@@ -2140,7 +2169,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 accumulator -= fixedTimeStep; 
             } 
 
-            updateCameraAndShadows();
+            updateCameraAndShadows(delta);
 
             if(composer) composer.render(); 
         }
