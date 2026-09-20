@@ -338,7 +338,6 @@ function updatePlayerMovement(delta) {
         return;
     }
 
-    // Align feet with the terrain surface (bottom of the player capsule collider)
     const pDef = window.GameCore.playerObj.def || { height: 2 };
     const pHalfHeight = (pDef.height || 2) / 2;
     window.GameCore.playerObj.visual.position.set(p.x, p.y - pHalfHeight, p.z);
@@ -359,7 +358,7 @@ function updatePlayerMovement(delta) {
     if (window.Input.isMoving) {
         moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle || Math.PI); 
         
-        // BASE WALK SPEED CALCULATION: 1 mile (1609.344 meters) / 32 minutes (1920 seconds) = ~0.8382 m/s
+        // BASE WALK SPEED: 1 mile (1609.344m) / 32 minutes (1920s) = ~0.8382 m/s
         const BASE_STARTING_SPEED = 1609.344 / 1920.0; 
         
         const athleticsLvl = window.GameState.pStats?.athletics?.level || 0;
@@ -386,7 +385,7 @@ function updatePlayerMovement(delta) {
 
         maxSpeed *= window.GameCore.getCombatInjuryMultiplier();
 
-        // Direct Velocity Control (prevents calibrated speeds from getting swallowed by friction/damping)
+        // Direct Horizontal Velocity Control
         if (!window.Input.isDashing) {
             window.GameCore.playerObj.body.setLinvel({
                 x: moveDir.x * maxSpeed,
@@ -1986,6 +1985,7 @@ async function bootEngine() {
         const startY = window.WorldGenerator.getTerrainHeight(0, 0); const safeY = isNaN(startY) ? 1 : startY;
         spawnPlayer(0, safeY + 3.0, 0); spawnPartyMembers(); ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
 
+        // Auto-generate Capital City on engine boot
         if (window.CapitalCityManager) {
             window.CapitalCityManager.generateCapital();
         }
@@ -2036,6 +2036,12 @@ async function bootEngine() {
             if (window.GameCore.horizonMaterial) {
                 window.GameCore.horizonMaterial.uniforms.sunPos.value.copy(dirLight.position);
                 window.GameCore.horizonMaterial.uniforms.fogColor.value.copy(window.GameCore.scene.fog.color);
+            }
+        });
+
+        window.EventBus.on('GAME_STARTED', () => {
+            if (window.CapitalCityManager && !window.CapitalCityManager.isGenerated) {
+                window.CapitalCityManager.generateCapital();
             }
         });
         
