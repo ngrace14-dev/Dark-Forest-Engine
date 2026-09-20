@@ -628,7 +628,6 @@ const ChunkManager = {
             c.r += colorNoise; c.g += colorNoise; c.b += colorNoise;
             colors.push(c.r, c.g, c.b);
 
-            // Safe Path Edge Ward Glow calculation (peaks along the road boundary)
             let edgeGlow = 0.0;
             const distFromEdge = Math.abs(minRoadDist - ROAD_WIDTH);
             if (distFromEdge < 1.2) {
@@ -1922,7 +1921,7 @@ async function bootEngine() {
         await RAPIER.init({}); 
         document.getElementById('loading-bar').style.width = "100%"; document.getElementById('loading-container').classList.add('hidden'); document.getElementById('btn-start').classList.remove('hidden');
         
-        window.GameCore.scene = new THREE.Scene(); window.GameCore.scene.fog = new THREE.FogExp2(0x040608, 0.03); window.GameCore.scene.background = new THREE.Color(0x040608);
+        window.GameCore.scene = new THREE.Scene(); window.GameCore.scene.fog = new THREE.FogExp2(0x040608, 0.00015); window.GameCore.scene.background = new THREE.Color(0x040608);
         window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 1000000); 
 
         initLightPool(window.GameCore.scene);
@@ -1957,7 +1956,8 @@ async function bootEngine() {
           
         clock = new THREE.Clock(); window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
   
-        const horizonGeo = new THREE.PlaneGeometry(100000, 100000, 512, 512); 
+        // EVEREST-SCALE LOOMING TITAN MOUNTAIN RANGE PLANE (800km x 800km)
+        const horizonGeo = new THREE.PlaneGeometry(800000, 800000, 512, 512); 
         horizonGeo.rotateX(-Math.PI / 2);
           
         const horizonMat = new THREE.ShaderMaterial({
@@ -1984,10 +1984,14 @@ async function bootEngine() {
                     vWorldPos = worldPosition.xyz;
                       
                     float dist = length(worldPosition.xz);
-                    float mountainMask = smoothstep(50000.0, 70000.0, dist); 
+                    float mountainMask = smoothstep(8000.0, 35000.0, dist); 
                       
-                    float h = noise(worldPosition.xz * 0.0001) * 2500.0;
-                    h += noise(worldPosition.xz * 0.001) * 200.0;
+                    // Multi-octave FBM for Everest-scale (8,800m+) jagged mountain peaks
+                    vec2 p = worldPosition.xz;
+                    float h = noise(p * 0.000015) * 6000.0;
+                    h += (1.0 - abs(noise(p * 0.00005) * 2.0 - 1.0)) * 3200.0;
+                    h += noise(p * 0.0002) * 800.0;
+                    h += noise(p * 0.0008) * 200.0;
                       
                     worldPosition.y += h * mountainMask;
                     vHeight = h * mountainMask;
@@ -2002,12 +2006,22 @@ async function bootEngine() {
                 uniform vec3 fogColor;
 
                 void main() {
-                    vec3 color = mix(vec3(0.05, 0.08, 0.1), vec3(0.2, 0.25, 0.3), vHeight / 2500.0);
-                      
+                    vec3 rockColor = vec3(0.05, 0.07, 0.10);
+                    vec3 peakColor = vec3(0.18, 0.22, 0.28);
+                    vec3 snowColor = vec3(0.85, 0.90, 0.96);
+
+                    // Height altitude gradient
+                    vec3 color = mix(rockColor, peakColor, clamp(vHeight / 4000.0, 0.0, 1.0));
+                    
+                    // Snow caps on Everest-height mountain peaks (> 4,500m)
+                    float snowMask = smoothstep(4200.0, 6500.0, vHeight);
+                    color = mix(color, snowColor, snowMask);
+
+                    // Distance-based atmospheric haze over hundreds of miles
                     float dist = length(vWorldPos.xz);
-                    float fogFactor = smoothstep(1000.0, 80000.0, dist);
+                    float fogFactor = smoothstep(10000.0, 350000.0, dist);
                       
-                    gl_FragColor = vec4(mix(color, fogColor, fogFactor), 1.0);
+                    gl_FragColor = vec4(mix(color, fogColor, fogFactor * 0.85), 1.0);
                 }
             `
         });
