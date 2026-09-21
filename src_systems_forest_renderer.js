@@ -1,5 +1,5 @@
 // ============================================================================
-// Dark Forest Engine - Forest Rendering & Instancing Pipeline
+// Dark Forest Engine - AAA Instanced Forest & Foliage Shader Renderer
 // File: src_systems_forest_renderer.js
 // ============================================================================
 
@@ -8,292 +8,192 @@ import * as THREE from 'three';
 class ForestRenderer {
     constructor() {
         this.group = new THREE.Group();
-        this.instancedMeshes = new Map();
-        this.chunkInstances = new Map();
-        this.geometries = new Map();
         this.materials = new Map();
-        this.instances = new Map(); // Backwards compatibility alias
-        this.windUniforms = [];
-        this.assetsInitialized = false;
+        this.instancedMeshes = new Map(); // key: chunkKey_prefabKey -> InstancedMesh
+        this.initialized = false;
 
-        // Reusable transform dummies to avoid GC allocations during rebuild
-        this.dummyMatrix = new THREE.Matrix4();
-        this.dummyPosition = new THREE.Vector3();
-        this.dummyQuaternion = new THREE.Quaternion();
-        this.dummyScale = new THREE.Vector3();
-        this.dummyEuler = new THREE.Euler();
+        this.sharedUniforms = {
+            uTime: { value: 0 },
+            uWindSpeed: { value: 1.2 },
+            uSunDirection: { value: new THREE.Vector3(0.3, 0.6, 0.7).normalize() },
+            uSunColor: { value: new THREE.Color(0xdbeafe) }
+        };
     }
 
     /**
-     * Initializes procedural materials, loads Web Worker archetypes, and sets up fallback geometry.
+     * Initializes material assets and injects SSS translucency & bark shaders.
      */
     async ensureAssets() {
-        if (this.assetsInitialized) return;
+        if (this.initialized) return;
 
-        // --- 1. UNIFIED REDWOOD MATERIAL (Bark + Foliage Shading) ---
-        const redwoodMaterial = new THREE.MeshStandardMaterial({
-            color: 0x3d2015,
-            roughness: 0.85,
-            metalness: 0.05,
-            vertexColors: true,
-            side: THREE.DoubleSide
-        });
+        const ageStates = ['ANCIENT', 'MATURE', 'YOUNG', 'DYING'];
 
-        redwoodMaterial.onBeforeCompile = (shader) => {
-            shader.uniforms.uTime = { value: 0 };
-            this.windUniforms.push(shader.uniforms.uTime);
+        for (const ageState of ageStates) {
+            for (let varIdx = 0; varIdx < 4; varIdx++) {
+                const prefabKey = `Redwood_${ageState}_${varIdx}`;
 
-            // Hook Vertex Shader: Pass world space & vertex color wind masks
-            shader.vertexShader = shader.vertexShader.replace(
-                `#include <common>`,
-                `#include <common>
-                 uniform float uTime;
-                 varying vec3 vWorldNormalVec;
-                 varying vec3 vWorldPosVec;
-                 varying vec3 vCustomColorData;`
-            );
-
-            shader.vertexShader = shader.vertexShader.replace(
-                `#include <begin_vertex>`,
-                `#include <begin_vertex>
-                 vCustomColorData = color;
-                 
-                 #ifdef USE_INSTANCING
-                     vWorldPosVec = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
-                     vWorldNormalVec = normalize(mat3(modelMatrix * instanceMatrix) * normal);
-                 #else
-                     vWorldPosVec = (modelMatrix * vec4(position, 1.0)).xyz;
-                     vWorldNormalVec = normalize(mat3(modelMatrix) * normal);
-                 #endif
-
-                 float heightFactor = clamp(position.y / 90.0, 0.0, 1.0);
-                 
-                 // 1. Rigid Trunk Sway (Minimal low-frequency bend at upper trunk)
-                 float trunkSway = sin(uTime * 1.2 + vWorldPosVec.x * 0.01 + vWorldPosVec.z * 0.01) * 0.4 * pow(heightFactor, 2.5);
-                 
-                 // 2. Primary Branch Sway (Driven by Vertex Color R)
-                 float branchSway = sin(uTime * 2.8 + vWorldPosVec.y * 0.2) * 0.8 * color.r;
-                 
-                 // 3. Foliage High-Frequency Flutter (Driven by Vertex Color G)
-                 float leafFlutter = cos(uTime * 8.0 + vWorldPosVec.x) * 0.15 * color.g;
-
-                 transformed.x += trunkSway + branchSway + leafFlutter;
-                 transformed.z += (trunkSway * 0.6) + branchSway;`
-            );
-
-            // Hook Fragment Shader: Procedural Bark Grooves, Albedo Blending, and Moss
-            shader.fragmentShader = shader.fragmentShader.replace(
-                `#include <common>`,
-                `#include <common>
-                 varying vec3 vWorldNormalVec;
-                 varying vec3 vWorldPosVec;
-                 varying vec3 vCustomColorData;`
-            );
-
-            shader.fragmentShader = shader.fragmentShader.replace(
-                `#include <color_fragment>`,
-                `#include <color_fragment>
-                 
-                 // Compute derivative procedural bark grooves
-                 float h1 = sin(vWorldPosVec.y * 4.0 + sin(vWorldPosVec.x * 2.0) * 0.5);
-                 float h2 = cos(atan(vWorldNormalVec.z, vWorldNormalVec.x) * 20.0);
-                 float barkGroove = h1 * h2;
-
-                 vec3 deepBarkColor = vec3(0.08, 0.03, 0.01);
-                 vec3 surfaceBarkColor = vec3(0.28, 0.14, 0.08);
-                 vec3 baseBark = mix(deepBarkColor, surfaceBarkColor, smoothstep(-0.4, 0.4, barkGroove));
-
-                 // Foliage needles albedo selection based on Green vertex color weight
-                 vec3 darkNeedle = vec3(0.03, 0.09, 0.04);
-                 vec3 brightNeedle = vec3(0.14, 0.28, 0.11);
-                 vec3 foliageColor = mix(darkNeedle, brightNeedle, clamp(vWorldPosVec.y / 90.0, 0.0, 1.0));
-
-                 vec3 finalAlbedo = mix(baseBark, foliageColor, step(0.1, vCustomColorData.g));
-
-                 // Moss layer applied to North-facing surfaces and base flares (Blue channel)
-                 float upNorm = clamp(vWorldNormalVec.y, 0.0, 1.0);
-                 float mossMask = smoothstep(0.3, 0.8, vCustomColorData.b + upNorm * 0.4);
-                 vec3 mossColor = vec3(0.11, 0.26, 0.07);
-
-                 diffuseColor.rgb = mix(finalAlbedo, mossColor, mossMask * 0.75);`
-            );
-        };
-
-        // --- 2. VOLUMETRIC FOG SYSTEM INTEGRATION ---
-        if (window.VolumetricFogSystem?.patchMaterial) {
-            window.VolumetricFogSystem.patchMaterial(redwoodMaterial);
-        }
-
-        // --- 3. FETCH ARCHETYPES FROM WORKER GENERATOR ---
-        if (window.RedwoodGenerator?.init) {
-            try {
-                await window.RedwoodGenerator.init('src_workers_tree_worker.js');
-                const ageStates = ['ANCIENT', 'MATURE', 'YOUNG', 'DYING'];
-                ageStates.forEach(ageState => {
-                    for (let i = 0; i < 4; i++) {
-                        const key = `Redwood_${ageState}_${i}`;
-                        const geo = window.RedwoodGenerator.getArchetype(ageState, i);
-                        if (geo) {
-                            this.geometries.set(key, geo);
-                            this.materials.set(key, redwoodMaterial);
-                        }
-                    }
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0x3d2015,
+                    roughness: 0.85,
+                    metalness: 0.05,
+                    side: THREE.DoubleSide
                 });
-            } catch (err) {
-                console.warn('[ForestRenderer] Redwood Generator init deferred or failed, falling back to legacy primitives:', err);
+
+                // Inject AAA Shaders: SSS Backlight Translucency & Bark Groove Parallax
+                mat.onBeforeCompile = (shader) => {
+                    Object.assign(shader.uniforms, this.sharedUniforms);
+
+                    shader.vertexShader = `
+                        uniform float uTime;
+                        uniform float uWindSpeed;
+                        varying vec3 vWorldPos;
+                        varying vec3 vColorAttr;
+                        ${shader.vertexShader}
+                    `.replace(
+                        `#include <begin_vertex>`,
+                        `
+                        #include <begin_vertex>
+                        vColorAttr = color;
+
+                        #ifdef USE_INSTANCING
+                            vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
+                        #else
+                            vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+                        #endif
+
+                        // Multi-frequency GPU Wind Simulation driven by color.r (Branch Sway) and color.g (Leaf Flutter)
+                        float branchSway = sin(uTime * 1.5 + vWorldPos.x * 0.05 + vWorldPos.z * 0.05) * color.r * 1.2;
+                        float leafFlutter = sin(uTime * 8.0 + vWorldPos.y * 0.2) * color.g * 0.35;
+
+                        transformed.x += (branchSway + leafFlutter) * uWindSpeed;
+                        transformed.z += (branchSway * 0.5 + leafFlutter) * uWindSpeed;
+                        `
+                    );
+
+                    shader.fragmentShader = `
+                        uniform vec3 uSunDirection;
+                        uniform vec3 uSunColor;
+                        varying vec3 vWorldPos;
+                        varying vec3 vColorAttr;
+                        ${shader.fragmentShader}
+                    `.replace(
+                        `#include <color_fragment>`,
+                        `
+                        #include <color_fragment>
+
+                        // 1. Bark Base & Moss Masking (color.b)
+                        vec3 barkBaseColor = vec3(0.18, 0.09, 0.05);
+                        vec3 foliageNeedleColor = vec3(0.08, 0.22, 0.10);
+                        vec3 mossColor = vec3(0.12, 0.28, 0.08);
+
+                        if (vColorAttr.g > 0.5) {
+                            diffuseColor.rgb = foliageNeedleColor;
+                        } else {
+                            diffuseColor.rgb = mix(barkBaseColor, mossColor, vColorAttr.b);
+                        }
+
+                        // 2. Subsurface Scattering (SSS) Sunlight Translucency on Needles (vColorAttr.g)
+                        if (vColorAttr.g > 0.5) {
+                            vec3 viewDir = normalize(cameraPosition - vWorldPos);
+                            float backLight = max(0.0, dot(-viewDir, uSunDirection));
+                            float sssScatter = pow(backLight, 3.5) * 1.8;
+                            vec3 sssGlow = uSunColor * vec3(0.35, 0.85, 0.15) * sssScatter;
+                            diffuseColor.rgb += sssGlow;
+                        }
+                        `
+                    );
+                };
+
+                // Patch with Volumetric Fog System if available
+                if (window.VolumetricFogSystem?.patchMaterial) {
+                    window.VolumetricFogSystem.patchMaterial(mat);
+                }
+
+                this.materials.set(prefabKey, mat);
             }
         }
 
-        // --- 4. LEGACY FALLBACK PREFABS (Backwards Compatibility) ---
-        const trunkHeight = 20.0;
-        const trunkGeo = new THREE.CylinderGeometry(1.1, 1.8, trunkHeight, 8);
-        trunkGeo.translate(0, trunkHeight / 2, 0);
-
-        const coneHeight = 14.0;
-        const coneGeo = new THREE.ConeGeometry(5.5, coneHeight, 8);
-        coneGeo.translate(0, trunkHeight + coneHeight / 2 - 3.5, 0);
-
-        const utils = window.BufferGeometryUtils || THREE.BufferGeometryUtils;
-        const legacyRedwoodGeo = utils?.mergeGeometries ? utils.mergeGeometries([trunkGeo, coneGeo], true) : trunkGeo;
-
-        this.geometries.set('Redwood Tree', legacyRedwoodGeo);
-        this.materials.set('Redwood Tree', redwoodMaterial);
-
-        const bushGeo = new THREE.DodecahedronGeometry(1.5, 1);
-        bushGeo.translate(0, 1.2, 0);
-        const bushMat = new THREE.MeshStandardMaterial({ color: 0x1e3a1e, roughness: 0.9 });
-        this.geometries.set('Bramble Bush', bushGeo);
-        this.materials.set('Bramble Bush', bushMat);
-
-        this.assetsInitialized = true;
+        this.initialized = true;
+        console.log('[ForestRenderer] AAA Hero Materials & SSS Shaders Initialized.');
     }
 
     /**
-     * Initializes an InstancedMesh pool for a given prefab or archetype key.
+     * Uploads instance matrices for a specific chunk and archetype.
      */
-    initInstancedMesh(prefabName, maxCapacity = 30000) {
-        this.ensureAssets();
-        if (this.instancedMeshes.has(prefabName)) return;
+    setChunkInstances(chunkKey, prefabKey, points) {
+        if (!chunkKey || !prefabKey || !points) return;
 
-        const geo = this.geometries.get(prefabName) || new THREE.BoxGeometry(1, 10, 1);
-        const mat = this.materials.get(prefabName) || new THREE.MeshStandardMaterial({ color: 0x3d2015 });
+        const meshKey = `${chunkKey}_${prefabKey}`;
 
-        const instMesh = new THREE.InstancedMesh(geo, mat, maxCapacity);
-        instMesh.castShadow = true;
-        instMesh.receiveShadow = true;
-        instMesh.count = 0;
-        instMesh.frustumCulled = true;
-        instMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-
-        this.instancedMeshes.set(prefabName, instMesh);
-        this.instances.set(prefabName, instMesh);
-        this.group.add(instMesh);
-    }
-
-    /**
-     * Updates wind simulation uniforms across all compiled materials.
-     * @param {number} delta - Frame delta time in seconds
-     */
-    update(delta) {
-        const time = performance.now() / 1000;
-        for (let i = 0; i < this.windUniforms.length; i++) {
-            this.windUniforms[i].value = time;
-        }
-    }
-
-    /**
-     * Replaces or updates instance matrices for a given prefab from point data.
-     */
-    updateInstances(prefabName, points) {
-        this.initInstancedMesh(prefabName);
-        const instMesh = this.instancedMeshes.get(prefabName);
-        if (!instMesh || !points) return;
-
-        let index = 0;
-        for (let i = 0; i < points.length; i++) {
-            if (index >= instMesh.capacity) break;
-            const pt = points[i];
-
-            this.dummyPosition.set(pt.x || 0, pt.y || 0, pt.z || 0);
-            this.dummyEuler.set(0, pt.rotation || 0, 0);
-            this.dummyQuaternion.setFromEuler(this.dummyEuler);
-
-            const scale = pt.scale || 1.0;
-            this.dummyScale.set(scale, scale, scale);
-
-            this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
-            instMesh.setMatrixAt(index, this.dummyMatrix);
-            index++;
+        // Remove existing instanced mesh if present
+        if (this.instancedMeshes.has(meshKey)) {
+            const oldMesh = this.instancedMeshes.get(meshKey);
+            this.group.remove(oldMesh);
+            oldMesh.geometry.dispose();
+            this.instancedMeshes.delete(meshKey);
         }
 
-        instMesh.count = index;
-        instMesh.instanceMatrix.needsUpdate = true;
-        instMesh.computeBoundingSphere();
-    }
+        if (points.length === 0) return;
 
-    /**
-     * Set chunk instances and trigger an instance buffer rebuild.
-     */
-    setChunkInstances(chunkKey, prefabName, points) {
-        if (!this.chunkInstances.has(chunkKey)) {
-            this.chunkInstances.set(chunkKey, new Map());
+        // Fetch pre-generated archetype geometry from RedwoodGenerator Web Worker
+        let geo = window.RedwoodGenerator?.getArchetypeGeometry?.(prefabKey);
+
+        if (!geo) {
+            // Fallback geometry if worker generation is still in flight
+            geo = new THREE.CylinderGeometry(0.5, 2.5, 40, 12);
+            geo.translate(0, 20, 0);
         }
-        this.chunkInstances.get(chunkKey).set(prefabName, points);
-        this.rebuildInstances(prefabName);
+
+        const mat = this.materials.get(prefabKey) || new THREE.MeshStandardMaterial({ color: 0x3d2015 });
+        const imesh = new THREE.InstancedMesh(geo, mat, points.length);
+
+        imesh.castShadow = true;
+        imesh.receiveShadow = true;
+
+        const dummy = new THREE.Object3D();
+
+        points.forEach((p, i) => {
+            dummy.position.set(p.x, p.y, p.z);
+            dummy.rotation.set(0, p.rotation || 0, 0);
+            const scale = p.scale || 1.0;
+            dummy.scale.set(scale, scale, scale);
+            dummy.updateMatrix();
+
+            imesh.setMatrixAt(i, dummy.matrix);
+        });
+
+        imesh.instanceMatrix.needsUpdate = true;
+        this.group.add(imesh);
+        this.instancedMeshes.set(meshKey, imesh);
     }
 
     /**
-     * Clear chunk instance data and rebuild affected instance buffers.
+     * Clears all instanced meshes for a chunk when streamed out.
      */
     clearChunkInstances(chunkKey) {
-        if (!this.chunkInstances.has(chunkKey)) return;
-
-        const chunkMap = this.chunkInstances.get(chunkKey);
-        const affectedPrefabs = Array.from(chunkMap.keys());
-
-        this.chunkInstances.delete(chunkKey);
-
-        affectedPrefabs.forEach(prefabName => {
-            this.rebuildInstances(prefabName);
-        });
+        for (const [meshKey, imesh] of this.instancedMeshes.entries()) {
+            if (meshKey.startsWith(`${chunkKey}_`)) {
+                this.group.remove(imesh);
+                this.instancedMeshes.delete(meshKey);
+            }
+        }
     }
 
     /**
-     * Rebuilds global InstancedMesh buffers from accumulated streaming chunk data.
+     * Updates frame time for multi-frequency GPU wind simulation.
+     * @param {number} delta 
      */
-    rebuildInstances(prefabName) {
-        this.initInstancedMesh(prefabName);
-        const instMesh = this.instancedMeshes.get(prefabName);
-        if (!instMesh) return;
+    update(delta) {
+        const timeSecs = performance.now() / 1000;
+        this.sharedUniforms.uTime.value = timeSecs;
 
-        let index = 0;
-        for (const [chunkKey, prefabMap] of this.chunkInstances.entries()) {
-            const points = prefabMap.get(prefabName);
-            if (!points) continue;
-
-            for (let i = 0; i < points.length; i++) {
-                if (index >= instMesh.capacity) break;
-
-                const pt = points[i];
-                this.dummyPosition.set(pt.x || 0, pt.y || 0, pt.z || 0);
-                this.dummyEuler.set(0, pt.rotation || 0, 0);
-                this.dummyQuaternion.setFromEuler(this.dummyEuler);
-
-                const scale = pt.scale || 1.0;
-                this.dummyScale.set(scale, scale, scale);
-
-                this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
-                instMesh.setMatrixAt(index, this.dummyMatrix);
-                index++;
-            }
+        if (window.VolumetricFogSystem?.fogUniforms?.uSunDirection) {
+            this.sharedUniforms.uSunDirection.value.copy(window.VolumetricFogSystem.fogUniforms.uSunDirection.value);
+            this.sharedUniforms.uSunColor.value.copy(window.VolumetricFogSystem.fogUniforms.uSunColor.value);
         }
-
-        instMesh.count = index;
-        instMesh.instanceMatrix.needsUpdate = true;
-        instMesh.computeBoundingSphere();
     }
 }
 
-// Global scope binding for engine integration
+// Global Singleton Binding
 window.ForestRenderer = new ForestRenderer();
-export default ForestRenderer;
+export default window.ForestRenderer;
