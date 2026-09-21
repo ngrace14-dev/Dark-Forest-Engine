@@ -5,7 +5,9 @@
 
 import * as THREE from 'three';
 
-// Export stub expected by src_systems_ruins.js
+/**
+ * Terrain Chunk wrapper required by src_systems_ruins.js
+ */
 export class BlockTerrainChunk {
     constructor(cx, cz, chunkSize = 60.0) {
         this.cx = cx;
@@ -17,7 +19,7 @@ export class BlockTerrainChunk {
     }
 }
 
-class BlockTerrainSystem {
+export class BlockTerrainSystem {
     constructor() {
         this.chunkSize = 60.0; // Synchronized with Engine ChunkManager (60m x 60m)
         this.activeChunks = new Set();
@@ -41,6 +43,10 @@ class BlockTerrainSystem {
         this.bindEvents();
     }
 
+    /**
+     * Initializes the system and binds to the main scene.
+     * @param {THREE.Scene} scene 
+     */
     init(scene) {
         if (this.initialized) return;
         this.scene = scene;
@@ -48,6 +54,9 @@ class BlockTerrainSystem {
         console.log('[BlockTerrainSystem] Initialized successfully.');
     }
 
+    /**
+     * Binds lifecycle event listeners for automatic startup and resets.
+     */
     bindEvents() {
         if (typeof window !== 'undefined' && window.EventBus) {
             window.EventBus.on('ENGINE_READY', () => {
@@ -69,11 +78,20 @@ class BlockTerrainSystem {
         }
     }
 
+    /**
+     * Deterministic pseudo-random hash based on world coordinates.
+     */
     hash2D(x, z) {
         let h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
         return h - Math.floor(h);
     }
 
+    /**
+     * Evaluates terrain height at world coordinates (x, z).
+     * @param {number} x 
+     * @param {number} z 
+     * @returns {number}
+     */
     getTerrainHeight(x, z) {
         if (window.WorldGenerator?.getTerrainHeight) {
             const h = window.WorldGenerator.getTerrainHeight(x, z);
@@ -82,6 +100,11 @@ class BlockTerrainSystem {
         return 0;
     }
 
+    /**
+     * Generates vegetation scattering points for a chunk.
+     * @param {number} chunkX - Chunk coordinate X
+     * @param {number} chunkZ - Chunk coordinate Z
+     */
     generateChunkVegetation(chunkX, chunkZ) {
         const chunkKey = `chunk_${chunkX}_${chunkZ}`;
         if (this.chunkVegetationMap.has(chunkKey)) return;
@@ -239,7 +262,9 @@ class BlockTerrainSystem {
     }
 }
 
-// Global Singleton Binding & Named/Default Exports
-window.BlockTerrainSystem = new BlockTerrainSystem();
-export { BlockTerrainSystem };
+// Global Singleton Binding
+if (typeof window !== 'undefined') {
+    window.BlockTerrainSystem = new BlockTerrainSystem();
+}
+
 export default BlockTerrainSystem;
