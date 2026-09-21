@@ -1,5 +1,5 @@
 // ============================================================================
-// Dark Forest Engine - AAA Hero Redwood Geometry Worker
+// Dark Forest Engine - Calibrated Hero Redwood Geometry Worker
 // File: src_workers_tree_worker.js
 // ============================================================================
 
@@ -122,7 +122,7 @@ self.onmessage = function (e) {
 
         self.postMessage({ generatedBuffers }, transferables);
     } catch (err) {
-        self.postMessage({ error: err.message || 'Hero Redwood Generator Exception' });
+        self.postMessage({ error: err.message || 'Redwood Calibration Worker Exception' });
     }
 };
 
@@ -130,41 +130,59 @@ function buildRedwoodMesh(ageState, seed) {
     const prng = new FastRandom(seed);
     const noiseGen = new SimplexNoise3D(prng);
 
-    let height, baseRadius, topRadius, flareAggression, bareTrunkRatio, branchCount;
+    let height, baseRadius, topRadius, flareAggression, bareTrunkRatio, branchCount, reitProbability;
 
+    // PASS 7: SCALE & PROPORTION AUDIT
     switch (ageState) {
+        case 'COLOSSAL_ANCIENT':
+            height = prng.range(115.0, 130.0);   // Landmark 380ft+ titans
+            baseRadius = prng.range(6.5, 8.5);   // 13m–17m buttress base
+            topRadius = 0.75;
+            flareAggression = 7.0;
+            bareTrunkRatio = 0.50;
+            branchCount = 120;
+            reitProbability = 0.80;
+            break;
+
         case 'ANCIENT':
-            height = prng.range(90.0, 105.0);    // Massive ~300ft Hero Redwood
-            baseRadius = prng.range(4.5, 6.0);    // 30ft+ base diameter
-            topRadius = 0.55;
-            flareAggression = 5.5;
-            bareTrunkRatio = 0.55;
-            branchCount = 55;
+            height = prng.range(95.0, 115.0);    // 310ft–375ft Old Growth
+            baseRadius = prng.range(5.8, 7.5);   // 12m–15m buttress base
+            topRadius = 0.60;
+            flareAggression = 6.2;
+            bareTrunkRatio = 0.52;
+            branchCount = 95;                    // PASS 3: Calibrated from 55
+            reitProbability = 0.65;              // PASS 4: Calibrated from 0.35
             break;
+
         case 'MATURE':
-            height = prng.range(65.0, 85.0);
-            baseRadius = prng.range(2.8, 3.8);
-            topRadius = 0.30;
-            flareAggression = 3.2;
-            bareTrunkRatio = 0.45;
-            branchCount = 42;
+            height = prng.range(70.0, 90.0);
+            baseRadius = prng.range(3.2, 4.5);
+            topRadius = 0.35;
+            flareAggression = 3.8;
+            bareTrunkRatio = 0.42;
+            branchCount = 50;
+            reitProbability = 0.25;
             break;
+
         case 'DYING':
-            height = prng.range(80.0, 95.0);
-            baseRadius = prng.range(3.8, 5.0);
+            height = prng.range(85.0, 100.0);
+            baseRadius = prng.range(4.5, 6.0);
             topRadius = 0.20;
-            flareAggression = 4.5;
-            bareTrunkRatio = 0.70;
-            branchCount = 20;
+            flareAggression = 5.0;
+            bareTrunkRatio = 0.68;
+            branchCount = 24;
+            reitProbability = 0.30;
             break;
+
         case 'YOUNG':
         default:
-            height = prng.range(35.0, 50.0);
-            baseRadius = prng.range(1.2, 1.8);
-            topRadius = 0.18;
-            flareAggression = 1.8;
-            bareTrunkRatio = 0.25;
-            branchCount = 30;
+            height = prng.range(38.0, 55.0);
+            baseRadius = prng.range(1.5, 2.2);
+            topRadius = 0.20;
+            flareAggression = 2.0;
+            bareTrunkRatio = 0.22;
+            branchCount = 32;
+            reitProbability = 0.05;
             break;
     }
 
@@ -174,19 +192,19 @@ function buildRedwoodMesh(ageState, seed) {
     const colors = [];
     const indices = [];
 
-    const radialSegs = 28; // Increased radial resolution for smooth trunks
-    const heightSegs = 60;
+    const radialSegs = 32;
+    const heightSegs = 64;
 
-    // --- 1. HERO TRUNK MESH (WITH BASAL BURLS & ROOT BUTTRESSES) ---
+    // --- 1. TRUNK GENERATION WITH BASAL BURLS & RIDGE DETAIL ---
     for (let y = 0; y <= heightSegs; y++) {
         const v = y / heightSegs;
         const currentY = v * height;
 
-        const taperPower = 3.2;
+        const taperPower = 3.0;
         let radius = baseRadius * (1.0 - Math.pow(v, taperPower)) + topRadius;
 
-        // Root Flare & Basal Burl Swells (Lower 22% of trunk)
-        const flareIntensity = v < 0.22 ? Math.pow(1.0 - (v / 0.22), 2.5) : 0.0;
+        // Flare & Basal Burl Swells (Lower 24% of trunk)
+        const flareIntensity = v < 0.24 ? Math.pow(1.0 - (v / 0.24), 2.6) : 0.0;
 
         for (let r = 0; r <= radialSegs; r++) {
             const u = r / radialSegs;
@@ -195,16 +213,14 @@ function buildRedwoodMesh(ageState, seed) {
             const cosT = Math.cos(theta);
             const sinT = Math.sin(theta);
 
-            // Multi-frequency organic burl displacement
             let burlDisplacement = 0.0;
             if (flareIntensity > 0.0) {
                 const n1 = Math.max(0.0, noiseGen.noise(cosT * 2.5, sinT * 2.5, v * 6.0));
-                const n2 = Math.sin(theta * 6.0) * 0.4 + Math.cos(theta * 4.0) * 0.3;
+                const n2 = Math.sin(theta * 7.0) * 0.45 + Math.cos(theta * 4.0) * 0.3;
                 burlDisplacement = (n1 * 0.7 + n2 * 0.3) * flareIntensity * flareAggression;
             }
 
-            // Mid-trunk bark ridge noise
-            const ridgeNoise = noiseGen.noise(cosT * 8.0, v * 25.0, sinT * 8.0) * 0.25 * (1.0 - v);
+            const ridgeNoise = noiseGen.noise(cosT * 9.0, v * 30.0, sinT * 9.0) * 0.28 * (1.0 - v);
 
             const currentRadius = radius + burlDisplacement + ridgeNoise;
             const px = cosT * currentRadius;
@@ -214,14 +230,13 @@ function buildRedwoodMesh(ageState, seed) {
             positions.push(px, py, pz);
 
             const nx = cosT;
-            const ny = 0.05 * (1.0 - v);
+            const ny = 0.04 * (1.0 - v);
             const nz = sinT;
             const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1.0;
             normals.push(nx / len, ny / len, nz / len);
 
             uvs.push(u * 8.0, v * (height / 2.5));
 
-            // Moss accumulation mask on North side (-Z) and lower basal burls
             const northBias = pz < -0.1 ? Math.abs(pz / currentRadius) : 0.0;
             const baseMoss = flareIntensity * 0.85;
             const mossWeight = Math.min(1.0, northBias * (1.0 - v * 0.7) + baseMoss);
@@ -230,7 +245,6 @@ function buildRedwoodMesh(ageState, seed) {
         }
     }
 
-    // Trunk Triangles
     for (let y = 0; y < heightSegs; y++) {
         for (let r = 0; r < radialSegs; r++) {
             const i1 = (y * (radialSegs + 1)) + r;
@@ -243,7 +257,7 @@ function buildRedwoodMesh(ageState, seed) {
 
     let vertexOffset = positions.length / 3;
 
-    // Helper to generate branch wood tubes
+    // Helper: Add Branch Tube
     const addBranchTube = (startX, startY, startZ, endX, endY, endZ, startRad, endRad, bV) => {
         const segs = 6;
         for (let s = 0; s <= segs; s++) {
@@ -273,83 +287,134 @@ function buildRedwoodMesh(ageState, seed) {
         }
     };
 
-    // Helper to generate dense foliage needle sprays
-    const addFoliageSpray = (tipX, tipY, tipZ, clusterSize, bV) => {
-        const numCards = 4; // Crossed 3D spray
-        for (let c = 0; c < numCards; c++) {
-            const cAngle = (c / numCards) * Math.PI;
-            const cCos = Math.cos(cAngle) * clusterSize;
-            const cSin = Math.sin(cAngle) * clusterSize;
+    // PASS 1, 2 & 5: CANOPY CLUSTERING & CROWN ZONING
+    const addFoliageClusterGroup = (originX, originY, originZ, radius, bV, clusterDensityMult) => {
+        const subClusterCount = Math.floor(prng.range(3, 7) * clusterDensityMult); // 3-7 sub-volumes per group
 
-            positions.push(tipX - cCos, tipY - clusterSize * 0.3, tipZ - cSin);
-            positions.push(tipX + cCos, tipY - clusterSize * 0.3, tipZ + cSin);
-            positions.push(tipX + cCos, tipY + clusterSize * 0.9, tipZ + cSin);
-            positions.push(tipX - cCos, tipY + clusterSize * 0.9, tipZ - cSin);
+        for (let sc = 0; s < subClusterCount; sc++) {
+            const scOffsetR = (sc / subClusterCount) * radius * 0.7;
+            const scAngle = prng.range(0, Math.PI * 2);
 
-            // Outward spherical normals for soft volumetric lighting
-            normals.push(cCos, 0.6, cSin);
-            normals.push(-cCos, 0.6, -cSin);
-            normals.push(-cCos, 0.8, -cSin);
-            normals.push(cCos, 0.8, cSin);
+            const cX = originX + Math.cos(scAngle) * scOffsetR;
+            const cY = originY + prng.range(-1.2, 1.8);
+            const cZ = originZ + Math.sin(scAngle) * scOffsetR;
 
-            uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
+            const subSize = radius * prng.range(0.45, 0.75);
+            const numCards = 4;
 
-            const branchSway = bV * 0.85;
-            colors.push(branchSway, 1.0, 0.0); // G = 1.0 enables leaf flutter & SSS translucency
-            colors.push(branchSway, 1.0, 0.0);
-            colors.push(branchSway, 1.0, 0.0);
-            colors.push(branchSway, 1.0, 0.0);
+            for (let c = 0; c < numCards; c++) {
+                const cAngle = (c / numCards) * Math.PI + prng.range(-0.2, 0.2);
+                const cCos = Math.cos(cAngle) * subSize;
+                const cSin = Math.sin(cAngle) * subSize;
 
-            indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2);
-            indices.push(vertexOffset, vertexOffset + 2, vertexOffset + 3);
-            vertexOffset += 4;
+                positions.push(cX - cCos, cY - subSize * 0.3, cZ - cSin);
+                positions.push(cX + cCos, cY - subSize * 0.3, cZ + cSin);
+                positions.push(cX + cCos, cY + subSize * 0.9, cZ + cSin);
+                positions.push(cX - cCos, cY + subSize * 0.9, cZ - cSin);
+
+                normals.push(cCos, 0.6, cSin);
+                normals.push(-cCos, 0.6, -cSin);
+                normals.push(-cCos, 0.8, -cSin);
+                normals.push(cCos, 0.8, cSin);
+
+                uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
+
+                const branchSway = bV * 0.85;
+                colors.push(branchSway, 1.0, 0.0);
+                colors.push(branchSway, 1.0, 0.0);
+                colors.push(branchSway, 1.0, 0.0);
+                colors.push(branchSway, 1.0, 0.0);
+
+                indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2);
+                indices.push(vertexOffset, vertexOffset + 2, vertexOffset + 3);
+                vertexOffset += 4;
+            }
         }
     };
 
-    // --- 2. PRIMARY BRANCHES & EPICORMIC REITERATIONS ---
+    // --- 2. PRIMARY BRANCHES, ZONED CANOPY & REITERATIONS ---
     for (let b = 0; b < branchCount; b++) {
         const bProgress = b / branchCount;
         const bV = bareTrunkRatio + bProgress * (1.0 - bareTrunkRatio);
         const bY = bV * height;
 
-        const bAngle = b * 2.39996 + prng.range(-0.15, 0.15);
-        const maxLen = (1.0 - (bV - bareTrunkRatio) / (1.0 - bareTrunkRatio)) * 16.0 + 4.0;
-        const bLength = maxLen * prng.range(0.8, 1.15);
+        // PASS 3: RANDOMIZED BRANCH LOSS (25% chance branch was broken/lost)
+        if (prng.next() < 0.25 && bV < 0.82) {
+            // Spawn short dead stub
+            const stubAngle = b * 2.39996;
+            const stubLen = prng.range(1.5, 3.5);
+            const tRad = baseRadius * (1.0 - Math.pow(bV, 3.0)) + topRadius;
+            const sX = Math.cos(stubAngle) * tRad;
+            const sZ = Math.sin(stubAngle) * tRad;
+            addBranchTube(sX, bY, sZ, sX + Math.cos(stubAngle) * stubLen, bY - 1.0, sZ + Math.sin(stubAngle) * stubLen, 0.35, 0.1, bV);
+            continue;
+        }
 
-        const tRadius = baseRadius * (1.0 - Math.pow(bV, 3.2)) + topRadius;
+        // PASS 2: CROWN ZONING CALCULATIONS
+        let zoneDensityMult = 1.0;
+        let isUpperCrown = false;
+
+        if (bV >= 0.80) {
+            // UPPER CROWN (Top 20%): Dominated by dense reiterations & massive foliage
+            zoneDensityMult = 1.75;
+            isUpperCrown = true;
+        } else if (bV >= 0.65) {
+            // MIDDLE CROWN (Mid 15%): Scaffolding branches
+            zoneDensityMult = 1.25;
+        } else {
+            // LOWER CROWN: Sparse drooping limbs
+            zoneDensityMult = 0.70;
+        }
+
+        const bAngle = b * 2.39996 + prng.range(-0.15, 0.15);
+        const maxLen = (1.0 - (bV - bareTrunkRatio) / (1.0 - bareTrunkRatio)) * 18.0 + 4.5;
+        const bLength = maxLen * prng.range(0.75, 1.2);
+
+        const tRadius = baseRadius * (1.0 - Math.pow(bV, 3.0)) + topRadius;
         const rootX = Math.cos(bAngle) * tRadius;
         const rootZ = Math.sin(bAngle) * tRadius;
 
         const tipX = rootX + Math.cos(bAngle) * bLength;
-        const droopAmount = prng.range(2.5, 5.0);
-        const tipY = bY - droopAmount + (bProgress * 2.5);
+        const droopAmount = isUpperCrown ? prng.range(1.0, 2.5) : prng.range(3.0, 6.0);
+        const tipY = bY - droopAmount + (bProgress * 3.0);
         const tipZ = rootZ + Math.sin(bAngle) * bLength;
 
-        // Build main branch tube
-        addBranchTube(rootX, bY, rootZ, tipX, tipY, tipZ, Math.max(0.12, (1.0 - bV) * 0.5), 0.05, bV);
+        addBranchTube(rootX, bY, rootZ, tipX, tipY, tipZ, Math.max(0.15, (1.0 - bV) * 0.6), 0.06, bV);
 
-        // Ancient Epicormic Reiterations (Vertical secondary trunks growing off limbs)
-        const isAncient = ageState === 'ANCIENT' || ageState === 'DYING';
-        if (isAncient && bV > 0.60 && bV < 0.88 && prng.next() < 0.35) {
-            const reitHeight = prng.range(12.0, 22.0);
-            const reitRad = prng.range(0.3, 0.6);
+        // PASS 4: EPICORMIC REITERATION EXPANSION (Trees growing out of trees)
+        if (bV > 0.62 && prng.next() < reitProbability) {
+            const reitCount = isUpperCrown ? Math.floor(prng.range(2, 4)) : 1;
 
-            // Reit grows vertically upward out of mid-branch
-            const reitStartX = rootX + (tipX - rootX) * 0.5;
-            const reitStartY = bY - droopAmount * 0.5;
-            const reitStartZ = rootZ + (tipZ - rootZ) * 0.5;
+            for (let rc = 0; rc < reitCount; rc++) {
+                const reitProgress = 0.3 + (rc * 0.25);
+                const reitHeight = prng.range(15.0, 28.0);
+                const reitRad = prng.range(0.35, 0.7);
 
-            const reitEndX = reitStartX + prng.range(-1.5, 1.5);
-            const reitEndY = reitStartY + reitHeight;
-            const reitEndZ = reitStartZ + prng.range(-1.5, 1.5);
+                const rStartX = rootX + (tipX - rootX) * reitProgress;
+                const rStartY = bY - droopAmount * reitProgress;
+                const rStartZ = rootZ + (tipZ - rootZ) * reitProgress;
 
-            addBranchTube(reitStartX, reitStartY, reitStartZ, reitEndX, reitEndY, reitEndZ, reitRad, 0.08, bV);
-            addFoliageSpray(reitEndX, reitEndY, reitEndZ, 6.0, bV);
+                const rEndX = rStartX + prng.range(-2.0, 2.0);
+                const rEndY = rStartY + reitHeight;
+                const rEndZ = rStartZ + prng.range(-2.0, 2.0);
+
+                addBranchTube(rStartX, rStartY, rStartZ, rEndX, rEndY, rEndZ, reitRad, 0.1, bV);
+                addFoliageClusterGroup(rEndX, rEndY, rEndZ, prng.range(6.0, 9.0), bV, 1.5);
+            }
         }
 
-        // Standard foliage spray at branch tip
-        if (ageState !== 'DYING' || prng.next() > 0.55) {
-            addFoliageSpray(tipX, tipY, tipZ, prng.range(5.0, 8.0), bV);
+        // PASS 5: FOLIAGE CLUSTERING ALONG LIMB
+        if (ageState !== 'DYING' || prng.next() > 0.50) {
+            // Spawn 2-3 cluster groups along outer 50% of major branch
+            const steps = isUpperCrown ? 3 : 2;
+            for (let st = 1; st <= steps; st++) {
+                const frac = 0.5 + (st / steps) * 0.5;
+                const pX = rootX + (tipX - rootX) * frac;
+                const pY = bY + (tipY - bY) * frac;
+                const pZ = rootZ + (tipZ - rootZ) * frac;
+
+                addFoliageClusterGroup(pX, pY, pZ, prng.range(5.0, 8.5), bV, zoneDensityMult);
+            }
         }
     }
 
