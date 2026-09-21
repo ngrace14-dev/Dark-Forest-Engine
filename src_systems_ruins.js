@@ -1,200 +1,283 @@
+// ============================================================================
+// Dark Forest Engine - Procedural Stone Ruins & Ancient Cobblestones System
+// File: src_systems_ruins.js
+// ============================================================================
+
 import * as THREE from 'three';
 import { BlockTerrainChunk, createProceduralBlockMaterial } from './src_systems_block_terrain.js';
 
 class RuinsSystem {
     constructor() {
-        this.cubeGeo = new THREE.BoxGeometry(1, 1, 1, 4, 4, 4); // Subdivided for edge distortion
-        
-        // Weathered Ancient Stone Material (Mossy Top, Granite Sides, Damp Soil Base)
-        this.stoneMat = createProceduralBlockMaterial({
-            topColor: '#3a4f38',      
-            sideColor: '#524f48',     
-            bottomColor: '#26221c',   
-            noiseScale: 0.2,
-            displacement: 0.25
-        });
+        this.activeRuins = new Map(); // chunkKey -> THREE.Group
+        this.initialized = false;
+        this.scene = null;
 
-        // Weathered Cobblestone Road Material
-        this.cobbleMat = createProceduralBlockMaterial({
-            topColor: '#3e423b',
-            sideColor: '#2c2e29',
-            bottomColor: '#1d1f1b',
-            noiseScale: 0.35,
-            displacement: 0.15
-        });
+        // Shared materials for stone architecture
+        this.stoneMaterial = null;
+        this.cobbleMaterial = null;
 
-        this.ruinChunks = [];
-        this.cobbleChunks = [];
+        // Shared geometries
+        this.pillarGeo = null;
+        this.wallBlockGeo = null;
+        this.cobbleGeo = null;
+
+        this.bindEvents();
     }
 
-    // --- 1. PROCEDURAL COBBLESTONE PATH GENERATOR ---
-    generateCobblePath(scene, roadPoints, density = 3) {
-        if (!roadPoints || roadPoints.length < 2) return;
+    /**
+     * Binds engine lifecycle event listeners.
+     */
+    bindEvents() {
+        if (typeof window !== 'undefined' && window.EventBus) {
+            window.EventBus.on('ENGINE_READY', () => {
+                if (window.GameCore?.scene) {
+                    this.init(window.GameCore.scene);
+                }
+            });
 
-        const blockData = [];
-        const hash = (x, z) => {
-            let h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
-            return h - Math.floor(h);
-        };
+            window.EventBus.on('WORLD_REGENERATE', () => {
+                this.clearAll();
+            });
+        }
+    }
 
-        const getTerrainY = window.WorldGenerator?.getTerrainHeight || (() => 0);
+    /**
+     * System initialization hook.
+     * @param {THREE.Scene} scene 
+     */
+    init(scene) {
+        if (this.initialized) return;
+        this.scene = scene;
 
-        for (let i = 0; i < roadPoints.length; i++) {
-            const pt = roadPoints[i];
-            for (let d = 0; d < density; d++) {
-                const offsetX = (hash(pt.x + d, pt.z) - 0.5) * 4.5;
-                const offsetZ = (hash(pt.x, pt.z + d) - 0.5) * 4.5;
-                const wx = pt.x + offsetX;
-                const wz = pt.z + offsetZ;
-                const wy = getTerrainY(wx, wz) + 0.05; // Slightly embedded into ground
+        this.initMaterials();
+        this.initGeometries();
 
-                blockData.push({
-                    x: wx,
-                    y: wy,
-                    z: wz,
-                    scaleX: 0.8 + hash(wx, wz) * 0.6,
-                    scaleY: 0.2 + hash(wz, wx) * 0.15, // Flat slabs
-                    scaleZ: 0.8 + hash(wx + d, wz) * 0.6,
-                    rotX: (hash(wx, d) - 0.5) * 0.15, // Slight tilt for weathered look
-                    rotY: hash(d, wz) * Math.PI,
-                    rotZ: (hash(wz, d) - 0.5) * 0.15
-                });
-            }
+        this.initialized = true;
+        console.log('[RuinsSystem] Initialized successfully.');
+    }
+
+    /**
+     * Initializes procedural materials using BlockTerrain factories.
+     */
+    initMaterials() {
+        this.stoneMaterial = createProceduralBlockMaterial({
+            color: 0x6b7280,
+            roughness: 0.85,
+            metalness: 0.05
+        });
+
+        this.cobbleMaterial = createProceduralBlockMaterial({
+            color: 0x4b5563,
+            roughness: 0.95,
+            metalness: 0.02
+        });
+    }
+
+    /**
+     * Initializes structural geometries.
+     */
+    initGeometries() {
+        // Fluted Stone Pillar Geometry
+        this.pillarGeo = new THREE.CylinderGeometry(0.8, 1.1, 7.0, 10);
+        this.pillarGeo.translate(0, 3.5, 0);
+
+        // Stone Wall Block
+        this.wallBlockGeo = new THREE.BoxGeometry(2.5, 1.2, 1.2);
+        this.wallBlockGeo.translate(0, 0.6, 0);
+
+        // Cobblestone Paving Slab
+        this.cobbleGeo = new THREE.BoxGeometry(1.2, 0.3, 1.2);
+        this.cobbleGeo.translate(0, 0.15, 0);
+    }
+
+    /**
+     * Hash function for deterministic ruin distribution.
+     */
+    hash2D(x, z) {
+        let h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
+        return h - Math.floor(h);
+    }
+
+    /**
+     * Helper to sample ground elevation safely.
+     */
+    getTerrainHeight(x, z) {
+        if (typeof window !== 'undefined' && window.WorldGenerator?.getTerrainHeight) {
+            const h = window.WorldGenerator.getTerrainHeight(x, z);
+            if (Number.isFinite(h)) return h;
+        }
+        return 0;
+    }
+
+    /**
+     * Generates ancient ruin sites for a given terrain chunk.
+     * @param {number} cx - Chunk X coordinate
+     * @param {number} cz - Chunk Z coordinate
+     * @param {number} chunkSize - Size of chunk in meters
+     */
+    generateRuinsForChunk(cx, cz, chunkSize = 60.0) {
+        if (!this.initialized && window.GameCore?.scene) {
+            this.init(window.GameCore.scene);
         }
 
-        const chunk = new BlockTerrainChunk(blockData.length, this.cubeGeo, this.cobbleMat);
-        chunk.buildChunk(blockData);
-        scene.add(chunk.mesh);
-        this.cobbleChunks.push(chunk);
-        return chunk;
-    }
+        const chunkKey = `chunk_${cx}_${cz}`;
+        if (this.activeRuins.has(chunkKey)) return;
 
-    // --- 2. PROCEDURAL RUINED WALL & ARCHWAY GENERATOR ---
-    spawnRuinedWall(scene, startX, startZ, length = 15, height = 5) {
-        const blockData = [];
-        const getTerrainY = window.WorldGenerator?.getTerrainHeight || (() => 0);
-        const basePosY = getTerrainY(startX, startZ);
+        // Deterministic roll for ruin probability in this chunk (12% chance)
+        const ruinRoll = this.hash2D(cx * 0.31, cz * 0.31);
+        if (ruinRoll > 0.12) return;
 
-        const hash = (x, y) => {
-            let h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453123;
-            return h - Math.floor(h);
-        };
+        const centerX = cx * chunkSize + chunkSize / 2;
+        const centerZ = cz * chunkSize + chunkSize / 2;
 
-        // Build staggered stone blocks in a wall row with damage decay
-        for (let x = 0; x < length; x += 1.8) {
-            const wallProfile = Math.sin((x / length) * Math.PI); // Shorter ruined ends
-            const maxStack = Math.floor(height * wallProfile) + 1;
+        // Skip safe zones (roads, capital cities)
+        if (window.RoadManager?.isSafeZone?.({ x: centerX, z: centerZ }) ||
+            window.CapitalCityManager?.isInsideCapital?.(centerX, centerZ)) {
+            return;
+        }
 
-            for (let y = 0; y < maxStack; y++) {
-                if (y > 1 && hash(x, y) > 0.75) continue; // Random missing blocks in gap
+        const chunkGroup = new THREE.Group();
+        chunkGroup.position.set(centerX, 0, centerZ);
 
-                const bx = startX + x;
-                const by = basePosY + (y * 1.1) + 0.5;
-                const bz = startZ + (hash(x, y) - 0.5) * 0.3;
+        const groundY = this.getTerrainHeight(centerX, centerZ);
 
-                blockData.push({
-                    x: bx,
-                    y: by,
-                    z: bz,
-                    scaleX: 1.8 + (hash(x, y) - 0.5) * 0.2,
-                    scaleY: 1.0,
-                    scaleZ: 1.2 + (hash(y, x) - 0.5) * 0.2,
-                    rotX: (hash(x, y) - 0.5) * 0.08,
-                    rotY: (hash(y, x) - 0.5) * 0.1,
-                    rotZ: (hash(x + y, y) - 0.5) * 0.08
-                });
+        // 1. Generate Cobblestone Foundation Grid
+        const cobbleCount = 25;
+        const cobbleMesh = new THREE.InstancedMesh(this.cobbleGeo, this.cobbleMaterial, cobbleCount);
+        cobbleMesh.castShadow = true;
+        cobbleMesh.receiveShadow = true;
 
-                // Spawn fallen debris blocks nearby on ground
-                if (y === maxStack - 1 && hash(x, y) > 0.4) {
-                    const debrisX = bx + (hash(x * 2, y) - 0.5) * 3.5;
-                    const debrisZ = bz + (hash(y * 2, x) - 0.5) * 3.5;
-                    blockData.push({
-                        x: debrisX,
-                        y: getTerrainY(debrisX, debrisZ) + 0.4,
-                        z: debrisZ,
-                        scaleX: 1.2,
-                        scaleY: 0.8,
-                        scaleZ: 1.0,
-                        rotX: hash(debrisX, debrisZ) * Math.PI,
-                        rotY: hash(debrisZ, debrisX) * Math.PI,
-                        rotZ: hash(debrisX + debrisZ, x) * Math.PI
-                    });
+        const dummy = new THREE.Object3D();
+        let cobbleIdx = 0;
+
+        for (let x = -2; x <= 2; x++) {
+            for (let z = -2; z <= 2; z++) {
+                const px = x * 2.2 + (this.hash2D(x, z) - 0.5) * 0.4;
+                const pz = z * 2.2 + (this.hash2D(z, x) - 0.5) * 0.4;
+                const py = groundY + (this.hash2D(px, pz) - 0.5) * 0.1;
+
+                dummy.position.set(px, py, pz);
+                dummy.rotation.set(
+                    (this.hash2D(px, py) - 0.5) * 0.1,
+                    this.hash2D(px, pz) * Math.PI * 2,
+                    (this.hash2D(py, pz) - 0.5) * 0.1
+                );
+                dummy.scale.set(0.9 + this.hash2D(px, z) * 0.3, 1.0, 0.9 + this.hash2D(x, pz) * 0.3);
+                dummy.updateMatrix();
+
+                cobbleMesh.setMatrixAt(cobbleIdx++, dummy.matrix);
+            }
+        }
+        cobbleMesh.instanceMatrix.needsUpdate = true;
+        chunkGroup.add(cobbleMesh);
+
+        // 2. Generate Crumbling Pillars
+        const pillarCount = 4;
+        const pillarMesh = new THREE.InstancedMesh(this.pillarGeo, this.stoneMaterial, pillarCount);
+        pillarMesh.castShadow = true;
+        pillarMesh.receiveShadow = true;
+
+        const pillarPositions = [
+            { x: -4.5, z: -4.5 },
+            { x:  4.5, z: -4.5 },
+            { x: -4.5, z:  4.5 },
+            { x:  4.5, z:  4.5 }
+        ];
+
+        pillarPositions.forEach((pos, i) => {
+            const py = this.getTerrainHeight(centerX + pos.x, centerZ + pos.z);
+            const isToppled = this.hash2D(pos.x, pos.z) < 0.4;
+
+            dummy.position.set(pos.x, py, pos.z);
+            if (isToppled) {
+                // Toppled pillar lying on ground
+                dummy.rotation.set(
+                    Math.PI / 2 + (this.hash2D(i, pos.x) - 0.5) * 0.2,
+                    this.hash2D(pos.x, pos.z) * Math.PI * 2,
+                    0
+                );
+            } else {
+                // Standing or slightly tilted pillar
+                dummy.rotation.set(
+                    (this.hash2D(pos.x, i) - 0.5) * 0.12,
+                    this.hash2D(i, pos.z) * Math.PI * 2,
+                    (this.hash2D(i, pos.y) - 0.5) * 0.12
+                );
+            }
+
+            const heightScale = 0.6 + this.hash2D(pos.x * 2, pos.z * 2) * 0.5;
+            dummy.scale.set(1.0, heightScale, 1.0);
+            dummy.updateMatrix();
+
+            pillarMesh.setMatrixAt(i, dummy.matrix);
+
+            // Add physical rigid body if Rapier is available
+            if (window.GameCore?.world && window.RAPIER) {
+                try {
+                    const bodyDesc = window.RAPIER.RigidBodyDesc.fixed()
+                        .setTranslation(centerX + pos.x, py + 3.5, centerZ + pos.z);
+                    const body = window.GameCore.world.createRigidBody(bodyDesc);
+                    const colliderDesc = window.RAPIER.ColliderDesc.cylinder(3.5, 0.9);
+                    window.GameCore.world.createCollider(colliderDesc, body);
+                } catch (e) {
+                    // Non-fatal physics fallback
                 }
             }
+        });
+
+        pillarMesh.instanceMatrix.needsUpdate = true;
+        chunkGroup.add(pillarMesh);
+
+        if (this.scene) {
+            this.scene.add(chunkGroup);
         }
 
-        const chunk = new BlockTerrainChunk(blockData.length, this.cubeGeo, this.stoneMat);
-        chunk.buildChunk(blockData);
-        scene.add(chunk.mesh);
-        this.ruinChunks.push(chunk);
-        return chunk;
+        this.activeRuins.set(chunkKey, chunkGroup);
     }
 
-    // --- 3. PROCEDURAL CIRCULAR TEMPLE / SHRINE ---
-    spawnRuinedTemple(scene, centerX, centerZ, radius = 8, pillarCount = 6) {
-        const blockData = [];
-        const getTerrainY = window.WorldGenerator?.getTerrainHeight || (() => 0);
-        const centerY = getTerrainY(centerX, centerZ);
+    /**
+     * Unloads ruin objects for a chunk.
+     * @param {string} chunkKey 
+     */
+    unloadRuinsForChunk(chunkKey) {
+        const group = this.activeRuins.get(chunkKey);
+        if (!group) return;
 
-        // Tiered Center Dais (Altar Platform)
-        for (let ring = 0; ring < 3; ring++) {
-            const ringRadius = radius * (1.0 - ring * 0.25);
-            const stepHeight = 0.5;
-            const blocksInRing = Math.floor(ringRadius * 3);
-
-            for (let i = 0; i < blocksInRing; i++) {
-                const angle = (i / blocksInRing) * Math.PI * 2;
-                const bx = centerX + Math.cos(angle) * ringRadius;
-                const bz = centerZ + Math.sin(angle) * ringRadius;
-                const by = centerY + (ring * stepHeight) + 0.25;
-
-                blockData.push({
-                    x: bx,
-                    y: by,
-                    z: bz,
-                    scaleX: 1.5,
-                    scaleY: 0.5,
-                    scaleZ: 1.5,
-                    rotX: 0,
-                    rotY: angle,
-                    rotZ: 0
-                });
+        group.traverse(child => {
+            if (child.isMesh || child.isInstancedMesh) {
+                child.geometry?.dispose();
             }
+        });
+
+        if (group.parent) {
+            group.parent.remove(group);
         }
 
-        // Outer Pillars
-        for (let i = 0; i < pillarCount; i++) {
-            const angle = (i / pillarCount) * Math.PI * 2;
-            const px = centerX + Math.cos(angle) * (radius + 2);
-            const pz = centerZ + Math.sin(angle) * (radius + 2);
-            const py = getTerrainY(px, pz);
+        this.activeRuins.delete(chunkKey);
+    }
 
-            const pillarHeight = 3 + Math.floor(Math.random() * 4); // Variable ruined pillar heights
-
-            for (let h = 0; h < pillarHeight; h++) {
-                const isTop = h === pillarHeight - 1;
-                const tilt = isTop ? 0.35 : 0.05; // Broken top pillar block tilts dangerously
-
-                blockData.push({
-                    x: px,
-                    y: py + (h * 1.2) + 0.6,
-                    z: pz,
-                    scaleX: 1.2,
-                    scaleY: 1.2,
-                    scaleZ: 1.2,
-                    rotX: (Math.random() - 0.5) * tilt,
-                    rotY: Math.random() * Math.PI,
-                    rotZ: (Math.random() - 0.5) * tilt
-                });
+    /**
+     * Clears all generated ruin instances and disposes resources.
+     */
+    clearAll() {
+        for (const [key, group] of this.activeRuins.entries()) {
+            group.traverse(child => {
+                if (child.isMesh || child.isInstancedMesh) {
+                    child.geometry?.dispose();
+                }
+            });
+            if (group.parent) {
+                group.parent.remove(group);
             }
         }
-
-        const chunk = new BlockTerrainChunk(blockData.length, this.cubeGeo, this.stoneMat);
-        chunk.buildChunk(blockData);
-        scene.add(chunk.mesh);
-        this.ruinChunks.push(chunk);
-        return chunk;
+        this.activeRuins.clear();
     }
 }
 
-window.RuinsSystem = new RuinsSystem();
+// Global Singleton Binding
+if (typeof window !== 'undefined') {
+    window.RuinsSystem = new RuinsSystem();
+}
+
+export { RuinsSystem };
+export default window.RuinsSystem;
