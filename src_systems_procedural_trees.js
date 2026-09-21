@@ -5,12 +5,15 @@ class ProceduralTreeBuilder {
         this.trunkMaterial = null;
         this.foliageMaterial = null;
         this.dummy = new THREE.Object3D();
+        this.tierDummy = new THREE.Object3D();
         this.initialized = false;
+        this.time = 0;
     }
 
     initMaterials() {
         if (this.initialized) return;
 
+        // --- TRUNK MATERIAL ---
         this.trunkMaterial = new THREE.MeshStandardMaterial({
             roughness: 0.9,
             metalness: 0.05
@@ -18,6 +21,7 @@ class ProceduralTreeBuilder {
 
         this.trunkMaterial.onBeforeCompile = (shader) => {
             shader.uniforms.uTime = { value: 0 };
+            this.trunkShader = shader; // Save reference to update uTime
 
             shader.vertexShader = `
                 varying vec3 vWorldPos;
@@ -78,6 +82,7 @@ class ProceduralTreeBuilder {
             );
         };
 
+        // --- FOLIAGE MATERIAL ---
         this.foliageMaterial = new THREE.MeshStandardMaterial({
             roughness: 0.75,
             metalness: 0.0,
@@ -86,11 +91,13 @@ class ProceduralTreeBuilder {
 
         this.foliageMaterial.onBeforeCompile = (shader) => {
             shader.uniforms.uTime = { value: 0 };
+            this.foliageShader = shader; // Save reference to update uTime
 
             shader.vertexShader = `
                 varying vec3 vWorldPos;
                 varying vec3 vWorldNormal;
                 varying float vHeight;
+                uniform float uTime;
                 ${shader.vertexShader}
             `;
 
@@ -109,8 +116,10 @@ class ProceduralTreeBuilder {
                 #endif
 
                 float heightFactor = clamp(position.y / 20.0, 0.0, 1.0);
-                float windMain = sin(vWorldPos.x * 0.2 + vWorldPos.z * 0.2) * 0.5 * heightFactor;
-                float windJitter = cos(vWorldPos.y * 3.0) * 0.12 * heightFactor;
+                
+                // Animated Wind integration (using uTime)
+                float windMain = sin(vWorldPos.x * 0.2 + vWorldPos.z * 0.2 + (uTime * 1.5)) * 0.5 * heightFactor;
+                float windJitter = cos(vWorldPos.y * 3.0 + (uTime * 3.0)) * 0.12 * heightFactor;
 
                 transformed.x += windMain + windJitter;
                 transformed.z += (windMain * 0.5) + windJitter;
@@ -145,9 +154,7 @@ class ProceduralTreeBuilder {
         this.initialized = true;
     }
 
-    createTreeGeometry(height = 22, baseRadius = 1.6) {
-        const group = new THREE.Group();
-
+    createTrunkGeometry(height = 22, baseRadius = 1.6) {
         const trunkGeo = new THREE.CylinderGeometry(baseRadius * 0.4, baseRadius, height, 12, 16);
         const posAttr = trunkGeo.attributes.position;
 
@@ -156,6 +163,7 @@ class ProceduralTreeBuilder {
             let y = posAttr.getY(i);
             let z = posAttr.getZ(i);
 
+            // Base flare mapping
             if (y < -height * 0.3) {
                 let angle = Math.atan2(z, x);
                 let flare = (1.0 + Math.sin(angle * 5.0) * 0.35) * (( -y - (height * 0.3) ) / (height * 0.2));
@@ -163,52 +171,50 @@ class ProceduralTreeBuilder {
                 z += z * flare * 0.25;
             }
 
+            // Pivot shift to base
             posAttr.setXYZ(i, x, y + height / 2, z);
         }
         trunkGeo.computeVertexNormals();
+        return trunkGeo;
+    }
 
-        const trunkMesh = new THREE.Mesh(trunkGeo, this.trunkMaterial);
-        trunkMesh.castShadow = true;
-        trunkMesh.receiveShadow = true;
-        group.add(trunkMesh);
-
-        const tiers = 5;
-        for (let t = 0; t < tiers; t++) {
-            const tierRatio = t / tiers;
-            const coneRadius = (1.0 - tierRatio * 0.6) * 5.5;
-            const coneHeight = 6.0 - tierRatio * 1.5;
-
-            const coneGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 8, 4);
-            coneGeo.translate(0, coneHeight / 2, 0);
-
-            const coneMesh = new THREE.Mesh(coneGeo, this.foliageMaterial);
-            coneMesh.position.y = (height * 0.35) + (t * (height * 0.14));
-            coneMesh.rotation.y = t * 0.75;
-            coneMesh.castShadow = true;
-            coneMesh.receiveShadow = true;
-            group.add(coneMesh);
-        }
-
-        return group;
+    createFoliageGeometry() {
+        // Base cone geometry normalized for reuse across tiers
+        const coneGeo = new THREE.ConeGeometry(1, 1, 8, 4);
+        coneGeo.translate(0, 0.5, 0); // Pivot at base of cone
+        return coneGeo;
     }
 
     spawnProceduralGrove(scene, centerX, centerZ, count = 40, radius = 50) {
         this.initMaterials();
 
-        const group = new THREE.Group();
-        const baseTree = this.createTreeGeometry(22, 1.6);
+        const height = 22;
+        const tiers = 5;
 
-        const trunkMesh = baseTree.children[0];
-        const instancedTrunks = new THREE.InstancedMesh(trunkMesh.geometry, this.trunkMaterial, count);
+        // 1. Initialize Geometries
+        const trunkGeo = this.createTrunkGeometry(height, 1.6);
+        const foliageGeo = this.createFoliageGeometry();
+
+        // 2. Setup Instanced Meshes (The Core Optimization)
+        // Draw Calls: 2 (1 for all trunks, 1 for all foliage across all trees)
+        const instancedTrunks = new THREE.InstancedMesh(trunkGeo, this.trunkMaterial, count);
         instancedTrunks.castShadow = true;
         instancedTrunks.receiveShadow = true;
+
+        const instancedFoliage = new THREE.InstancedMesh(foliageGeo, this.foliageMaterial, count * tiers);
+        instancedFoliage.castShadow = true;
+        instancedFoliage.receiveShadow = true;
 
         const getTerrainY = (x, z) => {
             const h = window.WorldGenerator?.getTerrainHeight?.(x, z) ?? 0;
             return Number.isFinite(h) ? h : 0;
         };
 
+        let foliageIndex = 0;
+
+        // 3. Populate Instance Matrices
         for (let i = 0; i < count; i++) {
+            // Tree Transform
             const angle = Math.random() * Math.PI * 2;
             const dist = Math.sqrt(Math.random()) * radius;
             const wx = centerX + Math.cos(angle) * dist;
@@ -217,6 +223,7 @@ class ProceduralTreeBuilder {
 
             const scale = 0.75 + Math.random() * 0.5;
 
+            // Compute Trunk Matrix
             this.dummy.position.set(wx, wy, wz);
             this.dummy.rotation.set((Math.random() - 0.5) * 0.08, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.08);
             this.dummy.scale.set(scale, scale, scale);
@@ -224,19 +231,42 @@ class ProceduralTreeBuilder {
 
             instancedTrunks.setMatrixAt(i, this.dummy.matrix);
 
-            for (let c = 1; c < baseTree.children.length; c++) {
-                const bough = baseTree.children[c];
-                const boughClone = bough.clone();
-                boughClone.position.add(this.dummy.position);
-                boughClone.scale.multiplyScalar(scale);
-                group.add(boughClone);
+            // Compute Foliage Tier Matrices
+            for (let t = 0; t < tiers; t++) {
+                const tierRatio = t / tiers;
+                const coneRadius = (1.0 - tierRatio * 0.6) * 5.5;
+                const coneHeight = 6.0 - tierRatio * 1.5;
+                const yPos = (height * 0.35) + (t * (height * 0.14));
+
+                // Local tier transform
+                this.tierDummy.position.set(0, yPos, 0);
+                this.tierDummy.rotation.set(0, t * 0.75, 0);
+                this.tierDummy.scale.set(coneRadius, coneHeight, coneRadius);
+                this.tierDummy.updateMatrix();
+
+                // Multiply local tier matrix by global tree matrix
+                this.tierDummy.matrix.premultiply(this.dummy.matrix);
+
+                instancedFoliage.setMatrixAt(foliageIndex, this.tierDummy.matrix);
+                foliageIndex++;
             }
         }
 
         instancedTrunks.instanceMatrix.needsUpdate = true;
+        instancedFoliage.instanceMatrix.needsUpdate = true;
+
+        const group = new THREE.Group();
         group.add(instancedTrunks);
+        group.add(instancedFoliage);
         scene.add(group);
+
         return group;
+    }
+
+    update(delta) {
+        this.time += delta;
+        if (this.trunkShader) this.trunkShader.uniforms.uTime.value = this.time;
+        if (this.foliageShader) this.foliageShader.uniforms.uTime.value = this.time;
     }
 }
 
