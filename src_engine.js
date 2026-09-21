@@ -2108,3 +2108,5 @@ window.addEventListener('DOMContentLoaded', () => {
         window.EventBus?.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
     }, { once: true }); 
 });
+
+bootEngine();
