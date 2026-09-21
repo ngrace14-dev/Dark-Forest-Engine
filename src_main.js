@@ -12,6 +12,7 @@ import './src_systems_inventory.js';
 import { initializeUIEngine } from './src/ui/init.js';
 import './src_systems_ui.js';
 import './src_systems_render_optimizer.js'; // Rendering & Shader LOD Optimizer
+import './src_systems_graphics.js';         // <-- NEW: Dedicated AAA Graphics Pipeline
 import './src_systems_input.js';
 import './src_systems_audio.js';
 import './src_systems_vfx.js';
