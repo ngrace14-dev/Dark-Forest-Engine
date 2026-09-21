@@ -1,15 +1,10 @@
 import * as THREE from 'three';
 
-/**
- * Northern California Mountains System
- * Reference: IMG_3353.jpg Architecture
- */
 export class MountainSystem {
     constructor(engine, maxInstances = 300000) {
         this.engine = engine;
         this.maxInstances = maxInstances;
         this.time = 0;
-        
         this.initMaterials();
         this.initGeometries();
         this.mountainChunks = [];
@@ -43,30 +38,21 @@ export class MountainSystem {
                 '#include <color_fragment>',
                 `
                 #include <color_fragment>
-
-                // [SCREEN-SPACE DERIVATIVE BUMP MAPPING (dFdx/dFdy)]
                 vec3 dX = dFdx(vWorldPos * 2.0);
                 vec3 dY = dFdy(vWorldPos * 2.0);
                 vec3 derivedNormal = normalize(cross(dX, dY));
-                
-                // Blend built-in vNormal with the high-frequency derived normal
                 vec3 finalNormal = normalize(mix(vNormal, derivedNormal, 0.7));
 
                 float slope = 1.0 - max(0.0, finalNormal.y);
 
-                // [PROCEDURAL SHADING: HEIGHT & SLOPE COLOR BLENDING]
                 vec3 pineDuffColor = vec3(0.18, 0.15, 0.11);
                 vec3 screeColor = vec3(0.35, 0.35, 0.38); 
                 vec3 graniteColor = vec3(0.22, 0.23, 0.25);
                 vec3 snowColor = vec3(0.9, 0.92, 0.95);    
 
                 vec3 terrainColor = pineDuffColor;
-
-                float screeBlend = smoothstep(0.2, 0.45, slope);
-                terrainColor = mix(terrainColor, screeColor, screeBlend);
-
-                float graniteBlend = smoothstep(0.5, 0.8, slope);
-                terrainColor = mix(terrainColor, graniteColor, graniteBlend);
+                terrainColor = mix(terrainColor, screeColor, smoothstep(0.2, 0.45, slope));
+                terrainColor = mix(terrainColor, graniteColor, smoothstep(0.5, 0.8, slope));
 
                 float snowElevation = smoothstep(120.0, 180.0, vWorldPos.y);
                 float snowSlopeStick = 1.0 - smoothstep(0.3, 0.6, slope);
@@ -74,7 +60,6 @@ export class MountainSystem {
 
                 diffuseColor.rgb = terrainColor;
 
-                // [ATMOSPHERE & DEPTH] 3km Volumetric Rayleigh distance fade
                 float distToCam = distance(vWorldPos, uCameraPos);
                 diffuseColor.a *= 1.0 - smoothstep(2500.0, 3000.0, distToCam);
                 `
@@ -82,12 +67,10 @@ export class MountainSystem {
                 '#include <roughnessmap_fragment>',
                 `
                 #include <roughnessmap_fragment>
-                // Calculate roughness separately where the variable exists
                 float slopeR = 1.0 - max(0.0, vNormal.y);
                 float snowElevationR = smoothstep(120.0, 180.0, vWorldPos.y);
                 float snowSlopeStickR = 1.0 - smoothstep(0.3, 0.6, slopeR);
                 float graniteBlendR = smoothstep(0.5, 0.8, slopeR);
-                
                 roughnessFactor = mix(0.95, 0.6, snowElevationR * snowSlopeStickR + graniteBlendR * 0.4);
                 `
             );
@@ -143,7 +126,6 @@ export class MountainSystem {
     initGeometries() {
         this.terrainGeo = new THREE.PlaneGeometry(100, 100, 64, 64);
         this.terrainGeo.rotateX(-Math.PI / 2);
-
         this.pineGeo = new THREE.ConeGeometry(2, 10, 8);
         this.pineGeo.translate(0, 5, 0); 
     }
