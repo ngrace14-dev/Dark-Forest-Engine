@@ -264,18 +264,26 @@ function updateEntities(delta) {
 }
 
 function processEntityStatusEffects(entity, delta) {
+    if (!entity.statusEffects) return;
     for (let j = entity.statusEffects.length - 1; j >= 0; j--) {
         const effect = entity.statusEffects[j];
-        effect.remaining -= delta; effect.tickTimer -= delta;
+        effect.remaining -= delta; 
+        effect.tickTimer -= delta;
         if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
             effect.tickTimer = 1;
-            const resistance = window.GameCore.getResistance(effect.type);
+            const resistance = window.GameCore?.getResistance?.(effect.type) || 0;
             const tickDamage = Math.max(1, effect.tickDamage - resistance);
-            window.GameState.pStats.hp = Math.max(0, window.GameState.pStats.hp - tickDamage);
-            window.EventBus.emit('ENTITY_DAMAGED', { damage: tickDamage, position: window.GameCore.playerObj.visual.position, isPlayer: true });
+            entity.hp = Math.max(0, entity.hp - tickDamage);
+            window.EventBus.emit('ENTITY_DAMAGED', { damage: tickDamage, position: entity.visual.position, isPlayer: false });
+            window.EventBus.emit('SPAWN_HIT_VFX', { type: effect.type === 'burning' ? 'Fire' : 'Void', pos: entity.visual.position });
+            
+            if (entity.hp <= 0) {
+                handleEntityDeath(entity);
+                break;
+            }
         }
-        return effect.remaining > 0;
-    });
+        if (effect.remaining <= 0) entity.statusEffects.splice(j, 1);
+    }
 }
 
 function alignEntityToGround(entity, delta, raycaster, downVector) {
@@ -359,9 +367,7 @@ function updatePlayerMovement(delta) {
     if (window.Input.isMoving) {
         moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle || Math.PI); 
         
-        // RECALIBRATED 15-MINUTE MILE BASE SPEED: ~1.7882 m/s
         const BASE_STARTING_SPEED = 1609.344 / 900.0; 
-        
         const athleticsLvl = window.GameState.pStats?.athletics?.level || 0;
         const athleticsBonus = window.GameCore.getBuffBonus?.('athletics') || 0;
         
@@ -2025,6 +2031,7 @@ async function bootEngine() {
         const startY = safeGetTerrainHeight(0, 0); const safeY = isNaN(startY) ? 1 : startY;
         spawnPlayer(0, safeY + 3.0, 0); spawnPartyMembers(); ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
 
+        // Auto-generate Capital City on engine boot
         if (window.CapitalCityManager) {
             window.CapitalCityManager.generateCapital();
         }
