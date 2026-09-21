@@ -12,14 +12,15 @@ import './src_systems_inventory.js';
 import { initializeUIEngine } from './src/ui/init.js';
 import './src_systems_ui.js';
 import './src_systems_render_optimizer.js'; 
-import './src_systems_graphics.js';         // Dedicated AAA Graphics Pipeline & Post-Processing
-import './src_systems_volumetric_fog.js';   // <-- ADDED: Atmospheric Height-Fog Shader
-import './src_systems_terrain_worker_pool.js'; // <-- ADDED: Background Web Worker Pool
-import './src_systems_block_terrain.js';     // NEW: Procedural Block Terrain & Shader System
+import './src_systems_graphics.js';          // Dedicated AAA Graphics Pipeline & Post-Processing
+import './src_systems_volumetric_fog.js';    // Atmospheric Height-Fog Shader
+import './src_systems_terrain_worker_pool.js'; // Background Web Worker Pool
+import './src_systems_block_terrain.js';      // Procedural Block Terrain & Shader System
 import './src_systems_grass.js';
-import './src_systems_ruins.js';            // <-- ADDED: Procedural Stone Ruins & Cobblestones
-import './src_systems_procedural_trees.js';  // <-- ADDED: High-Quality Procedural Trees
-import './src_systems_forest_impostors.js';   // <-- ADDED: 3km Distant Canopy Impostor System
+import './src_systems_ruins.js';             // Procedural Stone Ruins & Cobblestones
+import './src_generators_redwood.js';        // <-- ADDED: Redwood Generator & Web Worker Orchestrator
+import './src_systems_procedural_trees.js';   // High-Quality Procedural Trees
+import './src_systems_forest_impostors.js';   // 3km Distant Canopy Impostor System
 import { WetlandsSystem } from './src_systems_wetlands.js';
 import { MountainSystem } from './src_systems_mountains.js';
 import { DunesSystem } from './src_systems_dunes.js';
@@ -28,7 +29,7 @@ import './src_systems_audio.js';
 import './src_systems_vfx.js';
 import './src_systems_navigation_v2.js';
 import './src_systems_roads.js';
-import './src_systems_road_renderer.js';     // <-- ADDED: Procedural Road Decor & Lanterns
+import './src_systems_road_renderer.js';     // Procedural Road Decor & Lanterns
 import './src_systems_villages.js';
 import './src_systems_adventurers.js';
 import './src_systems_ai.js';
