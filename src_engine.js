@@ -135,7 +135,7 @@ function updateCameraAndShadows(delta) {
 
 function updateWorldClock(delta) {
     if (!window.NetworkSession?.connected) {
-        const hoursPerSecond = 24 / window.EngineParams.dayLengthSeconds;
+        const hoursPerSecond = 24 / (window.EngineParams?.dayLengthSeconds || 1200);
         window.EngineParams.timeOfDay += delta * hoursPerSecond;
         if (window.EngineParams.timeOfDay >= 24) {
             const elapsedDays = Math.floor(window.EngineParams.timeOfDay / 24);
@@ -146,14 +146,14 @@ function updateWorldClock(delta) {
                 window.AdventurerManager?.advanceDay();
                 window.GameState?.processCrowDay?.();
             }
-            if (window.EngineParams.worldDay > 0 && window.EngineParams.worldDay % window.EngineParams.cycleLengthDays === 0) regenerateWorldCycle();
+            if (window.EngineParams.worldDay > 0 && window.EngineParams.worldDay % (window.EngineParams.cycleLengthDays || 14) === 0) regenerateWorldCycle();
         }
     }
-    window.EventBus.emit('ENV_UPDATE');
+    window.EventBus?.emit('ENV_UPDATE');
 }
 
 function updatePeriodicSystems() {
-    if (window.VillageManager && window.VillageManager.simulateNextVillage) {
+    if (window.VillageManager?.simulateNextVillage) {
         window.VillageManager.simulateNextVillage();
     }
     window.AdventurerManager?.syncDeparted();
@@ -161,11 +161,12 @@ function updatePeriodicSystems() {
 }
 
 function updatePlayerStats(delta) {
+    if (!window.GameState?.pStats || !window.Input) return;
+    
     window.EngineParams.isPlayerSafe = false; 
     window.EngineParams.isPlayerHidden = false;
     const staminaMultiplier = 1 + (window.GameState.forestBlessing?.staminaRegen || 0);
     
-    // Regenerate stamina when not sprinting or blocking
     if (!window.Input.isSprinting && !window.Input.isBlocking) {
         window.GameState.pStats.stamina = Math.min(
             window.GameState.pStats.maxStamina, 
@@ -173,36 +174,38 @@ function updatePlayerStats(delta) {
         );
     }
 
-    if (performance.now() >= window.GameState.pStats.guardBrokenUntil) {
+    if (performance.now() >= (window.GameState.pStats.guardBrokenUntil || 0)) {
         window.GameState.pStats.poise = Math.min(window.GameState.pStats.maxPoise, window.GameState.pStats.poise + 10 * delta);
     }
     
-    window.GameState.statusEffects = window.GameState.statusEffects.filter(effect => {
-        effect.remaining -= delta; effect.tickTimer -= delta;
-        if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
-            effect.tickTimer = 1;
-            const resistance = window.GameCore.getResistance(effect.type);
-            const tickDamage = Math.max(1, effect.tickDamage - resistance);
-            window.GameState.pStats.hp = Math.max(0, window.GameState.pStats.hp - tickDamage);
-            window.EventBus.emit('ENTITY_DAMAGED', { damage: tickDamage, position: window.GameCore.playerObj.visual.position, isPlayer: true });
-        }
-        return effect.remaining > 0;
-    });
+    if (window.GameState.statusEffects) {
+        window.GameState.statusEffects = window.GameState.statusEffects.filter(effect => {
+            effect.remaining -= delta; effect.tickTimer -= delta;
+            if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
+                effect.tickTimer = 1;
+                const resistance = window.GameCore?.getResistance?.(effect.type) || 0;
+                const tickDamage = Math.max(1, effect.tickDamage - resistance);
+                window.GameState.pStats.hp = Math.max(0, window.GameState.pStats.hp - tickDamage);
+                window.EventBus?.emit('ENTITY_DAMAGED', { damage: tickDamage, position: window.GameCore.playerObj.visual.position, isPlayer: true });
+            }
+            return effect.remaining > 0;
+        });
+    }
 }
 
 function updateEntities(delta) {
-    const playerAlive = window.GameCore.playerObj && window.GameState.pStats.hp > 0;
+    const playerAlive = window.GameCore?.playerObj && window.GameState?.pStats?.hp > 0;
     const playerPosition = playerAlive ? window.GameCore.playerObj.visual.position : null;
-    const detectionRadiusSq = playerAlive ? Math.pow(window.GameState.forestBlessing?.dangerSense ? 18 : 15, 2) : 0;
+    const detectionRadiusSq = playerAlive ? Math.pow(window.GameState?.forestBlessing?.dangerSense ? 18 : 15, 2) : 0;
     const nowSecs = performance.now() / 1000;
-    const camPos = window.GameCore.camera ? window.GameCore.camera.position : _v1.set(0,0,0);
+    const camPos = window.GameCore?.camera ? window.GameCore.camera.position : _v1.set(0,0,0);
     const raycaster = new THREE.Raycaster();
     const downVector = new THREE.Vector3(0, -1, 0);
 
     let isHidden = false;
     let hostileNearby = false;
 
-    for (let i = window.GameCore.activeEntities.length - 1; i >= 0; i--) {
+    for (let i = (window.GameCore?.activeEntities?.length || 0) - 1; i >= 0; i--) {
         const entity = window.GameCore.activeEntities[i];
         if (!entity || !entity.visual || !entity.body) continue;
         
@@ -216,34 +219,34 @@ function updateEntities(delta) {
         }
 
         window.GameCore.SpatialGrid?.updateEntity?.(entity);
-        window.VATManager?.processLOD(entity, camPos);
+        window.VATManager?.processLOD?.(entity, camPos);
 
-        if (entity.def.type === 'npc' && entity.statusEffects?.length > 0 && entity.hp > 0) {
+        if (entity.def?.type === 'npc' && entity.statusEffects?.length > 0 && entity.hp > 0) {
             processEntityStatusEffects(entity, delta);
         }
 
-        if (entity.def.type === 'npc' || entity.def.type === 'character') {
+        if (entity.def?.type === 'npc' || entity.def?.type === 'character') {
             alignEntityToGround(entity, delta, raycaster, downVector);
         }
 
         if (playerAlive && entity.hp > 0) {
             const distSq = entity.visual.position.distanceToSquared(playerPosition);
-            if (!isHidden && entity.def.concealment) {
+            if (!isHidden && entity.def?.concealment) {
                 const hideRad = entity.def.hideRadius || entity.def.radius;
                 if (distSq <= hideRad * hideRad) isHidden = true;
             }
-            if (entity.def.touchEffect && entity.def.active !== false) {
+            if (entity.def?.touchEffect && entity.def?.active !== false) {
                 const touchRad = entity.def.touchRadius || entity.def.radius + 1;
                 if (distSq <= touchRad * touchRad) {
                     if (!entity.touchEffectAvailableAt || nowSecs >= entity.touchEffectAvailableAt) {
                         entity.touchEffectAvailableAt = nowSecs + (entity.def.touchCooldown || 4);
-                        window.EventBus.emit('SPAWN_HIT_VFX', { type: entity.def.touchEffect, pos: entity.visual.position.clone().add(_v1.set(0, 1, 0)) });
-                        if (entity.def.touchEffect === 'Poison') window.GameCore.applyStatusEffect('poison', 6, 3);
-                        window.EventBus.emit('UI_LOG', 'Poison cloud released by the flesh pods.');
+                        window.EventBus?.emit('SPAWN_HIT_VFX', { type: entity.def.touchEffect, pos: entity.visual.position.clone().add(_v1.set(0, 1, 0)) });
+                        if (entity.def.touchEffect === 'Poison') window.GameCore.applyStatusEffect?.('poison', 6, 3);
+                        window.EventBus?.emit('UI_LOG', 'Poison cloud released by the flesh pods.');
                     }
                 }
             }
-            if (!hostileNearby && entity.def.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest')) {
+            if (!hostileNearby && entity.def?.type === 'npc' && (entity.def.faction === 'monster' || entity.def.faction === 'forest')) {
                 if (distSq < detectionRadiusSq) hostileNearby = true;
             }
         }
@@ -253,10 +256,10 @@ function updateEntities(delta) {
         window.EngineParams.isPlayerHidden = isHidden;
         try {
             const p = window.GameCore.playerObj.body.translation(); 
-            window.EngineParams.isPlayerSafe = window.RoadManager.isSafeZone(p) || window.CapitalCityManager?.isInsideCapital(p.x, p.z);
+            window.EngineParams.isPlayerSafe = window.RoadManager?.isSafeZone?.(p) || window.CapitalCityManager?.isInsideCapital?.(p.x, p.z) || false;
 
             if (!window.EngineParams.isPlayerSafe && !window.EngineParams.isPlayerHidden && hostileNearby && !window.EngineParams.godMode && window.EngineParams.offPathCaptureCooldown <= 0) {
-                const pathPoint = window.RoadManager.getRandomPathPoint();
+                const pathPoint = window.RoadManager?.getRandomPathPoint?.();
                 if (pathPoint) {
                     ChunkManager.forceUpdatePosition(new THREE.Vector3(pathPoint.x, 0, pathPoint.z));
                     const safeY = safeGetTerrainHeight(pathPoint.x, pathPoint.z) + 5.0;
@@ -264,7 +267,7 @@ function updateEntities(delta) {
                     window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setTranslation({ x: pathPoint.x, y: safeY, z: pathPoint.z }, true);
                     window.EngineParams.offPathCaptureCooldown = 10;
-                    window.EventBus.emit('UI_LOG', 'The forest caught you off the safe path and dragged you back to the road.');
+                    window.EventBus?.emit('UI_LOG', 'The forest caught you off the safe path and dragged you back to the road.');
                 }
             }
         } catch (e) {
@@ -284,8 +287,8 @@ function processEntityStatusEffects(entity, delta) {
             const resistance = window.GameCore?.getResistance?.(effect.type) || 0;
             const tickDamage = Math.max(1, effect.tickDamage - resistance);
             entity.hp = Math.max(0, entity.hp - tickDamage);
-            window.EventBus.emit('ENTITY_DAMAGED', { damage: tickDamage, position: entity.visual.position, isPlayer: false });
-            window.EventBus.emit('SPAWN_HIT_VFX', { type: effect.type === 'burning' ? 'Fire' : 'Void', pos: entity.visual.position });
+            window.EventBus?.emit('ENTITY_DAMAGED', { damage: tickDamage, position: entity.visual.position, isPlayer: false });
+            window.EventBus?.emit('SPAWN_HIT_VFX', { type: effect.type === 'burning' ? 'Fire' : 'Void', pos: entity.visual.position });
             
             if (entity.hp <= 0) {
                 handleEntityDeath(entity);
@@ -297,6 +300,7 @@ function processEntityStatusEffects(entity, delta) {
 }
 
 function alignEntityToGround(entity, delta, raycaster, downVector) {
+    if (!entity?.visual) return;
     const ePos = entity.visual.position;
     raycaster.set(_v1.set(ePos.x, ePos.y + 2, ePos.z), downVector);
     const activeMeshes = [];
@@ -318,37 +322,41 @@ function alignEntityToGround(entity, delta, raycaster, downVector) {
 
 function handleEntityDeath(entity) {
     playEntityAnimation(entity, 'die');
-    window.AdventurerManager?.markDefeated(entity);
+    window.AdventurerManager?.markDefeated?.(entity);
     
     if (entity.name === 'Deer') {
-        window.CareerManager?.addXP('hunter', 25);
-        window.EventBus.emit('UI_LOG', `[HUNTER] You have harvested a deer carcass.`);
+        window.CareerManager?.addXP?.('hunter', 25);
+        window.EventBus?.emit('UI_LOG', `[HUNTER] You have harvested a deer carcass.`);
     }
 
-    if (window.GameCore.spawnGroundLoot) {
+    if (window.GameCore?.spawnGroundLoot) {
         const lootType = entity.name === 'Deer' ? 'food' : (entity.def?.faction === 'forest' ? 'corrupted_resin' : 'beast_bones');
         window.GameCore.spawnGroundLoot(lootType, entity.visual.position);
     }
 
     awardMonsterKill(entity);
-    window.GameState.inventory.gold += entity.def?.faction === 'monster' ? 10 : 50;
-    window.EventBus.emit('UI_UPDATE_HUD');
+    if (window.GameState?.inventory) {
+        window.GameState.inventory.gold += entity.def?.faction === 'monster' ? 10 : 50;
+    }
+    window.EventBus?.emit('UI_UPDATE_HUD');
     
     setTimeout(() => {
-        if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(entity.id);
-        window.GameCore.releaseEntityIndex(entity.memoryIndex);
-        window.GameCore.SpatialGrid?.unregisterEntity?.(entity);
-        if (entity.visual) window.GameCore.scene.remove(entity.visual);
-        if (entity.body) {
+        if (window.GameCore?.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(entity.id);
+        if (window.GameCore?.releaseEntityIndex) window.GameCore.releaseEntityIndex(entity.memoryIndex);
+        window.GameCore?.SpatialGrid?.unregisterEntity?.(entity);
+        if (entity.visual && window.GameCore?.scene) window.GameCore.scene.remove(entity.visual);
+        if (entity.body && window.GameCore?.world) {
             window.GameCore.world.removeRigidBody(entity.body);
             entity.body = null;
         }
-        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(candidate => candidate.id !== entity.id);
+        if (window.GameCore?.activeEntities) {
+            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(candidate => candidate.id !== entity.id);
+        }
     }, 2000);
 }
 
 function updatePlayerMovement(delta) {
-    if (!window.GameCore.playerObj || !window.GameCore.playerObj.visual || !window.GameCore.playerObj.body) return;
+    if (!window.Input || !window.GameCore?.playerObj?.visual || !window.GameCore.playerObj.body) return;
     
     let p;
     try {
@@ -363,13 +371,13 @@ function updatePlayerMovement(delta) {
 
     const moveDir = _v1.set(0, 0, 0); 
     if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') {
-        if (window.Input.keys.w) moveDir.z -= 1; 
-        if (window.Input.keys.s) moveDir.z += 1; 
-        if (window.Input.keys.a) moveDir.x -= 1; 
-        if (window.Input.keys.d) moveDir.x += 1;
+        if (window.Input.keys?.w) moveDir.z -= 1; 
+        if (window.Input.keys?.s) moveDir.z += 1; 
+        if (window.Input.keys?.a) moveDir.x -= 1; 
+        if (window.Input.keys?.d) moveDir.x += 1;
     }
 
-    window.Input.isBlocking = window.Input.keys.shift && window.GameState.pStats.stamina > 0 && performance.now() >= window.GameState.pStats.guardBrokenUntil; 
+    window.Input.isBlocking = window.Input.keys?.shift && (window.GameState?.pStats?.stamina || 0) > 0 && performance.now() >= (window.GameState?.pStats?.guardBrokenUntil || 0); 
     window.Input.isMoving = moveDir.lengthSq() > 0;
 
     const currentVel = window.GameCore.playerObj.body.linvel();
@@ -377,31 +385,29 @@ function updatePlayerMovement(delta) {
     if (window.Input.isMoving) {
         moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle || Math.PI); 
         
-        // BASE WALK SPEED: 1 mile (1609.344m) / 15 minutes (900s) = ~1.7882 m/s
         const BASE_STARTING_SPEED = 1609.344 / 900.0; 
-        const athleticsLvl = window.GameState.pStats?.athletics?.level || 0;
-        const athleticsBonus = window.GameCore.getBuffBonus?.('athletics') || 0;
+        const athleticsLvl = window.GameState?.pStats?.athletics?.level || 0;
+        const athleticsBonus = window.GameCore?.getBuffBonus?.('athletics') || 0;
         
         const speedMultiplier = 1.0 + (athleticsLvl * 0.05) + (athleticsBonus * 0.05);
         let maxSpeed = BASE_STARTING_SPEED * speedMultiplier;
 
-        // SPACEBAR SPRINTING (Holding Space + Moving + Has Stamina)
-        const isSpaceHeld = window.Input.keys[' '];
-        const canSprint = isSpaceHeld && window.GameState.pStats.stamina > 0 && !window.Input.isBlocking;
+        const isSpaceHeld = window.Input.keys?.[' '];
+        const canSprint = isSpaceHeld && (window.GameState?.pStats?.stamina || 0) > 0 && !window.Input.isBlocking;
         window.Input.isSprinting = canSprint;
 
         if (window.Input.isBlocking) {
             maxSpeed *= 0.3; 
-            window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 8 * delta);
+            if (window.GameState?.pStats) window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 8 * delta);
         } else if (window.Input.isSprinting) {
-            maxSpeed *= 1.75; // 75% speed boost while sprinting
-            window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 15 * delta); // 15 stamina/sec cost
-            window.GameCore.addXP?.('athletics', 0.25 * delta);
+            maxSpeed *= 1.75; 
+            if (window.GameState?.pStats) window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 15 * delta); 
+            window.GameCore?.addXP?.('athletics', 0.25 * delta);
         } else {
-            window.GameCore.addXP?.('athletics', 0.05 * delta); 
+            window.GameCore?.addXP?.('athletics', 0.05 * delta); 
         }
 
-        maxSpeed *= (window.GameCore.getCombatInjuryMultiplier?.() || 1.0);
+        maxSpeed *= (window.GameCore?.getCombatInjuryMultiplier?.() || 1.0);
 
         window.GameCore.playerObj.body.setLinvel({
             x: moveDir.x * maxSpeed,
@@ -438,571 +444,9 @@ function updatePlayerMovement(delta) {
         }
     }
 
+    if (window.Input.dashTimer > 0) window.Input.dashTimer -= delta; 
     if (window.Input.attackCooldown > 0) window.Input.attackCooldown -= delta; 
     else window.Input.isAttacking = false;
-}
-
-// ==========================================
-// COMBAT ENGINE
-// ==========================================
-
-function performAttack(isHeavy = false) {
-    if (!window.GameCore?.playerObj?.visual) return;
-    if (window.Input.isBlocking || window.Input.isAttacking) return; 
-    if (window.GameCore.playerObj.currentAnimState === 'hit' || window.GameCore.playerObj.currentAnimState === 'die') return;
-    
-    const isDashStrike = !isHeavy && window.Input.isSprinting;
-    
-    const profile = isHeavy ? 
-        { stamina: 35, cooldown: 1.2, reach: 4.5, radius: 1.5, angle: Math.PI * 0.8, multiplier: 2.2, poise: 2.5, windup: 0.15, duration: 0.35 } : 
-        isDashStrike ? 
-        { stamina: 20, cooldown: 1.0, reach: 5.0, radius: 1.2, angle: Math.PI * 0.4, multiplier: 1.6, poise: 1.8, windup: 0.1, duration: 0.25 } : 
-        { stamina: 15, cooldown: 0.8, reach: 3.5, radius: 1.0, angle: Math.PI * 0.6, multiplier: 1.0, poise: 1.0, windup: 0.1, duration: 0.25 };
-        
-    const currentStamina = window.GameState?.pStats?.stamina ?? 100;
-    if (currentStamina < profile.stamina) { 
-        window.EventBus.emit('UI_LOG', 'Too exhausted to attack.'); 
-        return; 
-    }
-
-    if (window.NetworkSession?.connected) window.NetworkSession.sendAttack(isHeavy);
-
-    window.GameState.pStats.stamina = Math.max(0, currentStamina - profile.stamina); 
-    window.Input.isAttacking = true; 
-    window.Input.attackCooldown = profile.cooldown;
-    
-    playEntityAnimation(window.GameCore.playerObj, 'attack');
-    
-    window.Input.activeSweep = {
-        profile: profile,
-        timer: profile.windup + profile.duration,
-        activeAt: profile.duration, 
-        alreadyHit: new Set(),
-        isHeavy: isHeavy,
-        playerPos: new THREE.Vector3(), 
-        playerForward: new THREE.Vector3()
-    };
-
-    window.GameCore.addXP?.('meleeAtt', isHeavy ? 4 : 2); 
-}
-
-function performGuardbreaker() {
-    if (window.Input.isBlocking || window.Input.isAttacking || window.Input.guardbreakerCooldown > 0 || !window.GameCore.playerObj.visual) return;
-    const currentStamina = window.GameState?.pStats?.stamina ?? 100;
-    if (currentStamina < 30) { window.EventBus.emit('UI_LOG', 'Too exhausted to use Guardbreaker.'); return; }
-    
-    const profile = { stamina: 30, cooldown: 0.7, reach: 3.5, radius: 1.0, angle: Math.PI * 0.4, multiplier: 0.7, poise: 999, windup: 0.2, duration: 0.2, isGuardbreaker: true };
-    
-    window.GameState.pStats.stamina -= profile.stamina;
-    window.Input.guardbreakerCooldown = 5;
-    window.Input.isAttacking = true;
-    window.Input.attackCooldown = profile.cooldown;
-    
-    playEntityAnimation(window.GameCore.playerObj, 'attack');
-    window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'GUARDBREAKER', pos: window.GameCore.playerObj.visual.position, color: '#fbbf24' });
-    
-    window.Input.activeSweep = {
-        profile: profile,
-        timer: profile.windup + profile.duration,
-        activeAt: profile.duration,
-        alreadyHit: new Set(),
-        isHeavy: true 
-    };
-}
-
-function updateCombatHitboxes(delta) {
-    if (!window.Input?.activeSweep || !window.GameCore?.playerObj?.body) return;
-    
-    const sweep = window.Input.activeSweep;
-    sweep.timer -= delta;
-
-    if (sweep.timer <= 0) {
-        window.Input.activeSweep = null;
-        return;
-    }
-
-    if (sweep.timer <= sweep.activeAt) {
-        let pTrans;
-        try {
-            pTrans = window.GameCore.playerObj.body.translation();
-        } catch (e) {
-            return;
-        }
-
-        sweep.playerPos.set(pTrans.x, pTrans.y, pTrans.z);
-        sweep.playerForward.set(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
-        
-        let candidates = [];
-        if (window.GameCore.SpatialGrid?.getNearbyEntities) {
-            candidates = window.GameCore.SpatialGrid.getNearbyEntities(sweep.playerPos.x, sweep.playerPos.z, sweep.profile.reach + 2);
-        }
-        if (!candidates || candidates.length === 0) {
-            candidates = window.GameCore.activeEntities || [];
-        }
-
-        for (let i = candidates.length - 1; i >= 0; i--) {
-            const en = candidates[i];
-            if (!en || en === window.GameCore.playerObj || en.hp <= 0 || sweep.alreadyHit.has(en.id)) continue;
-            if (en.def?.faction === 'player') continue;
-
-            let ePos = en.visual ? en.visual.position : null;
-            if (!ePos && en.body) {
-                try {
-                    const t = en.body.translation();
-                    ePos = _v3.set(t.x, t.y, t.z);
-                } catch(e) { continue; }
-            }
-            if (!ePos) continue;
-
-            const dx = ePos.x - sweep.playerPos.x;
-            const dz = ePos.z - sweep.playerPos.z;
-            const distSq = dx * dx + dz * dz;
-            const reachSq = (sweep.profile.reach + (en.def?.radius || 0.5)) ** 2;
-
-            if (distSq <= reachSq) {
-                _v1.set(dx, 0, dz).normalize();
-                const angleToTarget = sweep.playerForward.angleTo(_v1);
-                
-                if (angleToTarget <= (sweep.profile.angle / 2) || distSq < 1.0) {
-                    sweep.alreadyHit.add(en.id);
-                    
-                    let damageMultiplier = sweep.profile.multiplier;
-                    if (window.Input.isStealth && sweep.isHeavy) {
-                        damageMultiplier *= 5.0;
-                        window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: "ASSASSINATION!", pos: ePos, color: '#ff0000'});
-                        window.EventBus.emit('UI_LOG', `[CRITICAL] You assassinated ${en.name}!`);
-                        window.EventBus.emit('TOGGLE_STEALTH');
-                    }
-
-                    const weaponDmg = window.GameState?.derivedStats?.weaponDamage ?? 10;
-                    const strLvl = window.GameState?.pStats?.strength?.level ?? 1;
-                    const strBuff = window.GameCore?.getBuffBonus?.('strength') ?? 0;
-                    const attBuff = window.GameCore?.getBuffBonus?.('meleeAtt') ?? 0;
-                    const injuryMult = window.GameCore?.getCombatInjuryMultiplier?.() ?? 1.0;
-
-                    const rawDamage = weaponDmg + ((strLvl + strBuff) * 2) + attBuff;
-                    const damage = Math.max(1, Math.floor(rawDamage * damageMultiplier * injuryMult) - (en.def?.armor || 0)); 
-                    
-                    en.hp = Math.max(0, en.hp - damage); 
-                    en.poise = Math.max(0, (en.poise || 10) - (sweep.profile.poise || 10));
-
-                    window.EventBus.emit('ENTITY_DAMAGED', { damage: damage, position: ePos, isPlayer: false });
-                    window.EventBus.emit('SPAWN_HIT_VFX', { type: en.def?.vfx?.onHit || 'Blood', pos: ePos.clone().add(_v1.set(0, 1, 0)) });
-                    
-                    if (sweep.isHeavy || sweep.profile.isGuardbreaker) {
-                        window.Input.hitPauseTimer = 0.08; 
-                        window.Input.camShake = 0.5;
-                        const recoilDir = sweep.playerForward.clone().negate();
-                        if (window.GameCore.playerObj.body) {
-                            window.GameCore.playerObj.body.applyImpulse(_v2.set(recoilDir.x * 5, 0, recoilDir.z * 5), true);
-                        }
-                    } else {
-                        window.Input.hitPauseTimer = 0.03;
-                    }
-
-                    if (en.hp <= 0) {
-                        handleEntityDeath(en);
-                    }
-                }
-            }
-        }
-    }
-}
-
-// EVENT BUS LISTENERS
-window.EventBus.on('PRIMARY_CLICK_DOWN', () => { if(window.Input.attackCooldown <= 0) performAttack(); });
-window.EventBus.on('SECONDARY_CLICK_DOWN', () => { if(window.Input.attackCooldown <= 0) performAttack(true); });
-window.EventBus.on('GUARDBREAKER', performGuardbreaker);
-window.EventBus.on('TOGGLE_STEALTH', () => {
-    if (!window.GameCore.playerObj) return;
-    window.Input.isStealth = !window.Input.isStealth;
-    
-    const player = window.GameCore.playerObj;
-    if (window.Input.isStealth) {
-        window.EventBus.emit('UI_LOG', '[STEALTH] You blend into the surroundings.');
-        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'STEALTH', pos: player.visual.position, color: '#94a3b8' });
-        
-        if (player.body) {
-            const pPos = player.body.translation();
-            const biomeKey = window.WorldGenerator.getBiome(pPos.x, pPos.z);
-            const biomeColor = window.WorldGenConfig.biomes[biomeKey].color;
-            
-            player.visual.traverse(child => {
-                if (child.isMesh) {
-                    child.userData.originalColor = child.material.color.clone();
-                    child.material.color.set(biomeColor);
-                    child.material.transparent = true;
-                    child.material.opacity = 0.5;
-                }
-            });
-        }
-    } else {
-        window.EventBus.emit('UI_LOG', '[STEALTH] You reveal yourself.');
-        player.visual.traverse(child => {
-            if (child.isMesh && child.userData.originalColor) {
-                child.material.color.copy(child.userData.originalColor);
-                child.material.opacity = 1.0;
-            }
-        });
-    }
-});
-window.EventBus.on('VOID_RUNE_SHOT', () => {
-    if (window.Input.runeShotCooldown > 0 || window.Input.isBlocking || !Object.values(window.GameState.inventory.runes).includes('voidward_rune')) return;
-    if (window.GameState.pStats.stamina < 20 || !window.GameCore.playerObj.visual) { window.EventBus.emit('UI_LOG', 'A Voidward Rune and 20 stamina are required.'); return; }
-    const player = window.GameCore.playerObj;
-    const direction = new THREE.Vector3(0, 0, 1).applyQuaternion(player.visual.quaternion).normalize();
-    window.GameState.pStats.stamina -= 20;
-    window.Input.runeShotCooldown = 3;
-    window.VFXManager.spawnProjectile({ position: player.visual.position.clone().add(new THREE.Vector3(0, 1, 0)).addScaledVector(direction, 0.9), direction, damage: 22 + window.GameCore.getBuffBonus('meleeAtt'), damageType: 'void', speed: 16, range: 20, color: '#a855f7', owner: 'player' });
-    window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'VOID SHOT', pos: player.visual.position, color: '#a855f7' });
-    window.EventBus.emit('UI_UPDATE_HUD');
-});
-window.EventBus.on('FIRE_RUNE_SHOT', () => {
-    if (window.Input.fireShotCooldown > 0 || window.Input.isBlocking || !Object.values(window.GameState.inventory.runes).includes('ember_rune')) return;
-    if (window.GameState.pStats.stamina < 25 || !window.GameCore.playerObj.visual) { window.EventBus.emit('UI_LOG', 'An Ember Rune and 25 stamina are required.'); return; }
-    const player = window.GameCore.playerObj;
-    const direction = new THREE.Vector3(0, 0, 1).applyQuaternion(player.visual.quaternion).normalize();
-    window.GameState.pStats.stamina -= 25;
-    window.Input.fireShotCooldown = 4;
-    window.VFXManager.spawnProjectile({ position: player.visual.position.clone().add(new THREE.Vector3(0, 1, 0)).addScaledVector(direction, 0.9), direction, damage: 28 + window.GameCore.getBuffBonus('meleeAtt'), damageType: 'fire', speed: 14, range: 18, color: '#fb923c', owner: 'player', statusEffect: { type: 'burning', duration: 3, tickDamage: 2 } });
-    window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'FIRE SHOT', pos: player.visual.position, color: '#fb923c' });
-    window.EventBus.emit('UI_UPDATE_HUD');
-});
-window.EventBus.on('PLAYER_PROJECTILE_HIT', ({ target, damage, damageType, position, statusEffect }) => {
-    const actualDamage = Math.max(1, damage - (target.def.armor || 0));
-    target.hp -= actualDamage;
-    target.poise = Math.max(0, target.poise - actualDamage);
-    window.EventBus.emit('ENTITY_DAMAGED', { damage: actualDamage, position, isPlayer: false });
-    window.EventBus.emit('SPAWN_HIT_VFX', { type: damageType === 'fire' ? 'Fire' : 'Void', pos: position });
-    if (statusEffect) {
-        target.statusEffects = target.statusEffects || [];
-        const activeEffect = target.statusEffects.find(effect => effect.type === statusEffect.type);
-        if (activeEffect) activeEffect.remaining = Math.max(activeEffect.remaining, statusEffect.duration);
-        else target.statusEffects.push({ ...statusEffect, remaining: statusEffect.duration, tickTimer: 1 });
-    }
-    if (target.hp <= 0) {
-        playEntityAnimation(target, 'die');
-        window.AdventurerManager?.markDefeated(target);
-        spawnGroundLoot(target.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', target.visual.position);
-        awardMonsterKill(target);
-        window.GameState.inventory.gold += target.def.faction === 'monster' ? 10 : 50;
-        window.EventBus.emit('UI_UPDATE_HUD');
-        setTimeout(() => {
-            if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(target.id);
-            window.GameCore.releaseEntityIndex(target.memoryIndex);
-            if (target.visual) window.GameCore.scene.remove(target.visual);
-            if (target.body) {
-                window.GameCore.world.removeRigidBody(target.body);
-                target.body = null;
-            }
-            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => entity.id !== target.id);
-        }, 2000);
-    } else if (target.poise <= 0) {
-        target.poise = target.maxPoise;
-        target.staggeredUntil = performance.now() + 800;
-        playEntityAnimation(target, 'hit');
-        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'STAGGERED', pos: target.visual.position, color: '#fbbf24' });
-    } else {
-        playEntityAnimation(target, 'hit');
-    }
-});
-window.EventBus.on('SPAWN_HIT_VFX', ({type, pos}) => window.VFXManager.spawnHit(type, pos));
-window.EventBus.on('SPAWN_INVASION', () => { const p = window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : new THREE.Vector3(); for(let i=0; i<3; i++) instantiatePrefab('Ghoul', p.x + (Math.random()-0.5)*15, safeGetTerrainHeight(p.x, p.z), p.z + (Math.random()-0.5)*15); window.EventBus.emit('UI_LOG', "Ghoul Invasion Spawned!"); });
-window.EventBus.on('SPAWN_BLIGHT', () => {
-    if (!window.GameCore.playerObj) return; const p = window.GameCore.playerObj.visual.position; const pts = window.RoadManager.getRoadPointsNear(Math.floor(p.x/60), Math.floor(p.z/60));
-        if (pts.length > 0) { const pt = pts[Math.floor(Math.random() * pts.length)]; const root = instantiatePrefab('Blight Root', pt.x, safeGetTerrainHeight(pt.x, pt.z), pt.z, 'persistent'); if (root) { root.hp = 150; window.EventBus.emit('UI_LOG', "A Blight Root has corrupted a nearby road!"); } } 
- 
-    else window.EventBus.emit('UI_LOG', "No roads nearby to corrupt!");
-});
-window.EventBus.on('CLEAR_MAP', () => { 
-    window.GameCore.activeEntities.forEach(en => { 
-        if(en.def.faction === 'player') return; 
-        if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(en.id);
-        window.GameCore.releaseEntityIndex(en.memoryIndex); 
-        if (en.visual) window.GameCore.scene.remove(en.visual);
-        if (en.body) {
-            window.GameCore.world.removeRigidBody(en.body); 
-            en.body = null;
-        }
-    }); 
-    window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => en.def.faction === 'player'); 
-    window.GameState.questBoard = []; window.EventBus.emit('UI_LOG', "World Entities Cleared."); 
-});
-window.EventBus.on('CLAIM_PLAYER_CAMP', () => {
-    const base = window.GameState.base;
-    if (base.owned || !window.GameCore.playerObj) {
-        window.EventBus.emit('UI_LOG', base.owned ? 'You already control a camp.' : 'No valid camp location.');
-        return;
-    }
-    const pack = window.GameState.inventory.backpack;
-    if (pack.filter(itemId => itemId === 'wood').length < 3 || pack.filter(itemId => itemId === 'stone').length < 2) {
-        window.EventBus.emit('UI_LOG', 'Claiming a camp requires 3 timber and 2 stone.');
-        return;
-    }
-    const playerPosition = window.GameCore.playerObj.visual.position;
-    if (window.EngineParams.isPlayerSafe || window.RoadManager.isVillageProtected(playerPosition)) {
-        window.EventBus.emit('UI_LOG', 'Claim camps away from settlements and protected paths.');
-        return;
-    }
-    let woodNeeded = 3; let stoneNeeded = 2;
-    window.GameState.inventory.backpack = pack.filter(itemId => {
-        if (itemId === 'wood' && woodNeeded > 0) { woodNeeded--; return false; }
-        if (itemId === 'stone' && stoneNeeded > 0) { stoneNeeded--; return false; }
-        return true;
-    });
-    const camp = instantiatePrefab('Iron Fire Pit', playerPosition.x, safeGetTerrainHeight(playerPosition.x, playerPosition.z), playerPosition.z, 'persistent');
-    if (!camp) return;
-    camp.playerBase = true;
-    base.owned = true;
-    base.position = { x: playerPosition.x, z: playerPosition.z };
-    base.structures.push({ prefab: 'Iron Fire Pit', x: playerPosition.x, z: playerPosition.z });
-    window.EventBus.emit('UI_LOG', 'Wayfarer Camp claimed. The fire marks your territory.');
-    window.EventBus.emit('RENDER_INVENTORY');
-});
-window.EventBus.on('BUILD_BASE_STRUCTURE', prefab => {
-    const base = window.GameState.base;
-    const blueprints = { 'Camp Storage Cache': { wood: 5, stone: 2 }, 'Camp Farm Plot': { wood: 4, stone: 1 }, 'Rune Tower': { wood: 12, stone: 10, research: 5 } };
-    const cost = blueprints[prefab];
-    if (!base.owned || !cost) return;
-    if ((cost.research && (base.researchPoints || 0) < cost.research) || Object.entries(cost).filter(([resource]) => resource !== 'research').some(([resource, amount]) => base.storage.filter(itemId => itemId === resource).length < amount)) {
-        window.EventBus.emit('UI_LOG', `Camp storage lacks materials for ${prefab}.`);
-        return;
-    }
-    Object.entries(cost).filter(([resource]) => resource !== 'research').forEach(([resource, amount]) => {
-        for (let index = 0; index < amount; index++) base.storage.splice(base.storage.indexOf(resource), 1);
-    });
-    if (cost.research) base.researchPoints -= cost.research;
-    const buildIndex = base.structures.length;
-    const x = base.position.x + 4 + (buildIndex % 3) * 4; const z = base.position.z + Math.floor(buildIndex / 3) * 4;
-    const entity = instantiatePrefab(prefab, x, safeGetTerrainHeight(x, z), z, 'persistent');
-    if (!entity) return;
-    entity.playerBase = true;
-    base.structures.push({ prefab, x, z });
-        if (prefab === 'Camp Farm Plot') base.farms.push({ x, z });
-    if (prefab === 'Rune Tower') base.wardRadius = 30;
-    
-    window.CareerManager?.addXP('builder', 50);
-    
-    window.EventBus.emit('UI_LOG', `[CAMP] Built ${prefab}.`);
-});
-window.EventBus.on('WORLD_REGENERATE', () => {
-    window.EventBus.emit('CLEAR_MAP'); const keys = Array.from(ChunkManager.activeChunks.keys()); keys.forEach(k => ChunkManager.unloadChunk(k)); ChunkManager.currentChunkX = null; 
-    window.currentPrng = alea(window.EngineParams?.worldSeed ?? 1337); window.currentNoise2D = window.createNoise2D(window.currentPrng);
-    if (window.GameCore.playerObj && window.GameCore.playerObj.body) { 
-        ChunkManager.forceUpdatePosition(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, 0, window.GameCore.playerObj.visual.position.z));
-        const vy = safeGetTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 5.0; 
-        window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true);
-        window.GameCore.playerObj.body.setAngvel({x:0, y:0, z:0}, true);
-        window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); 
-        spawnPartyMembers(); syncCaravanAgents(); syncPlayerBase(); 
-    }
-    window.EventBus.emit('UI_LOG', `World Math Regenerated with Seed: ${window.EngineParams.worldSeed}`);
-});
-
-// SAFE WARP & TELEPORT HANDLERS
-window.EventBus.on('CMD_TELEPORT', (pos) => { 
-    if (window.GameCore.playerObj?.body) {
-        const groundY = safeGetTerrainHeight(pos.x, pos.z);
-        const safeY = (isNaN(groundY) ? 10 : groundY) + 5.0; 
-
-        window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: safeY, z: pos.z }, true);
-        
-        if (window.GameCore.playerObj.visual) {
-            window.GameCore.playerObj.visual.position.set(pos.x, safeY - 1.0, pos.z);
-        }
-
-        ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, safeY, pos.z));
-    }
-});
-
-window.EventBus.on('PLAYER_RESPAWN', () => { 
-    if (!window.EngineParams.arenaMode && window.GameState.pStats.hp <= 0) {
-        window.GameCore.recordCombatDefeat({ source: 'open-world', injury: `open-world defeat on day ${window.EngineParams.worldDay}` });
-    }
-    
-    const respawnY = safeGetTerrainHeight(0, 0) + 5.0; 
-    
-    if (window.GameCore.playerObj?.body) {
-        window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        window.GameCore.playerObj.body.setTranslation({ x: 0, y: respawnY, z: 0 }, true); 
-    }
-    
-    ChunkManager.forceUpdatePosition(new THREE.Vector3(0, respawnY, 0));
-    window.GameState.pStats.hp = window.GameState.pStats.maxHp; 
-    window.GameState.inventory.gold = Math.floor(window.GameState.inventory.gold / 2); 
-    playEntityAnimation(window.GameCore.playerObj, 'idle'); 
-    window.EventBus.emit('UI_UPDATE_HUD'); 
-});
-
-function punishExposedActors() {
-    const player = window.GameCore.playerObj;
-    const playerSafe = player && (window.RoadManager.isSafeZone(player.visual.position) || window.RoadManager.isVillageProtected(player.visual.position));
-    const destination = () => window.RoadManager.getRandomPathPoint() || { x: 0, z: 0 };
-    
-    if (player && player.body && !playerSafe) {
-        if (window.GameCore.getForestLuck() > 0 && Math.random() < (window.GameState.forestBlessing.teleportLuck || 0)) {
-            window.EventBus.emit('UI_LOG', '[THE CROW] The woods reach for you, but the landing bends away.');
-        } else {
-            const point = destination(); 
-            const y = safeGetTerrainHeight(point.x, point.z) + 5.0;
-            
-            player.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-            player.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-            player.body.setTranslation({ x: point.x, y, z: point.z }, true); 
-            ChunkManager.forceUpdatePosition(new THREE.Vector3(point.x, y, point.z));
-            window.EventBus.emit('UI_LOG', '[THE WOODS] The shift catches you. You are thrown across the new landscape.');
-        }
-    }
-    
-    window.GameCore.activeEntities.filter(entity => entity.body && entity.def.type === 'npc' && !window.RoadManager.isVillageProtected(entity.visual.position)).forEach(entity => {
-        if (window.GameCore.getForestLuck(entity) > 0 && Math.random() < (entity.forestBlessing.teleportLuck || 0)) return;
-        const point = destination(); 
-        const y = safeGetTerrainHeight(point.x, point.z) + 2.0;
-        entity.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        entity.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        entity.body.setTranslation({ x: point.x, y, z: point.z }, true); 
-    });
-}
-
-function regenerateWorldCycle() {
-    if (window.EngineParams.suppressWorldRegenerate) return;
-    
-    const uiOverlay = document.createElement('div');
-    uiOverlay.style.position = 'fixed';
-    uiOverlay.style.top = '0'; uiOverlay.style.left = '0';
-    uiOverlay.style.width = '100vw'; uiOverlay.style.height = '100vh';
-    uiOverlay.style.backgroundColor = 'white';
-    uiOverlay.style.opacity = '0';
-    uiOverlay.style.transition = 'opacity 3s ease-in-out';
-    uiOverlay.style.zIndex = '9999';
-    uiOverlay.style.pointerEvents = 'none';
-    document.body.appendChild(uiOverlay);
-
-    setTimeout(() => {
-        uiOverlay.style.opacity = '1';
-        
-        setTimeout(() => {
-            punishExposedActors();
-            
-            const newEpoch = window.EpochManagerInstance.advanceEpoch();
-            
-            window.EngineParams.worldSeed = window.EpochManagerInstance.currentSeed;
-            window.EngineParams.lastCycleDay = window.EngineParams.worldDay;
-            
-            if (window.VillageManager && window.VillageManager.villages.length > 0) {
-                window.VillageManager.shiftLocations();
-            }
-
-            let playerShiftedSafely = false;
-            
-            if (window.GameCore.playerObj && window.GameCore.playerObj.body) {
-              const playerPos = window.GameCore.playerObj.visual.position;
-                
-              const protectedVillage = window.VillageManager.villages.find(v => {
-                  const distSq = Math.pow(playerPos.x - v.x, 2) + Math.pow(playerPos.z - v.z, 2);
-                  return distSq <= Math.pow(v.territory?.barrierRadius || 90, 2);
-              });
-                
-              const hasAnchorItem = window.GameState.inventory.equipment.waist === 'epoch_anchor' || 
-                                    window.GameState.inventory.backpack.includes('epoch_anchor');
-                
-              if (protectedVillage) {
-                  const newY = safeGetTerrainHeight(protectedVillage.x, protectedVillage.z) + 5.0;
-                  window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
-                  window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
-                  window.GameCore.playerObj.body.setTranslation({x: protectedVillage.x, y: newY, z: protectedVillage.z}, true);
-                  ChunkManager.forceUpdatePosition(new THREE.Vector3(protectedVillage.x, newY, protectedVillage.z));
-                  playerShiftedSafely = true;
-                  window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The ward held. You shifted safely with ${protectedVillage.name}.`);
-              } 
-              else if (hasAnchorItem) {
-                  const nearestRoadPt = window.RoadManager.getRandomPathPoint();
-                  if (nearestRoadPt) {
-                      const newY = safeGetTerrainHeight(nearestRoadPt.x, nearestRoadPt.z) + 5.0;
-                      window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
-                      window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
-                      window.GameCore.playerObj.body.setTranslation({x: nearestRoadPt.x, y: newY, z: nearestRoadPt.z}, true);
-                      ChunkManager.forceUpdatePosition(new THREE.Vector3(nearestRoadPt.x, newY, nearestRoadPt.z));
-                      playerShiftedSafely = true;
-                      window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The Anchor burns in your pocket, pulling you to the nearest road.`);
-                  }
-              }
-            }
-            
-            if (!playerShiftedSafely && !window.EngineParams.isPlayerSafe && window.GameCore.playerObj?.body) {
-              const forestExtent = window.WorldGenConfig.darkForestSideMeters / 2 - 1000;
-              let newX, newZ;
-              let valid = false;
-              while(!valid) {
-                  newX = (Math.random() * 2 - 1) * forestExtent;
-                  newZ = (Math.random() * 2 - 1) * forestExtent;
-                  if (Math.abs(newX) > 500 || Math.abs(newZ) > 500) valid = true;
-              }
-              const newY = safeGetTerrainHeight(newX, newZ) + 5.0;
-              window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
-              window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
-              window.GameCore.playerObj.body.setTranslation({x: newX, y: newY, z: newZ}, true);
-              ChunkManager.forceUpdatePosition(new THREE.Vector3(newX, newY, newZ));
-              window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] You were caught unprotected. You are lost in the deep forest.`);
-            }
-
-            window.EventBus.emit('WORLD_REGENERATE');
-            
-            window.CareerManager?.addXP('navigator', 100);
-            window.CareerManager?.addXP('archivist', 50);
-            
-            window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The white wave passed. The forest has shifted.`);
-
-            setTimeout(() => {
-                uiOverlay.style.opacity = '0';
-                setTimeout(() => { document.body.removeChild(uiOverlay); }, 3000);
-            }, 1000); 
-
-        }, 3000); 
-    }, 100);
-}
-
-function fixedUpdateLogic(delta) {
-    if (window.GameCore.playerObj) ChunkManager.update(window.GameCore.playerObj.visual.position);
-    if (window.EngineParams.offPathCaptureCooldown > 0) window.EngineParams.offPathCaptureCooldown = Math.max(0, window.EngineParams.offPathCaptureCooldown - delta);
-    
-    window.GameCore.worldTimer += delta;
-
-    updateWorldClock(delta);
-    
-    if (window.GameCore.worldTimer > 0.25) { 
-        updatePeriodicSystems();
-        updateLightPool(); 
-        
-        const checkInterval = (4 / 24) * window.EngineParams.dayLengthSeconds; 
-        if (!window.GameCore.lastNeedsCheck || window.GameCore.worldTimerAbsolute > window.GameCore.lastNeedsCheck + checkInterval) {
-             processCompanionNeeds();
-             window.GameCore.lastNeedsCheck = window.GameCore.worldTimerAbsolute || 0;
-        }
-
-        window.GameCore.worldTimer = 0; 
-    }
-
-    window.GameCore.worldTimerAbsolute = (window.GameCore.worldTimerAbsolute || 0) + delta;
-
-    window.ArenaTestManager?.update(delta);
-    window.VATManager?.update(delta);
-    window.EncounterDirector?.update(delta);
-    if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.update(delta);
-    if (window.ForestRenderer) window.ForestRenderer.update(delta);
-
-    updatePlayerStats(delta);
-    updateEntities(delta);
-
-    if (window.RenderOptimizer && window.GameCore.camera) {
-        window.RenderOptimizer.updateEntityLOD(window.GameCore.activeEntities, window.GameCore.camera.position);
-    }
-
-    updatePlayerMovement(delta);
-    updateCombatHitboxes(delta);
 }
 
 // ==========================================
@@ -1016,7 +460,7 @@ const ChunkManager = {
     instancedMeshes: new Map(),
 
     forceUpdatePosition: function(playerPos) {
-        if (window.EngineParams.suppressChunkLoading || !playerPos) return;
+        if (window.EngineParams?.suppressChunkLoading || !playerPos) return;
         _lastChunkCheckPos.set(playerPos.x, 0, playerPos.z);
         const cx = Math.floor(playerPos.x / 60); 
         const cz = Math.floor(playerPos.z / 60);
@@ -1026,7 +470,7 @@ const ChunkManager = {
     },
 
     update: function(playerPos) {
-        if (window.EngineParams.suppressChunkLoading || !playerPos) return;
+        if (window.EngineParams?.suppressChunkLoading || !playerPos) return;
         
         const dx = playerPos.x - _lastChunkCheckPos.x;
         const dz = playerPos.z - _lastChunkCheckPos.z;
@@ -1080,7 +524,7 @@ const ChunkManager = {
         const chunkX = cx * 60 + 30; 
         const chunkZ = cz * 60 + 30;
 
-        const isInsideAethelgard = window.CapitalCityManager?.isInsideCapital(chunkX, chunkZ);
+        const isInsideAethelgard = window.CapitalCityManager?.isInsideCapital?.(chunkX, chunkZ) || false;
         
         const segments = lod === 'A' ? 30 : (lod === 'B' ? 10 : 2);
         const geo = new THREE.PlaneGeometry(60, 60, segments, segments); 
@@ -1089,7 +533,7 @@ const ChunkManager = {
         const vertices = geo.attributes.position.array; 
         const colors = [];
         const roadEdgeData = new Float32Array(geo.attributes.position.count);
-        const localRoadPoints = window.RoadManager.getRoadPointsNear(cx, cz); 
+        const localRoadPoints = window.RoadManager?.getRoadPointsNear?.(cx, cz) || []; 
         const ROAD_WIDTH = 5;
         
         for (let i = 0; i < vertices.length; i += 3) {
@@ -1102,8 +546,8 @@ const ChunkManager = {
                 vertices[i+1] = 0; 
                 c.set('#1e293b'); 
             } else {
-                const biomeKey = window.WorldGenerator.getBiome(vx, vz); 
-                const biome = window.WorldGenConfig.biomes[biomeKey]; 
+                const biomeKey = window.WorldGenerator?.getBiome?.(vx, vz) || 'plains'; 
+                const biome = window.WorldGenConfig?.biomes?.[biomeKey] || { color: '#4ade80' }; 
                 c.set(biome.color);
                 
                 let minRoadDistSq = 999999;
@@ -1141,10 +585,12 @@ const ChunkManager = {
         const normalArray = geo.attributes.normal.array;
         
         const clutterData = new Float32Array(geo.attributes.position.count);
+        const noiseFn = window.WorldGenerator?.getNoise || (() => 0);
+
         for (let i = 0; i < vertices.length; i += 3) {
             const vx = vertices[i] + chunkX; 
             const vz = vertices[i+2] + chunkZ;
-            clutterData[i/3] = isInsideAethelgard ? 0 : window.WorldGenerator.getNoise(vx * 0.5, vz * 0.5); 
+            clutterData[i/3] = isInsideAethelgard ? 0 : noiseFn(vx * 0.5, vz * 0.5); 
             
             const hL = safeGetTerrainHeight(vx - 0.1, vz);
             const hR = safeGetTerrainHeight(vx + 0.1, vz);
@@ -1191,20 +637,30 @@ const ChunkManager = {
             );
         };
         
-        const mesh = new THREE.Mesh(geo, mat);  mesh.position.set(chunkX, 0, chunkZ); mesh.receiveShadow = true; mesh.userData.isTerrain = true; mesh.userData.chunkKey = key; window.GameCore.scene.add(mesh);
+        const mesh = new THREE.Mesh(geo, mat);  
+        mesh.position.set(chunkX, 0, chunkZ); 
+        mesh.receiveShadow = true; 
+        mesh.userData.isTerrain = true; 
+        mesh.userData.chunkKey = key; 
+        if (window.GameCore?.scene) window.GameCore.scene.add(mesh);
 
-        const physicsVertices = new Float32Array(vertices); const indicesU32 = new Uint32Array(geo.index.array); 
+        const physicsVertices = new Float32Array(vertices); 
+        const indicesU32 = new Uint32Array(geo.index.array); 
 
-        const groundBody = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(chunkX, 0, chunkZ));
-        const collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.trimesh(physicsVertices, indicesU32), groundBody);
+        let groundBody = null;
+        let collider = null;
+        if (window.GameCore?.world) {
+            groundBody = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(chunkX, 0, chunkZ));
+            collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.trimesh(physicsVertices, indicesU32), groundBody);
+        }
         this.activeChunks.set(key, { mesh, body: groundBody, collider, lod });
         
         if (isInsideAethelgard) {
-            window.EventBus.emit('CHUNK_GENERATED');
+            window.EventBus?.emit('CHUNK_GENERATED');
             return;
         }
 
-        const chunkData = window.ForestManager?.generateChunk(cx, cz) || { tierA: [], tierB: [] };
+        const chunkData = window.ForestManager?.generateChunk?.(cx, cz) || { tierA: [], tierB: [] };
         
         if (window.ForestRenderer?.setChunkInstances) {
             const redwoodPoints = [];
@@ -1227,7 +683,7 @@ const ChunkManager = {
             window.ForestRenderer.setChunkInstances(key, 'Redwood Tree', redwoodPoints);
             window.ForestRenderer.setChunkInstances(key, 'Bramble Bush', bushPoints);
 
-            if (lod === 'A') {
+            if (lod === 'A' && window.GameCore?.world) {
                 redwoodPoints.forEach(pt => {
                     const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(pt.x, pt.y + 15.0, pt.z));
                     window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(15.0, 1.8), body);
@@ -1237,12 +693,13 @@ const ChunkManager = {
             }
         }
 
-        window.EventBus.emit('CHUNK_GENERATED');
+        window.EventBus?.emit('CHUNK_GENERATED');
     },
     unloadChunk: function(key) {
         const chunk = this.activeChunks.get(key); if(!chunk) return;
-        chunk.mesh.geometry.dispose(); chunk.mesh.material.dispose(); window.GameCore.scene.remove(chunk.mesh); 
-        if (chunk.body) {
+        chunk.mesh.geometry.dispose(); chunk.mesh.material.dispose(); 
+        if (window.GameCore?.scene) window.GameCore.scene.remove(chunk.mesh); 
+        if (chunk.body && window.GameCore?.world) {
             window.GameCore.world.removeRigidBody(chunk.body);
             chunk.body = null;
         }
@@ -1254,40 +711,43 @@ const ChunkManager = {
         const instances = this.instancedMeshes.get(key);
         if (instances) {
             instances.forEach(imesh => {
-                imesh.geometry.dispose(); imesh.material.dispose(); window.GameCore.scene.remove(imesh);
+                imesh.geometry.dispose(); imesh.material.dispose(); 
+                if (window.GameCore?.scene) window.GameCore.scene.remove(imesh);
             });
             this.instancedMeshes.delete(key);
         }
-        if (chunk.instanceBodies) {
+        if (chunk.instanceBodies && window.GameCore?.world) {
             chunk.instanceBodies.forEach(body => {
                 if (body) window.GameCore.world.removeRigidBody(body);
             });
             chunk.instanceBodies = [];
         }
 
-        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
-            if(en.chunkKey === key) { 
-                if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(en.id);
-                window.GameCore.releaseEntityIndex(en.memoryIndex);
-                window.GameCore.SpatialGrid?.unregisterEntity?.(en);
-                if (en.visual) window.GameCore.scene.remove(en.visual); 
-                if (en.body) {
-                    window.GameCore.world.removeRigidBody(en.body); 
-                    en.body = null;
-                }
-                return false; 
-            } 
-            return true; 
-        });
+        if (window.GameCore?.activeEntities) {
+            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
+                if(en.chunkKey === key) { 
+                    if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(en.id);
+                    if (window.GameCore.releaseEntityIndex) window.GameCore.releaseEntityIndex(en.memoryIndex);
+                    window.GameCore.SpatialGrid?.unregisterEntity?.(en);
+                    if (en.visual && window.GameCore.scene) window.GameCore.scene.remove(en.visual); 
+                    if (en.body && window.GameCore.world) {
+                        window.GameCore.world.removeRigidBody(en.body); 
+                        en.body = null;
+                    }
+                    return false; 
+                } 
+                return true; 
+            });
+        }
         this.activeChunks.delete(key);
-        window.EventBus.emit('CHUNK_UNLOADED');
+        window.EventBus?.emit('CHUNK_UNLOADED');
     }
 };
 
 function getVisualMesh(def) {
     let meshGroup = new THREE.Group();
     
-    if (def.customModel && window.AssetManager && window.AssetManager.models[def.customModel]) {
+    if (def.customModel && window.AssetManager?.models?.[def.customModel]) {
         const sourceModel = window.AssetManager.models[def.customModel];
         const clone = window.SkeletonUtils.clone(sourceModel);
         
@@ -1308,7 +768,6 @@ function getVisualMesh(def) {
         const trunkHeight = 20.0;
         const trunkRadiusBottom = 1.8;
         const trunkRadiusTop = 1.1;
-
         const coneHeight = 14.0;
         const coneRadius = 5.5;
         const overlap = 3.5;
@@ -1334,7 +793,6 @@ function getVisualMesh(def) {
             const h = def.height || 2.0;
             const r = def.radius || 0.5;
 
-            // Legs: bottom at y = 0
             const legs = new THREE.Mesh(
                 new THREE.BoxGeometry(r * 0.8, h * 0.3, r * 0.8),
                 new THREE.MeshStandardMaterial({ color: def.color || 0xcccccc, roughness: 0.8 })
@@ -1343,7 +801,6 @@ function getVisualMesh(def) {
             legs.castShadow = true; legs.receiveShadow = true;
             meshGroup.add(legs);
 
-            // Torso: center at 0.55*h
             const torso = new THREE.Mesh(
                 new THREE.BoxGeometry(r * 1.5, h * 0.5, r * 1.2),
                 new THREE.MeshStandardMaterial({ color: def.color || 0xcccccc, roughness: 0.8 })
@@ -1352,7 +809,6 @@ function getVisualMesh(def) {
             torso.castShadow = true; torso.receiveShadow = true;
             meshGroup.add(torso);
 
-            // Head: center at 0.85*h
             const head = new THREE.Mesh(
                 new THREE.BoxGeometry(r, r, r),
                 new THREE.MeshStandardMaterial({ color: def.color || 0xcccccc, roughness: 0.8 })
@@ -1381,7 +837,7 @@ function getVisualMesh(def) {
 }
 
 function playEntityAnimation(entity, state) {
-    if (window.GameCore.AnimationSystem) {
+    if (window.GameCore?.AnimationSystem) {
         window.GameCore.AnimationSystem.transitionTo(entity, state);
         return;
     }
@@ -1389,7 +845,8 @@ function playEntityAnimation(entity, state) {
     if (entity.currentAnimState === 'die') return;
     if (entity.currentAnimState === state) return; 
     
-    const newAction = entity.actions[state]; const oldAction = entity.currentAnimState ? entity.actions[entity.currentAnimState] : null;
+    const newAction = entity.actions[state]; 
+    const oldAction = entity.currentAnimState ? entity.actions[entity.currentAnimState] : null;
     newAction.reset(); 
     newAction.play(); 
     if (oldAction) newAction.crossFadeFrom(oldAction, 0.35, true); 
@@ -1400,7 +857,7 @@ function playEntityAnimation(entity, state) {
             if (e.action === newAction) { 
                 entity.mixer.removeEventListener('finished', restoreIdle); 
                 if(entity.hp > 0) {
-                    if (window.Input && window.Input.isBlocking && entity.def.faction === 'player') {
+                    if (window.Input?.isBlocking && entity.def?.faction === 'player') {
                         playEntityAnimation(entity, 'block');
                     } else {
                         playEntityAnimation(entity, 'idle');
@@ -1413,14 +870,14 @@ function playEntityAnimation(entity, state) {
 window.GameCore.playEntityAnimation = playEntityAnimation;
 
 function setupEntityAnimations(entity, isPlayer = false) {
-    const def = isPlayer ? window.AssetManager.prefabs['Player'] : entity.def; 
-    if (!def.customModel) return;
+    const def = isPlayer ? window.AssetManager?.prefabs?.['Player'] : entity.def; 
+    if (!def?.customModel) return;
     
-    let clips = window.AssetManager.animations[def.customModel] || [];
-    clips = clips.concat(window.AssetManager.globalAnimations || []);
+    let clips = window.AssetManager?.animations?.[def.customModel] || [];
+    clips = clips.concat(window.AssetManager?.globalAnimations || []);
     if (clips.length === 0) return;
 
-    if (window.GameCore.AnimationSystem) {
+    if (window.GameCore?.AnimationSystem) {
         window.GameCore.AnimationSystem.initEntity(entity, entity.visual, clips);
         return;
     }
@@ -1429,7 +886,7 @@ function setupEntityAnimations(entity, isPlayer = false) {
     
     const states = ['idle', 'walk', 'attack', 'block', 'dash', 'hit', 'die'];
     states.forEach(state => {
-        if (def.animMap[state] && def.animMap[state] !== 'None') {
+        if (def.animMap?.[state] && def.animMap[state] !== 'None') {
             const clip = clips.find(c => c.name === def.animMap[state]);
             if (clip) {
                 const action = entity.mixer.clipAction(clip);
@@ -1444,15 +901,15 @@ function setupEntityAnimations(entity, isPlayer = false) {
 }
 
 function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
-    const def = window.AssetManager.prefabs[name]; if(!def) return;
+    const def = window.AssetManager?.prefabs?.[name]; if(!def) return;
     let mesh = getVisualMesh(def);
     
     const height = def.height || 2.0;
     const halfHeight = height / 2.0;
     const spawnY = y + halfHeight;
 
-    mesh.position.set(x, y, z); // Feet at terrain y
-    window.GameCore.scene.add(mesh);
+    mesh.position.set(x, y, z); 
+    if (window.GameCore?.scene) window.GameCore.scene.add(mesh);
 
     let rigidBodyDesc = (def.type === 'structure' || def.type === 'hub' || def.type === 'mountain' || def.type === 'runeTower' || def.type === 'powerStone' || def.type === 'firePit' || def.type === 'streetLight' || def.type === 'merchantChest') ? RAPIER.RigidBodyDesc.fixed() : RAPIER.RigidBodyDesc.dynamic().lockRotations();
     
@@ -1460,20 +917,26 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
         rigidBodyDesc.setLinearDamping(4.0);
     }
     
-    rigidBodyDesc.setTranslation(x, spawnY, z); let body = window.GameCore.world.createRigidBody(rigidBodyDesc);
+    rigidBodyDesc.setTranslation(x, spawnY, z); 
+    let body = window.GameCore?.world ? window.GameCore.world.createRigidBody(rigidBodyDesc) : null;
     
     let collider = null;
-    if (def.isObstacle !== false) {
-        let colliderDesc; if (def.type === 'structure' || def.type === 'hub' || def.type === 'runeTower' || def.type === 'powerStone' || def.type === 'firePit' || def.type === 'streetLight' || def.type === 'merchantChest') colliderDesc = RAPIER.ColliderDesc.cuboid(def.radius, def.height/2, def.radius); else if (def.type === 'mountain') colliderDesc = RAPIER.ColliderDesc.cone(def.height/2, def.radius); else colliderDesc = RAPIER.ColliderDesc.capsule(Math.max(0.1, def.height/2 - def.radius), def.radius);
+    if (def.isObstacle !== false && body && window.GameCore?.world) {
+        let colliderDesc; 
+        if (def.type === 'structure' || def.type === 'hub' || def.type === 'runeTower' || def.type === 'powerStone' || def.type === 'firePit' || def.type === 'streetLight' || def.type === 'merchantChest') colliderDesc = RAPIER.ColliderDesc.cuboid(def.radius, def.height/2, def.radius); 
+        else if (def.type === 'mountain') colliderDesc = RAPIER.ColliderDesc.cone(def.height/2, def.radius); 
+        else colliderDesc = RAPIER.ColliderDesc.capsule(Math.max(0.1, def.height/2 - def.radius), def.radius);
         collider = window.GameCore.world.createCollider(colliderDesc, body);
     }
 
     const entity = { id: Math.random().toString(36).substr(2, 9), name: name, def: def, visual: mesh, body: body, collider: collider, chunkKey: chunkKey };
     
-    window.GameCore.bindEntityToBuffer(entity, def.hp || 50, def.poise || 30);
+    if (window.GameCore?.bindEntityToBuffer) {
+        window.GameCore.bindEntityToBuffer(entity, def.hp || 50, def.poise || 30);
+    }
 
     if(collider) collider.handle = Math.floor(Math.random() * 1000000); 
-    body.userData = { entityId: entity.id };
+    if(body) body.userData = { entityId: entity.id };
     
     if (def.type === 'hub') { 
         activeLightEmitters.push({ mesh, color: def.color || 0xffd700, intensity: 2, distance: 15 });
@@ -1482,7 +945,9 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     if (def.type === 'arcaneDoor') { 
         activeLightEmitters.push({ mesh, color: 0x6366f1, intensity: 3, distance: 10 });
     }
-    if (def.type === 'merchantChest') entity.merchantInventory = def.merchantInventory.map(item => ({ ...item }));
+    if (def.type === 'merchantChest' && def.merchantInventory) {
+        entity.merchantInventory = def.merchantInventory.map(item => ({ ...item }));
+    }
     if (def.type === 'powerStone') { 
         activeLightEmitters.push({ mesh, color: 0x7dd3fc, intensity: def.active === false ? 0.2 : 3, distance: 25 });
     }
@@ -1493,160 +958,28 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
         activeLightEmitters.push({ mesh, color: 0x9bdcff, intensity: def.active === false ? 0 : 2.5, distance: 18 });
     }
 
-    setupEntityAnimations(entity); window.VFXManager.applyAura(entity, def); 
+    setupEntityAnimations(entity); 
+    if (window.VFXManager?.applyAura) window.VFXManager.applyAura(entity, def); 
     
     window.GameCore.SpatialGrid?.registerEntity?.(entity);
 
     if (def.faction === 'monster' || def.faction === 'forest') {
-        entity.lastFedDay = window.EngineParams.worldDay;
+        entity.lastFedDay = window.EngineParams?.worldDay || 0;
         entity.hungerLevel = 0;
         entity.isFeral = false;
     }
 
-    window.GameCore.activeEntities.push(entity);
-    if (!window.GameState.narrator.targetId && (def.faction === 'village' || def.faction === 'adventurer')) {
+    if (window.GameCore?.activeEntities) window.GameCore.activeEntities.push(entity);
+    if (window.GameState?.narrator && !window.GameState.narrator.targetId && (def.faction === 'village' || def.faction === 'adventurer')) {
         window.GameState.narrator.targetId = entity.id;
         window.GameState.narrator.targetName = entity.name;
         applyForestBlessing(entity);
-        window.EventBus.emit('UI_LOG', `[THE CROW] It chooses ${entity.name} as the story's main character.`);
+        window.EventBus?.emit('UI_LOG', `[THE CROW] It chooses ${entity.name} as the story's main character.`);
     }
     return entity;
 }
 window.GameCore.instantiatePrefab = instantiatePrefab;
 window.GameCore.ChunkManager = ChunkManager;
-
-window.ArenaTestManager = {
-    center: { x: 120, z: 120 },
-    size: 40,
-    walls: [],
-    match: null,
-    ensureArena: function() {
-        if (this.walls.length > 0) return;
-        const groundY = safeGetTerrainHeight(this.center.x, this.center.z);
-        const wallHeight = 8;
-        const wallThickness = 1;
-        const wallSpecs = [
-            { x: this.center.x, z: this.center.z - this.size / 2, width: this.size + 2, depth: wallThickness },
-            { x: this.center.x, z: this.center.z + this.size / 2, width: this.size + 2, depth: wallThickness },
-            { x: this.center.x - this.size / 2, z: this.center.z, width: wallThickness, depth: this.size },
-            { x: this.center.x + this.size / 2, z: this.center.z, width: wallThickness, depth: this.size }
-        ];
-        wallSpecs.forEach(spec => {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(spec.width, wallHeight, spec.depth), new THREE.MeshStandardMaterial({ color: 0x171b22, roughness: 0.9 }));
-            mesh.position.set(spec.x, groundY + wallHeight / 2, spec.z);
-            mesh.castShadow = true; mesh.receiveShadow = true; window.GameCore.scene.add(mesh);
-            const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(spec.x, groundY + wallHeight / 2, spec.z));
-            window.GameCore.world.createCollider(RAPIER.ColliderDesc.cuboid(spec.width / 2, wallHeight / 2, spec.depth / 2), body);
-            this.walls.push({ mesh, body });
-        });
-    },
-    enter: function() {
-        this.ensureArena();
-        window.EngineParams.arenaMode = true;
-        window.EventBus.emit('CMD_TELEPORT', this.center);
-        window.EventBus.emit('UI_LOG', '[ARENA] Locked gladiator test arena entered.');
-    },
-    startMatch: function(totalWaves = 3) {
-        if (this.match?.state === 'fighting') {
-            window.EventBus.emit('UI_LOG', '[ARENA] A match is already in progress.');
-            return;
-        }
-        this.enter();
-        this.clear();
-        this.match = { state: 'fighting', totalWaves, transitionTimer: 0, waveCleared: false };
-        window.EngineParams.arenaWave = 0;
-        window.GameState.gladiator.matchState = 'fighting';
-        window.GameState.gladiator.objective = `Survive ${totalWaves} waves`;
-        window.EventBus.emit('UI_LOG', `[ARENA] ${window.GameState.gladiator.name} enters the arena.`);
-        this.spawnWave();
-    },
-    spawnWave: function() {
-        if (!window.EngineParams.arenaMode) this.enter();
-        const wave = ++window.EngineParams.arenaWave;
-        const prefabs = ['Ghoul', 'Flesh Horror', 'Wendigo'];
-        const count = Math.min(8, 2 + wave);
-        for (let index = 0; index < count; index++) {
-            const angle = (index / count) * Math.PI * 2;
-            const radius = this.size * 0.35;
-            const x = this.center.x + Math.cos(angle) * radius;
-            const z = this.center.z + Math.sin(angle) * radius;
-            const prefab = prefabs[(wave + index) % prefabs.length];
-            const entity = instantiatePrefab(prefab, x, safeGetTerrainHeight(x, z), z, 'arena');
-            if (entity) { entity.arenaEntity = true; entity.arenaWave = wave; }
-        }
-        window.EventBus.emit('UI_LOG', `[ARENA] Monster wave ${wave} spawned.`);
-    },
-    update: function(delta) {
-        if (!this.match || this.match.state !== 'fighting') return;
-        if (window.GameState.pStats.hp <= 0) { this.defeat(); return; }
-        const living = window.GameCore.activeEntities.filter(entity => entity.arenaEntity && entity.hp > 0);
-        if (living.length > 0) { this.match.waveCleared = false; return; }
-        if (!this.match.waveCleared) {
-            this.match.waveCleared = true;
-            this.match.transitionTimer = 2;
-            window.EventBus.emit('UI_LOG', `[ARENA] Wave ${window.EngineParams.arenaWave} cleared.`);
-        }
-        this.match.transitionTimer -= delta;
-        if (this.match.transitionTimer > 0) return;
-        if (window.EngineParams.arenaWave >= this.match.totalWaves) this.victory();
-        else { this.match.waveCleared = false; this.spawnWave(); }
-    },
-    victory: function() {
-        if (!this.match || this.match.state !== 'fighting') return;
-        this.match.state = 'victory';
-        const reward = 50 + this.match.totalWaves * 25;
-        window.GameCore.recordCombatVictory({ source: 'arena', reward, fame: this.match.totalWaves * 5, label: 'won an arena match' });
-        window.GameState.gladiator.matchState = 'victory';
-        window.GameState.gladiator.objective = `Victory. Reward: ${reward} gold`;
-        window.EventBus.emit('UI_LOG', `[ARENA] Victory. ${reward} gold awarded.`);
-        window.EventBus.emit('OPEN_ARENA_RESULT', { result: 'victory', reward });
-        window.EventBus.emit('UI_UPDATE_HUD');
-    },
-    defeat: function() {
-        if (!this.match || this.match.state !== 'fighting') return;
-        this.match.state = 'defeat';
-        window.GameCore.recordCombatDefeat({ source: 'arena', injury: `arena defeat on day ${window.EngineParams.worldDay}` });
-        window.GameState.gladiator.matchState = 'defeat';
-        window.GameState.gladiator.objective = 'Defeated. Recover before the next match.';
-        this.clear();
-        window.EventBus.emit('UI_LOG', '[ARENA] Defeat. The gladiator is dragged from the sand.');
-        window.EventBus.emit('OPEN_ARENA_RESULT', { result: 'defeat', reward: 0 });
-        window.EventBus.emit('UI_UPDATE_HUD');
-    },
-    clear: function() {
-        window.GameCore.activeEntities.filter(entity => entity.arenaEntity).forEach(entity => {
-            if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(entity.id);
-            window.GameCore.releaseEntityIndex(entity.memoryIndex);
-            if (entity.visual) window.GameCore.scene.remove(entity.visual);
-            if (entity.body) {
-                window.GameCore.world.removeRigidBody(entity.body);
-                entity.body = null;
-            }
-        });
-        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => !entity.arenaEntity);
-        window.EventBus.emit('UI_LOG', '[ARENA] Arena monsters cleared.');
-    },
-    exit: function() {
-        this.clear();
-        this.walls.forEach(wall => { 
-            window.GameCore.scene.remove(wall.mesh); 
-            if (wall.body) window.GameCore.world.removeRigidBody(wall.body); 
-        });
-        this.walls = [];
-        window.EngineParams.arenaMode = false;
-        window.EngineParams.arenaWave = 0;
-        this.match = null;
-        window.GameState.gladiator.matchState = 'hub';
-        window.GameState.gladiator.objective = 'Awaiting a match';
-        window.EventBus.emit('CMD_TELEPORT', { x: 0, z: 0 });
-        window.EventBus.emit('UI_LOG', '[ARENA] Returned to the open world.');
-    }
-};
-window.EventBus.on('ENTER_ARENA_TEST', () => window.ArenaTestManager.enter());
-window.EventBus.on('START_ARENA_MATCH', () => window.ArenaTestManager.startMatch());
-window.EventBus.on('SPAWN_ARENA_WAVE', () => window.ArenaTestManager.spawnWave());
-window.EventBus.on('CLEAR_ARENA_TEST', () => window.ArenaTestManager.clear());
-window.EventBus.on('EXIT_ARENA_TEST', () => window.ArenaTestManager.exit());
 
 function spawnPlayer(x, y, z) {
     const def = window.AssetManager?.prefabs?.['Player'] || { height: 2, radius: 0.5 };
@@ -1659,217 +992,98 @@ function spawnPlayer(x, y, z) {
         .setCcdEnabled(true)
         .setLinearDamping(2.0);
     
-    let body = window.GameCore.world.createRigidBody(rigidBodyDesc);
-    let collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.capsule(Math.max(0.1, def.height/2 - def.radius), def.radius), body);
+    let body = window.GameCore?.world ? window.GameCore.world.createRigidBody(rigidBodyDesc) : null;
+    let collider = (body && window.GameCore?.world) ? window.GameCore.world.createCollider(RAPIER.ColliderDesc.capsule(Math.max(0.1, def.height/2 - def.radius), def.radius), body) : null;
+    
     window.GameCore.playerObj = { visual: getVisualMesh(def), body: body, collider: collider, def: def };
     
-    window.GameCore.bindEntityToBuffer(window.GameCore.playerObj, window.GameState.pStats.maxHp, window.GameState.pStats.maxPoise);
-    
-    const pMemIdx = window.GameCore.playerObj.memoryIndex * 4;
-    Object.defineProperties(window.GameState.pStats, {
-        'hp': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 0], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 0] = v; } },
-        'maxHp': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 1], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 1] = v; } },
-        'poise': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 2], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 2] = v; } },
-        'maxPoise': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 3], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 3] = v; } }
-    });
+    if (window.GameCore?.bindEntityToBuffer) {
+        window.GameCore.bindEntityToBuffer(window.GameCore.playerObj, window.GameState?.pStats?.maxHp || 100, window.GameState?.pStats?.maxPoise || 100);
+        
+        const pMemIdx = window.GameCore.playerObj.memoryIndex * 4;
+        if (window.GameState?.pStats) {
+            Object.defineProperties(window.GameState.pStats, {
+                'hp': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 0], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 0] = v; } },
+                'maxHp': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 1], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 1] = v; } },
+                'poise': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 2], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 2] = v; } },
+                'maxPoise': { get: () => window.GameCore.entityStatBuffer[pMemIdx + 3], set: (v) => { window.GameCore.entityStatBuffer[pMemIdx + 3] = v; } }
+            });
+        }
+    }
 
-    const p = body.translation(); 
+    const p = body ? body.translation() : {x, y: spawnY, z}; 
     window.GameCore.playerObj.visual.position.set(p.x, p.y - halfHeight, p.z); 
-    window.GameCore.scene.add(window.GameCore.playerObj.visual);
-    setupEntityAnimations(window.GameCore.playerObj, true); window.VFXManager.applyAura(window.GameCore.playerObj, def);
+    if (window.GameCore?.scene) window.GameCore.scene.add(window.GameCore.playerObj.visual);
+    setupEntityAnimations(window.GameCore.playerObj, true); 
+    if (window.VFXManager?.applyAura) window.VFXManager.applyAura(window.GameCore.playerObj, def);
     
     window.GameCore.playerObj.node_id = 'player_node';
 }
 
-function applyForestBlessing(entity, isPlayer = false) {
-    if (!entity) return;
-    const targetDef = entity.def || window.AssetManager.prefabs['Player'];
-    const blessing = isPlayer ? {
-        active: true, tier: 'true', name: "Forest's True Chosen", athletics: 3, dodge: 2, staminaRegen: 0.15, dangerSense: true, combatLuck: 0.30, teleportLuck: 0.35
-    } : {
-        active: true, tier: 'chosen', name: "Forest's Chosen", athletics: 2, dodge: 1, staminaRegen: 0.10, dangerSense: false, combatLuck: 0.20, teleportLuck: 0.20
-    };
-    if (isPlayer) {
-        const current = window.GameState.forestBlessing;
-        if (current.active && current.tier === blessing.tier) return;
-        window.GameState.forestBlessing = blessing;
-        window.GameCore.applyBuff('athletics', blessing.athletics, 315360000, blessing.name);
-        window.GameCore.applyBuff('dodge', blessing.dodge, 315360000, blessing.name);
-        window.GameCore.adjustFactionStanding('village', -5, 'the crow marked you');
-        window.EventBus.emit('UI_LOG', `[FOREST] ${blessing.name}: +${blessing.athletics} Athletics, +${blessing.dodge} Dodge, ${Math.round(blessing.combatLuck * 100)}% enemy miss chance.`);
-    } else {
-        entity.forestChosen = true;
-        entity.forestBlessing = blessing;
-        entity.speedMultiplier = 1.1;
-    }
-    window.VFXManager.applyAura(entity, { ...targetDef, vfx: { ...(targetDef.vfx || {}), aura: 'ForestChosen' } });
-}
-window.GameCore.applyForestBlessing = applyForestBlessing;
-
-function spawnGroundLoot(itemId, position) {
-    if (!window.ItemDatabase?.[itemId]) return;
+function fixedUpdateLogic(delta) {
+    if (window.GameCore?.playerObj) ChunkManager.update(window.GameCore.playerObj.visual.position);
+    if (window.EngineParams?.offPathCaptureCooldown > 0) window.EngineParams.offPathCaptureCooldown = Math.max(0, window.EngineParams.offPathCaptureCooldown - delta);
     
-    const groundY = safeGetTerrainHeight(position.x, position.z);
-    const finalPos = new THREE.Vector3(position.x, groundY + 0.4, position.z);
+    window.GameCore.worldTimer += delta;
+
+    updateWorldClock(delta);
     
-    const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.25), new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0x8a5a00, emissiveIntensity: 1 }));
-    mesh.position.copy(finalPos);
-    window.GameCore.scene.add(mesh);
-    window.GameCore.groundLoot.push({ id: Math.random().toString(36).slice(2), itemId, visual: mesh });
-}
-window.GameCore.spawnGroundLoot = spawnGroundLoot;
-
-function awardMonsterKill(target) {
-    if (!target?.def || (target.def.faction !== 'monster' && target.def.faction !== 'forest')) return;
-    const essence = Math.max(1, Math.ceil((target.def.hp || target.hp || 50) / 25));
-    const nearestVillage = window.VillageManager.villages.reduce((nearest, village) => {
-        const distance = Math.hypot(target.visual.position.x - village.x, target.visual.position.z - village.z);
-        return !nearest || distance < nearest.distance ? { village, distance } : nearest;
-    }, null)?.village;
-        if (nearestVillage) {
-        nearestVillage.stats ??= {};
-        nearestVillage.stats.essence = (nearestVillage.stats.essence || 0) + essence;
-        window.CareerManager.addXP('warden', essence * 5);
-    }
-    const impact = target.def.boss ? 12 : (target.def.faction === 'forest' ? 4 : 2);
-    window.GameCore.recordRenown({ renown: target.def.boss ? 8 : 2, faction: 'village', reason: `defeated ${target.name}` });
-    window.GameCore.recordFeat({ impact, label: `The ${target.name} fed a village's ward.` });
-    window.EventBus.emit('UI_LOG', `[ESSENCE] ${nearestVillage?.name || 'The settlements'} gained ${essence} life essence.`);
-}
-window.GameCore.awardMonsterKill = awardMonsterKill;
-
-function spawnPartyMembers() {
-    if (!window.GameCore.playerObj) return;
-    const playerPosition = window.GameCore.playerObj.body.translation();
-    window.GameState.party.members.forEach((member, index) => {
-        if (window.GameCore.activeEntities.some(entity => entity.companionId === member.id || entity.recruitId === member.id)) return;
-        const companionX = playerPosition.x + 2 + index * 2;
-        const companionZ = playerPosition.z + 2;
-        const companion = instantiatePrefab(member.prefab, companionX, safeGetTerrainHeight(companionX, companionZ), companionZ, 'persistent');
-        if (companion) {
-            if (member.recruited) companion.companionId = member.id; else companion.recruitId = member.id;
-            companion.hp = member.hp || member.maxHp || 100;
-            companion.name = member.name;
+    if (window.GameCore.worldTimer > 0.25) { 
+        updatePeriodicSystems();
+        updateLightPool(); 
+        
+        const checkInterval = (4 / 24) * (window.EngineParams?.dayLengthSeconds || 1200); 
+        if (!window.GameCore.lastNeedsCheck || window.GameCore.worldTimerAbsolute > window.GameCore.lastNeedsCheck + checkInterval) {
+             processCompanionNeeds();
+             window.GameCore.lastNeedsCheck = window.GameCore.worldTimerAbsolute || 0;
         }
-    });
-}
-window.GameCore.spawnPartyMembers = spawnPartyMembers;
 
-function processCompanionNeeds() {
-    const hoursPerSecond = 24 / window.EngineParams.dayLengthSeconds;
-    const hungerPerSecond = 100 / (24 * 60 * 60 / hoursPerSecond); 
-    
-    const pStats = window.GameState.pStats;
-    pStats.hunger = Math.max(0, pStats.hunger - (hungerPerSecond * 60)); 
-    
-    if (pStats.hunger <= 0) {
-        window.GameState.starvationDays = (window.GameState.starvationDays || 0) + (1/6); 
-        
-        const dayT = window.GameState.starvationDays / 7;
-        const weakness = Math.min(0.9, Math.pow(dayT, 1.5)); 
-        
-        pStats.maxHp = 100 * (1 - weakness);
-        pStats.hp = Math.min(pStats.hp, pStats.maxHp);
-        
-        if (window.GameState.starvationDays >= 7) {
-            pStats.hp = 0; 
-            window.EventBus.emit('UI_LOG', "You have starved to death.");
-        } else {
-            window.EventBus.emit('UI_LOG', `Starvation: You are growing weak (${Math.floor(weakness*100)}% debuff)`);
-        }
-    } else {
-        window.GameState.starvationDays = 0;
+        window.GameCore.worldTimer = 0; 
     }
 
-    window.GameState.party.members.filter(member => member.recruited).forEach(member => {
-        member.hunger = Math.max(0, (member.hunger || 100) - 25); 
-        
-        const rationIndex = member.inventory.indexOf('food');
-        if (member.hunger <= 60 && rationIndex >= 0) {
-            member.inventory.splice(rationIndex, 1);
-            member.hunger = 100;
-            member.loyalty = Math.min(100, (member.loyalty || 0) + 1);
-        }
-        
-        if (member.hunger <= 0) {
-            member.starvationDays = (member.starvationDays || 0) + (1/6);
-            if (member.starvationDays >= 7) {
-                member.hp = 0;
-                member.downed = true;
-                window.EventBus.emit('UI_LOG', `${member.name} has starved to death.`);
-            } else {
-                member.hp = Math.max(1, member.hp - (member.maxHp * 0.1)); 
-            }
-        } else {
-            member.starvationDays = 0;
-        }
-        
-        const entity = window.GameCore.activeEntities.find(candidate => candidate.companionId === member.id);
-        if (entity) entity.hp = member.hp;
-    });
-}
+    window.GameCore.worldTimerAbsolute = (window.GameCore.worldTimerAbsolute || 0) + delta;
 
-function processBaseJobs() {
-    const base = window.GameState.base;
-    if (!base.owned) return;
-    const workers = window.GameState.party.members.filter(member => member.recruited && !member.downed);
-    const farmers = workers.filter(member => member.job === 'farm').length;
-    const researchers = workers.filter(member => member.job === 'research').length;
-    if (farmers > 0 && base.farms.length > 0) {
-        const harvest = farmers * base.farms.length * 2;
-        for (let index = 0; index < harvest; index++) base.storage.push('food');
-        window.EventBus.emit('UI_LOG', `[CAMP] Harvested ${harvest} rations.`);
+    window.ArenaTestManager?.update?.(delta);
+    window.VATManager?.update?.(delta);
+    window.EncounterDirector?.update?.(delta);
+    if (window.GameCore?.AnimationSystem) window.GameCore.AnimationSystem.update(delta);
+    if (window.ForestRenderer) window.ForestRenderer.update(delta);
+
+    updatePlayerStats(delta);
+    updateEntities(delta);
+
+    if (window.RenderOptimizer && window.GameCore?.camera) {
+        window.RenderOptimizer.updateEntityLOD(window.GameCore.activeEntities || [], window.GameCore.camera.position);
     }
-    if (researchers > 0) {
-        base.researchPoints = (base.researchPoints || 0) + researchers;
-        window.EventBus.emit('UI_LOG', `[CAMP] Generated ${researchers} runic research point${researchers === 1 ? '' : 's'}.`);
-    }
+
+    updatePlayerMovement(delta);
+    updateCombatHitboxes(delta);
 }
 
-function syncCaravanAgents() {
-    window.VillageManager.villages.forEach(village => {
-        village.caravans?.filter(caravan => caravan.status === 'traveling').forEach(caravan => {
-            if (window.GameCore.activeEntities.some(entity => entity.caravanId === caravan.id)) return;
-            const position = caravan.position || { x: village.x + 3, z: village.z };
-            const agent = instantiatePrefab('Merchant Caravan', position.x, safeGetTerrainHeight(position.x, position.z), position.z, 'persistent');
-            if (agent) { agent.caravanId = caravan.id; agent.villageId = village.id; }
-        });
-    });
-}
-window.GameCore.syncCaravanAgents = syncCaravanAgents;
+// RESTORED EVENT BUS LISTENERS
+window.EventBus?.on('PRIMARY_CLICK_DOWN', () => { if(window.Input?.attackCooldown <= 0) performAttack(); });
+window.EventBus?.on('SECONDARY_CLICK_DOWN', () => { if(window.Input?.attackCooldown <= 0) performAttack(true); });
+window.EventBus?.on('GUARDBREAKER', performGuardbreaker);
 
-function syncPlayerBase() {
-    const base = window.GameState.base;
-    if (!base.owned) return;
-    base.structures.forEach(structure => {
-        if (window.GameCore.activeEntities.some(entity => entity.playerBase && entity.name === structure.prefab)) return;
-        const entity = instantiatePrefab(structure.prefab, structure.x, safeGetTerrainHeight(structure.x, structure.z), structure.z, 'persistent');
-        if (entity) entity.playerBase = true;
-    });
-}
-window.GameCore.syncPlayerBase = syncPlayerBase;
-
-window.GameCore.swapPlayerModel = function() {
-    if (!window.GameCore.playerObj || !window.GameCore.scene) return;
-    const def = window.AssetManager.prefabs['Player'];
-    
-    const oldPos = window.GameCore.playerObj.visual.position.clone();
-    const oldRot = window.GameCore.playerObj.visual.rotation.clone();
-    
-    window.GameCore.scene.remove(window.GameCore.playerObj.visual);
-    if (window.GameCore.playerObj.auraMesh) {
-        window.GameCore.playerObj.visual.remove(window.GameCore.playerObj.auraMesh);
-        window.GameCore.playerObj.auraMesh = null;
+window.EventBus?.on('GAME_STARTED', () => {
+    // 1. Force Capital City Generation
+    if (window.CapitalCityManager && !window.CapitalCityManager.isGenerated) {
+        window.CapitalCityManager.generateCapital();
     }
     
-    window.GameCore.playerObj.visual = getVisualMesh(def);
-    window.GameCore.playerObj.visual.position.copy(oldPos);
-    window.GameCore.playerObj.visual.rotation.copy(oldRot);
+    // 2. Clear all potentially corrupted boot chunks and explicitly rebuild them 
+    //    now that we are 100% sure window.WorldGenerator and RoadManager are fully loaded.
+    if (window.GameCore?.playerObj && window.GameCore.playerObj.body) {
+        ChunkManager.activeChunks.forEach((chunk, key) => ChunkManager.unloadChunk(key));
+        ChunkManager.currentChunkX = null;
+        ChunkManager.currentChunkZ = null;
+        
+        const p = window.GameCore.playerObj.visual.position;
+        ChunkManager.forceUpdatePosition(new THREE.Vector3(p.x, 0, p.z));
+    }
     
-    window.GameCore.scene.add(window.GameCore.playerObj.visual);
-    setupEntityAnimations(window.GameCore.playerObj, true);
-    window.VFXManager.applyAura(window.GameCore.playerObj, def);
-};
+    window.EventBus.emit('UI_LOG', "World Simulation Engaged. Wilderness Synchronized.");
+});
 
 // BOOT ENGINE
 async function bootEngine() {
@@ -1892,7 +1106,7 @@ async function bootEngine() {
         renderer.toneMappingExposure = 1.25; 
         document.body.appendChild(renderer.domElement);
 
-        window.RenderOptimizer?.prewarmShaders(renderer, window.GameCore.scene, window.GameCore.camera);
+        window.RenderOptimizer?.prewarmShaders?.(renderer, window.GameCore.scene, window.GameCore.camera);
 
         window.GameCore.pocketScene = new THREE.Scene();
         window.GameCore.pocketScene.background = new THREE.Color(0x020617);
@@ -2010,7 +1224,7 @@ async function bootEngine() {
         const pocketPass = new RenderPass(window.GameCore.pocketScene, window.GameCore.camera);
         composer.addPass(worldPass);
 
-        window.EventBus.on('SCENE_SWAP', ({ target, pos }) => {
+        window.EventBus?.on('SCENE_SWAP', ({ target, pos }) => {
             if (target === 'establishment') {
                 composer.removePass(worldPass);
                 composer.insertPass(pocketPass, 0);
@@ -2019,7 +1233,7 @@ async function bootEngine() {
                     window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setTranslation({ x: 0, y: 3, z: 0 }, true);
-                    window.EngineParams.suppressChunkLoading = true;
+                    if (window.EngineParams) window.EngineParams.suppressChunkLoading = true;
                 }
             } else if (target === 'world') {
                 composer.removePass(pocketPass);
@@ -2031,15 +1245,16 @@ async function bootEngine() {
                     window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: groundY, z: pos.z }, true);
-                    window.EngineParams.suppressChunkLoading = false;
+                    if (window.EngineParams) window.EngineParams.suppressChunkLoading = false;
                 }
             }
-            window.EventBus.emit('ENV_UPDATE');
+            window.EventBus?.emit('ENV_UPDATE');
         });
 
+        window.GameCore.passes = window.GameCore.passes || {};
         window.GameCore.passes.bloom = new UnrealBloomPass(
             new THREE.Vector2((window.innerWidth || 800) * 0.5, (window.innerHeight || 600) * 0.5), 
-            window.EngineParams.bloom, 
+            window.EngineParams?.bloom || 1.5, 
             0.25, 
             0.9
         ); 
@@ -2052,14 +1267,12 @@ async function bootEngine() {
         window.GameCore.passes.colorTint = new ShaderPass(ColorTintShader); composer.addPass(window.GameCore.passes.colorTint);
 
         const startY = safeGetTerrainHeight(0, 0); const safeY = isNaN(startY) ? 1 : startY;
-        spawnPlayer(0, safeY + 3.0, 0); spawnPartyMembers(); ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
+        spawnPlayer(0, safeY + 3.0, 0); 
+        spawnPartyMembers(); 
+        ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
 
-        // Auto-generate Capital City on engine boot
-        if (window.CapitalCityManager) {
-            window.CapitalCityManager.generateCapital();
-        }
-        
-        window.EventBus.on('ENV_UPDATE', () => {
+        window.EventBus?.on('ENV_UPDATE', () => {
+            if(!window.EngineParams) return;
             const hourNormalized = (window.EngineParams.timeOfDay % 24) / 24;
             const angle = hourNormalized * Math.PI * 2 - (Math.PI / 2); 
             
@@ -2108,13 +1321,7 @@ async function bootEngine() {
             }
         });
 
-        window.EventBus.on('GAME_STARTED', () => {
-            if (window.CapitalCityManager && !window.CapitalCityManager.isGenerated) {
-                window.CapitalCityManager.generateCapital();
-            }
-        });
-        
-        window.EventBus.emit('ENGINE_READY'); window.EventBus.emit('ENV_UPDATE');
+        window.EventBus?.emit('ENGINE_READY'); window.EventBus?.emit('ENV_UPDATE');
     } catch(e) { console.error("CRITICAL BOOT ERROR", e); }
 }
 
@@ -2125,10 +1332,10 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('hud').classList.remove('hidden');
 
-        window.GameCore.engineState = 'running';
+        if(window.GameCore) window.GameCore.engineState = 'running';
 
-        window.EventBus.emit('UI_UPDATE_HUD');
-        window.EventBus.emit('GAME_STARTED');
+        window.EventBus?.emit('UI_UPDATE_HUD');
+        window.EventBus?.emit('GAME_STARTED');
 
         (async () => {
             try {
@@ -2145,13 +1352,13 @@ window.addEventListener('DOMContentLoaded', () => {
         })();
 
         window.addEventListener('resize', () => { 
-            if(window.GameCore.camera) {
+            if(window.GameCore?.camera) {
                 window.GameCore.camera.aspect = window.innerWidth / window.innerHeight; 
                 window.GameCore.camera.updateProjectionMatrix(); 
             }
             if(renderer) {
                 renderer.setSize(window.innerWidth, window.innerHeight); 
-                composer.setSize(window.innerWidth, window.innerHeight); 
+                if(composer) composer.setSize(window.innerWidth, window.innerHeight); 
             }
         });
     
@@ -2162,9 +1369,8 @@ window.addEventListener('DOMContentLoaded', () => {
             accumulator += delta; 
         
             while (accumulator >= fixedTimeStep) { 
-                if(window.GameCore.world) window.GameCore.world.step(); 
-        
-                window.GameCore.checkFloatingOrigin();
+                if(window.GameCore?.world) window.GameCore.world.step(); 
+                if(window.GameCore?.checkFloatingOrigin) window.GameCore.checkFloatingOrigin();
         
                 fixedUpdateLogic(fixedTimeStep); 
                 accumulator -= fixedTimeStep; 
@@ -2177,7 +1383,7 @@ window.addEventListener('DOMContentLoaded', () => {
     
         animate();
     
-        window.EventBus.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
+        window.EventBus?.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
     }, { once: true }); 
 });
 
