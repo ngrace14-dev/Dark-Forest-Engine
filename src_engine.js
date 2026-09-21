@@ -879,7 +879,7 @@ const ChunkManager = {
                 c.set(biome.color);
                 
                 let minRoadDistSq = 999999;
-                for(let r=0; r<localRoadPoints.length; r++) { 
+                for(let r = 0; r < localRoadPoints.length; r++) { 
                     const dx = vx - localRoadPoints[r].x;
                     const dz = vz - localRoadPoints[r].z;
                     const distSq = (dx * dx) + (dz * dz);
@@ -888,9 +888,10 @@ const ChunkManager = {
                 
                 const minRoadDist = Math.sqrt(minRoadDistSq);
                 
-                if(minRoadDist < ROAD_WIDTH + 2) { 
+                // Smooth blend from grass to dirt path without mutating color scratch
+                if (minRoadDist < ROAD_WIDTH + 2) { 
                     const dirtInfluence = Math.max(0, 1.0 - (minRoadDist / (ROAD_WIDTH + 2))); 
-                    c.lerp(_colorScratch.set('#38281d'), dirtInfluence); 
+                    c.lerp(_dirtColorScratch, dirtInfluence * 0.55); 
                 }
 
                 vertices[i+1] = safeGetTerrainHeight(vx, vz); 
@@ -903,10 +904,10 @@ const ChunkManager = {
                 roadEdgeData[i / 3] = edgeGlow;
             }
 
-            const colorNoise = window.currentNoise2D ? window.currentNoise2D(vx * 0.1, vz * 0.1) * 0.05 : 0; 
-            c.r += colorNoise; 
-            c.g += colorNoise; 
-            c.b += colorNoise;
+            const colorNoise = window.currentNoise2D ? window.currentNoise2D(vx * 0.1, vz * 0.1) * 0.04 : 0; 
+            c.r = Math.min(1.0, Math.max(0.0, c.r + colorNoise)); 
+            c.g = Math.min(1.0, Math.max(0.0, c.g + colorNoise)); 
+            c.b = Math.min(1.0, Math.max(0.0, c.b + colorNoise));
             
             colors.push(c.r, c.g, c.b);
         }
