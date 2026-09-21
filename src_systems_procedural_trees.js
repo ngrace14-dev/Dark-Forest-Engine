@@ -54,15 +54,17 @@ class ProceduralTreeBuilder {
                 `
                 #include <color_fragment>
 
-                vec3 norm = normalize(vWorldNormal);
+                vec3 norm = length(vWorldNormal) > 0.0001 ? normalize(vWorldNormal) : vec3(0.0, 1.0, 0.0);
                 
                 float h1 = sin(vWorldPos.y * 3.0 + sin(vWorldPos.x * 4.0) * 0.5);
                 float h2 = cos(atan(norm.z, norm.x) * 16.0);
                 float barkHeight = h1 * h2;
 
+                // Safe Derivative Bump Normal calculation
                 vec3 dX = dFdx(vWorldPos);
                 vec3 dY = dFdy(vWorldPos);
-                vec3 bumpNorm = normalize(cross(dX, dY));
+                vec3 crossN = cross(dX, dY);
+                vec3 bumpNorm = length(crossN) > 0.00001 ? normalize(crossN) : norm;
 
                 vec3 darkBark = vec3(0.12, 0.06, 0.03);
                 vec3 lightBark = vec3(0.32, 0.18, 0.10);
