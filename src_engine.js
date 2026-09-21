@@ -20,6 +20,7 @@ const _q1 = new THREE.Quaternion();
 const _e1 = new THREE.Euler();
 const _m1 = new THREE.Matrix4();
 const _colorScratch = new THREE.Color();
+const _dirtColorScratch = new THREE.Color('#4a3e31'); // Dedicated dirt road color
 
 const _targetCamPos = new THREE.Vector3();
 const _currentCamTarget = new THREE.Vector3();
