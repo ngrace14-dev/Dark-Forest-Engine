@@ -6,7 +6,7 @@ class GrassSystem {
         this.maxBlades = 100000;
         this.windUniforms = { 
             uTime: { value: 0 },
-            uMaxRadius: { value: 120.0 },
+            uMaxRadius: { value: 60.0 }, // Culling horizon
             uPlayerPos: { value: new THREE.Vector3() }
         };
         this.dummy = new THREE.Object3D();
@@ -21,8 +21,8 @@ class GrassSystem {
         bladeGeo.translate(0, 0.7, 0); 
 
         const bladeMat = new THREE.MeshStandardMaterial({
-            roughness: 0.75,
-            metalness: 0.05,
+            roughness: 0.8,
+            metalness: 0.02,
             side: THREE.DoubleSide
         });
 
@@ -54,28 +54,28 @@ class GrassSystem {
                     vec3 worldOrigin = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
                 #endif
 
-                // Safe Player Trampling (Guards against NaN division by zero)
+                // --- 1. PLAYER-FOLIAGE INTERACTION ---
                 vec3 playerVec = worldOrigin - uPlayerPos;
                 float playerDist = length(playerVec.xz);
-                float pushRadius = 2.2;
+                float pushRadius = 2.5; // Interaction radius around player
                 if (playerDist < pushRadius) {
-                    float pushStrength = (1.0 - (playerDist / pushRadius)) * heightFactor * 1.2;
+                    float pushStrength = (1.0 - (playerDist / pushRadius)) * heightFactor * 1.4;
                     vec3 pushDir = playerDist > 0.001 ? normalize(vec3(playerVec.x, 0.0, playerVec.z)) : vec3(0.0, 0.0, 1.0);
                     transformed.xz += pushDir.xz * pushStrength;
-                    transformed.y -= pushStrength * 0.4;
+                    transformed.y -= pushStrength * 0.5; // Bend downward underfoot
                 }
 
                 // Curved Geometry Bend
-                transformed.z += pow(heightFactor, 2.0) * 0.3;
+                transformed.z += pow(heightFactor, 2.0) * 0.25;
 
-                // Horizon Distance Fade
+                // --- 2. DISTANCE-BASED LOD / DENSITY FADE (30m+) ---
                 float dist = length(cameraPosition.xz - worldOrigin.xz);
-                vDistFade = 1.0 - smoothstep(uMaxRadius * 0.7, uMaxRadius, dist);
+                vDistFade = 1.0 - smoothstep(30.0, uMaxRadius, dist);
 
                 // Wind Sway
-                float wave = sin(uTime * 2.8 + worldOrigin.x * 0.15 + worldOrigin.z * 0.15) * 0.4 * heightFactor;
+                float wave = sin(uTime * 2.8 + worldOrigin.x * 0.15 + worldOrigin.z * 0.15) * 0.35 * heightFactor;
                 transformed.x += wave;
-                transformed.z += wave * 0.5;
+                transformed.z += wave * 0.4;
                 `
             );
 
@@ -89,14 +89,14 @@ class GrassSystem {
                 `#include <color_fragment>`,
                 `
                 #include <color_fragment>
-                vec3 rootColor = vec3(0.02, 0.08, 0.02);
-                vec3 tipColor = vec3(0.22, 0.52, 0.14);
-                vec3 dryTipColor = vec3(0.45, 0.42, 0.18);
 
-                vec3 bladeGrad = mix(rootColor, tipColor, vHeightFactor);
-                if (vHeightFactor > 0.8) {
-                    bladeGrad = mix(bladeGrad, dryTipColor, (vHeightFactor - 0.8) * 2.0);
-                }
+                // --- 3. GROUND MATERIAL BLENDING (Dark Soil Root Transition) ---
+                vec3 dampSoilRoot = vec3(0.04, 0.03, 0.02); // Dark earth tint at ground line
+                vec3 midGrass     = vec3(0.08, 0.28, 0.08); // Forest green mid-section
+                vec3 sunlitTip    = vec3(0.22, 0.52, 0.14); // Light top blade
+
+                vec3 bladeGrad = mix(dampSoilRoot, midGrass, smoothstep(0.0, 0.25, vHeightFactor));
+                bladeGrad = mix(bladeGrad, sunlitTip, smoothstep(0.25, 1.0, vHeightFactor));
 
                 diffuseColor.rgb = bladeGrad;
                 `
@@ -106,6 +106,7 @@ class GrassSystem {
                 `#include <dither_fragment>`,
                 `
                 #include <dither_fragment>
+                // Fragment density discard past 30m threshold
                 if (vDistFade < 0.05) discard;
                 `
             );
@@ -120,7 +121,7 @@ class GrassSystem {
         this.initialized = true;
     }
 
-    generateAroundPlayer(centerX, centerZ, radius = 120) {
+    generateAroundPlayer(centerX, centerZ, radius = 60) {
         if (!this.initialized || !this.instancedMesh) return;
 
         let index = 0;
@@ -144,10 +145,7 @@ class GrassSystem {
             if (window.RoadManager?.isSafeZone?.({ x: worldX, z: worldZ })) continue;
 
             const worldY = getTerrainY(worldX, worldZ);
-
-            const distRatio = r / radius; 
-            const distanceScaleBonus = 1.0 + (distRatio * 1.4); 
-            const baseScale = (0.7 + hash(worldX, worldZ) * 0.5) * distanceScaleBonus;
+            const baseScale = 0.7 + hash(worldX, worldZ) * 0.5;
 
             this.dummy.position.set(worldX, worldY, worldZ);
             this.dummy.rotation.set(0, hash(i, i) * Math.PI * 2, 0);
@@ -170,8 +168,8 @@ class GrassSystem {
             const pos = window.GameCore.playerObj.visual.position;
             this.windUniforms.uPlayerPos.value.copy(pos);
 
-            if (!this.lastPos || this.lastPos.distanceToSquared(pos) > 144) {
-                this.generateAroundPlayer(pos.x, pos.z, 120);
+            if (!this.lastPos || this.lastPos.distanceToSquared(pos) > 64) {
+                this.generateAroundPlayer(pos.x, pos.z, 60);
                 this.lastPos = pos.clone();
             }
         }
