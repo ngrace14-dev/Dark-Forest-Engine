@@ -13,6 +13,7 @@ import { initializeUIEngine } from './src/ui/init.js';
 import './src_systems_ui.js';
 import './src_systems_render_optimizer.js'; 
 import './src_systems_graphics.js';         // Dedicated AAA Graphics Pipeline & Post-Processing
+import './src_systems_volumetric_fog.js';   // <-- ADDED: Atmospheric Height-Fog Shader
 import './src_systems_block_terrain.js';     // NEW: Procedural Block Terrain & Shader System
 import './src_systems_grass.js';
 import './src_systems_ruins.js';            // <-- ADDED: Procedural Stone Ruins & Cobblestones
