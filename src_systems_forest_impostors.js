@@ -1,3 +1,8 @@
+// ============================================================================
+// Dark Forest Engine - Distant Redwood Impostor Billboard System (3km Draw Distance)
+// File: src_systems_forest_impostors.js
+// ============================================================================
+
 import * as THREE from 'three';
 
 class ForestImpostorSystem {
@@ -10,23 +15,28 @@ class ForestImpostorSystem {
 
         this.uniforms = {
             uTime: { value: 0 },
-            uMinRadius: { value: 150.0 },
-            uMaxRadius: { value: 3000.0 },
+            uMinRadius: { value: 480.0 },  // Distance where LOD3 transitions to LOD4 Impostor
+            uMaxRadius: { value: 3500.0 }, // Maximum draw distance (3.5km)
             uFogColor: { value: new THREE.Color(0x0c131a) },
             uFogDensity: { value: 0.0018 }
         };
     }
 
+    /**
+     * Initializes quad geometry, cylindrical billboarding material, and InstancedMesh pool.
+     * @param {THREE.Scene} scene 
+     */
     init(scene) {
         if (this.initialized) return;
 
-        const quadGeo = new THREE.PlaneGeometry(12, 28, 1, 1);
-        quadGeo.translate(0, 14, 0);
+        // Scale quad to match mature Northern California Redwood dimensions (45m wide x 100m tall)
+        const quadGeo = new THREE.PlaneGeometry(45, 100, 1, 1);
+        quadGeo.translate(0, 50, 0); // Ground pivot at base of trunk
 
         const impostorMat = new THREE.ShaderMaterial({
             uniforms: this.uniforms,
             side: THREE.DoubleSide,
-            transparent: true,
+            transparent: false, // CRITICAL: Disabled to force solid WebGL depth writes
             depthWrite: true,
             depthTest: true,
 
@@ -51,7 +61,7 @@ class ForestImpostorSystem {
                     vWorldPos = worldOrigin;
                     vDist = length(cameraPosition.xz - worldOrigin.xz);
 
-                    // Safe cylindrical billboarding look calculation
+                    // Cylindrical Billboarding (Rotates quad on Y axis toward camera position)
                     vec3 look = cameraPosition - worldOrigin;
                     look.y = 0.0;
                     float lookLen = length(look);
@@ -61,6 +71,11 @@ class ForestImpostorSystem {
                     vec3 right = cross(up, look);
 
                     vec3 localPos = position;
+                    
+                    // Low-frequency wind sway applied to top crown of billboard plane
+                    float sway = sin(uTime * 1.0 + worldOrigin.x * 0.005) * pow(localPos.y / 100.0, 2.0) * 2.5;
+                    localPos.x += sway;
+
                     vec3 billboardPos = worldOrigin + right * localPos.x + up * localPos.y;
 
                     gl_Position = projectionMatrix * viewMatrix * vec4(billboardPos, 1.0);
@@ -77,39 +92,57 @@ class ForestImpostorSystem {
                 varying float vDist;
                 varying vec3 vWorldPos;
 
+                float hash(vec2 p) {
+                    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+                }
+
                 void main() {
-                    if (vDist < uMinRadius) discard;
-                    if (vDist > uMaxRadius) discard;
+                    // Distance clipping bounds
+                    if (vDist < uMinRadius || vDist > uMaxRadius) discard;
 
                     vec2 uv = vUv;
+                    float treeHash = hash(vWorldPos.xz);
 
-                    float trunkMask = smoothstep(0.12, 0.04, abs(uv.x - 0.5)) * step(uv.y, 0.35);
+                    // 1. Tapered Redwood Trunk Profile
+                    float trunkWidth = mix(0.10, 0.015, uv.y); 
+                    float trunkMask = smoothstep(trunkWidth, trunkWidth - 0.008, abs(uv.x - 0.5)) * step(uv.y, 0.95);
 
-                    float conePattern = 0.0;
-                    for (int i = 0; i < 5; i++) {
-                        float tierY = 0.2 + float(i) * 0.16;
-                        float tierWidth = (1.0 - (uv.y - tierY) * 2.2) * 0.45;
-                        if (uv.y >= tierY && uv.y <= tierY + 0.22) {
-                            conePattern += smoothstep(tierWidth, tierWidth - 0.08, abs(uv.x - 0.5));
-                        }
+                    // 2. Irregular Redwood Upper Canopy Mask (Upper ~40% only)
+                    float canopyBase = mix(0.58, 0.68, treeHash);
+                    float canopyMask = 0.0;
+                    
+                    if (uv.y > canopyBase) {
+                        float heightNorm = (uv.y - canopyBase) / (1.0 - canopyBase);
+                        float env = sin(heightNorm * 3.1415); 
+                        
+                        // Ragged high-frequency sine waves to break up mechanical silhouette
+                        float raggedEdge = sin(uv.y * 50.0 + treeHash * 20.0) * 0.05 
+                                         + cos(uv.y * 20.0) * 0.07;
+                        
+                        float maxWidth = (0.28 * env) + raggedEdge;
+                        canopyMask = smoothstep(maxWidth, maxWidth - 0.015, abs(uv.x - 0.5));
                     }
 
-                    float alpha = clamp(trunkMask + conePattern, 0.0, 1.0);
-                    if (alpha < 0.1) discard;
+                    float alpha = clamp(trunkMask + canopyMask, 0.0, 1.0);
+                    
+                    // HARD DISCARD: Writes solid pixel to depth buffer for Volumetric Fog depth reconstruction
+                    if (alpha < 0.5) discard;
 
-                    vec3 darkNeedle = vec3(0.03, 0.09, 0.04);
-                    vec3 sunlitTip = vec3(0.12, 0.28, 0.10);
-                    vec3 trunkColor = vec3(0.20, 0.11, 0.06);
+                    // Deep Redwood Foliage and Bark Albedo Blending
+                    vec3 darkNeedle = vec3(0.03, 0.07, 0.03);
+                    vec3 tipHighlight = vec3(0.12, 0.22, 0.09);
+                    vec3 trunkColor = vec3(0.18, 0.09, 0.05);
 
-                    vec3 finalColor = mix(darkNeedle, sunlitTip, uv.y);
-                    if (trunkMask > 0.5 && conePattern < 0.2) {
+                    vec3 finalColor = mix(darkNeedle, tipHighlight, uv.y);
+                    if (trunkMask > 0.5 && canopyMask < 0.2) {
                         finalColor = trunkColor;
                     }
 
+                    // Atmospheric Scattering & Fog Absorption
                     float fogFactor = 1.0 - exp(-vDist * uFogDensity);
-                    finalColor = mix(finalColor, uFogColor, clamp(fogFactor, 0.0, 0.95));
+                    finalColor = mix(finalColor, uFogColor, clamp(fogFactor, 0.0, 0.98));
 
-                    gl_FragColor = vec4(finalColor, alpha);
+                    gl_FragColor = vec4(finalColor, 1.0);
                 }
             `
         });
@@ -122,6 +155,10 @@ class ForestImpostorSystem {
         this.initialized = true;
     }
 
+    /**
+     * Regenerates distant forest instance matrix positions around player center.
+     * Uses "Fairy Ring" spatial clustering noise logic.
+     */
     generateDistantForest(centerX, centerZ) {
         if (!this.initialized || !this.instancedMesh) return;
 
@@ -136,12 +173,12 @@ class ForestImpostorSystem {
             return Number.isFinite(h) ? h : 0;
         };
 
-        const step = 18;
-        const maxDistSq = 3000 * 3000;
-        const minDistSq = 140 * 140;
+        const step = 28; // Spacing step calibrated for massive crown sizes
+        const maxDistSq = 3500 * 3500;
+        const minDistSq = 480 * 480;
 
-        for (let x = -3000; x <= 3000; x += step) {
-            for (let z = -3000; z <= 3000; z += step) {
+        for (let x = -3500; x <= 3500; x += step) {
+            for (let z = -3500; z <= 3500; z += step) {
                 if (index >= this.maxImpostors) break;
 
                 const distSq = x * x + z * z;
@@ -152,13 +189,14 @@ class ForestImpostorSystem {
 
                 if (window.RoadManager?.isSafeZone?.({ x: wx, z: wz })) continue;
 
-                const densityNoise = hash(wx * 0.005, wz * 0.005);
-                if (densityNoise < 0.25) continue;
+                // Density mask for natural glades and clustered groves
+                const clusterNoise = hash(wx * 0.002, wz * 0.002);
+                if (clusterNoise < 0.35) continue;
 
                 const wy = getTerrainY(wx, wz);
                 if (!Number.isFinite(wy)) continue;
 
-                const scale = 0.8 + hash(wx, wz) * 0.6;
+                const scale = 0.85 + hash(wx, wz) * 0.4;
 
                 this.dummy.position.set(wx, wy, wz);
                 this.dummy.scale.set(scale, scale, scale);
@@ -173,6 +211,10 @@ class ForestImpostorSystem {
         this.instancedMesh.instanceMatrix.needsUpdate = true;
     }
 
+    /**
+     * Updates uniforms and recalculates distant tree grid when player crosses chunk boundary.
+     * @param {number} timeSecs 
+     */
     update(timeSecs) {
         if (!this.initialized) return;
 
@@ -196,3 +238,4 @@ class ForestImpostorSystem {
 }
 
 window.ForestImpostorSystem = new ForestImpostorSystem();
+export default ForestImpostorSystem;
