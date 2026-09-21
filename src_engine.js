@@ -264,7 +264,7 @@ function processEntityStatusEffects(entity, delta) {
         if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
             effect.tickTimer = 1;
             entity.hp = Math.max(0, entity.hp - effect.tickDamage);
-            window.EventBus.emit('ENTITY_DAMAGED', { damage: effect.tickDamage, position: entity.visual.position, isPlayer: false });
+            window.EventBus.emit('ENTITY_DAMAGED', { damage: effect.tickDamage, position: entity.visual.position, isPlayer: true });
             window.EventBus.emit('SPAWN_HIT_VFX', { type: effect.type === 'burning' ? 'Fire' : 'Void', pos: entity.visual.position });
             
             if (entity.hp <= 0) {
@@ -357,7 +357,7 @@ function updatePlayerMovement(delta) {
     if (window.Input.isMoving) {
         moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle || Math.PI); 
         
-        // CALIBRATED 15-MINUTE MILE BASE SPEED: ~1.7882 m/s
+        // RECALIBRATED 15-MINUTE MILE BASE SPEED: ~1.7882 m/s
         const BASE_STARTING_SPEED = 1609.344 / 900.0; 
         
         const athleticsLvl = window.GameState.pStats?.athletics?.level || 0;
@@ -426,7 +426,7 @@ function updatePlayerMovement(delta) {
 }
 
 // ==========================================
-// COMBAT ENGINE & EVENT LISTENERS
+// COMBAT ENGINE
 // ==========================================
 
 function performAttack(isHeavy = false) {
@@ -782,6 +782,44 @@ window.EventBus.on('WORLD_REGENERATE', () => {
     window.EventBus.emit('UI_LOG', `World Math Regenerated with Seed: ${window.EngineParams.worldSeed}`);
 });
 
+// SAFE WARP & TELEPORT HANDLERS
+window.EventBus.on('CMD_TELEPORT', (pos) => { 
+    if (window.GameCore.playerObj?.body) {
+        const groundY = window.WorldGenerator.getTerrainHeight(pos.x, pos.z);
+        const safeY = (isNaN(groundY) ? 10 : groundY) + 5.0; 
+
+        window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: safeY, z: pos.z }, true);
+        
+        if (window.GameCore.playerObj.visual) {
+            window.GameCore.playerObj.visual.position.set(pos.x, safeY - 1.0, pos.z);
+        }
+
+        ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, safeY, pos.z));
+    }
+});
+
+window.EventBus.on('PLAYER_RESPAWN', () => { 
+    if (!window.EngineParams.arenaMode && window.GameState.pStats.hp <= 0) {
+        window.GameCore.recordCombatDefeat({ source: 'open-world', injury: `open-world defeat on day ${window.EngineParams.worldDay}` });
+    }
+    
+    const respawnY = window.WorldGenerator.getTerrainHeight(0, 0) + 5.0; 
+    
+    if (window.GameCore.playerObj?.body) {
+        window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        window.GameCore.playerObj.body.setTranslation({ x: 0, y: respawnY, z: 0 }, true); 
+    }
+    
+    ChunkManager.forceUpdatePosition(new THREE.Vector3(0, respawnY, 0));
+    window.GameState.pStats.hp = window.GameState.pStats.maxHp; 
+    window.GameState.inventory.gold = Math.floor(window.GameState.inventory.gold / 2); 
+    playEntityAnimation(window.GameCore.playerObj, 'idle'); 
+    window.EventBus.emit('UI_UPDATE_HUD'); 
+});
+
 function punishExposedActors() {
     const player = window.GameCore.playerObj;
     const playerSafe = player && (window.RoadManager.isSafeZone(player.visual.position) || window.RoadManager.isVillageProtected(player.visual.position));
@@ -792,12 +830,12 @@ function punishExposedActors() {
             window.EventBus.emit('UI_LOG', '[THE CROW] The woods reach for you, but the landing bends away.');
         } else {
             const point = destination(); 
-            ChunkManager.forceUpdatePosition(new THREE.Vector3(point.x, 0, point.z));
             const y = window.WorldGenerator.getTerrainHeight(point.x, point.z) + 5.0;
             
             player.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
             player.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
             player.body.setTranslation({ x: point.x, y, z: point.z }, true); 
+            ChunkManager.forceUpdatePosition(new THREE.Vector3(point.x, y, point.z));
             window.EventBus.emit('UI_LOG', '[THE WOODS] The shift catches you. You are thrown across the new landscape.');
         }
     }
@@ -855,22 +893,22 @@ function regenerateWorldCycle() {
                                     window.GameState.inventory.backpack.includes('epoch_anchor');
                 
               if (protectedVillage) {
-                  ChunkManager.forceUpdatePosition(new THREE.Vector3(protectedVillage.x, 0, protectedVillage.z));
                   const newY = window.WorldGenerator.getTerrainHeight(protectedVillage.x, protectedVillage.z) + 5.0;
                   window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
                   window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
                   window.GameCore.playerObj.body.setTranslation({x: protectedVillage.x, y: newY, z: protectedVillage.z}, true);
+                  ChunkManager.forceUpdatePosition(new THREE.Vector3(protectedVillage.x, newY, protectedVillage.z));
                   playerShiftedSafely = true;
                   window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The ward held. You shifted safely with ${protectedVillage.name}.`);
               } 
               else if (hasAnchorItem) {
                   const nearestRoadPt = window.RoadManager.getRandomPathPoint();
                   if (nearestRoadPt) {
-                      ChunkManager.forceUpdatePosition(new THREE.Vector3(nearestRoadPt.x, 0, nearestRoadPt.z));
                       const newY = window.WorldGenerator.getTerrainHeight(nearestRoadPt.x, nearestRoadPt.z) + 5.0;
                       window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
                       window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
                       window.GameCore.playerObj.body.setTranslation({x: nearestRoadPt.x, y: newY, z: nearestRoadPt.z}, true);
+                      ChunkManager.forceUpdatePosition(new THREE.Vector3(nearestRoadPt.x, newY, nearestRoadPt.z));
                       playerShiftedSafely = true;
                       window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The Anchor burns in your pocket, pulling you to the nearest road.`);
                   }
@@ -886,11 +924,11 @@ function regenerateWorldCycle() {
                   newZ = (Math.random() * 2 - 1) * forestExtent;
                   if (Math.abs(newX) > 500 || Math.abs(newZ) > 500) valid = true;
               }
-              ChunkManager.forceUpdatePosition(new THREE.Vector3(newX, 0, newZ));
               const newY = window.WorldGenerator.getTerrainHeight(newX, newZ) + 5.0;
               window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
               window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
               window.GameCore.playerObj.body.setTranslation({x: newX, y: newY, z: newZ}, true);
+              ChunkManager.forceUpdatePosition(new THREE.Vector3(newX, newY, newZ));
               window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] You were caught unprotected. You are lost in the deep forest.`);
             }
 
@@ -937,6 +975,7 @@ function fixedUpdateLogic(delta) {
     window.VATManager?.update(delta);
     window.EncounterDirector?.update(delta);
     if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.update(delta);
+    if (window.ForestRenderer) window.ForestRenderer.update(delta);
 
     updatePlayerStats(delta);
     updateEntities(delta);
@@ -961,7 +1000,7 @@ const ChunkManager = {
 
     forceUpdatePosition: function(playerPos) {
         if (window.EngineParams.suppressChunkLoading || !playerPos) return;
-        _lastChunkCheckPos.copy(playerPos);
+        _lastChunkCheckPos.set(playerPos.x, 0, playerPos.z);
         const cx = Math.floor(playerPos.x / 60); 
         const cz = Math.floor(playerPos.z / 60);
         this.currentChunkX = cx; 
@@ -972,8 +1011,10 @@ const ChunkManager = {
     update: function(playerPos) {
         if (window.EngineParams.suppressChunkLoading || !playerPos) return;
         
-        if (_lastChunkCheckPos.distanceToSquared(playerPos) < 25) return;
-        _lastChunkCheckPos.copy(playerPos);
+        const dx = playerPos.x - _lastChunkCheckPos.x;
+        const dz = playerPos.z - _lastChunkCheckPos.z;
+        if ((dx * dx + dz * dz) < 25) return; // 2D distance threshold
+        _lastChunkCheckPos.set(playerPos.x, 0, playerPos.z);
 
         const cx = Math.floor(playerPos.x / 60); 
         const cz = Math.floor(playerPos.z / 60);
@@ -1981,7 +2022,6 @@ async function bootEngine() {
         const startY = window.WorldGenerator.getTerrainHeight(0, 0); const safeY = isNaN(startY) ? 1 : startY;
         spawnPlayer(0, safeY + 3.0, 0); spawnPartyMembers(); ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
 
-        // Auto-generate Capital City on engine boot
         if (window.CapitalCityManager) {
             window.CapitalCityManager.generateCapital();
         }
