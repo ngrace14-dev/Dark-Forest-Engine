@@ -5,7 +5,6 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
-import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 
 class RenderPipeline {
     constructor() {
@@ -17,54 +16,58 @@ class RenderPipeline {
         this.pocketPass = null;
         this.renderer = null;
         this.camera = null;
+        this.qualityTier = 'medium'; // Default to balanced performance
     }
 
     init(renderer, scene, pocketScene, camera) {
         this.renderer = renderer;
         this.camera = camera;
 
-        // --- 1. AAA Renderer Settings ---
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Feathered soft shadows
+        // Cap pixel ratio to 1.0 during dev to prevent 4K screen lag
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.0));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.25;
+        renderer.toneMappingExposure = 1.2;
 
-        // --- 2. Lighting Setup ---
-        this.ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+        // --- Lighting Setup ---
+        this.ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
         scene.add(this.ambientLight);
 
-        this.dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
+        this.dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
         this.dirLight.position.set(20, 60, 20);
         this.dirLight.castShadow = true;
-        this.dirLight.shadow.mapSize.width = 2048;
-        this.dirLight.shadow.mapSize.height = 2048;
-        this.dirLight.shadow.camera.left = -150;
-        this.dirLight.shadow.camera.right = 150;
-        this.dirLight.shadow.camera.top = 150;
-        this.dirLight.shadow.camera.bottom = -150;
+        // Optimized Shadow Resolution (1024 vs 2048 cuts shadow VRAM/GPU cost by 75%)
+        this.dirLight.shadow.mapSize.width = 1024;
+        this.dirLight.shadow.mapSize.height = 1024;
+        this.dirLight.shadow.camera.left = -100;
+        this.dirLight.shadow.camera.right = 100;
+        this.dirLight.shadow.camera.top = 100;
+        this.dirLight.shadow.camera.bottom = -100;
         this.dirLight.shadow.bias = -0.0005;
         scene.add(this.dirLight);
 
-        // --- 3. Composer & Post-Processing Pipeline ---
+        // --- Composer Setup ---
         this.composer = new EffectComposer(renderer);
         this.worldPass = new RenderPass(scene, camera);
         this.pocketPass = new RenderPass(pocketScene, camera);
         this.composer.addPass(this.worldPass);
 
-        // --- 4. SSAO (Screen-Space Contact Shadows) ---
+        // --- Optimized SSAO Pass ---
         this.passes.ssao = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
-        this.passes.ssao.kernelRadius = 16;
+        this.passes.ssao.kernelRadius = 8; // Reduced from 16 for better speed
         this.passes.ssao.minDistance = 0.001;
         this.passes.ssao.maxDistance = 0.1;
         this.composer.addPass(this.passes.ssao);
 
-        // --- 5. Bloom ---
+        // --- Bloom Pass ---
         this.passes.bloom = new UnrealBloomPass(
-            new THREE.Vector2(window.innerWidth * 0.5, window.innerHeight * 0.5),
-            window.EngineParams?.bloom || 1.5, 0.25, 0.9
+            new THREE.Vector2(window.innerWidth * 0.25, window.innerHeight * 0.25), // Reduced resolution target
+            0.8, 0.2, 0.9
         );
         this.composer.addPass(this.passes.bloom);
 
-        // --- 6. Vignette Shader ---
+        // --- Vignette Shader ---
         const VignetteShader = {
             uniforms: { "tDiffuse": { value: null }, "darkness": { value: 0.35 } },
             vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
@@ -73,41 +76,42 @@ class RenderPipeline {
         this.passes.vignette = new ShaderPass(VignetteShader);
         this.composer.addPass(this.passes.vignette);
 
-        // --- 7. Color Tint Shader ---
-        const ColorTintShader = {
-            uniforms: { "tDiffuse": { value: null }, "tintColor": { value: new THREE.Color('#2b4461') }, "tintIntensity": { value: 0.65 } },
-            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
-            fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 tintColor; uniform float tintIntensity; varying vec2 vUv; void main() { vec4 texel = texture2D( tDiffuse, vUv ); vec3 tinted = texel.rgb * tintColor * 2.0; vec3 finalColor = mix(texel.rgb, tinted, tintIntensity); gl_FragColor = vec4( finalColor, texel.a ); }`
-        };
-        this.passes.colorTint = new ShaderPass(ColorTintShader);
-        this.composer.addPass(this.passes.colorTint);
-
-        // --- 8. Cinematic Depth of Field (Bokeh) ---
-        this.passes.bokeh = new BokehPass(scene, camera, {
-            focus: 15.0,
-            aperture: 0.00005,
-            maxblur: 0.012,
-            width: window.innerWidth,
-            height: window.innerHeight
-        });
-        this.composer.addPass(this.passes.bokeh);
-
-        // --- 9. SMAA (Hardware Anti-Aliasing) ---
+        // --- Fast Anti-Aliasing (SMAA) ---
         this.passes.smaa = new SMAAPass(
-            window.innerWidth * renderer.getPixelRatio(),
-            window.innerHeight * renderer.getPixelRatio()
+            window.innerWidth,
+            window.innerHeight
         );
         this.composer.addPass(this.passes.smaa);
 
         window.GameCore.passes = this.passes;
+        this.setQuality(this.qualityTier);
+    }
+
+    setQuality(tier) {
+        this.qualityTier = tier;
+        if (!this.composer) return;
+
+        if (tier === 'low') {
+            this.passes.ssao.enabled = false;
+            this.passes.bloom.enabled = false;
+            this.passes.smaa.enabled = false;
+            this.dirLight.castShadow = false;
+        } else if (tier === 'medium') {
+            this.passes.ssao.enabled = true;
+            this.passes.bloom.enabled = true;
+            this.passes.smaa.enabled = false;
+            this.dirLight.castShadow = true;
+        } else if (tier === 'high') {
+            this.passes.ssao.enabled = true;
+            this.passes.bloom.enabled = true;
+            this.passes.smaa.enabled = true;
+            this.dirLight.castShadow = true;
+        }
     }
 
     resize(width, height) {
         if (this.composer) this.composer.setSize(width, height);
         if (this.passes.ssao) this.passes.ssao.setSize(width, height);
-        if (this.passes.bokeh && this.passes.bokeh.renderTargetDepth) {
-            this.passes.bokeh.setSize(width, height);
-        }
     }
 
     render() {
@@ -142,19 +146,16 @@ class RenderPipeline {
         this.dirLight.position.z = Math.cos(angle) * 100;
 
         const sunHeight = Math.sin(angle);
-        let baseDirIntensity = 2.5;
-        let baseAmbientIntensity = 1.8;
+        let baseDirIntensity = 2.2;
+        let baseAmbientIntensity = 1.2;
 
         if (sunHeight > 0.3) {
-            baseDirIntensity = 3.0; baseAmbientIntensity = 2.0;
             this.dirLight.color.setHex(0xffffff); this.ambientLight.color.setHex(0xffffff);
             fog.color.setHex(0x94a3b8); scene.background = new THREE.Color(0x94a3b8);
         } else if (sunHeight > -0.1) {
-            baseDirIntensity = 1.8; baseAmbientIntensity = 1.4;
             this.dirLight.color.setHex(0xffccaa); this.ambientLight.color.setHex(0x7c2d12);
             fog.color.setHex(0x451a03); scene.background = new THREE.Color(0x451a03);
         } else {
-            baseDirIntensity = 0.5; baseAmbientIntensity = 0.6;
             this.dirLight.color.setHex(0x1e293b); this.ambientLight.color.setHex(0x0f172a);
             fog.color.setHex(0x020617); scene.background = new THREE.Color(0x020617);
         }
