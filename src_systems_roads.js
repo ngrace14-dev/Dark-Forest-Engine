@@ -1,90 +1,106 @@
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import * as THREE from 'three';
 
-window.RoadManager = {
-    paths: [], roadChunks: new Map(),
-    generateRoads: function(villages) {
-        this.paths = []; this.roadChunks.clear();
-        const prng = window.EpochManagerInstance ? window.EpochManagerInstance.prng : Math.random;
+class RoadManager {
+    constructor() {
+        this.roadNodes = [];
+        this.roadSegments = [];
+        this.minPathDistance = 180; // Minimum distance between parallel road branches (prevents seeing paths through trees)
+        this.roadWidth = 6.0;
+        this.decorMeshGroup = null;
+    }
+
+    // --- 1. SPREAD OUT ROAD NETWORK GENERATION ---
+    generateWorldRoads(seed = 1337) {
+        this.roadNodes = [];
+        this.roadSegments = [];
+
+        // Generates widely spaced highways extending across major biome regions
+        const waypoints = [
+            { x: 0, z: 0 },
+            { x: 220, z: -180 },
+            { x: 480, z: 80 },
+            { x: 150, z: 380 },
+            { x: -280, z: 240 },
+            { x: -350, z: -190 },
+            { x: -120, z: -420 }
+        ];
+
+        // Connect main waypoints into a single sprawling highway spine
+        for (let i = 0; i < waypoints.length - 1; i++) {
+            this.createCurvedRoadSegment(waypoints[i], waypoints[i + 1]);
+        }
+    }
+
+    createCurvedRoadSegment(start, end) {
+        const dist = Math.hypot(end.x - start.x, end.z - start.z);
+        const steps = Math.max(8, Math.floor(dist / 12)); // 12m resolution between points
         
-        for (let i = 0; i < villages.length - 1; i++) {
-            const start = new THREE.Vector3(villages[i].x, 0, villages[i].z); 
-            const end = new THREE.Vector3(villages[i+1].x, 0, villages[i+1].z);
-            const dist = start.distanceTo(end); 
-            
-            // To ensure the road is ~10x longer than the straight-line vector, 
-            // we heavily meander the path with wide, sweeping arcs and loops.
-            // A straight line is dist. To reach 10x dist, we need extreme perpendicular offsets.
-            const targetLength = dist * 10.0;
-            const numSegments = Math.max(10, Math.floor(targetLength / 5000)); // Lots of nodes to make it twisty
-            const dir = end.clone().sub(start).normalize(); 
-            const perp = new THREE.Vector3(-dir.z, 0, dir.x);
-            
-            const points = [start]; 
-            
-            // Instead of just zigzagging, we generate a highly spiraled/winding path
-            // by using sine waves of varying frequencies.
-            for (let j = 1; j < numSegments; j++) {
-                const t = j / numSegments; 
-                
-                // base point along the straight line
-                const basePt = start.clone().lerp(end, t); 
-                
-                // Low frequency massive sweep (creates the huge 10x distance detour)
-                const macroSweep = Math.sin(t * Math.PI * (3 + prng() * 4)) * (dist * 2.5);
-                
-                // Medium frequency zigzag
-                const mesoZigzag = Math.cos(t * Math.PI * (10 + prng() * 5)) * (dist * 0.8);
-                
-                // Add the offsets to the perpendicular vector
-                const offsetMag = macroSweep + mesoZigzag;
-                
-                points.push(basePt.add(perp.clone().multiplyScalar(offsetMag)));
-            }
-            points.push(end);
-            
-            // Use chordal curve type to prevent the splines from creating tight knots when meandering wildly
-            const curve = new THREE.CatmullRomCurve3(points, false, 'chordal'); 
-            this.paths.push({ startVillage: villages[i].id, endVillage: villages[i+1].id, curve: curve });
-            
-            const curveLength = curve.getLength(); 
-            const numSamples = Math.floor(curveLength / 5); 
-            for(let k=0; k<=numSamples; k++) {
-                const pt = curve.getPoint(k / numSamples); 
-                const cx = Math.floor(pt.x / 60); 
-                const cz = Math.floor(pt.z / 60);
-                const key = `${cx},${cz}`; 
-                if(!this.roadChunks.has(key)) this.roadChunks.set(key, []); 
-                this.roadChunks.get(key).push({x: pt.x, z: pt.z});
+        // Perpendicular offset for gentle, natural winding curves
+        const midX = (start.x + end.x) / 2;
+        const midZ = (start.z + end.z) / 2;
+        const dirX = (end.x - start.x) / dist;
+        const dirZ = (end.z - start.z) / dist;
+        const perpX = -dirZ;
+        const perpZ = dirX;
+
+        const curveOffset = (Math.sin(start.x * 0.05 + end.z * 0.05) - 0.5) * 45.0;
+
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const curveFactor = Math.sin(t * Math.PI) * curveOffset;
+
+            const px = start.x + (end.x - start.x) * t + perpX * curveFactor;
+            const pz = start.z + (end.z - start.z) * t + perpZ * curveFactor;
+
+            // Enforce minimum isolation spacing from existing non-connected road points
+            if (!this.isTooCloseToOtherPaths(px, pz, 30.0)) {
+                this.roadNodes.push({ x: px, z: pz, width: this.roadWidth });
             }
         }
-        window.EventBus.emit('UI_LOG', `Road network generated between ${villages.length} settlements.`);
-    },
-    getRoadPointsNear: function(cx, cz) {
-        let pts = []; for(let x = cx - 2; x <= cx + 2; x++) { for(let z = cz - 2; z <= cz + 2; z++) { const key = `${x},${z}`; if(this.roadChunks.has(key)) pts.push(...this.roadChunks.get(key)); } }
-        return pts;
-    },
-    isSafeZone: function(pos) {
-        for (let i = 0; i < window.GameCore.activeEntities.length; i++) { if (window.GameCore.activeEntities[i].name === 'Blight Root') { if (window.GameCore.activeEntities[i].visual.position.distanceTo(pos) < 30.0) return false; } }
-        const cx = Math.floor(pos.x / 60); const cz = Math.floor(pos.z / 60); const pts = this.getRoadPointsNear(cx, cz);
-        for (let i = 0; i < pts.length; i++) { if (Math.sqrt(Math.pow(pos.x - pts[i].x, 2) + Math.pow(pos.z - pts[i].z, 2)) < 7.0) return true; }
-        return false;
-    },
-    isRuneProtected: function(pos) {
-        if (!this.isSafeZone(pos)) return false;
-        return window.GameCore.activeEntities.some(entity => entity.name === 'Rune Tower' && entity.def.active !== false && entity.visual.position.distanceTo(pos) <= (entity.def.protectionRadius || 18));
-    },
-    isVillageProtected: function(pos) {
-        return window.VillageManager.villages.some(village => {
-            const radius = village.territory?.barrierRadius || 22;
-            return village.barrierIntegrity > 0 && Math.hypot(pos.x - village.x, pos.z - village.z) <= radius;
-        }) || window.GameCore.activeEntities.some(entity => entity.name === 'Floating Power Stone' && entity.def.active !== false && entity.visual.position.distanceTo(pos) <= (entity.def.barrierRadius || 22));
-    },
-    getRandomPathPoint: function() {
-        const points = Array.from(this.roadChunks.values()).flat();
-        if (points.length === 0) return null;
-        return points[Math.floor(Math.random() * points.length)];
     }
-};
 
+    isTooCloseToOtherPaths(x, z, minDistThreshold) {
+        for (let i = 0; i < this.roadNodes.length - 10; i++) {
+            const node = this.roadNodes[i];
+            const dx = node.x - x;
+            const dz = node.z - z;
+            if (dx * dx + dz * dz < minDistThreshold * minDistThreshold) {
+                return true;
+            }
+        }
+        return false;
+    }
 
+    getRoadPointsNear(chunkX, chunkZ, searchRadius = 90) {
+        const cx = chunkX * 60 + 30;
+        const cz = chunkZ * 60 + 30;
+        const rSq = searchRadius * searchRadius;
 
+        return this.roadNodes.filter(node => {
+            const dx = node.x - cx;
+            const dz = node.z - cz;
+            return (dx * dx + dz * dz) <= rSq;
+        });
+    }
+
+    isSafeZone(pos) {
+        if (!pos) return false;
+        const radiusSq = (this.roadWidth + 2.5) ** 2;
+        for (let i = 0; i < this.roadNodes.length; i++) {
+            const n = this.roadNodes[i];
+            const dx = n.x - pos.x;
+            const dz = n.z - pos.z;
+            if (dx * dx + dz * dz <= radiusSq) return true;
+        }
+        return false;
+    }
+
+    getRandomPathPoint() {
+        if (this.roadNodes.length === 0) this.generateWorldRoads();
+        const randIdx = Math.floor(Math.random() * this.roadNodes.length);
+        return this.roadNodes[randIdx];
+    }
+}
+
+window.RoadManager = new RoadManager();
+window.RoadManager.generateWorldRoads();
