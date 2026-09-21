@@ -6,8 +6,7 @@
 import * as THREE from 'three';
 
 /**
- * Creates a standard procedural block material patched for clutter, world-pos, and height-fog.
- * Exported for src_systems_ruins.js and structural generators.
+ * Procedural material factory required by src_systems_ruins.js
  */
 export function createProceduralBlockMaterial(options = {}) {
     const mat = new THREE.MeshStandardMaterial({
@@ -63,17 +62,16 @@ export class BlockTerrainChunk {
 
 export class BlockTerrainSystem {
     constructor() {
-        this.chunkSize = 60.0; // Synchronized with Engine ChunkManager (60m x 60m)
+        this.chunkSize = 60.0;
         this.activeChunks = new Set();
         this.chunkVegetationMap = new Map();
         this.initialized = false;
         this.scene = null;
 
-        // Calibration parameters for Climax Ancient Redwood Ecosystem
         this.calibration = {
-            gridStep: 24.0,             // 24m grid spacing for massive 100m trees
-            fairyRingProbability: 0.35, // 35% chance a cluster forms a fairy ring
-            clearingNoiseThreshold: 0.25, // Threshold for natural forest clearings
+            gridStep: 24.0,
+            fairyRingProbability: 0.35,
+            clearingNoiseThreshold: 0.25,
             ageDistribution: {
                 ANCIENT: 0.10,
                 MATURE: 0.35,
@@ -85,10 +83,6 @@ export class BlockTerrainSystem {
         this.bindEvents();
     }
 
-    /**
-     * Initializes the system and binds to the main scene.
-     * @param {THREE.Scene} scene 
-     */
     init(scene) {
         if (this.initialized) return;
         this.scene = scene;
@@ -96,9 +90,6 @@ export class BlockTerrainSystem {
         console.log('[BlockTerrainSystem] Initialized successfully.');
     }
 
-    /**
-     * Binds lifecycle event listeners for automatic startup and resets.
-     */
     bindEvents() {
         if (typeof window !== 'undefined' && window.EventBus) {
             window.EventBus.on('ENGINE_READY', () => {
@@ -120,20 +111,11 @@ export class BlockTerrainSystem {
         }
     }
 
-    /**
-     * Deterministic pseudo-random hash based on world coordinates.
-     */
     hash2D(x, z) {
         let h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
         return h - Math.floor(h);
     }
 
-    /**
-     * Evaluates terrain height at world coordinates (x, z).
-     * @param {number} x 
-     * @param {number} z 
-     * @returns {number}
-     */
     getTerrainHeight(x, z) {
         if (typeof window !== 'undefined' && window.WorldGenerator?.getTerrainHeight) {
             const h = window.WorldGenerator.getTerrainHeight(x, z);
@@ -142,11 +124,6 @@ export class BlockTerrainSystem {
         return 0;
     }
 
-    /**
-     * Generates vegetation scattering points for a chunk.
-     * @param {number} chunkX - Chunk coordinate X
-     * @param {number} chunkZ - Chunk coordinate Z
-     */
     generateChunkVegetation(chunkX, chunkZ) {
         const chunkKey = `chunk_${chunkX}_${chunkZ}`;
         if (this.chunkVegetationMap.has(chunkKey)) return;
