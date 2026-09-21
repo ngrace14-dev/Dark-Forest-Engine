@@ -1,7 +1,6 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
 window.EventBus = {
-    
     events: {},
     on: function(event, callback) { if(!this.events[event]) this.events[event] = []; this.events[event].push(callback); },
     emit: function(event, data) { if(this.events[event]) this.events[event].forEach(cb => cb(data)); }
@@ -28,14 +27,14 @@ function rollRunPotential() {
 }
 
 window.GameState = {
-        pStats: {
+    pStats: {
         hp: 100, maxHp: 100, stamina: 100, maxStamina: 100, poise: 60, maxPoise: 60, guardBrokenUntil: 0,
         hunger: 100, maxHunger: 100, // 100 = Full, 0 = Starving
         strength: { level: 1, xp: 0, next: 100 }, toughness: { level: 1, xp: 0, next: 100 },
         athletics: { level: 1, xp: 0, next: 100 }, dodge: { level: 1, xp: 0, next: 100 },
         meleeAtt: { level: 1, xp: 0, next: 100 }, meleeDef: { level: 1, xp: 0, next: 100 }
     },
-        inventory: { 
+    inventory: { 
         food: 100, gold: 0, 
         equipment: { 
             head: null, chest: 'leather_armor', waist: null, hands: null, legs: 'pants', weapon: 'iron_sword',
@@ -64,7 +63,8 @@ window.GameState = {
     renown: { score: 0, infamy: 0, title: 'Unknown', history: [] },
     coop: { sessionId: null, localPlayerId: null, partyMode: 'solo' },
     base: { owned: false, name: 'Wayfarer Camp', position: null, storage: [], structures: [], farms: [], research: [] },
-            party: { command: 'follow', selectedMembers: ['lyra-scout'], escortCaravanId: null, formation: 'line', 
+    party: { 
+        command: 'follow', selectedMembers: ['lyra-scout'], escortCaravanId: null, formation: 'line', 
         resonanceLevel: 0,
         tacticalLearning: { aggression: 0.5, flanking: 0.5, skillPreference: {}, averageEngagementDist: 10 },
         members: [
@@ -98,7 +98,8 @@ window.GameState = {
                 loyalty: 45, hunger: 0, injuries: [], downed: false,
                 voicePitch: 1.0, specialization: 'Medic'
             }
-        ] },
+        ] 
+    },
     questBoard: [],
     worldEvents: [],
     gladiator: {
@@ -198,7 +199,7 @@ window.GameCore = {
                 body.setTranslation({ x: trans.x - shift.x, y: trans.y, z: trans.z - shift.z }, true);
             });
             
-                        // 2. Shift all Three.js Scene Objects (that aren't parented to player)
+            // 2. Shift all Three.js Scene Objects (that aren't parented to player)
             this.scene.children.forEach(child => {
                 if (child !== this.camera && !child.isLight) {
                     child.position.x -= shift.x;
@@ -223,66 +224,66 @@ window.GameCore = {
     // DATA-ORIENTED DESIGN (DOD) OPTIMIZATION
     // Flat memory buffer for all entity combat stats (HP, MaxHP, Poise, MaxPoise)
     // Allows 10,000 entities. Layout: [Index * 4 + 0] = HP, [1] = MaxHP, [2] = Poise, [3] = MaxPoise
-        MAX_ENTITIES: 10000,
-        entityStatBuffer: new Float32Array(40000), 
-        entityIndexPool: Array.from({length: 10000}, (_, i) => i).reverse(), // Stack of available indices
+    MAX_ENTITIES: 10000,
+    entityStatBuffer: new Float32Array(40000), 
+    entityIndexPool: Array.from({length: 10000}, (_, i) => i).reverse(), // Stack of available indices
     
-        // --- SPATIAL PARTITIONING GRID (Kenshi 1:1 Scale Optimization) ---
-        // Divides the world into 20m x 20m cells. Entities only check their own and 8 neighbors.
-        SpatialGrid: {
-            cellSize: 20,
-            cells: new Map(), // Key: "x,z" -> Value: Set of Entity IDs
+    // --- SPATIAL PARTITIONING GRID (Kenshi 1:1 Scale Optimization) ---
+    // Divides the world into 20m x 20m cells. Entities only check their own and 8 neighbors.
+    SpatialGrid: {
+        cellSize: 20,
+        cells: new Map(), // Key: "x,z" -> Value: Set of Entity IDs
 
-            getGridKey: function(x, z) {
-                return `${Math.floor(x / this.cellSize)},${Math.floor(z / this.cellSize)}`;
-            },
+        getGridKey: function(x, z) {
+            return `${Math.floor(x / this.cellSize)},${Math.floor(z / this.cellSize)}`;
+        },
 
-            registerEntity: function(entity) {
-                const pos = entity.visual.position;
-                const key = this.getGridKey(pos.x, pos.z);
-                if (!this.cells.has(key)) this.cells.set(key, new Set());
-                this.cells.get(key).add(entity);
-                entity.currentGridKey = key;
-            },
+        registerEntity: function(entity) {
+            const pos = entity.visual.position;
+            const key = this.getGridKey(pos.x, pos.z);
+            if (!this.cells.has(key)) this.cells.set(key, new Set());
+            this.cells.get(key).add(entity);
+            entity.currentGridKey = key;
+        },
 
-            unregisterEntity: function(entity) {
-                if (entity.currentGridKey && this.cells.has(entity.currentGridKey)) {
-                    this.cells.get(entity.currentGridKey).delete(entity);
-                }
-            },
-
-            updateEntity: function(entity) {
-                const pos = entity.visual.position;
-                const newKey = this.getGridKey(pos.x, pos.z);
-                if (newKey !== entity.currentGridKey) {
-                    this.unregisterEntity(entity);
-                    if (!this.cells.has(newKey)) this.cells.set(newKey, new Set());
-                    this.cells.get(newKey).add(entity);
-                    entity.currentGridKey = newKey;
-                }
-            },
-
-            // Returns all entities within the entity's cell and its 8 neighbors
-            getNearbyEntities: function(x, z, radius = 20) {
-                const nearby = [];
-                const centerX = Math.floor(x / this.cellSize);
-                const centerZ = Math.floor(z / this.cellSize);
-                const range = Math.ceil(radius / this.cellSize);
-
-                for (let ox = -range; ox <= range; ox++) {
-                    for (let oz = -range; oz <= range; oz++) {
-                        const key = `${centerX + ox},${centerZ + oz}`;
-                        const cell = this.cells.get(key);
-                        if (cell) {
-                            for (const en of cell) nearby.push(en);
-                        }
-                    }
-                }
-                return nearby;
+        unregisterEntity: function(entity) {
+            if (entity.currentGridKey && this.cells.has(entity.currentGridKey)) {
+                this.cells.get(entity.currentGridKey).delete(entity);
             }
         },
 
-        // MEMORY MANAGEMENT HELPERS
+        updateEntity: function(entity) {
+            const pos = entity.visual.position;
+            const newKey = this.getGridKey(pos.x, pos.z);
+            if (newKey !== entity.currentGridKey) {
+                this.unregisterEntity(entity);
+                if (!this.cells.has(newKey)) this.cells.set(newKey, new Set());
+                this.cells.get(newKey).add(entity);
+                entity.currentGridKey = newKey;
+            }
+        },
+
+        // Returns all entities within the entity's cell and its 8 neighbors
+        getNearbyEntities: function(x, z, radius = 20) {
+            const nearby = [];
+            const centerX = Math.floor(x / this.cellSize);
+            const centerZ = Math.floor(z / this.cellSize);
+            const range = Math.ceil(radius / this.cellSize);
+
+            for (let ox = -range; ox <= range; ox++) {
+                for (let oz = -range; oz <= range; oz++) {
+                    const key = `${centerX + ox},${centerZ + oz}`;
+                    const cell = this.cells.get(key);
+                    if (cell) {
+                        for (const en of cell) nearby.push(en);
+                    }
+                }
+            }
+            return nearby;
+        }
+    },
+
+    // MEMORY MANAGEMENT HELPERS
     // Binds an entity object's HP/Poise to the high-performance Float32 buffer
     bindEntityToBuffer: function(entity, hp, poise) {
         const index = this.entityIndexPool.pop();
@@ -366,7 +367,7 @@ window.GameCore = {
         if (renown.score >= 20) return 'Known';
         return 'Unknown';
     },
-        recordRenown: function({ renown = 0, infamy = 0, faction = 'kingdom', reason = 'word spread' } = {}) {
+    recordRenown: function({ renown = 0, infamy = 0, faction = 'kingdom', reason = 'word spread' } = {}) {
         const record = window.GameState.renown ??= { score: 0, infamy: 0, title: 'Unknown', history: [] };
         
         // --- ADVENTURER LIMITER ---
@@ -495,13 +496,13 @@ window.GameCore = {
             narrator.targetName = 'The Wanderer';
             if (window.GameCore.applyForestBlessing) window.GameCore.applyForestBlessing(window.GameCore.playerObj, true);
             window.EventBus.emit('UI_LOG', '[THE CROW] The eye leaves its chosen hero. It follows you now.');
-        } else         if (narrator.playerClaimed) {
+        } else if (narrator.playerClaimed) {
             window.EventBus.emit('UI_LOG', `[THE CROW] ${label}.`);
         }
         
         // --- PHASE 5: NARRATIVE PACING ---
         // Clearing the Huntsman's Mark via Feats
-                if (impact >= 5 && window.EncounterDirector && window.EncounterDirector.huntsmanMarkTimer > 0) {
+        if (impact >= 5 && window.EncounterDirector && window.EncounterDirector.huntsmanMarkTimer > 0) {
             window.EncounterDirector.clearHuntsmanMark();
         }
 
@@ -587,15 +588,23 @@ window.EventBus.on('GAME_SAVE', () => {
             window.GameState.companionsAbsPos[en.companionId] = window.GameCore.getAbsolutePos(en.visual.position);
         });
 
-        localStorage.setItem('dark-forest-save', JSON.stringify({ 
+        // --- COMPRESSION IMPLEMENTATION ---
+        // Serialize and compress data to bypass QuotaExceededError in localStorage
+        const saveData = { 
             gameState: window.GameState, 
             engineParams: window.EngineParams, 
-            worldOffset: window.GameCore.worldOffset, // Save the origin shift
+            worldOffset: window.GameCore.worldOffset,
             villages: window.VillageManager ? window.VillageManager.villages : [], 
             adventurers: window.AdventurerManager ? window.AdventurerManager.records : [] 
-        }));
+        };
         
-        window.EventBus.emit('UI_LOG', 'Game saved locally (Origin-Aware).');
+        const jsonString = JSON.stringify(saveData);
+        // If LZString is loaded, compress. Otherwise, fall back to raw string.
+        const finalSaveString = typeof LZString !== 'undefined' ? LZString.compressToUTF16(jsonString) : jsonString;
+
+        localStorage.setItem('dark-forest-save', finalSaveString);
+        
+        window.EventBus.emit('UI_LOG', 'Game saved locally (Compressed & Origin-Aware).');
     } catch (error) {
         console.error('GAME_SAVE failed', error);
         window.EventBus.emit('UI_LOG', 'Unable to save the game.');
@@ -609,7 +618,16 @@ window.EventBus.on('GAME_LOAD', () => {
             window.EventBus.emit('UI_LOG', 'No local save found.');
             return;
         }
-        const save = JSON.parse(rawSave);
+
+        let save;
+        try {
+            // Attempt to decompress first (Assuming standard LZString format)
+            const decompressed = typeof LZString !== 'undefined' ? LZString.decompressFromUTF16(rawSave) : null;
+            save = JSON.parse(decompressed || rawSave);
+        } catch (e) {
+            // Fallback for older saves that were not compressed
+            save = JSON.parse(rawSave);
+        }
         
         // --- PHASE 1: ORIGIN-AWARE LOADING ---
         if (save.gameState) Object.assign(window.GameState, save.gameState);
@@ -647,5 +665,3 @@ window.EventBus.on('GAME_LOAD', () => {
     }
 });
 console.log("%c🟢 Core Hub: State & EventBus Restored", "color: #4ade80; font-weight: bold; font-size: 11px;");
-
-
