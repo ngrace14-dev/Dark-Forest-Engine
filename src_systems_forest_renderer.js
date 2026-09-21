@@ -9,17 +9,18 @@ class ForestRenderer {
         this.materials = new Map();
         this.instances = new Map();
         this.windUniforms = [];
+        this.assetsInitialized = false;
         
         this.dummyMatrix = new THREE.Matrix4();
         this.dummyPosition = new THREE.Vector3();
         this.dummyQuaternion = new THREE.Quaternion();
         this.dummyScale = new THREE.Vector3();
         this.dummyEuler = new THREE.Euler();
-        
-        this.initAssets();
     }
 
-    initAssets() {
+    ensureAssets() {
+        if (this.assetsInitialized) return;
+
         // --- 100-FOOT REDWOOD PROCEDURAL GEOMETRY (30.5m) ---
         const trunkHeight = 20.0;
         const trunkGeo = new THREE.CylinderGeometry(1.1, 1.8, trunkHeight, 8);
@@ -30,8 +31,9 @@ class ForestRenderer {
         coneGeo.translate(0, trunkHeight + coneHeight / 2 - 3.5, 0);
 
         let redwoodGeo;
-        if (window.BufferGeometryUtils?.mergeGeometries) {
-            redwoodGeo = window.BufferGeometryUtils.mergeGeometries([trunkGeo, coneGeo], true);
+        const utils = window.BufferGeometryUtils || THREE.BufferGeometryUtils;
+        if (utils?.mergeGeometries) {
+            redwoodGeo = utils.mergeGeometries([trunkGeo, coneGeo], true);
         } else {
             redwoodGeo = trunkGeo;
         }
@@ -39,7 +41,7 @@ class ForestRenderer {
         const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6a2817, roughness: 0.9 });
         const coneMat = new THREE.MeshStandardMaterial({ color: 0x173820, roughness: 0.8 });
 
-        // Valheim-style Wind Sway Shader Injection
+        // Valheim-style Wind Sway Shader
         [trunkMat, coneMat].forEach(mat => {
             mat.onBeforeCompile = (shader) => {
                 shader.uniforms.uTime = { value: 0 };
@@ -87,9 +89,12 @@ class ForestRenderer {
 
         this.geometries.set('Bramble Bush', bushGeo);
         this.materials.set('Bramble Bush', bushMat);
+
+        this.assetsInitialized = true;
     }
 
     initInstancedMesh(prefabName, maxCapacity = 30000) {
+        this.ensureAssets();
         if (this.instancedMeshes.has(prefabName)) return;
 
         const geo = this.geometries.get(prefabName) || new THREE.BoxGeometry(1, 5, 1);
@@ -117,15 +122,18 @@ class ForestRenderer {
     updateInstances(prefabName, points) {
         this.initInstancedMesh(prefabName);
         const instMesh = this.instancedMeshes.get(prefabName);
-        if (!instMesh) return;
+        if (!instMesh || !points) return;
 
         let index = 0;
         for (let i = 0; i < points.length; i++) {
             if (index >= instMesh.capacity) break;
             const pt = points[i];
-            const scale = pt.scale || 1.0;
+            const px = Number.isFinite(pt.x) ? pt.x : 0;
+            const py = Number.isFinite(pt.y) ? pt.y : 0;
+            const pz = Number.isFinite(pt.z) ? pt.z : 0;
+            const scale = Number.isFinite(pt.scale) ? pt.scale : 1.0;
 
-            this.dummyPosition.set(pt.x, pt.y || 0, pt.z);
+            this.dummyPosition.set(px, py, pz);
             this.dummyEuler.set(0, pt.rotation || 0, 0);
             this.dummyQuaternion.setFromEuler(this.dummyEuler);
             this.dummyScale.set(scale, scale, scale);
@@ -176,9 +184,12 @@ class ForestRenderer {
                 if (index >= instMesh.capacity) break;
 
                 const pt = points[i];
-                const scale = pt.scale || 1.0;
+                const px = Number.isFinite(pt.x) ? pt.x : 0;
+                const py = Number.isFinite(pt.y) ? pt.y : 0;
+                const pz = Number.isFinite(pt.z) ? pt.z : 0;
+                const scale = Number.isFinite(pt.scale) ? pt.scale : 1.0;
                 
-                this.dummyPosition.set(pt.x, pt.y, pt.z);
+                this.dummyPosition.set(px, py, pz);
                 this.dummyEuler.set(0, pt.rotation || 0, 0);
                 this.dummyQuaternion.setFromEuler(this.dummyEuler);
                 this.dummyScale.set(scale, scale, scale);
