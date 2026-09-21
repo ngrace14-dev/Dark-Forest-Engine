@@ -1,4 +1,3 @@
-
 // ============================================================================
 // Dark Forest Engine - Redwood Geometry Worker Thread
 // File: src_workers_tree_worker.js
@@ -7,7 +6,7 @@
 // --- Fast Seedable PRNG ---
 class FastRandom {
     constructor(seed = 1337) {
-        this.s = seed;
+        this.s = Math.abs(seed) || 1337;
     }
     next() {
         this.s = (this.s * 9301 + 49297) % 233280;
@@ -105,30 +104,31 @@ class SimplexNoise3D {
 
 // --- Worker Message Dispatcher ---
 self.onmessage = function (e) {
-    const { archetypesToGenerate } = e.data;
-    if (!archetypesToGenerate || !Array.isArray(archetypesToGenerate)) return;
+    try {
+        const { archetypesToGenerate } = e.data || {};
+        if (!archetypesToGenerate || !Array.isArray(archetypesToGenerate)) return;
 
-    const generatedBuffers = {};
+        const generatedBuffers = {};
+        const transferables = [];
 
-    archetypesToGenerate.forEach(task => {
-        const { key, ageState, seed } = task;
-        generatedBuffers[key] = buildRedwoodMesh(ageState || 'ANCIENT', seed || 1337);
-    });
+        archetypesToGenerate.forEach(task => {
+            const { key, ageState, seed } = task;
+            const meshData = buildRedwoodMesh(ageState || 'ANCIENT', seed || 1337);
+            generatedBuffers[key] = meshData;
 
-    // Extract transferable ArrayBuffers for zero-copy main thread messaging
-    const transferables = [];
-    Object.keys(generatedBuffers).forEach(k => {
-        const buf = generatedBuffers[k];
-        transferables.push(
-            buf.positions.buffer,
-            buf.normals.buffer,
-            buf.uvs.buffer,
-            buf.colors.buffer,
-            buf.indices.buffer
-        );
-    });
+            // Collect ArrayBuffers for zero-copy transfer
+            if (meshData.positions?.buffer) transferables.push(meshData.positions.buffer);
+            if (meshData.normals?.buffer) transferables.push(meshData.normals.buffer);
+            if (meshData.uvs?.buffer) transferables.push(meshData.uvs.buffer);
+            if (meshData.colors?.buffer) transferables.push(meshData.colors.buffer);
+            if (meshData.indices?.buffer) transferables.push(meshData.indices.buffer);
+        });
 
-    self.postMessage({ generatedBuffers }, transferables);
+        self.postMessage({ generatedBuffers }, transferables);
+    } catch (err) {
+        // Prevent main thread hanging if worker execution fails
+        self.postMessage({ error: err.message || 'Redwood Worker Exception' });
+    }
 };
 
 // --- Procedural Redwood Mesh Construction ---
@@ -136,16 +136,15 @@ function buildRedwoodMesh(ageState, seed) {
     const prng = new FastRandom(seed);
     const noiseGen = new SimplexNoise3D(prng);
 
-    // Profile Specs according to species specification
     let height, baseRadius, topRadius, flareAggression, bareTrunkRatio, branchCount;
 
     switch (ageState) {
         case 'ANCIENT':
-            height = prng.range(85.0, 100.0);       // ~280 - 325 ft
-            baseRadius = prng.range(3.8, 5.2);   // ~25 - 34 ft diameter base
+            height = prng.range(85.0, 100.0);
+            baseRadius = prng.range(3.8, 5.2);
             topRadius = 0.35;
             flareAggression = 4.2;
-            bareTrunkRatio = 0.62;                 // Lower 62% self-pruned
+            bareTrunkRatio = 0.62;
             branchCount = 45;
             break;
         case 'MATURE':
@@ -161,7 +160,7 @@ function buildRedwoodMesh(ageState, seed) {
             baseRadius = prng.range(3.2, 4.5);
             topRadius = 0.15;
             flareAggression = 3.8;
-            bareTrunkRatio = 0.75;                 // Mostly bare, broken top
+            bareTrunkRatio = 0.75;
             branchCount = 18;
             break;
         case 'YOUNG':
@@ -178,7 +177,7 @@ function buildRedwoodMesh(ageState, seed) {
     const positions = [];
     const normals = [];
     const uvs = [];
-    const colors = []; // R: Branch Sway, G: Leaf Flutter, B: Moss Mask
+    const colors = [];
     const indices = [];
 
     const radialSegs = 20;
@@ -189,11 +188,9 @@ function buildRedwoodMesh(ageState, seed) {
         const v = y / heightSegs;
         const currentY = v * height;
 
-        // Exponential taper: Tapers very slowly in low/mid trunk, then drops near apex
         const taperPower = 3.6;
         let radius = baseRadius * (1.0 - Math.pow(v, taperPower)) + topRadius;
 
-        // Root Flare Buttress Noise (Active in lower 18% of trunk)
         const flareIntensity = v < 0.18 ? Math.pow(1.0 - (v / 0.18), 2.2) : 0.0;
 
         for (let r = 0; r <= radialSegs; r++) {
@@ -203,7 +200,6 @@ function buildRedwoodMesh(ageState, seed) {
             const cosT = Math.cos(theta);
             const sinT = Math.sin(theta);
 
-            // Multi-octave organic root flare
             let flareNoise = 0.0;
             if (flareIntensity > 0.0) {
                 const n1 = Math.max(0.0, noiseGen.noise(cosT * 2.0, sinT * 2.0, v * 8.0));
@@ -218,20 +214,14 @@ function buildRedwoodMesh(ageState, seed) {
 
             positions.push(px, py, pz);
 
-            // Compute surface normals
             const nx = cosT;
             const ny = 0.08 * (1.0 - v);
             const nz = sinT;
             const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1.0;
             normals.push(nx / len, ny / len, nz / len);
 
-            // UVs: Tiled heavily vertically for bark detail maps
             uvs.push(u * 6.0, v * (height / 3.5));
 
-            // Vertex Colors:
-            // R = 0.0 (Trunk stays rigid against branch wind)
-            // G = 0.0 (Not a leaf)
-            // B = Moss accumulation mask on North-facing side (-Z) and base
             const northBias = pz < -0.1 ? Math.abs(pz / currentRadius) : 0.0;
             const baseMoss = flareIntensity * 0.8;
             const mossWeight = Math.min(1.0, northBias * (1.0 - v * 0.8) + baseMoss);
@@ -259,38 +249,32 @@ function buildRedwoodMesh(ageState, seed) {
         const bV = bareTrunkRatio + bProgress * (1.0 - bareTrunkRatio);
         const bY = bV * height;
 
-        // Golden Ratio spiral distribution for natural asymmetry
         const bAngle = b * 2.39996 + prng.range(-0.15, 0.15);
         
-        // Branch length shortens toward top
         const maxLen = (1.0 - (bV - bareTrunkRatio) / (1.0 - bareTrunkRatio)) * 14.0 + 3.5;
         const bLength = maxLen * prng.range(0.75, 1.1);
 
-        // Trunk origin point
         const tRadius = baseRadius * (1.0 - Math.pow(bV, 3.6)) + topRadius;
         const rootX = Math.cos(bAngle) * tRadius;
         const rootZ = Math.sin(bAngle) * tRadius;
 
-        // Negative Gravitropism curve: Heavy downward droop, tip curling up to sun
         const tipX = rootX + Math.cos(bAngle) * bLength;
         const droopAmount = prng.range(2.0, 4.5);
-        const tipY = bY - droopAmount + (bProgress * 2.0); // Tip turns upward
+        const tipY = bY - droopAmount + (bProgress * 2.0);
         const tipZ = rootZ + Math.sin(bAngle) * bLength;
 
-        // --- Branch Wood Geometry (Tube) ---
+        // Branch Wood Geometry
         const bSegs = 6;
         const bRadius = Math.max(0.08, (1.0 - bV) * 0.4);
 
         for (let s = 0; s <= bSegs; s++) {
             const sT = s / bSegs;
             const currX = rootX + (tipX - rootX) * sT;
-            // Quadratic Bezier arc for downward bend
             const currY = bY + (-droopAmount * 1.5 * Math.sin(sT * Math.PI * 0.8)) + (tipY - bY) * sT;
             const currZ = rootZ + (tipZ - rootZ) * sT;
 
             const currRad = bRadius * (1.0 - sT * 0.7);
 
-            // Quad cap for branch segment
             positions.push(currX - currRad, currY, currZ);
             positions.push(currX + currRad, currY, currZ);
             positions.push(currX + currRad, currY + currRad * 2.0, currZ);
@@ -299,7 +283,6 @@ function buildRedwoodMesh(ageState, seed) {
             normals.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
             uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
 
-            // R: Branch Sway weight increases with distance from trunk
             const swayWeight = Math.pow(sT, 1.5) * (bV * 0.9);
             colors.push(swayWeight, 0.0, 0.0);
             colors.push(swayWeight, 0.0, 0.0);
@@ -311,7 +294,7 @@ function buildRedwoodMesh(ageState, seed) {
             vertexOffset += 4;
         }
 
-        // --- Foliage Sprays (Intersecting Quad Cards at branch ends) ---
+        // Foliage Sprays
         if (ageState !== 'DYING' || prng.next() > 0.6) {
             const clusterSize = prng.range(4.5, 7.5);
             const numCards = 3;
@@ -322,13 +305,11 @@ function buildRedwoodMesh(ageState, seed) {
                 const cCos = Math.cos(cAngle) * clusterSize;
                 const cSin = Math.sin(cAngle) * clusterSize;
 
-                // Vertices for crossed foliage planes
                 positions.push(tipX - cCos, tipY - clusterSize * 0.2, tipZ - cSin);
                 positions.push(tipX + cCos, tipY - clusterSize * 0.2, tipZ + cSin);
                 positions.push(tipX + cCos, tipY + clusterSize * 0.8, tipZ + cSin);
                 positions.push(tipX - cCos, tipY + clusterSize * 0.8, tipZ - cSin);
 
-                // Volumetric Normal Trick: Spherical normals pointing outward
                 normals.push(cCos, 0.5, cSin);
                 normals.push(-cCos, 0.5, -cSin);
                 normals.push(-cCos, 0.8, -cSin);
@@ -336,7 +317,6 @@ function buildRedwoodMesh(ageState, seed) {
 
                 uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
 
-                // Colors: R = Branch Sway, G = Foliage High-Freq Flutter (1.0)
                 const branchSway = bV * 0.85;
                 colors.push(branchSway, 1.0, 0.0);
                 colors.push(branchSway, 1.0, 0.0);
@@ -355,6 +335,6 @@ function buildRedwoodMesh(ageState, seed) {
         normals: new Float32Array(normals),
         uvs: new Float32Array(uvs),
         colors: new Float32Array(colors),
-        indices: indices.length > 65535 ? new Uint32Array(indices) : new Uint16Array(indices)
+        indices: new Uint32Array(indices) // Universal Uint32Array prevents 16-bit truncation
     };
 }
