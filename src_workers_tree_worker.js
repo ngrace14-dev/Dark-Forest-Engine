@@ -122,7 +122,7 @@ self.onmessage = function (e) {
 
         self.postMessage({ generatedBuffers }, transferables);
     } catch (err) {
-        self.postMessage({ error: err.message || 'Redwood Calibration Worker Exception' });
+        self.postMessage({ error: err.message || 'Redwood Worker Exception' });
     }
 };
 
@@ -132,16 +132,15 @@ function buildRedwoodMesh(ageState, seed) {
 
     let height, baseRadius, topRadius, flareAggression, bareTrunkRatio, branchCount, reitProbability;
 
-    // PASS 7: SCALE & PROPORTION AUDIT
     switch (ageState) {
         case 'COLOSSAL_ANCIENT':
-            height = prng.range(115.0, 130.0);   // Landmark 380ft+ titans
-            baseRadius = prng.range(6.5, 8.5);   // 13m–17m buttress base
-            topRadius = 0.75;
-            flareAggression = 7.0;
-            bareTrunkRatio = 0.50;
+            height = prng.range(118.0, 132.0);   // Landmark 390ft+ titans
+            baseRadius = prng.range(6.8, 8.8);   // Massive 14m–18m buttress base
+            topRadius = 0.80;
+            flareAggression = 7.5;
+            bareTrunkRatio = 0.48;
             branchCount = 120;
-            reitProbability = 0.80;
+            reitProbability = 0.85;
             break;
 
         case 'ANCIENT':
@@ -150,8 +149,8 @@ function buildRedwoodMesh(ageState, seed) {
             topRadius = 0.60;
             flareAggression = 6.2;
             bareTrunkRatio = 0.52;
-            branchCount = 95;                    // PASS 3: Calibrated from 55
-            reitProbability = 0.65;              // PASS 4: Calibrated from 0.35
+            branchCount = 95;
+            reitProbability = 0.65;
             break;
 
         case 'MATURE':
@@ -186,6 +185,15 @@ function buildRedwoodMesh(ageState, seed) {
             break;
     }
 
+    // PRIORITY 3: BROKEN CROWN / LIGHTNING STRIKE LOGIC (12% chance for Ancient/Dying)
+    const hasBrokenCrown = (ageState === 'ANCIENT' || ageState === 'COLOSSAL_ANCIENT' || ageState === 'DYING') && (prng.next() < 0.12);
+    const effectiveHeight = hasBrokenCrown ? height * prng.range(0.72, 0.85) : height;
+
+    // PRIORITY 2: TRUNK LEAN & ASYMMETRIC DRIFT
+    const leanAngleX = (prng.range(-0.05, 0.05)) * (ageState.includes('ANCIENT') ? 1.5 : 0.8);
+    const leanAngleZ = (prng.range(-0.05, 0.05)) * (ageState.includes('ANCIENT') ? 1.5 : 0.8);
+    const trunkTwistRate = prng.range(-0.15, 0.15);
+
     const positions = [];
     const normals = [];
     const uvs = [];
@@ -195,20 +203,27 @@ function buildRedwoodMesh(ageState, seed) {
     const radialSegs = 32;
     const heightSegs = 64;
 
-    // --- 1. TRUNK GENERATION WITH BASAL BURLS & RIDGE DETAIL ---
+    // --- 1. TRUNK MESH GENERATION ---
     for (let y = 0; y <= heightSegs; y++) {
         const v = y / heightSegs;
-        const currentY = v * height;
+        const currentY = v * effectiveHeight;
+
+        // Apply lean drift offset as height increases
+        const driftX = Math.sin(v * Math.PI * 0.5) * (effectiveHeight * leanAngleX);
+        const driftZ = Math.sin(v * Math.PI * 0.5) * (effectiveHeight * leanAngleZ);
 
         const taperPower = 3.0;
         let radius = baseRadius * (1.0 - Math.pow(v, taperPower)) + topRadius;
 
-        // Flare & Basal Burl Swells (Lower 24% of trunk)
+        if (hasBrokenCrown && v > 0.88) {
+            radius *= (1.0 + (v - 0.88) * 2.5); // Jagged splintered fracture top
+        }
+
         const flareIntensity = v < 0.24 ? Math.pow(1.0 - (v / 0.24), 2.6) : 0.0;
 
         for (let r = 0; r <= radialSegs; r++) {
             const u = r / radialSegs;
-            const theta = u * Math.PI * 2.0;
+            const theta = u * Math.PI * 2.0 + (v * trunkTwistRate); // Spiral bark twist
 
             const cosT = Math.cos(theta);
             const sinT = Math.sin(theta);
@@ -223,9 +238,9 @@ function buildRedwoodMesh(ageState, seed) {
             const ridgeNoise = noiseGen.noise(cosT * 9.0, v * 30.0, sinT * 9.0) * 0.28 * (1.0 - v);
 
             const currentRadius = radius + burlDisplacement + ridgeNoise;
-            const px = cosT * currentRadius;
+            const px = cosT * currentRadius + driftX;
             const py = currentY;
-            const pz = sinT * currentRadius;
+            const pz = sinT * currentRadius + driftZ;
 
             positions.push(px, py, pz);
 
@@ -235,7 +250,7 @@ function buildRedwoodMesh(ageState, seed) {
             const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1.0;
             normals.push(nx / len, ny / len, nz / len);
 
-            uvs.push(u * 8.0, v * (height / 2.5));
+            uvs.push(u * 8.0, v * (effectiveHeight / 2.5));
 
             const northBias = pz < -0.1 ? Math.abs(pz / currentRadius) : 0.0;
             const baseMoss = flareIntensity * 0.85;
@@ -245,6 +260,7 @@ function buildRedwoodMesh(ageState, seed) {
         }
     }
 
+    // Trunk Triangles
     for (let y = 0; y < heightSegs; y++) {
         for (let r = 0; r < radialSegs; r++) {
             const i1 = (y * (radialSegs + 1)) + r;
@@ -257,41 +273,78 @@ function buildRedwoodMesh(ageState, seed) {
 
     let vertexOffset = positions.length / 3;
 
-    // Helper: Add Branch Tube
-    const addBranchTube = (startX, startY, startZ, endX, endY, endZ, startRad, endRad, bV) => {
+    // PRIORITY 4: 6-SIDED CYLINDRICAL BRANCHES FOR COLOSSAL LANDMARKS
+    const addBranchTube = (startX, startY, startZ, endX, endY, endZ, startRad, endRad, bV, useCylinder = false) => {
         const segs = 6;
-        for (let s = 0; s <= segs; s++) {
-            const t = s / segs;
-            const cx = startX + (endX - startX) * t;
-            const cy = startY + (endY - startY) * t;
-            const cz = startZ + (endZ - startZ) * t;
-            const cr = startRad * (1.0 - t) + endRad * t;
+        if (useCylinder) {
+            const sides = 6;
+            for (let s = 0; s <= segs; s++) {
+                const t = s / segs;
+                const cx = startX + (endX - startX) * t;
+                const cy = startY + (endY - startY) * t;
+                const cz = startZ + (endZ - startZ) * t;
+                const cr = startRad * (1.0 - t) + endRad * t;
 
-            positions.push(cx - cr, cy, cz);
-            positions.push(cx + cr, cy, cz);
-            positions.push(cx + cr, cy + cr * 2.0, cz);
-            positions.push(cx - cr, cy + cr * 2.0, cz);
+                for (let side = 0; side <= sides; side++) {
+                    const angle = (side / sides) * Math.PI * 2.0;
+                    const px = cx + Math.cos(angle) * cr;
+                    const py = cy + Math.sin(angle) * cr;
+                    const pz = cz;
 
-            normals.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
-            uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
+                    positions.push(px, py, pz);
+                    normals.push(Math.cos(angle), Math.sin(angle), 0);
+                    uvs.push(side / sides, t);
 
-            const sway = Math.pow(t, 1.5) * (bV * 0.9);
-            colors.push(sway, 0.0, 0.0);
-            colors.push(sway, 0.0, 0.0);
-            colors.push(sway, 0.0, 0.0);
-            colors.push(sway, 0.0, 0.0);
+                    const sway = Math.pow(t, 1.5) * (bV * 0.9);
+                    colors.push(sway, 0.0, 0.0);
+                }
+            }
 
-            indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2);
-            indices.push(vertexOffset, vertexOffset + 2, vertexOffset + 3);
-            vertexOffset += 4;
+            for (let s = 0; s < segs; s++) {
+                for (let side = 0; side < sides; side++) {
+                    const i1 = vertexOffset + (s * (sides + 1)) + side;
+                    const i2 = i1 + sides + 1;
+                    indices.push(i1, i2, i1 + 1);
+                    indices.push(i2, i2 + 1, i1 + 1);
+                }
+            }
+            vertexOffset += (segs + 1) * (sides + 1);
+        } else {
+            // Standard Quad Ribbon
+            for (let s = 0; s <= segs; s++) {
+                const t = s / segs;
+                const cx = startX + (endX - startX) * t;
+                const cy = startY + (endY - startY) * t;
+                const cz = startZ + (endZ - startZ) * t;
+                const cr = startRad * (1.0 - t) + endRad * t;
+
+                positions.push(cx - cr, cy, cz);
+                positions.push(cx + cr, cy, cz);
+                positions.push(cx + cr, cy + cr * 2.0, cz);
+                positions.push(cx - cr, cy + cr * 2.0, cz);
+
+                normals.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
+                uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
+
+                const sway = Math.pow(t, 1.5) * (bV * 0.9);
+                colors.push(sway, 0.0, 0.0);
+                colors.push(sway, 0.0, 0.0);
+                colors.push(sway, 0.0, 0.0);
+                colors.push(sway, 0.0, 0.0);
+
+                indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2);
+                indices.push(vertexOffset, vertexOffset + 2, vertexOffset + 3);
+                vertexOffset += 4;
+            }
         }
     };
 
-    // PASS 1, 2 & 5: CANOPY CLUSTERING & CROWN ZONING
+    // PRIORITY 1: BUG FIX & CANOPY VOLUME EXPANSION (numCards: 8 for Colossal, 6 for Ancient)
     const addFoliageClusterGroup = (originX, originY, originZ, radius, bV, clusterDensityMult) => {
-        const subClusterCount = Math.floor(prng.range(3, 7) * clusterDensityMult); // 3-7 sub-volumes per group
+        const subClusterCount = Math.floor(prng.range(3, 7) * clusterDensityMult);
 
-        for (let sc = 0; s < subClusterCount; sc++) {
+        // BUG FIX #1: Correct loop condition (sc < subClusterCount)
+        for (let sc = 0; sc < subClusterCount; sc++) {
             const scOffsetR = (sc / subClusterCount) * radius * 0.7;
             const scAngle = prng.range(0, Math.PI * 2);
 
@@ -299,11 +352,13 @@ function buildRedwoodMesh(ageState, seed) {
             const cY = originY + prng.range(-1.2, 1.8);
             const cZ = originZ + Math.sin(scAngle) * scOffsetR;
 
-            const subSize = radius * prng.range(0.45, 0.75);
-            const numCards = 4;
+            const subSize = radius * prng.range(0.50, 0.80);
+
+            // PRIORITY 1: Expand card count for volumetric density
+            const numCards = (ageState === 'COLOSSAL_ANCIENT') ? 8 : (ageState === 'ANCIENT') ? 6 : 4;
 
             for (let c = 0; c < numCards; c++) {
-                const cAngle = (c / numCards) * Math.PI + prng.range(-0.2, 0.2);
+                const cAngle = (c / numCards) * Math.PI + prng.range(-0.25, 0.25);
                 const cCos = Math.cos(cAngle) * subSize;
                 const cSin = Math.sin(cAngle) * subSize;
 
@@ -333,14 +388,14 @@ function buildRedwoodMesh(ageState, seed) {
     };
 
     // --- 2. PRIMARY BRANCHES, ZONED CANOPY & REITERATIONS ---
-    for (let b = 0; b < branchCount; b++) {
-        const bProgress = b / branchCount;
-        const bV = bareTrunkRatio + bProgress * (1.0 - bareTrunkRatio);
-        const bY = bV * height;
+    const effectiveBranchCount = hasBrokenCrown ? Math.floor(branchCount * 0.70) : branchCount;
 
-        // PASS 3: RANDOMIZED BRANCH LOSS (25% chance branch was broken/lost)
+    for (let b = 0; b < effectiveBranchCount; b++) {
+        const bProgress = b / effectiveBranchCount;
+        const bV = bareTrunkRatio + bProgress * (1.0 - bareTrunkRatio);
+        const bY = bV * effectiveHeight;
+
         if (prng.next() < 0.25 && bV < 0.82) {
-            // Spawn short dead stub
             const stubAngle = b * 2.39996;
             const stubLen = prng.range(1.5, 3.5);
             const tRad = baseRadius * (1.0 - Math.pow(bV, 3.0)) + topRadius;
@@ -350,19 +405,15 @@ function buildRedwoodMesh(ageState, seed) {
             continue;
         }
 
-        // PASS 2: CROWN ZONING CALCULATIONS
         let zoneDensityMult = 1.0;
         let isUpperCrown = false;
 
         if (bV >= 0.80) {
-            // UPPER CROWN (Top 20%): Dominated by dense reiterations & massive foliage
-            zoneDensityMult = 1.75;
+            zoneDensityMult = 1.85;
             isUpperCrown = true;
         } else if (bV >= 0.65) {
-            // MIDDLE CROWN (Mid 15%): Scaffolding branches
-            zoneDensityMult = 1.25;
+            zoneDensityMult = 1.30;
         } else {
-            // LOWER CROWN: Sparse drooping limbs
             zoneDensityMult = 0.70;
         }
 
@@ -379,9 +430,9 @@ function buildRedwoodMesh(ageState, seed) {
         const tipY = bY - droopAmount + (bProgress * 3.0);
         const tipZ = rootZ + Math.sin(bAngle) * bLength;
 
-        addBranchTube(rootX, bY, rootZ, tipX, tipY, tipZ, Math.max(0.15, (1.0 - bV) * 0.6), 0.06, bV);
+        const use6SideCylinder = (ageState === 'COLOSSAL_ANCIENT') && (bV < 0.75);
+        addBranchTube(rootX, bY, rootZ, tipX, tipY, tipZ, Math.max(0.15, (1.0 - bV) * 0.6), 0.06, bV, use6SideCylinder);
 
-        // PASS 4: EPICORMIC REITERATION EXPANSION (Trees growing out of trees)
         if (bV > 0.62 && prng.next() < reitProbability) {
             const reitCount = isUpperCrown ? Math.floor(prng.range(2, 4)) : 1;
 
@@ -398,14 +449,12 @@ function buildRedwoodMesh(ageState, seed) {
                 const rEndY = rStartY + reitHeight;
                 const rEndZ = rStartZ + prng.range(-2.0, 2.0);
 
-                addBranchTube(rStartX, rStartY, rStartZ, rEndX, rEndY, rEndZ, reitRad, 0.1, bV);
-                addFoliageClusterGroup(rEndX, rEndY, rEndZ, prng.range(6.0, 9.0), bV, 1.5);
+                addBranchTube(rStartX, rStartY, rStartZ, rEndX, rEndY, rEndZ, reitRad, 0.1, bV, use6SideCylinder);
+                addFoliageClusterGroup(rEndX, rEndY, rEndZ, prng.range(6.0, 9.0), bV, 1.6);
             }
         }
 
-        // PASS 5: FOLIAGE CLUSTERING ALONG LIMB
         if (ageState !== 'DYING' || prng.next() > 0.50) {
-            // Spawn 2-3 cluster groups along outer 50% of major branch
             const steps = isUpperCrown ? 3 : 2;
             for (let st = 1; st <= steps; st++) {
                 const frac = 0.5 + (st / steps) * 0.5;
@@ -413,7 +462,7 @@ function buildRedwoodMesh(ageState, seed) {
                 const pY = bY + (tipY - bY) * frac;
                 const pZ = rootZ + (tipZ - rootZ) * frac;
 
-                addFoliageClusterGroup(pX, pY, pZ, prng.range(5.0, 8.5), bV, zoneDensityMult);
+                addFoliageClusterGroup(pX, pY, pZ, prng.range(5.5, 9.0), bV, zoneDensityMult);
             }
         }
     }
