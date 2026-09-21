@@ -6,6 +6,48 @@
 import * as THREE from 'three';
 
 /**
+ * Creates a standard procedural block material patched for clutter, world-pos, and height-fog.
+ * Exported for src_systems_ruins.js and structural generators.
+ */
+export function createProceduralBlockMaterial(options = {}) {
+    const mat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: options.roughness ?? 0.9,
+        metalness: options.metalness ?? 0.1,
+        color: options.color ?? 0xffffff,
+        ...options
+    });
+
+    mat.onBeforeCompile = (shader) => {
+        shader.vertexShader = shader.vertexShader.replace(
+            `#include <common>`,
+            `#include <common>
+             attribute float clutter;
+             varying float vClutter;
+             varying vec3 vWorldPos;`
+        );
+        shader.vertexShader = shader.vertexShader.replace(
+            `#include <begin_vertex>`,
+            `#include <begin_vertex>
+             vClutter = clutter;
+             vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;`
+        );
+        shader.fragmentShader = shader.fragmentShader.replace(
+            `#include <common>`,
+            `#include <common>
+             varying float vClutter;
+             varying vec3 vWorldPos;`
+        );
+    };
+
+    if (typeof window !== 'undefined' && window.VolumetricFogSystem?.patchMaterial) {
+        window.VolumetricFogSystem.patchMaterial(mat);
+    }
+
+    return mat;
+}
+
+/**
  * Terrain Chunk wrapper required by src_systems_ruins.js
  */
 export class BlockTerrainChunk {
@@ -93,7 +135,7 @@ export class BlockTerrainSystem {
      * @returns {number}
      */
     getTerrainHeight(x, z) {
-        if (window.WorldGenerator?.getTerrainHeight) {
+        if (typeof window !== 'undefined' && window.WorldGenerator?.getTerrainHeight) {
             const h = window.WorldGenerator.getTerrainHeight(x, z);
             if (Number.isFinite(h)) return h;
         }
