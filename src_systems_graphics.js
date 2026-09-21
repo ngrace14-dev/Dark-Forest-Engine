@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 
 class RenderPipeline {
     constructor() {
@@ -15,13 +16,15 @@ class RenderPipeline {
         this.worldPass = null;
         this.pocketPass = null;
         this.renderer = null;
+        this.camera = null;
     }
 
     init(renderer, scene, pocketScene, camera) {
         this.renderer = renderer;
+        this.camera = camera;
 
         // --- 1. AAA Renderer Upgrades ---
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Feathered, realistic shadows
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft, feathered shadows
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.25;
 
@@ -79,7 +82,18 @@ class RenderPipeline {
         this.passes.colorTint = new ShaderPass(ColorTintShader);
         this.composer.addPass(this.passes.colorTint);
 
-        // --- 8. SMAA (Hardware Anti-Aliasing for crisp edges) ---
+        // --- 8. Cinematic Depth of Field (Bokeh) ---
+        // Keeps player focused while gently blurring distant basic shapes/LODs
+        this.passes.bokeh = new BokehPass(scene, camera, {
+            focus: 15.0,        // Focal distance targeting the player camera radius
+            aperture: 0.00005,  // Lens width
+            maxblur: 0.012,     // Max background blur cap
+            width: window.innerWidth,
+            height: window.innerHeight
+        });
+        this.composer.addPass(this.passes.bokeh);
+
+        // --- 9. SMAA (Hardware Anti-Aliasing) ---
         this.passes.smaa = new SMAAPass(
             window.innerWidth * renderer.getPixelRatio(),
             window.innerHeight * renderer.getPixelRatio()
@@ -92,7 +106,9 @@ class RenderPipeline {
     resize(width, height) {
         if (this.composer) this.composer.setSize(width, height);
         if (this.passes.ssao) this.passes.ssao.setSize(width, height);
-        // SMAA resize requires recreating the render target, but standard size updates usually suffice
+        if (this.passes.bokeh && this.passes.bokeh.renderTargetDepth) {
+            this.passes.bokeh.setSize(width, height);
+        }
     }
 
     render() {
