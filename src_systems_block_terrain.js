@@ -1,260 +1,213 @@
+// ============================================================================
+// Dark Forest Engine - Terrain Chunk & Forest Scatter Generator
+// File: src_systems_block_terrain.js
+// ============================================================================
+
 import * as THREE from 'three';
 
-export function createProceduralBlockMaterial(options = {}) {
-    const {
-        topColor = '#2e5a27',
-        sideColor = '#4a4740',
-        bottomColor = '#241c15',
-        noiseScale = 0.12,
-        displacement = 0.75,
-        triplanarScale = 0.15,
-        roughness = 0.85,
-        metalness = 0.1,
-        ...standardOptions
-    } = options;
-
-    const mat = new THREE.MeshStandardMaterial({
-        roughness,
-        metalness,
-        flatShading: false,
-        ...standardOptions
-    });
-
-    mat.userData.uniforms = {
-        uTime: { value: 0 },
-        uNoiseScale: { value: noiseScale },
-        uDisplacementAmount: { value: displacement },
-        uTriplanarScale: { value: triplanarScale },
-        uRainIntensity: { value: 0.0 },
-        uTopColor: { value: new THREE.Color(topColor) },
-        uSideColor: { value: new THREE.Color(sideColor) },
-        uBottomColor: { value: new THREE.Color(bottomColor) }
-    };
-
-    mat.onBeforeCompile = (shader) => {
-        Object.assign(shader.uniforms, mat.userData.uniforms);
-
-        shader.vertexShader = `
-            uniform float uTime;
-            uniform float uNoiseScale;
-            uniform float uDisplacementAmount;
-            varying vec3 vWorldPosition;
-            varying vec3 vWorldNormal;
-
-            vec3 mod289_v(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-            vec4 mod289_v(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-            vec4 permute_v(vec4 x) { return mod289_v(((x*34.0)+1.0)*x); }
-            vec4 taylorInvSqrt_v(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
-            float snoise3D(vec3 v) {
-                const vec2 C = vec2(1.0/6.0, 1.0/3.0);
-                const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
-                vec3 i  = floor(v + dot(v, C.yyy));
-                vec3 x0 = v - i + dot(i, C.xxx);
-                vec3 g = step(x0.yzx, x0.xyz);
-                vec3 l = 1.0 - g;
-                vec3 i1 = min(g.xyz, l.zxy);
-                vec3 i2 = max(g.xyz, l.zxy);
-                vec3 x1 = x0 - i1 + C.xxx;
-                vec3 x2 = x0 - i2 + C.yyy;
-                vec3 x3 = x0 - D.yyy;
-                i = mod289_v(i);
-                vec4 p = permute_v(permute_v(permute_v(
-                            i.z + vec4(0.0, i1.z, i2.z, 1.0))
-                        + i.y + vec4(0.0, i1.y, i2.y, 1.0))
-                        + i.x + vec4(0.0, i1.x, i2.x, 1.0));
-                float n_ = 0.142857142857;
-                vec3 ns = n_ * D.wyz - D.xzx;
-                vec4 j = p - 49.0 * floor(p * ns.z);
-                vec4 x_ = floor(j * ns.z);
-                vec4 y_ = floor(j - 7.0 * x_);
-                vec4 x = x_ *ns.x + ns.yyyy;
-                vec4 y = y_ *ns.x + ns.yyyy;
-                vec4 h = 1.0 - abs(x) - abs(y);
-                vec4 b0 = vec4(x.xy, y.xy);
-                vec4 b1 = vec4(x.zw, y.zw);
-                vec4 s0 = floor(b0)*2.0 + 1.0;
-                vec4 s1 = floor(b1)*2.0 + 1.0;
-                vec4 sh = -step(h, vec4(0.0));
-                vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
-                vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
-                vec3 p0 = vec3(a0.xy, h.x);
-                vec3 p1 = vec3(a0.zw, h.y);
-                vec3 p2 = vec3(a1.xy, h.z);
-                vec3 p3 = vec3(a1.zw, h.w);
-                vec4 norm = taylorInvSqrt_v(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
-                p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
-                vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
-                m = m * m;
-                return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
-            }
-
-            ${shader.vertexShader}
-        `;
-
-        shader.vertexShader = shader.vertexShader.replace(
-            `#include <begin_vertex>`,
-            `
-            #include <begin_vertex>
-            
-            #ifdef USE_INSTANCING
-                vec4 wPos = instanceMatrix * vec4(position, 1.0);
-                vWorldPosition = (modelMatrix * wPos).xyz;
-                vWorldNormal = normalize(mat3(modelMatrix * instanceMatrix) * normal);
-            #else
-                vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
-                vWorldNormal = normalize(mat3(modelMatrix) * normal);
-            #endif
-
-            float displacement = snoise3D(vWorldPosition * uNoiseScale);
-            transformed += normal * displacement * uDisplacementAmount;
-            `
-        );
-
-        shader.fragmentShader = `
-            uniform float uTriplanarScale;
-            uniform float uRainIntensity;
-            uniform vec3 uTopColor;
-            uniform vec3 uSideColor;
-            uniform vec3 uBottomColor;
-            varying vec3 vWorldPosition;
-            varying vec3 vWorldNormal;
-
-            ${shader.fragmentShader}
-        `;
-
-        shader.fragmentShader = shader.fragmentShader.replace(
-            `#include <color_fragment>`,
-            `
-            #include <color_fragment>
-
-            vec3 norm = normalize(vWorldNormal);
-            float slope = norm.y;
-
-            vec3 matColor = mix(uSideColor, uTopColor, smoothstep(0.45, 0.78, slope));
-            matColor = mix(uBottomColor, matColor, smoothstep(-0.5, 0.1, slope));
-
-            vec3 triWeight = abs(norm);
-            triWeight = pow(triWeight, vec3(6.0));
-            triWeight /= (triWeight.x + triWeight.y + triWeight.z);
-
-            float noiseX = sin(vWorldPosition.y * uTriplanarScale * 8.0) * cos(vWorldPosition.z * uTriplanarScale * 8.0);
-            float noiseY = sin(vWorldPosition.x * uTriplanarScale * 8.0) * cos(vWorldPosition.z * uTriplanarScale * 8.0);
-            float noiseZ = sin(vWorldPosition.x * uTriplanarScale * 8.0) * cos(vWorldPosition.y * uTriplanarScale * 8.0);
-            float triplanarTex = noiseX * triWeight.x + noiseY * triWeight.y + noiseZ * triWeight.z;
-
-            diffuseColor.rgb = matColor + (triplanarTex * 0.07);
-
-            if (uRainIntensity > 0.01) {
-                float wetness = clamp(slope, 0.0, 1.0) * uRainIntensity;
-                diffuseColor.rgb *= mix(1.0, 0.60, wetness);
-            }
-            `
-        );
-
-        shader.fragmentShader = shader.fragmentShader.replace(
-            `#include <roughnessmap_fragment>`,
-            `
-            #include <roughnessmap_fragment>
-            if (uRainIntensity > 0.01) {
-                float wetness = clamp(vWorldNormal.y, 0.0, 1.0) * uRainIntensity;
-                roughnessFactor = mix(roughnessFactor, 0.05, wetness);
-            }
-            `
-        );
-    };
-
-    return mat;
-}
-
-export class BlockTerrainChunk {
-    constructor(blockCount, geometry, material) {
-        this.mesh = new THREE.InstancedMesh(geometry, material, blockCount);
-        this.mesh.castShadow = true;
-        this.mesh.receiveShadow = true;
-        this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-        this.dummy = new THREE.Object3D();
-    }
-
-    buildChunk(blockDataArray) {
-        for (let i = 0; i < blockDataArray.length; i++) {
-            const block = blockDataArray[i];
-            this.dummy.position.set(block.x, block.y, block.z);
-            this.dummy.scale.set(block.scaleX || 1, block.scaleY || 1, block.scaleZ || 1);
-            this.dummy.rotation.set(block.rotX || 0, block.rotY || 0, block.rotZ || 0);
-            this.dummy.updateMatrix();
-            this.mesh.setMatrixAt(i, this.dummy.matrix);
-        }
-        this.mesh.count = blockDataArray.length;
-        this.mesh.instanceMatrix.needsUpdate = true;
-        this.mesh.computeBoundingSphere();
-    }
-}
-
-class BlockTerrainManager {
+class BlockTerrainSystem {
     constructor() {
-        this.cubeGeometry = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
-        this.materials = {
-            cliff: createProceduralBlockMaterial({
-                topColor: '#2d4a22',
-                sideColor: '#3a3832',
-                bottomColor: '#1d1712',
-                noiseScale: 0.12,
-                displacement: 0.85
-            }),
-            ruins: createProceduralBlockMaterial({
-                topColor: '#3b4e3a',
-                sideColor: '#5c5850',
-                bottomColor: '#2b2620',
-                noiseScale: 0.25,
-                displacement: 0.35
-            })
+        this.chunkSize = 120.0; // 120m x 120m terrain chunks
+        this.activeChunks = new Set();
+        this.chunkVegetationMap = new Map();
+
+        // Calibration parameters for Climax Ancient Redwood Ecosystem
+        this.calibration = {
+            gridStep: 28.0,            // 28m spacing for 100m trees
+            fairyRingProbability: 0.35, // 35% chance a cluster forms a fairy ring
+            clearingNoiseThreshold: 0.28, // Noise threshold for natural glades
+            ageDistribution: {
+                ANCIENT: 0.10,
+                MATURE: 0.35,
+                YOUNG: 0.35,
+                DYING: 0.20
+            }
         };
-        this.activeChunks = new Map();
     }
 
-    setWeatherRain(intensity) {
-        for (const matKey in this.materials) {
-            const mat = this.materials[matKey];
-            if (mat.userData.uniforms?.uRainIntensity) {
-                mat.userData.uniforms.uRainIntensity.value = intensity;
+    /**
+     * Deterministic pseudo-random hash based on world coordinates.
+     */
+    hash2D(x, z) {
+        let h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
+        return h - Math.floor(h);
+    }
+
+    /**
+     * Evaluates terrain height at world coordinates (x, z).
+     * @param {number} x 
+     * @param {number} z 
+     * @returns {number}
+     */
+    getTerrainHeight(x, z) {
+        const h = window.WorldGenerator?.getTerrainHeight?.(x, z) ?? 0;
+        return Number.isFinite(h) ? h : 0;
+    }
+
+    /**
+     * Generates vegetation scattering points for a chunk key (e.g. "chunk_3_-2").
+     * @param {number} chunkX - Chunk coordinate X
+     * @param {number} chunkZ - Chunk coordinate Z
+     */
+    generateChunkVegetation(chunkX, chunkZ) {
+        const chunkKey = `chunk_${chunkX}_${chunkZ}`;
+        if (this.chunkVegetationMap.has(chunkKey)) return;
+
+        const startX = chunkX * this.chunkSize;
+        const startZ = chunkZ * this.chunkSize;
+        const endX = startX + this.chunkSize;
+        const endZ = startZ + this.chunkSize;
+
+        // Container map: archetypeKey -> array of point transforms
+        const prefabPointsMap = new Map();
+
+        const addPoint = (prefabKey, pt) => {
+            if (!prefabPointsMap.has(prefabKey)) {
+                prefabPointsMap.set(prefabKey, []);
+            }
+            prefabPointsMap.get(prefabKey).push(pt);
+        };
+
+        const step = this.calibration.gridStep;
+
+        for (let x = startX; x < endX; x += step) {
+            for (let z = startZ; z < endZ; z += step) {
+                // Jitter position within cell
+                const wx = x + (this.hash2D(x, z) - 0.5) * (step * 0.7);
+                const wz = z + (this.hash2D(z, x) - 0.5) * (step * 0.7);
+
+                // Safe zone check (roads, villages)
+                if (window.RoadManager?.isSafeZone?.({ x: wx, z: wz })) continue;
+
+                // Natural Forest Clearing Glade Noise
+                const gladeNoise = this.hash2D(wx * 0.003, wz * 0.003);
+                if (gladeNoise < this.calibration.clearingNoiseThreshold) continue;
+
+                const wy = this.getTerrainHeight(wx, wz);
+                if (!Number.isFinite(wy)) continue;
+
+                // Determine whether to spawn a Fairy Ring cluster or an individual tree
+                const ringRoll = this.hash2D(wx * 0.05, wz * 0.05);
+
+                if (ringRoll < this.calibration.fairyRingProbability && window.RedwoodGenerator?.generateFairyRingCluster) {
+                    // Spawn Fairy Ring Cluster (4 to 7 trees around an old central burl)
+                    const ringCount = 4 + Math.floor(this.hash2D(wx, wz) * 4);
+                    const ringRadius = 8.0 + this.hash2D(wz, wx) * 6.0;
+
+                    const ringPoints = window.RedwoodGenerator.generateFairyRingCluster(
+                        wx, wz, ringCount, ringRadius, this.getTerrainHeight.bind(this)
+                    );
+
+                    ringPoints.forEach(pt => {
+                        addPoint(pt.prefabKey, {
+                            x: pt.x,
+                            y: pt.y,
+                            z: pt.z,
+                            rotation: pt.rotation,
+                            scale: pt.scale
+                        });
+                    });
+                } else {
+                    // Spawn Individual Redwood Tree based on Age State distribution
+                    const ageRoll = this.hash2D(wx * 0.1, wz * 0.1);
+                    let ageState = 'MATURE';
+
+                    if (ageRoll < this.calibration.ageDistribution.ANCIENT) {
+                        ageState = 'ANCIENT';
+                    } else if (ageRoll < this.calibration.ageDistribution.ANCIENT + this.calibration.ageDistribution.MATURE) {
+                        ageState = 'MATURE';
+                    } else if (ageRoll < 1.0 - this.calibration.ageDistribution.DYING) {
+                        ageState = 'YOUNG';
+                    } else {
+                        ageState = 'DYING';
+                    }
+
+                    // Select variation index (0 to 3)
+                    const varIdx = Math.floor(this.hash2D(wz * 0.3, wx * 0.3) * 4);
+                    const prefabKey = `Redwood_${ageState}_${varIdx}`;
+
+                    const scale = 0.85 + this.hash2D(wx * 0.7, wz * 0.7) * 0.35;
+                    const rotation = this.hash2D(wx, wz) * Math.PI * 2.0;
+
+                    addPoint(prefabKey, {
+                        x: wx,
+                        y: wy,
+                        z: wz,
+                        rotation: rotation,
+                        scale: scale
+                    });
+                }
+            }
+        }
+
+        // Store chunk vegetation data
+        this.chunkVegetationMap.set(chunkKey, prefabPointsMap);
+        this.activeChunks.add(chunkKey);
+
+        // Upload instance matrices to ForestRenderer
+        if (window.ForestRenderer?.setChunkInstances) {
+            for (const [prefabKey, points] of prefabPointsMap.entries()) {
+                window.ForestRenderer.setChunkInstances(chunkKey, prefabKey, points);
             }
         }
     }
 
-    updateTime(timeSecs) {
-        for (const matKey in this.materials) {
-            const mat = this.materials[matKey];
-            if (mat.userData.uniforms?.uTime) {
-                mat.userData.uniforms.uTime.value = timeSecs;
-            }
+    /**
+     * Unloads vegetation instances for a chunk when streamed out.
+     * @param {number} chunkX 
+     * @param {number} chunkZ 
+     */
+    unloadChunkVegetation(chunkX, chunkZ) {
+        const chunkKey = `chunk_${chunkX}_${chunkZ}`;
+        if (!this.chunkVegetationMap.has(chunkKey)) return;
+
+        if (window.ForestRenderer?.clearChunkInstances) {
+            window.ForestRenderer.clearChunkInstances(chunkKey);
         }
+
+        this.chunkVegetationMap.delete(chunkKey);
+        this.activeChunks.delete(chunkKey);
     }
 
-    spawnProceduralCliffCluster(scene, centerX, centerZ, count = 120) {
-        const blockData = [];
-        for (let i = 0; i < count; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * 25;
-            const x = centerX + Math.cos(angle) * radius;
-            const z = centerZ + Math.sin(angle) * radius;
-            const y = (Math.random() * 18) - 2;
+    /**
+     * Synchronizes chunk streaming around player position.
+     * @param {number} playerX 
+     * @param {number} playerZ 
+     * @param {number} viewRadiusChunks - Load radius in chunks (default 6 chunks / ~720m)
+     */
+    updateStreaming(playerX, playerZ, viewRadiusChunks = 6) {
+        const centerChunkX = Math.floor(playerX / this.chunkSize);
+        const centerChunkZ = Math.floor(playerZ / this.chunkSize);
 
-            blockData.push({
-                x, y, z,
-                scaleX: 3 + Math.random() * 6,
-                scaleY: 4 + Math.random() * 10,
-                scaleZ: 3 + Math.random() * 6,
-                rotX: (Math.random() - 0.5) * 0.2,
-                rotY: Math.random() * Math.PI,
-                rotZ: (Math.random() - 0.5) * 0.2
-            });
+        const neededChunkKeys = new Set();
+
+        for (let cx = centerChunkX - viewRadiusChunks; cx <= centerChunkX + viewRadiusChunks; cx++) {
+            for (let cz = centerChunkZ - viewRadiusChunks; cz <= centerChunkZ + viewRadiusChunks; cz++) {
+                const dx = cx - centerChunkX;
+                const dz = cz - centerChunkZ;
+                if (dx * dx + dz * dz > viewRadiusChunks * viewRadiusChunks) continue;
+
+                const key = `chunk_${cx}_${cz}`;
+                neededChunkKeys.add(key);
+
+                if (!this.chunkVegetationMap.has(key)) {
+                    this.generateChunkVegetation(cx, cz);
+                }
+            }
         }
 
-        const chunk = new BlockTerrainChunk(count, this.cubeGeometry, this.materials.cliff);
-        chunk.buildChunk(blockData);
-        scene.add(chunk.mesh);
-        return chunk;
+        // Unload out-of-range chunks
+        for (const activeKey of Array.from(this.activeChunks)) {
+            if (!neededChunkKeys.has(activeKey)) {
+                const parts = activeKey.split('_');
+                const cx = parseInt(parts[1], 10);
+                const cz = parseInt(parts[2], 10);
+                this.unloadChunkVegetation(cx, cz);
+            }
+        }
     }
 }
 
-window.BlockTerrainManager = new BlockTerrainManager();
+// Global Singleton Binding
+window.BlockTerrainSystem = new BlockTerrainSystem();
+export default BlockTerrainSystem;
