@@ -20,7 +20,7 @@ const _q1 = new THREE.Quaternion();
 const _e1 = new THREE.Euler();
 const _m1 = new THREE.Matrix4();
 const _colorScratch = new THREE.Color();
-const _dirtColorScratch = new THREE.Color('#4a3e31'); // Dedicated dirt road color
+const _dirtColorScratch = new THREE.Color('#4a3e31'); // Dedicated dirt road color scratch
 
 const _targetCamPos = new THREE.Vector3();
 const _currentCamTarget = new THREE.Vector3();
@@ -751,18 +751,26 @@ function fixedUpdateLogic(delta) {
     
     if (window.GameCore?.AnimationSystem) window.GameCore.AnimationSystem.update(delta);
     if (window.ForestRenderer) window.ForestRenderer.update(delta);
+    
     if (window.GrassSystem) {
         if (!window.GrassSystem.initialized && window.GameCore?.scene) {
             window.GrassSystem.init(window.GameCore.scene);
         }
         window.GrassSystem.update(delta);
     }
-    
+
     if (window.ForestImpostorSystem) {
         if (!window.ForestImpostorSystem.initialized && window.GameCore?.scene) {
             window.ForestImpostorSystem.init(window.GameCore.scene);
         }
         window.ForestImpostorSystem.update(window.GameCore?.worldTimerAbsolute || 0);
+    }
+
+    if (window.VolumetricFogSystem && window.EngineParams) {
+        window.VolumetricFogSystem.update(
+            window.GameCore?.worldTimerAbsolute || 0,
+            window.EngineParams.timeOfDay
+        );
     }
 
     updatePlayerStats(delta);
@@ -888,16 +896,20 @@ const ChunkManager = {
                 
                 let minRoadDistSq = 999999;
                 for(let r = 0; r < localRoadPoints.length; r++) { 
-                    const dx = vx - localRoadPoints[r].x;
-                    const dz = vz - localRoadPoints[r].z;
+                    const pt = localRoadPoints[r];
+                    if (!pt || !Number.isFinite(pt.x) || !Number.isFinite(pt.z)) continue;
+
+                    const dx = vx - pt.x;
+                    const dz = vz - pt.z;
                     const distSq = (dx * dx) + (dz * dz);
-                    if(distSq < minRoadDistSq) minRoadDistSq = distSq; 
+                    if (Number.isFinite(distSq) && distSq < minRoadDistSq) {
+                        minRoadDistSq = distSq; 
+                    }
                 }
                 
                 const minRoadDist = Math.sqrt(minRoadDistSq);
                 
-                // Smooth blend from grass to dirt path without mutating color scratch
-                if (minRoadDist < ROAD_WIDTH + 2) { 
+                if (Number.isFinite(minRoadDist) && minRoadDist < ROAD_WIDTH + 2) { 
                     const dirtInfluence = Math.max(0, 1.0 - (minRoadDist / (ROAD_WIDTH + 2))); 
                     c.lerp(_dirtColorScratch, dirtInfluence * 0.55); 
                 }
@@ -952,35 +964,52 @@ const ChunkManager = {
 
         const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
 
-        // Inject Volumetric Fog Shader
-        if (window.VolumetricFogSystem) {
-            window.VolumetricFogSystem.patchMaterial(mat);
-        }
-
         mat.onBeforeCompile = (shader) => {
             shader.vertexShader = shader.vertexShader.replace(
                 `#include <common>`,
                 `#include <common>
                  attribute float clutter;
-                 varying float vClutter;`
+                 varying float vClutter;
+                 varying vec3 vWorldPos;`
             );
             shader.vertexShader = shader.vertexShader.replace(
                 `#include <begin_vertex>`,
                 `#include <begin_vertex>
-                 vClutter = clutter;`
+                 vClutter = clutter;
+                 vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;`
             );
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <common>`,
                 `#include <common>
-                 varying float vClutter;`
+                 varying float vClutter;
+                 varying vec3 vWorldPos;`
             );
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <color_fragment>`,
                 `#include <color_fragment>
-                 vec3 grassColor = vec3(0.1, 0.3, 0.1);
-                 diffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);`
+                 vec3 grassColor = vec3(0.08, 0.28, 0.08);
+                 diffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);
+
+                 float puddleNoise = sin(vWorldPos.x * 0.12) * cos(vWorldPos.z * 0.12);
+                 float puddleMask = smoothstep(0.45, 0.65, puddleNoise) * (1.0 - vClutter);
+
+                 if (puddleMask > 0.01) {
+                     vec3 waterBedColor = vec3(0.08, 0.06, 0.04);
+                     diffuseColor.rgb = mix(diffuseColor.rgb, waterBedColor, puddleMask * 0.85);
+                 }`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                `#include <roughnessmap_fragment>`,
+                `#include <roughnessmap_fragment>
+                 float puddleNoiseRough = sin(vWorldPos.x * 0.12) * cos(vWorldPos.z * 0.12);
+                 float puddleMaskRough = smoothstep(0.45, 0.65, puddleNoiseRough) * (1.0 - vClutter);
+                 roughnessFactor = mix(roughnessFactor, 0.03, puddleMaskRough);`
             );
         };
+
+        if (window.VolumetricFogSystem) {
+            window.VolumetricFogSystem.patchMaterial(mat);
+        }
         
         const mesh = new THREE.Mesh(geo, mat);  
         mesh.position.set(chunkX, 0, chunkZ); 
@@ -1001,6 +1030,7 @@ const ChunkManager = {
         }
         
         this.activeChunks.set(key, { mesh, body: groundBody, collider, lod });
+        
         if (window.RoadRenderer && window.GameCore?.scene) {
             window.RoadRenderer.buildDecorationsForChunk(key, cx, cz, window.GameCore.scene);
         }
@@ -1047,6 +1077,11 @@ const ChunkManager = {
     },
     unloadChunk: function(key) {
         const chunk = this.activeChunks.get(key); 
+
+        if (window.RoadRenderer && window.GameCore?.scene) {
+            window.RoadRenderer.removeDecorationsForChunk(key, window.GameCore.scene);
+        }
+
         if(!chunk) return;
         
         chunk.mesh.geometry.dispose(); 
@@ -1858,9 +1893,15 @@ async function bootEngine() {
 
         initLightPool(window.GameCore.scene);
 
-        renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); 
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" }); 
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); 
         renderer.setSize(window.innerWidth || 800, window.innerHeight || 600); 
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
         document.body.appendChild(renderer.domElement);
 
         if (window.RenderOptimizer?.prewarmShaders) {
@@ -1956,9 +1997,13 @@ async function bootEngine() {
         window.GameCore.scene.add(horizonMesh);
         window.GameCore.horizonMaterial = horizonMat;
 
-        // --- ALL LIGHTING & POST PROCESSING DELEGATED TO GRAPHICS SYSTEM ---
         if (window.RenderPipeline) {
             window.RenderPipeline.init(renderer, window.GameCore.scene, window.GameCore.pocketScene, window.GameCore.camera);
+            if (window.RenderPipeline.dirLight) {
+                window.RenderPipeline.dirLight.castShadow = true;
+                window.RenderPipeline.dirLight.shadow.bias = -0.0005;
+                window.RenderPipeline.dirLight.shadow.normalBias = 0.03;
+            }
             window.RenderPipeline.updateEnvironment(window.GameCore.scene, window.GameCore.scene.fog, window.EngineParams, window.GameCore.horizonMaterial);
         }
 
