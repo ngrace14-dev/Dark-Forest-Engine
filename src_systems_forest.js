@@ -1,167 +1,160 @@
-import * as THREE from 'three';
+/**
+ * FOREST SYSTEMS - Phase 1.5 (Updated)
+ * 
+ * Implements Multi-Scale Masking (Macro-Density + Micro-Placement)
+ * and LOD management for efficient rendering of the 128k sq mile wilderness.
+ */
 
-class ForestRenderer {
+class ForestSystem {
     constructor() {
-        this.group = new THREE.Group();
-        this.instancedMeshes = new Map(); // prefabName -> THREE.InstancedMesh
-        this.chunkInstances = new Map();  // chunkKey -> Map(prefabName -> Array<{x, y, z, scale, rotation}>)
-        this.geometries = new Map();
-        this.materials = new Map();
-        this.instances = new Map();      // Alias map for legacy compatibility
+        this.config = {
+            tierA: 150, // Full Collision/VAT (100ft Redwoods)
+            tierB: 600, // InstancedMesh Undergrowth & Pines
+            tierC: 5000 // Billboards / Distant LOD
+        };
         
-        this.dummyMatrix = new THREE.Matrix4();
-        this.dummyPosition = new THREE.Vector3();
-        this.dummyQuaternion = new THREE.Quaternion();
-        this.dummyScale = new THREE.Vector3();
-        this.dummyEuler = new THREE.Euler();
-        
-        this.initAssets();
+        this.modificationsMap = new Map();
     }
 
-    initAssets() {
-        // --- 100-FOOT REDWOOD PROCEDURAL GEOMETRY (30.5m) ---
-        const trunkHeight = 20.0;
-        const trunkGeo = new THREE.CylinderGeometry(1.1, 1.8, trunkHeight, 8);
-        trunkGeo.translate(0, trunkHeight / 2, 0);
-
-        const coneHeight = 14.0;
-        const coneGeo = new THREE.ConeGeometry(5.5, coneHeight, 8);
-        coneGeo.translate(0, trunkHeight + coneHeight / 2 - 3.5, 0);
-
-        // Merge trunk and canopy geometry
-        let redwoodGeo;
-        if (window.BufferGeometryUtils?.mergeGeometries) {
-            redwoodGeo = window.BufferGeometryUtils.mergeGeometries([trunkGeo, coneGeo], true);
-        } else {
-            redwoodGeo = trunkGeo;
-        }
-
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6a2817, roughness: 0.9 });
-        const coneMat = new THREE.MeshStandardMaterial({ color: 0x173820, roughness: 0.8 });
-
-        const matArray = (Array.isArray(redwoodGeo.groups) && redwoodGeo.groups.length > 1) ? [trunkMat, coneMat] : trunkMat;
-
-        this.geometries.set('Redwood Tree', redwoodGeo);
-        this.materials.set('Redwood Tree', matArray);
-
-        // --- BRAMBLE BUSH PROCEDURAL GEOMETRY ---
-        const bushGeo = new THREE.DodecahedronGeometry(1.5, 1);
-        bushGeo.translate(0, 1.2, 0);
-        const bushMat = new THREE.MeshStandardMaterial({ color: 0x1e3a1e, roughness: 0.9 });
-
-        this.geometries.set('Bramble Bush', bushGeo);
-        this.materials.set('Bramble Bush', bushMat);
-    }
-
-    initInstancedMesh(prefabName, maxCapacity = 5000) {
-        if (this.instancedMeshes.has(prefabName)) return;
-
-        const geo = this.geometries.get(prefabName) || new THREE.BoxGeometry(1, 5, 1);
-        const mat = this.materials.get(prefabName) || new THREE.MeshStandardMaterial({ color: 0x228b22 });
-
-        const instMesh = new THREE.InstancedMesh(geo, mat, maxCapacity);
-        instMesh.castShadow = true;
-        instMesh.receiveShadow = true;
-        instMesh.count = 0;
-        instMesh.frustumCulled = true;
-        instMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-
-        this.instancedMeshes.set(prefabName, instMesh);
-        this.instances.set(prefabName, instMesh); // Legacy alias check
-        this.group.add(instMesh);
+    createPRNG(seed) {
+        let s = seed % 2147483647;
+        if (s <= 0) s += 2147483646;
+        return function() {
+            s = (s * 16807) % 2147483647;
+            return (s - 1) / 2147483646;
+        };
     }
 
     /**
-     * Legacy direct update compatibility method
+     * Hierarchical Micro/Macro Distribution Logic
      */
-    updateInstances(prefabName, points) {
-        this.initInstancedMesh(prefabName);
-        const instMesh = this.instancedMeshes.get(prefabName);
-        if (!instMesh) return;
+    generateChunk(cx, cz) {
+        const worldX = cx * 60 + 30;
+        const worldZ = cz * 60 + 30;
 
-        let index = 0;
-        for (let i = 0; i < points.length; i++) {
-            if (index >= instMesh.capacity) break;
-            const pt = points[i];
-            const scale = pt.scale || 1.0;
-
-            this.dummyPosition.set(pt.x, pt.y || 0, pt.z);
-            this.dummyEuler.set(0, pt.rotation || 0, 0);
-            this.dummyQuaternion.setFromEuler(this.dummyEuler);
-            this.dummyScale.set(scale, scale, scale);
-
-            this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
-            instMesh.setMatrixAt(index, this.dummyMatrix);
-            index++;
+        // 1. Aethelgard Capital Protection (No wild trees inside 280m city radius)
+        if (window.CapitalCityManager?.isInsideCapital(worldX, worldZ)) {
+            return { tierA: [], tierB: [], tierC: [] };
         }
 
-        instMesh.count = index;
-        instMesh.instanceMatrix.needsUpdate = true;
-        instMesh.computeBoundingSphere();
-    }
+        // 2. Calibrated Macro-Density Check via Noise (0.003 frequency for vast forest patches)
+        const density = window.WorldGenerator ? window.WorldGenerator.getNoise(worldX * 0.003, worldZ * 0.003) : 0.6;
+        if (density < 0.20) return { tierA: [], tierB: [], tierC: [] };
 
-    /**
-     * Stores tree positions for a chunk and rebuilds instanced mesh matrices
-     */
-    setChunkInstances(chunkKey, prefabName, points) {
-        if (!this.chunkInstances.has(chunkKey)) {
-            this.chunkInstances.set(chunkKey, new Map());
-        }
+        // 3. Micro-Placement (Poisson Disk Sampling)
+        const rawPoints = this.generatePoissonPoints(cx, cz, worldX, worldZ, density);
         
-        this.chunkInstances.get(chunkKey).set(prefabName, points);
-        this.rebuildInstances(prefabName);
-    }
+        // 4. Fine-grained filtering against roads, villages, and harvested trees
+        const validPoints = rawPoints.filter(p => {
+            const instanceId = `${Math.floor(p.x)}_${Math.floor(p.z)}`;
+            
+            if (this.modificationsMap.has(instanceId)) {
+                const mod = this.modificationsMap.get(instanceId);
+                if (mod.scale <= 0.01) return false;
+            }
 
-    /**
-     * Removes instances associated with an unloaded chunk
-     */
-    clearChunkInstances(chunkKey) {
-        if (!this.chunkInstances.has(chunkKey)) return;
-
-        const chunkMap = this.chunkInstances.get(chunkKey);
-        const affectedPrefabs = Array.from(chunkMap.keys());
-        
-        this.chunkInstances.delete(chunkKey);
-        
-        affectedPrefabs.forEach(prefabName => {
-            this.rebuildInstances(prefabName);
+            return !this.isNearProtectedArea(p.x, p.z);
         });
+
+        return {
+            tierA: validPoints.filter(p => p.type === 'redwood'),
+            tierB: validPoints.filter(p => p.type === 'bush'),
+            tierC: []
+        };
     }
 
-    /**
-     * Rebuilds InstancedMesh buffer for a prefab from active chunk registry
-     */
-    rebuildInstances(prefabName) {
-        this.initInstancedMesh(prefabName);
-        const instMesh = this.instancedMeshes.get(prefabName);
-        if (!instMesh) return;
+    isNearProtectedArea(x, z) {
+        try {
+            if (window.CapitalCityManager?.isInsideCapital(x, z)) {
+                return true;
+            }
 
-        let index = 0;
-        for (const [chunkKey, prefabMap] of this.chunkInstances.entries()) {
-            const points = prefabMap.get(prefabName);
-            if (!points) continue;
+            if (window.VillageManager?.villages) {
+                const nearVillage = window.VillageManager.villages.some(v => Math.hypot(x - v.x, z - v.z) < 50);
+                if (nearVillage) return true;
+            }
 
-            for (let i = 0; i < points.length; i++) {
-                if (index >= instMesh.capacity) break;
+            if (window.RoadManager) {
+                const cx = Math.floor(x / 60);
+                const cz = Math.floor(z / 60);
+                const localRoadPoints = window.RoadManager.getRoadPointsNear(cx, cz) || [];
+                const nearRoad = localRoadPoints.some(r => Math.hypot(x - r.x, z - r.z) < 10);
+                if (nearRoad) return true;
+            }
 
-                const pt = points[i];
-                const scale = pt.scale || 1.0;
-                
-                this.dummyPosition.set(pt.x, pt.y, pt.z);
-                this.dummyEuler.set(0, pt.rotation || 0, 0);
-                this.dummyQuaternion.setFromEuler(this.dummyEuler);
-                this.dummyScale.set(scale, scale, scale);
+            return false;
+        } catch(e) {
+            console.error("Forest System: Error checking protected areas", e);
+            return false;
+        }
+    }
 
-                this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
-                instMesh.setMatrixAt(index, this.dummyMatrix);
-                index++;
+    generatePoissonPoints(cx, cz, worldX, worldZ, density) {
+        const points = [];
+        const minRadius = 12; // Balanced spacing for 100ft Redwoods
+
+        const epochSeed = window.EngineParams?.worldSeed ?? 1337;
+        const seed = Math.abs(epochSeed * 73856093 ^ cx * 19349663 ^ cz * 83492791);
+        const rng = this.createPRNG(seed);
+
+        const candidateCount = Math.floor(12 + density * 18);
+
+        for (let i = 0; i < candidateCount; i++) {
+            const px = (worldX - 30) + rng() * 60;
+            const pz = (worldZ - 30) + rng() * 60;
+
+            let valid = true;
+            for (let j = 0; j < points.length; j++) {
+                const p = points[j];
+                if (Math.hypot(px - p.x, pz - p.z) < minRadius) {
+                    valid = false;
+                    break;
+                }
+            }
+
+            if (valid) {
+                // 60% Redwoods, 40% Undergrowth Bushes
+                const type = (rng() < 0.65) ? 'redwood' : 'bush';
+                points.push({ x: px, z: pz, type });
             }
         }
 
-        instMesh.count = index;
-        instMesh.instanceMatrix.needsUpdate = true;
-        instMesh.computeBoundingSphere();
+        return points;
+    }
+
+    harvest(instanceId) {
+        this.modificationsMap.set(instanceId, { scale: 0.001, timestamp: Date.now() });
+        window.EventBus?.emit('UI_LOG', '[FOREST] Timber harvested from the woods.');
+        window.EventBus?.emit('FOREST_TREE_HARVESTED', { instanceId });
+    }
+
+    applyEnvironmentEffects(material, uniforms = {}) {
+        if (!material) return;
+
+        material.onBeforeCompile = (shader) => {
+            shader.uniforms.uForestCorruption = uniforms.corruption || { value: 0.0 };
+            shader.uniforms.uEpochShiftProgress = uniforms.shiftProgress || { value: 0.0 };
+
+            shader.vertexShader = shader.vertexShader.replace(
+                `#include <common>`,
+                `#include <common>\nuniform float uForestCorruption;\nuniform float uEpochShiftProgress;`
+            );
+
+            shader.fragmentShader = shader.fragmentShader.replace(
+                `#include <common>`,
+                `#include <common>\nuniform float uForestCorruption;\nuniform float uEpochShiftProgress;`
+            );
+
+            shader.fragmentShader = shader.fragmentShader.replace(
+                `#include <color_fragment>`,
+                `#include <color_fragment>
+                 vec3 corruptColor = vec3(0.15, 0.02, 0.05);
+                 diffuseColor.rgb = mix(diffuseColor.rgb, corruptColor, uForestCorruption);
+                 vec3 shiftGlow = vec3(0.9, 0.95, 1.0);
+                 diffuseColor.rgb += shiftGlow * uEpochShiftProgress * 0.5;`
+            );
+        };
     }
 }
 
-window.ForestRenderer = new ForestRenderer();
+window.ForestManager = new ForestSystem();
