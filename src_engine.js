@@ -367,6 +367,7 @@ function updatePlayerMovement(delta) {
     if (window.Input.isMoving) {
         moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle || Math.PI); 
         
+        // RECALIBRATED 15-MINUTE MILE BASE SPEED: ~1.7882 m/s
         const BASE_STARTING_SPEED = 1609.344 / 900.0; 
         const athleticsLvl = window.GameState.pStats?.athletics?.level || 0;
         const athleticsBonus = window.GameCore.getBuffBonus?.('athletics') || 0;
@@ -600,7 +601,7 @@ function updateCombatHitboxes(delta) {
     }
 }
 
-// RESTORED EVENT BUS LISTENERS
+// EVENT BUS LISTENERS
 window.EventBus.on('PRIMARY_CLICK_DOWN', () => { if(window.Input.attackCooldown <= 0) performAttack(); });
 window.EventBus.on('SECONDARY_CLICK_DOWN', () => { if(window.Input.attackCooldown <= 0) performAttack(true); });
 window.EventBus.on('GUARDBREAKER', performGuardbreaker);
