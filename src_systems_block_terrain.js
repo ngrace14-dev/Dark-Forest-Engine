@@ -1,50 +1,9 @@
 // ============================================================================
-// Dark Forest Engine - Terrain Chunk & Forest Scatter Generator
+// Dark Forest Engine - Old-Growth Redwood Forest Placement System
 // File: src_systems_block_terrain.js
 // ============================================================================
 
 import * as THREE from 'three';
-
-/**
- * Procedural material factory required by src_systems_ruins.js
- */
-export function createProceduralBlockMaterial(options = {}) {
-    const mat = new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        roughness: options.roughness ?? 0.9,
-        metalness: options.metalness ?? 0.1,
-        color: options.color ?? 0xffffff,
-        ...options
-    });
-
-    mat.onBeforeCompile = (shader) => {
-        shader.vertexShader = shader.vertexShader.replace(
-            `#include <common>`,
-            `#include <common>
-             attribute float clutter;
-             varying float vClutter;
-             varying vec3 vWorldPos;`
-        );
-        shader.vertexShader = shader.vertexShader.replace(
-            `#include <begin_vertex>`,
-            `#include <begin_vertex>
-             vClutter = clutter;
-             vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;`
-        );
-        shader.fragmentShader = shader.fragmentShader.replace(
-            `#include <common>`,
-            `#include <common>
-             varying float vClutter;
-             varying vec3 vWorldPos;`
-        );
-    };
-
-    if (typeof window !== 'undefined' && window.VolumetricFogSystem?.patchMaterial) {
-        window.VolumetricFogSystem.patchMaterial(mat);
-    }
-
-    return mat;
-}
 
 /**
  * Terrain Chunk wrapper required by src_systems_ruins.js
@@ -60,25 +19,54 @@ export class BlockTerrainChunk {
     }
 }
 
+/**
+ * Procedural block material factory required by structural generators.
+ */
+export function createProceduralBlockMaterial(options = {}) {
+    const mat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: options.roughness ?? 0.9,
+        metalness: options.metalness ?? 0.1,
+        color: options.color ?? 0xffffff,
+        ...options
+    });
+
+    if (typeof window !== 'undefined' && window.VolumetricFogSystem?.patchMaterial) {
+        window.VolumetricFogSystem.patchMaterial(mat);
+    }
+
+    return mat;
+}
+
+/**
+ * Procedural Ecosystem Placement Manager
+ */
 export class BlockTerrainSystem {
     constructor() {
         this.chunkSize = 60.0;
         this.activeChunks = new Set();
         this.chunkVegetationMap = new Map();
+        
+        // Lore & Landmark Registry (Queryable by Oracle Board & Rumor System)
+        this.loreTreeRegistry = new Map();
+        this.landmarkRegistry = new Map();
+
         this.initialized = false;
         this.scene = null;
 
-        this.calibration = {
-            gridStep: 24.0,
-            fairyRingProbability: 0.35,
-            clearingNoiseThreshold: 0.25,
-            ageDistribution: {
-                ANCIENT: 0.10,
-                MATURE: 0.35,
-                YOUNG: 0.35,
-                DYING: 0.20
-            }
-        };
+        // Curated Lore Tree Names for the 0.05% Champion subset
+        this.loreTreeNames = [
+            "The Widow of Oakhaven",
+            "Crow Root",
+            "The Fallen Saint",
+            "The King's Spine",
+            "The Iron Sentinel",
+            "Sorrow's Canopy",
+            "The Elder Monarch",
+            "The Blind Titan",
+            "Watcher of the Mist",
+            "The Cathedral Pillar"
+        ];
 
         this.bindEvents();
     }
@@ -87,7 +75,7 @@ export class BlockTerrainSystem {
         if (this.initialized) return;
         this.scene = scene;
         this.initialized = true;
-        console.log('[BlockTerrainSystem] Initialized successfully.');
+        console.log('[BlockTerrainSystem] Old-Growth Ecosystem Placement Engine Initialized.');
     }
 
     bindEvents() {
@@ -111,11 +99,22 @@ export class BlockTerrainSystem {
         }
     }
 
+    /**
+     * Multi-scale deterministic hash generator.
+     */
     hash2D(x, z) {
         let h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
         return h - Math.floor(h);
     }
 
+    hash3D(x, y, z) {
+        let h = Math.sin(x * 12.9898 + y * 156.432 + z * 78.233) * 43758.5453123;
+        return h - Math.floor(h);
+    }
+
+    /**
+     * Samples terrain height at world coordinates (x, z).
+     */
     getTerrainHeight(x, z) {
         if (typeof window !== 'undefined' && window.WorldGenerator?.getTerrainHeight) {
             const h = window.WorldGenerator.getTerrainHeight(x, z);
@@ -124,6 +123,56 @@ export class BlockTerrainSystem {
         return 0;
     }
 
+    /**
+     * Computes slope gradient at world coordinates.
+     */
+    getTerrainSlope(x, z) {
+        const delta = 1.0;
+        const hL = this.getTerrainHeight(x - delta, z);
+        const hR = this.getTerrainHeight(x + delta, z);
+        const hD = this.getTerrainHeight(x, z - delta);
+        const hU = getTerrainHeight(x, z + delta);
+
+        const dx = (hR - hL) / (2 * delta);
+        const dz = (hU - hD) / (2 * delta);
+        return Math.sqrt(dx * dx + dz * dz); // Tangent of slope angle
+    }
+
+    /**
+     * Evaluates ecological terrain attributes.
+     */
+    getTerrainEcoProfile(wx, wz, wy) {
+        const slope = this.getTerrainSlope(wx, wz);
+        
+        // Valleys have low height relative to neighbors & low slope
+        const valleyMoisture = Math.max(0.0, 1.0 - (wy / 45.0)) * (1.0 - Math.min(1.0, slope * 1.5));
+        
+        // Ridges have high elevation and high slope exposure
+        const ridgeExposure = Math.min(1.0, Math.max(0.0, (wy - 25.0) / 35.0) + slope * 0.8);
+
+        return { slope, valleyMoisture, ridgeExposure };
+    }
+
+    /**
+     * Evaluates Biome Density Mode using noise-modified shapes.
+     */
+    getDensityMode(wx, wz, eco) {
+        const densityNoise = this.hash2D(wx * 0.0015, wz * 0.0015);
+        const clearingNoise = this.hash2D(wx * 0.004 + 50.0, wz * 0.004 + 50.0);
+
+        // Noise-deformed non-circular clearings (20m - 100m openings)
+        if (clearingNoise < 0.22) return 'CLEARING';
+
+        if (eco.valleyMoisture > 0.65) return 'RIPARIAN';
+        if (eco.ridgeExposure > 0.70) return 'MOUNTAIN_RIDGE';
+        if (densityNoise > 0.72) return 'DENSE_ANCIENT';
+        if (densityNoise < 0.38) return 'OPEN_WOODLAND';
+        return 'MIXED_OLD_GROWTH';
+    }
+
+    /**
+     * Main Ecosystem Placement Pipeline for a chunk.
+     */
     generateChunkVegetation(chunkX, chunkZ) {
         const chunkKey = `chunk_${chunkX}_${chunkZ}`;
         if (this.chunkVegetationMap.has(chunkKey)) return;
@@ -142,71 +191,159 @@ export class BlockTerrainSystem {
             prefabPointsMap.get(prefabKey).push(pt);
         };
 
-        const step = this.calibration.gridStep;
+        // Grid stepping adapts per biome
+        const baseStep = 24.0;
 
-        for (let x = startX; x < endX; x += step) {
-            for (let z = startZ; z < endZ; z += step) {
-                const wx = x + (this.hash2D(x, z) - 0.5) * (step * 0.7);
-                const wz = z + (this.hash2D(z, x) - 0.5) * (step * 0.7);
+        for (let x = startX; x < endX; x += baseStep) {
+            for (let z = startZ; z < endZ; z += baseStep) {
+                const wx = x + (this.hash2D(x, z) - 0.5) * (baseStep * 0.75);
+                const wz = z + (this.hash2D(z, x) - 0.5) * (baseStep * 0.75);
 
+                // Skip safe zones (roads, capital city perimeters)
                 const isSafe = window.RoadManager?.isSafeZone?.({ x: wx, z: wz }) || 
                                window.CapitalCityManager?.isInsideCapital?.(wx, wz);
                 if (isSafe) continue;
 
-                const gladeNoise = this.hash2D(wx * 0.003, wz * 0.003);
-                if (gladeNoise < this.calibration.clearingNoiseThreshold) continue;
-
                 const wy = this.getTerrainHeight(wx, wz);
                 if (!Number.isFinite(wy)) continue;
 
-                const ringRoll = this.hash2D(wx * 0.05, wz * 0.05);
+                const eco = this.getTerrainEcoProfile(wx, wz, wy);
+                const densityMode = this.getDensityMode(wx, wz, eco);
 
-                if (ringRoll < this.calibration.fairyRingProbability && window.RedwoodGenerator?.generateFairyRingCluster) {
-                    const ringCount = 4 + Math.floor(this.hash2D(wx, wz) * 4);
-                    const ringRadius = 8.0 + this.hash2D(wz, wx) * 6.0;
-
-                    const ringPoints = window.RedwoodGenerator.generateFairyRingCluster(
-                        wx, wz, ringCount, ringRadius, (rx, rz) => this.getTerrainHeight(rx, rz)
-                    );
-
-                    if (Array.isArray(ringPoints)) {
-                        ringPoints.forEach(pt => {
-                            addPoint(pt.prefabKey || 'Redwood_ANCIENT_0', {
-                                x: pt.x,
-                                y: pt.y,
-                                z: pt.z,
-                                rotation: pt.rotation || 0,
-                                scale: pt.scale || 1.0
-                            });
+                // 1. CLEARING RULE: Skip placement inside glades/clearings
+                if (densityMode === 'CLEARING') {
+                    // 15% chance to place young regrowth or fallen logs along clearing edges
+                    if (this.hash2D(wx * 0.5, wz * 0.5) < 0.15) {
+                        const varIdx = Math.floor(this.hash2D(wz, wx) * 4);
+                        addPoint(`Redwood_YOUNG_${varIdx}`, {
+                            x: wx, y: wy, z: wz,
+                            rotation: this.hash2D(wx, wz) * Math.PI * 2.0,
+                            scale: 0.7 + this.hash2D(wx, wz) * 0.3
                         });
                     }
-                } else {
-                    const ageRoll = this.hash2D(wx * 0.1, wz * 0.1);
-                    let ageState = 'MATURE';
+                    continue;
+                }
 
-                    if (ageRoll < this.calibration.ageDistribution.ANCIENT) {
-                        ageState = 'ANCIENT';
-                    } else if (ageRoll < this.calibration.ageDistribution.ANCIENT + this.calibration.ageDistribution.MATURE) {
-                        ageState = 'MATURE';
-                    } else if (ageRoll < 1.0 - this.calibration.ageDistribution.DYING) {
-                        ageState = 'YOUNG';
-                    } else {
-                        ageState = 'DYING';
+                // 2. DEADFALL SYSTEM: Rotting logs & collapsed ancient trunks
+                const deadfallRoll = this.hash2D(wx * 0.8, wz * 0.8);
+                const deadfallThreshold = (densityMode === 'RIPARIAN' || densityMode === 'DENSE_ANCIENT') ? 0.14 : 0.06;
+
+                if (deadfallRoll < deadfallThreshold) {
+                    addPoint('Redwood_Deadfall_Log', {
+                        x: wx,
+                        y: wy + 0.8,
+                        z: wz,
+                        rotation: this.hash2D(wx, wz) * Math.PI * 2.0,
+                        scale: 1.0 + this.hash2D(wz, wx) * 0.6
+                    });
+                    
+                    // Deadfall feeds young regrowth nearby
+                    if (this.hash2D(wz * 1.2, wx * 1.2) < 0.50) {
+                        const varIdx = Math.floor(this.hash2D(wx, wz) * 4);
+                        addPoint(`Redwood_YOUNG_${varIdx}`, {
+                            x: wx + (this.hash2D(wx, wz) - 0.5) * 6.0,
+                            y: wy,
+                            z: wz + (this.hash2D(wz, wx) - 0.5) * 6.0,
+                            rotation: this.hash2D(wz, wx) * Math.PI * 2.0,
+                            scale: 0.8 + this.hash2D(wx, wz) * 0.3
+                        });
+                    }
+                    continue;
+                }
+
+                // 3. ECOLOGICAL HIERARCHY EVALUATION
+                const championRoll = this.hash2D(wx * 0.01, wz * 0.01);
+                const ageRoll = this.hash2D(wx * 0.1, wz * 0.1);
+                let ageState = 'MATURE';
+
+                // LAYER A: CHAMPION TREES (0.35%)
+                if (championRoll < 0.0035 && eco.slope < 0.25) {
+                    ageState = 'COLOSSAL_ANCIENT';
+
+                    // LORE TREE SUBSET RULE: 0.05% of Champions designated as Lore Landmarks
+                    const loreRoll = this.hash3D(wx, wy, wz);
+                    if (loreRoll < 0.05) {
+                        const nameIdx = Math.floor(this.hash2D(wx * 3.1, wz * 3.1) * this.loreTreeNames.length);
+                        const loreName = this.loreTreeNames[nameIdx];
+                        const loreId = `lore_tree_${Math.floor(wx)}_${Math.floor(wz)}`;
+
+                        const loreData = {
+                            id: loreId,
+                            name: loreName,
+                            x: wx, y: wy, z: wz,
+                            description: `An ancient landmark tree known in Crow archives as ${loreName}.`,
+                            rumorText: `Travelers speak of ${loreName} standing deep in the ancient grove.`
+                        };
+
+                        this.loreTreeRegistry.set(loreId, loreData);
+                        console.log(`[LoreTree] World Landmark Spawned: "${loreName}" at (${Math.floor(wx)}, ${Math.floor(wz)})`);
                     }
 
-                    const varIdx = Math.floor(this.hash2D(wz * 0.3, wx * 0.3) * 4);
-                    const prefabKey = `Redwood_${ageState}_${varIdx}`;
-
-                    const scale = 0.85 + this.hash2D(wx * 0.7, wz * 0.7) * 0.35;
-                    const rotation = this.hash2D(wx, wz) * Math.PI * 2.0;
-
-                    addPoint(prefabKey, {
-                        x: wx,
-                        y: wy,
-                        z: wz,
-                        rotation: rotation,
-                        scale: scale
+                    // Register landmark titan for UI & mini-map tracking
+                    this.landmarkRegistry.set(`titan_${Math.floor(wx)}_${Math.floor(wz)}`, {
+                        x: wx, y: wy, z: wz, label: 'Colossal Redwood Titan'
                     });
+                }
+                // LAYER B: ANCIENT GROVES & COLOSSALS (5% - 20% based on density mode)
+                else if (densityMode === 'DENSE_ANCIENT' || densityMode === 'RIPARIAN') {
+                    if (ageRoll < 0.08) ageState = 'COLOSSAL_ANCIENT';
+                    else if (ageRoll < 0.35) ageState = 'ANCIENT';
+                    else if (ageRoll < 0.75) ageState = 'MATURE';
+                    else if (ageRoll < 0.90) ageState = 'YOUNG';
+                    else ageState = 'DYING';
+                }
+                // LAYER C: MOUNTAIN RIDGES (Wind-damaged, stunted, leaning, dying snags)
+                else if (densityMode === 'MOUNTAIN_RIDGE') {
+                    if (ageRoll < 0.25) ageState = 'DYING'; // High snag ratio on ridges
+                    else if (ageRoll < 0.65) ageState = 'MATURE';
+                    else ageState = 'YOUNG';
+                }
+                // LAYER D: STANDARD MIXED FOREST
+                else {
+                    if (ageRoll < 0.05) ageState = 'COLOSSAL_ANCIENT';
+                    else if (ageRoll < 0.22) ageState = 'ANCIENT';
+                    else if (ageRoll < 0.68) ageState = 'MATURE';
+                    else if (ageRoll < 0.88) ageState = 'YOUNG';
+                    else ageState = 'DYING';
+                }
+
+                const varIdx = Math.floor(this.hash2D(wz * 0.3, wx * 0.3) * 4);
+                const prefabKey = `Redwood_${ageState}_${varIdx}`;
+
+                const scale = 0.90 + this.hash2D(wx * 0.7, wz * 0.7) * 0.30;
+                const rotation = this.hash2D(wx, wz) * Math.PI * 2.0;
+
+                addPoint(prefabKey, {
+                    x: wx,
+                    y: wy,
+                    z: wz,
+                    rotation: rotation,
+                    scale: scale
+                });
+
+                // ANCIENT GROVE CATHEDRAL CLUSTERING: Spawns 4-8 secondary trees around Ancients
+                if ((ageState === 'ANCIENT' || ageState === 'COLOSSAL_ANCIENT') && eco.valleyMoisture > 0.40) {
+                    const clusterTrees = 3 + Math.floor(this.hash2D(wx * 2.0, wz * 2.0) * 5);
+                    for (let c = 0; c < clusterTrees; c++) {
+                        const cAngle = (c / clusterTrees) * Math.PI * 2.0 + this.hash2D(c, wx);
+                        const cDist = 8.0 + this.hash2D(c, wz) * 12.0;
+                        const cx = wx + Math.cos(cAngle) * cDist;
+                        const cz = wz + Math.sin(cAngle) * cDist;
+
+                        const cy = this.getTerrainHeight(cx, cz);
+                        if (!Number.isFinite(cy)) continue;
+
+                        const cAgeState = (c % 2 === 0) ? 'MATURE' : 'YOUNG';
+                        const cVarIdx = Math.floor(this.hash2D(cx, cz) * 4);
+
+                        addPoint(`Redwood_${cAgeState}_${cVarIdx}`, {
+                            x: cx,
+                            y: cy,
+                            z: cz,
+                            rotation: this.hash2D(cx, cz) * Math.PI * 2.0,
+                            scale: 0.85 + this.hash2D(cx, cz) * 0.30
+                        });
+                    }
                 }
             }
         }
@@ -270,6 +407,20 @@ export class BlockTerrainSystem {
         }
     }
 
+    /**
+     * Public API: Retrieves all discovered Lore Trees for Oracle Board & UI Rumors.
+     */
+    getLoreTrees() {
+        return Array.from(this.loreTreeRegistry.values());
+    }
+
+    /**
+     * Public API: Retrieves all landmark titans for map rendering.
+     */
+    getLandmarks() {
+        return Array.from(this.landmarkRegistry.values());
+    }
+
     clearAll() {
         for (const activeKey of Array.from(this.activeChunks)) {
             if (window.ForestRenderer?.clearChunkInstances) {
@@ -278,6 +429,8 @@ export class BlockTerrainSystem {
         }
         this.chunkVegetationMap.clear();
         this.activeChunks.clear();
+        this.loreTreeRegistry.clear();
+        this.landmarkRegistry.clear();
     }
 }
 
