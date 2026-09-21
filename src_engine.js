@@ -944,6 +944,11 @@ const ChunkManager = {
 
         const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
 
+        // Inject Volumetric Fog Shader
+        if (window.VolumetricFogSystem) {
+            window.VolumetricFogSystem.patchMaterial(mat);
+        }
+
     mat.onBeforeCompile = (shader) => {
             shader.vertexShader = shader.vertexShader.replace(
                 `#include <common>`,
