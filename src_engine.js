@@ -992,6 +992,9 @@ const ChunkManager = {
         }
         
         this.activeChunks.set(key, { mesh, body: groundBody, collider, lod });
+        if (window.RoadRenderer && window.GameCore?.scene) {
+    window.RoadRenderer.buildDecorationsForChunk(key, cx, cz, window.GameCore.scene);
+}
         
         if (isInsideAethelgard) {
             window.EventBus?.emit('CHUNK_GENERATED');
