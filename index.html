@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dark Forests: WebGL2 Modular Code Hub</title>
     
-    <!-- Fixes the 404 Favicon error -->
     <link rel="icon" href="data:,">
     
     <!-- Tailwind CSS for UI -->
@@ -106,23 +105,22 @@
                     <span class="px-2 py-1 bg-gray-800 rounded text-xs border border-amber-700/50 text-amber-300 block w-max ml-auto select-none pointer-events-none">B to Claim Camp</span>
                     <span class="px-2 py-1 bg-gray-800 rounded text-xs border border-cyan-700/50 text-cyan-300 block w-max ml-auto select-none pointer-events-none">P to Toggle Co-op Party Mode</span>
                     <span class="px-2 py-1 bg-gray-800 rounded text-xs border border-cyan-700/50 text-cyan-300 block w-max ml-auto select-none pointer-events-none">1 Follow  2 Hold  3 Guard  4 Attack  5 Retreat</span>
+                    <span class="px-2 py-1 bg-gray-800 rounded text-xs border border-emerald-700/50 text-emerald-400 block w-max ml-auto select-none pointer-events-none">Ctrl + F to Cycle Graphics Quality</span>
                     
-                    <!-- Component Triggers -->
                     <span id="btn-stats" class="px-2 py-1 bg-gray-800 rounded text-xs border border-yellow-700/50 text-yellow-500 hover:bg-yellow-900/30 cursor-pointer block w-max ml-auto transition-colors">C for Stats</span>
                     <span id="btn-inv" class="px-2 py-1 bg-gray-800 rounded text-xs border border-purple-700/50 text-purple-400 hover:bg-purple-900/30 cursor-pointer block w-max ml-auto transition-colors">I for Inventory</span>
                     <span id="btn-intel" class="px-2 py-1 bg-gray-800 rounded text-xs border border-blue-700/50 text-blue-400 hover:bg-blue-900/30 cursor-pointer block w-max ml-auto transition-colors">K for Intel</span>
                     <span id="btn-squad" class="px-2 py-1 bg-gray-800 rounded text-xs border border-cyan-700/50 text-cyan-400 hover:bg-cyan-900/30 cursor-pointer block w-max ml-auto transition-colors">G for Squad</span>
                     <span id="btn-map" class="px-2 py-1 bg-gray-800 rounded text-xs border border-indigo-700/50 text-indigo-400 hover:bg-indigo-900/30 cursor-pointer block w-max ml-auto transition-colors">M for Map</span>
                     
-                    <!-- Dev Tools -->
                     <span id="btn-intel-debug" class="px-2 py-1 bg-gray-800 rounded text-xs border border-red-700/50 text-red-400 hover:bg-red-900/30 cursor-pointer block w-max ml-auto transition-colors mt-2">F9 for Intel Debug</span>
-                    <span id="btn-asset" class="px-2 py-1 bg-gray-800 rounded text-xs border border-indigo-700/50 text-indigo-400 hover:bg-indigo-900/30 cursor-pointer block w-max ml-auto font-bold transition-colors shadow-[0_0_10px_rgba(99,102,241,0.2)]">U for Assets</span>
+                    <span id="btn-asset" class="px-2 py-1 bg-gray-800 rounded text-xs border border-indigo-700/50 text-indigo-400 hover:bg-indigo-900/30 cursor-pointer block w-max ml-auto font-bold transition-colors shadow-[0_0_10px_rgba(99,102,241,0.2)]">U for Assets & Quality</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- UI PANELS (Absolute Center/Sides) -->
+    <!-- UI PANELS -->
     <div id="stats-panel" class="absolute left-6 top-32 bottom-32 w-80 bg-gray-900/95 border border-gray-700 rounded-lg shadow-2xl p-6 hidden z-20 flex-col font-mono text-sm pointer-events-auto">
         <h2 class="text-xl font-bold text-white border-b border-gray-600 pb-2 mb-4 tracking-widest uppercase">Character Stats</h2>
         <div id="stats-container" class="space-y-4 overflow-y-auto flex-1 pr-2 custom-scrollbar"></div>
@@ -134,13 +132,11 @@
     <div id="intel-bag-panel" class="absolute right-1/2 translate-x-1/2 top-32 bottom-32 w-[600px] bg-gray-900/95 border border-blue-700 rounded-lg shadow-2xl p-6 hidden z-20 flex-col font-mono text-sm text-gray-300 pointer-events-auto backdrop-blur-md">
     </div>
 
-    <!-- SQUAD MANAGER -->
     <div id="squad-manager-panel" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-900/95 border border-cyan-700 rounded-lg p-5 shadow-2xl z-40 hidden flex-col w-[450px] backdrop-blur-md pointer-events-auto">
         <button data-action="close" class="absolute top-2 right-2 text-gray-500 hover:text-white font-bold">&times;</button>
         <div id="squad-manager-content"></div>
     </div>
 
-    <!-- FACTION MAP -->
     <div id="faction-map-panel" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-900/95 border border-indigo-700 rounded-lg p-5 shadow-2xl z-40 hidden flex-col w-[600px] h-[600px] backdrop-blur-md pointer-events-auto">
         <button data-action="close" class="absolute top-2 right-2 text-gray-500 hover:text-white font-bold">&times;</button>
         <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
@@ -164,10 +160,18 @@
                 <h2 class="text-2xl font-bold text-white tracking-widest uppercase flex items-center gap-2"><span class="text-indigo-500">📦</span> Asset Manager</h2>
                 <p class="text-[10px] text-gray-500 mt-1">Upload models, map VFX, set 1:1 Scale Biomes, and manage RPG Factions.</p>
             </div>
+            
+            <!-- GRAPHICS PRESET QUICK BUTTONS -->
+            <div class="flex items-center gap-1 bg-gray-900 border border-gray-800 p-1.5 rounded-lg">
+                <span class="text-[10px] text-gray-400 font-mono uppercase mr-1">Quality:</span>
+                <button onclick="window.RenderPipeline?.setQuality('low')" class="px-2 py-1 bg-red-950/80 hover:bg-red-900 text-red-400 text-[10px] rounded border border-red-800 font-bold transition-all">LOW</button>
+                <button onclick="window.RenderPipeline?.setQuality('medium')" class="px-2 py-1 bg-yellow-950/80 hover:bg-yellow-900 text-yellow-400 text-[10px] rounded border border-yellow-800 font-bold transition-all">MED</button>
+                <button onclick="window.RenderPipeline?.setQuality('high')" class="px-2 py-1 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-400 text-[10px] rounded border border-emerald-800 font-bold transition-all">HIGH</button>
+            </div>
+
             <button id="btn-close-asset" class="text-gray-500 hover:text-red-400 transition-colors text-xl font-bold px-2">&times;</button>
         </div>
         <div class="flex justify-between items-center p-4 bg-gray-900 border-b border-gray-800">
-            <!-- FULL RESTORED TABS LIST -->
             <div class="flex gap-2 flex-wrap" id="asset-tabs">
                 <button class="asset-tab active bg-indigo-600 text-white px-4 py-1.5 rounded text-xs font-bold transition-colors" data-tab="characters">Characters</button>
                 <button class="asset-tab bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-1.5 rounded text-xs transition-colors" data-tab="npcs">NPCs</button>
@@ -187,18 +191,13 @@
         <div id="asset-content" class="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-3 bg-[#0a0c10]"></div>
     </div>
 
-    <!-- OVERLAYS (Floating Texts / Investigation) -->
+    <!-- OVERLAYS -->
     <div id="intel-tags-layer" class="absolute inset-0 pointer-events-none z-30 overflow-hidden"></div>
     <div id="damage-overlay" class="absolute inset-0 pointer-events-none z-20 overflow-hidden"></div>
     
     <div id="investigation-tracker" class="hidden absolute top-24 left-1/2 -translate-x-1/2 bg-gray-900/95 border border-purple-500/50 px-8 py-2 rounded shadow-[0_0_20px_rgba(168,85,247,0.15)] backdrop-blur-md flex flex-col items-center pointer-events-none z-20">
         <span class="text-[8px] text-purple-400 font-bold uppercase tracking-widest border-b border-purple-900/50 pb-0.5 mb-1">Active Focus</span>
         <span id="inv-title" class="text-white text-[11px] font-bold text-center w-48 truncate">Title</span>
-    </div>
-
-    <div id="dnd-overlay" class="fixed inset-0 z-[100] hidden flex flex-col items-center justify-center bg-black/90 border-[16px] border-dashed border-green-500 backdrop-blur-md pointer-events-none transition-all">
-        <h1 class="text-6xl font-black text-green-400 tracking-widest uppercase mb-4" style="text-shadow: 0 0 20px #10b981;">Drop Asset Files Here</h1>
-        <p class="text-green-200 font-mono text-xl tracking-widest uppercase">Supports 3D Models & 2D Textures</p>
     </div>
 
     <script type="module" src="./src_main.js"></script>
