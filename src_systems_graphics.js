@@ -23,19 +23,19 @@ class RenderPipeline {
         this.renderer = renderer;
         this.camera = camera;
 
-        // --- 1. AAA Renderer Upgrades ---
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft, feathered shadows
+        // --- 1. AAA Renderer Settings ---
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Feathered soft shadows
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.25;
 
-        // --- 2. Core Lighting Setup ---
+        // --- 2. Lighting Setup ---
         this.ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
         scene.add(this.ambientLight);
 
         this.dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
         this.dirLight.position.set(20, 60, 20);
         this.dirLight.castShadow = true;
-        this.dirLight.shadow.mapSize.width = 2048; // High-res shadows
+        this.dirLight.shadow.mapSize.width = 2048;
         this.dirLight.shadow.mapSize.height = 2048;
         this.dirLight.shadow.camera.left = -150;
         this.dirLight.shadow.camera.right = 150;
@@ -44,13 +44,13 @@ class RenderPipeline {
         this.dirLight.shadow.bias = -0.0005;
         scene.add(this.dirLight);
 
-        // --- 3. Base Composer & Passes ---
+        // --- 3. Composer & Post-Processing Pipeline ---
         this.composer = new EffectComposer(renderer);
         this.worldPass = new RenderPass(scene, camera);
         this.pocketPass = new RenderPass(pocketScene, camera);
         this.composer.addPass(this.worldPass);
 
-        // --- 4. SSAO (Contact Shadows) ---
+        // --- 4. SSAO (Screen-Space Contact Shadows) ---
         this.passes.ssao = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
         this.passes.ssao.kernelRadius = 16;
         this.passes.ssao.minDistance = 0.001;
@@ -83,11 +83,10 @@ class RenderPipeline {
         this.composer.addPass(this.passes.colorTint);
 
         // --- 8. Cinematic Depth of Field (Bokeh) ---
-        // Keeps player focused while gently blurring distant basic shapes/LODs
         this.passes.bokeh = new BokehPass(scene, camera, {
-            focus: 15.0,        // Focal distance targeting the player camera radius
-            aperture: 0.00005,  // Lens width
-            maxblur: 0.012,     // Max background blur cap
+            focus: 15.0,
+            aperture: 0.00005,
+            maxblur: 0.012,
             width: window.innerWidth,
             height: window.innerHeight
         });
@@ -112,6 +111,12 @@ class RenderPipeline {
     }
 
     render() {
+        if (window.BlockTerrainManager) {
+            window.BlockTerrainManager.updateTime(performance.now() / 1000);
+            if (window.EngineParams?.isRaining !== undefined) {
+                window.BlockTerrainManager.setWeatherRain(window.EngineParams.isRaining ? 1.0 : 0.0);
+            }
+        }
         if (this.composer) this.composer.render();
     }
 
@@ -166,5 +171,4 @@ class RenderPipeline {
     }
 }
 
-// Expose globally
 window.RenderPipeline = new RenderPipeline();
