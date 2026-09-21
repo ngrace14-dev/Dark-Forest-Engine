@@ -4,10 +4,17 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import RAPIER from 'rapier';
 import alea from 'alea';
 
-// Your new AAA system imports
+// Your AAA system imports
 import { WetlandsSystem } from './src_systems_wetlands.js';
 import { MountainSystem } from './src_systems_mountains.js';
 import { DunesSystem } from './src_systems_dunes.js';
+
+// Redwood Ecosystem imports
+import RedwoodGenerator from './src_generators_redwood.js';
+import ForestRenderer from './src_systems_forest_renderer.js';
+import ForestImpostorSystem from './src_systems_forest_impostors.js';
+import VolumetricFogSystem from './src_systems_volumetric_fog.js';
+import BlockTerrainSystem from './src_systems_block_terrain.js';
 
 window.THREE = THREE;
 window.SkeletonUtils = SkeletonUtils;
@@ -238,7 +245,6 @@ function updateEntities(delta) {
         try {
             const eTrans = entity.body.translation();
             
-            // [NEW] VOID CATCHER FOR NPCs
             const groundY = safeGetTerrainHeight(eTrans.x, eTrans.z);
             if (eTrans.y < groundY - 2.0) {
                 entity.body.setTranslation({ x: eTrans.x, y: groundY + 3.0, z: eTrans.z }, true);
@@ -435,13 +441,11 @@ function updatePlayerMovement(delta) {
         return;
     }
 
-    // [NEW] VOID CATCHER: Prevent falling through unloaded terrain chunks
     const groundY = safeGetTerrainHeight(p.x, p.z);
     if (p.y < groundY - 2.0) { 
-        // Player fell through! Snap them back to the surface and kill downward momentum.
         window.GameCore.playerObj.body.setTranslation({ x: p.x, y: groundY + 5.0, z: p.z }, true);
         window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        p.y = groundY + 5.0; // Update local reference
+        p.y = groundY + 5.0;
     }
 
     const pDef = window.GameCore.playerObj.def || { height: 2 };
@@ -788,7 +792,7 @@ function fixedUpdateLogic(delta) {
         window.GrassSystem.update(delta, activePos);
     }
 
-    // NEW HOOKS: WETLANDS, MOUNTAINS, AND DUNES SYSTEMS
+    // AAA SYSTEM UPDATES
     if (window.GameCore?.wetlandsSystem && window.GameCore.camera) {
         window.GameCore.wetlandsSystem.update(delta, window.GameCore.camera);
     }
@@ -803,6 +807,12 @@ function fixedUpdateLogic(delta) {
             window.GameCore.camera, 
             window.EngineParams?.worldDay || 0
         );
+    }
+
+    // REDWOOD ECOSYSTEM UPDATES
+    if (window.BlockTerrainSystem && window.GameCore?.playerObj?.visual) {
+        const pPos = window.GameCore.playerObj.visual.position;
+        window.BlockTerrainSystem.updateStreaming(pPos.x, pPos.z, 6);
     }
 
     if (window.ForestImpostorSystem) {
@@ -917,7 +927,6 @@ const ChunkManager = {
         const isInsideAethelgard = window.CapitalCityManager?.isInsideCapital?.(chunkX, chunkZ) || false;
         const localRoadPoints = window.RoadManager?.getRoadPointsNear?.(cx, cz) || [];
 
-        // Reserve chunk slot while Web Worker processes calculation off main thread
         this.activeChunks.set(key, { mesh: null, body: null, collider: null, lod });
 
         window.TerrainWorkerPool.requestChunkData(
@@ -928,7 +937,6 @@ const ChunkManager = {
                 const segments = lod === 'A' ? 30 : (lod === 'B' ? 10 : 2);
                 const geo = new THREE.BufferGeometry();
 
-                // Zero-copy assignment of transferred ArrayBuffers
                 geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
                 geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
                 geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -1036,15 +1044,43 @@ const ChunkManager = {
                 const chunkData = window.ForestManager?.generateChunk?.(cx, cz) || { tierA: [], tierB: [] };
 
                 if (window.ForestRenderer?.setChunkInstances) {
-                    const redwoodPoints = [];
                     const bushPoints = [];
 
-                    chunkData.tierA.forEach(point => {
-                        const px = point.x;
-                        const pz = point.z;
-                        const py = safeGetTerrainHeight(px, pz);
-                        redwoodPoints.push({ x: px, y: py, z: pz, scale: 0.8 + Math.random() * 0.4, rotation: Math.random() * Math.PI * 2 });
-                    });
+                    if (chunkData.tierA && chunkData.tierA.length > 0) {
+                        if (window.RedwoodGenerator?.isInitialized) {
+                            const pointsByArchetype = new Map();
+                            const ageStates = ['ANCIENT', 'MATURE', 'YOUNG', 'DYING'];
+
+                            chunkData.tierA.forEach((point, idx) => {
+                                const px = point.x;
+                                const pz = point.z;
+                                const py = safeGetTerrainHeight(px, pz);
+                                const ageState = ageStates[idx % 4];
+                                const varIdx = idx % 4;
+                                const archKey = `Redwood_${ageState}_${varIdx}`;
+
+                                if (!pointsByArchetype.has(archKey)) pointsByArchetype.set(archKey, []);
+                                pointsByArchetype.get(archKey).push({
+                                    x: px, y: py, z: pz,
+                                    scale: 0.85 + Math.random() * 0.4,
+                                    rotation: Math.random() * Math.PI * 2
+                                });
+                            });
+
+                            for (const [archKey, pts] of pointsByArchetype.entries()) {
+                                window.ForestRenderer.setChunkInstances(key, archKey, pts);
+                            }
+                        } else {
+                            const redwoodPoints = chunkData.tierA.map(point => ({
+                                x: point.x,
+                                y: safeGetTerrainHeight(point.x, point.z),
+                                z: point.z,
+                                scale: 0.8 + Math.random() * 0.4,
+                                rotation: Math.random() * Math.PI * 2
+                            }));
+                            window.ForestRenderer.setChunkInstances(key, 'Redwood Tree', redwoodPoints);
+                        }
+                    }
 
                     chunkData.tierB.forEach(point => {
                         const px = point.x;
@@ -1053,12 +1089,12 @@ const ChunkManager = {
                         bushPoints.push({ x: px, y: py, z: pz, scale: 0.7 + Math.random() * 0.5, rotation: Math.random() * Math.PI * 2 });
                     });
 
-                    window.ForestRenderer.setChunkInstances(key, 'Redwood Tree', redwoodPoints);
                     window.ForestRenderer.setChunkInstances(key, 'Bramble Bush', bushPoints);
 
-                    if (lod === 'A' && window.GameCore?.world) {
-                        redwoodPoints.forEach(pt => {
-                            const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(pt.x, pt.y + 15.0, pt.z));
+                    if (lod === 'A' && window.GameCore?.world && chunkData.tierA) {
+                        chunkData.tierA.forEach(pt => {
+                            const py = safeGetTerrainHeight(pt.x, pt.z);
+                            const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(pt.x, py + 15.0, pt.z));
                             window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(15.0, 1.8), body);
                             if (!this.activeChunks.get(key).instanceBodies) this.activeChunks.get(key).instanceBodies = [];
                             this.activeChunks.get(key).instanceBodies.push(body);
@@ -1153,6 +1189,19 @@ function getVisualMesh(def) {
         meshGroup.add(clone);
 
     } else if (def.type === 'redwood' || def.name === 'Redwood Tree') {
+        if (window.RedwoodGenerator?.isInitialized) {
+            const geo = window.RedwoodGenerator.getArchetype('ANCIENT', 0);
+            const mat = window.ForestRenderer?.materials.get('Redwood_ANCIENT_0') || new THREE.MeshStandardMaterial({ color: 0x3d2015 });
+            if (geo) {
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                meshGroup.add(mesh);
+                return meshGroup;
+            }
+        }
+
+        // Fallback if archetype is not initialized yet
         const trunkHeight = 20.0;
         const trunkRadiusBottom = 1.8;
         const trunkRadiusTop = 1.1;
@@ -1170,7 +1219,7 @@ function getVisualMesh(def) {
         meshGroup.add(trunkMesh);
 
         const coneGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 8);
-        const coneMat = new MeshStandardMaterial({ color: 0x173820, roughness: 0.8 });
+        const coneMat = new THREE.MeshStandardMaterial({ color: 0x173820, roughness: 0.8 });
         const coneMesh = new THREE.Mesh(coneGeo, coneMat);
         coneMesh.position.y = trunkHeight + (coneHeight / 2) - overlap;
         coneMesh.castShadow = true;
@@ -1887,6 +1936,24 @@ async function bootEngine() {
         window.GameCore.scene.background = new THREE.Color(0x040608);
         window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 2000000); 
 
+        // INITIALIZE REDWOOD WORKER ARCHETYPES & FOREST SYSTEM
+        if (window.RedwoodGenerator?.init) {
+            try {
+                await window.RedwoodGenerator.init('src_workers_tree_worker.js');
+            } catch (err) {
+                console.warn('[Engine] RedwoodGenerator worker fallback:', err);
+            }
+        }
+
+        if (window.ForestRenderer) {
+            await window.ForestRenderer.ensureAssets();
+            window.GameCore.scene.add(window.ForestRenderer.group);
+        }
+
+        if (window.ForestImpostorSystem) {
+            window.ForestImpostorSystem.init(window.GameCore.scene);
+        }
+
         // INITIALIZE NEW SYSTEMS
         if (WetlandsSystem) {
             window.GameCore.wetlandsSystem = new WetlandsSystem(window.GameCore, 300000);
@@ -1923,10 +1990,6 @@ async function bootEngine() {
         window.GameCore.pocketScene = new THREE.Scene();
         window.GameCore.pocketScene.background = new THREE.Color(0x020617);
         
-        if (window.ForestRenderer) {
-            window.ForestRenderer.ensureAssets();
-            window.GameCore.scene.add(window.ForestRenderer.group);
-        }
         if (window.BillboardManager) {
             window.GameCore.scene.add(window.BillboardManager.group);
         }
