@@ -206,4 +206,5 @@ class ForestRenderer {
     }
 }
 
+// Bind to global scope so src_engine.js can use it
 window.ForestRenderer = new ForestRenderer();
