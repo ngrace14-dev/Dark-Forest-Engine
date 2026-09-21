@@ -164,8 +164,18 @@ function updatePlayerStats(delta) {
     window.EngineParams.isPlayerSafe = false; 
     window.EngineParams.isPlayerHidden = false;
     const staminaMultiplier = 1 + (window.GameState.forestBlessing?.staminaRegen || 0);
-    window.GameState.pStats.stamina = Math.min(window.GameState.pStats.maxStamina, window.GameState.pStats.stamina + (window.Input.isBlocking ? 3 : 12) * staminaMultiplier * delta);
-    if (performance.now() >= window.GameState.pStats.guardBrokenUntil) window.GameState.pStats.poise = Math.min(window.GameState.pStats.maxPoise, window.GameState.pStats.poise + 10 * delta);
+    
+    // Regenerate stamina when not sprinting or blocking
+    if (!window.Input.isSprinting && !window.Input.isBlocking) {
+        window.GameState.pStats.stamina = Math.min(
+            window.GameState.pStats.maxStamina, 
+            window.GameState.pStats.stamina + 12 * staminaMultiplier * delta
+        );
+    }
+
+    if (performance.now() >= window.GameState.pStats.guardBrokenUntil) {
+        window.GameState.pStats.poise = Math.min(window.GameState.pStats.maxPoise, window.GameState.pStats.poise + 10 * delta);
+    }
     
     window.GameState.statusEffects = window.GameState.statusEffects.filter(effect => {
         effect.remaining -= delta; effect.tickTimer -= delta;
@@ -199,7 +209,6 @@ function updateEntities(delta) {
         try {
             const eTrans = entity.body.translation();
             const totalHeight = entity.def?.height || 2.0;
-            // Align feet to exact ground surface (Bottom of capsule collider)
             entity.visual.position.set(eTrans.x, eTrans.y - (totalHeight / 2), eTrans.z);
         } catch (e) {
             entity.body = null;
@@ -350,7 +359,6 @@ function updatePlayerMovement(delta) {
 
     const pDef = window.GameCore.playerObj.def || { height: 2 };
     const totalHeight = pDef.height || 2.0;
-    // Align feet to exact ground surface (Bottom of capsule collider)
     window.GameCore.playerObj.visual.position.set(p.x, p.y - (totalHeight / 2), p.z);
 
     const moveDir = _v1.set(0, 0, 0); 
@@ -369,6 +377,7 @@ function updatePlayerMovement(delta) {
     if (window.Input.isMoving) {
         moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle || Math.PI); 
         
+        // BASE WALK SPEED: 1 mile (1609.344m) / 15 minutes (900s) = ~1.7882 m/s
         const BASE_STARTING_SPEED = 1609.344 / 900.0; 
         const athleticsLvl = window.GameState.pStats?.athletics?.level || 0;
         const athleticsBonus = window.GameCore.getBuffBonus?.('athletics') || 0;
@@ -376,33 +385,31 @@ function updatePlayerMovement(delta) {
         const speedMultiplier = 1.0 + (athleticsLvl * 0.05) + (athleticsBonus * 0.05);
         let maxSpeed = BASE_STARTING_SPEED * speedMultiplier;
 
+        // SPACEBAR SPRINTING (Holding Space + Moving + Has Stamina)
+        const isSpaceHeld = window.Input.keys[' '];
+        const canSprint = isSpaceHeld && window.GameState.pStats.stamina > 0 && !window.Input.isBlocking;
+        window.Input.isSprinting = canSprint;
+
         if (window.Input.isBlocking) {
             maxSpeed *= 0.3; 
             window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 8 * delta);
+        } else if (window.Input.isSprinting) {
+            maxSpeed *= 1.75; // 75% speed boost while sprinting
+            window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 15 * delta); // 15 stamina/sec cost
+            window.GameCore.addXP?.('athletics', 0.25 * delta);
         } else {
-            window.GameCore.addXP?.('athletics', 0.1 * delta); 
-            if (window.Input.keys[' '] && window.Input.dashTimer <= 0 && window.GameState.pStats.stamina >= 25) { 
-                window.GameState.pStats.stamina -= 25;
-                window.Input.dashTimer = Math.max(0.25, 2.0 - (((window.GameState.pStats?.dodge?.level || 0) + (window.GameCore.getBuffBonus?.('dodge') || 0)) * 0.05)); 
-                window.Input.isDashing = true; 
-                window.GameCore.addXP?.('dodge', 15); 
-                window.GameCore.playerObj.body.applyImpulse(_v2.set(moveDir.x * 12, 0, moveDir.z * 12), true);
-                playEntityAnimation(window.GameCore.playerObj, 'dash');
-                setTimeout(() => window.Input.isDashing = false, 200); 
-            }
+            window.GameCore.addXP?.('athletics', 0.05 * delta); 
         }
 
         maxSpeed *= (window.GameCore.getCombatInjuryMultiplier?.() || 1.0);
 
-        if (!window.Input.isDashing) {
-            window.GameCore.playerObj.body.setLinvel({
-                x: moveDir.x * maxSpeed,
-                y: currentVel.y,
-                z: moveDir.z * maxSpeed
-            }, true);
-        }
+        window.GameCore.playerObj.body.setLinvel({
+            x: moveDir.x * maxSpeed,
+            y: currentVel.y,
+            z: moveDir.z * maxSpeed
+        }, true);
 
-        if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
+        if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
             if (window.Input.isBlocking) {
                 playEntityAnimation(window.GameCore.playerObj, 'block');
             } else {
@@ -416,7 +423,8 @@ function updatePlayerMovement(delta) {
                 playEntityAnimation(window.GameCore.playerObj, 'walk'); 
             }
         }
-    } else if (!window.Input.isAttacking && !window.Input.isDashing && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
+    } else if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
+        window.Input.isSprinting = false;
         window.GameCore.playerObj.body.setLinvel({
             x: currentVel.x * 0.8,
             y: currentVel.y,
@@ -430,7 +438,6 @@ function updatePlayerMovement(delta) {
         }
     }
 
-    if (window.Input.dashTimer > 0) window.Input.dashTimer -= delta; 
     if (window.Input.attackCooldown > 0) window.Input.attackCooldown -= delta; 
     else window.Input.isAttacking = false;
 }
@@ -444,7 +451,7 @@ function performAttack(isHeavy = false) {
     if (window.Input.isBlocking || window.Input.isAttacking) return; 
     if (window.GameCore.playerObj.currentAnimState === 'hit' || window.GameCore.playerObj.currentAnimState === 'die') return;
     
-    const isDashStrike = !isHeavy && window.Input.isDashing;
+    const isDashStrike = !isHeavy && window.Input.isSprinting;
     
     const profile = isHeavy ? 
         { stamina: 35, cooldown: 1.2, reach: 4.5, radius: 1.5, angle: Math.PI * 0.8, multiplier: 2.2, poise: 2.5, windup: 0.15, duration: 0.35 } : 
