@@ -3,6 +3,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import RAPIER from 'rapier';
 import alea from 'alea';
+import { WetlandsSystem } from './src_systems_wetlands.js';
 
 window.THREE = THREE;
 window.SkeletonUtils = SkeletonUtils;
@@ -756,7 +757,18 @@ function fixedUpdateLogic(delta) {
         if (!window.GrassSystem.initialized && window.GameCore?.scene) {
             window.GrassSystem.init(window.GameCore.scene);
         }
-        window.GrassSystem.update(delta);
+        
+        const activePos = [];
+        if (window.GameCore.playerObj?.visual) {
+            activePos.push(window.GameCore.playerObj.visual.position);
+        }
+        
+        window.GrassSystem.update(delta, activePos);
+    }
+
+    // NEW WETLANDS HOOK
+    if (window.GameCore?.wetlandsSystem && window.GameCore.camera) {
+        window.GameCore.wetlandsSystem.update(delta, window.GameCore.camera);
     }
 
     if (window.ForestImpostorSystem) {
@@ -1841,6 +1853,12 @@ async function bootEngine() {
         window.GameCore.scene.background = new THREE.Color(0x040608);
         window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 2000000); 
 
+        // INITIALIZE NEW SYSTEMS
+        if (window.WetlandsSystem) {
+            window.GameCore.wetlandsSystem = new window.WetlandsSystem(window.GameCore, 300000);
+            window.GameCore.wetlandsSystem.spawnWetlandsChunk(window.GameCore.scene, 0, 0, 0.0);
+        }
+
         initLightPool(window.GameCore.scene);
 
         renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" }); 
@@ -2064,5 +2082,3 @@ window.addEventListener('DOMContentLoaded', () => {
         window.EventBus?.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
     }, { once: true }); 
 });
-
-bootEngine();
