@@ -357,7 +357,7 @@ function updatePlayerMovement(delta) {
     if (window.Input.isMoving) {
         moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle || Math.PI); 
         
-        // RECALIBRATED 15-MINUTE MILE BASE SPEED: 1 mile (1609.344 meters) / 15 minutes (900 seconds) = ~1.7882 m/s
+        // CALIBRATED 15-MINUTE MILE BASE SPEED: ~1.7882 m/s
         const BASE_STARTING_SPEED = 1609.344 / 900.0; 
         
         const athleticsLvl = window.GameState.pStats?.athletics?.level || 0;
@@ -426,7 +426,7 @@ function updatePlayerMovement(delta) {
 }
 
 // ==========================================
-// RECONSTRUCTED COMBAT ENGINE
+// COMBAT ENGINE & EVENT LISTENERS
 // ==========================================
 
 function performAttack(isHeavy = false) {
@@ -590,6 +590,324 @@ function updateCombatHitboxes(delta) {
             }
         }
     }
+}
+
+// RESTORED EVENT BUS LISTENERS
+window.EventBus.on('PRIMARY_CLICK_DOWN', () => { if(window.Input.attackCooldown <= 0) performAttack(); });
+window.EventBus.on('SECONDARY_CLICK_DOWN', () => { if(window.Input.attackCooldown <= 0) performAttack(true); });
+window.EventBus.on('GUARDBREAKER', performGuardbreaker);
+window.EventBus.on('TOGGLE_STEALTH', () => {
+    if (!window.GameCore.playerObj) return;
+    window.Input.isStealth = !window.Input.isStealth;
+    
+    const player = window.GameCore.playerObj;
+    if (window.Input.isStealth) {
+        window.EventBus.emit('UI_LOG', '[STEALTH] You blend into the surroundings.');
+        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'STEALTH', pos: player.visual.position, color: '#94a3b8' });
+        
+        if (player.body) {
+            const pPos = player.body.translation();
+            const biomeKey = window.WorldGenerator.getBiome(pPos.x, pPos.z);
+            const biomeColor = window.WorldGenConfig.biomes[biomeKey].color;
+            
+            player.visual.traverse(child => {
+                if (child.isMesh) {
+                    child.userData.originalColor = child.material.color.clone();
+                    child.material.color.set(biomeColor);
+                    child.material.transparent = true;
+                    child.material.opacity = 0.5;
+                }
+            });
+        }
+    } else {
+        window.EventBus.emit('UI_LOG', '[STEALTH] You reveal yourself.');
+        player.visual.traverse(child => {
+            if (child.isMesh && child.userData.originalColor) {
+                child.material.color.copy(child.userData.originalColor);
+                child.material.opacity = 1.0;
+            }
+        });
+    }
+});
+window.EventBus.on('VOID_RUNE_SHOT', () => {
+    if (window.Input.runeShotCooldown > 0 || window.Input.isBlocking || !Object.values(window.GameState.inventory.runes).includes('voidward_rune')) return;
+    if (window.GameState.pStats.stamina < 20 || !window.GameCore.playerObj.visual) { window.EventBus.emit('UI_LOG', 'A Voidward Rune and 20 stamina are required.'); return; }
+    const player = window.GameCore.playerObj;
+    const direction = new THREE.Vector3(0, 0, 1).applyQuaternion(player.visual.quaternion).normalize();
+    window.GameState.pStats.stamina -= 20;
+    window.Input.runeShotCooldown = 3;
+    window.VFXManager.spawnProjectile({ position: player.visual.position.clone().add(new THREE.Vector3(0, 1, 0)).addScaledVector(direction, 0.9), direction, damage: 22 + window.GameCore.getBuffBonus('meleeAtt'), damageType: 'void', speed: 16, range: 20, color: '#a855f7', owner: 'player' });
+    window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'VOID SHOT', pos: player.visual.position, color: '#a855f7' });
+    window.EventBus.emit('UI_UPDATE_HUD');
+});
+window.EventBus.on('FIRE_RUNE_SHOT', () => {
+    if (window.Input.fireShotCooldown > 0 || window.Input.isBlocking || !Object.values(window.GameState.inventory.runes).includes('ember_rune')) return;
+    if (window.GameState.pStats.stamina < 25 || !window.GameCore.playerObj.visual) { window.EventBus.emit('UI_LOG', 'An Ember Rune and 25 stamina are required.'); return; }
+    const player = window.GameCore.playerObj;
+    const direction = new THREE.Vector3(0, 0, 1).applyQuaternion(player.visual.quaternion).normalize();
+    window.GameState.pStats.stamina -= 25;
+    window.Input.fireShotCooldown = 4;
+    window.VFXManager.spawnProjectile({ position: player.visual.position.clone().add(new THREE.Vector3(0, 1, 0)).addScaledVector(direction, 0.9), direction, damage: 28 + window.GameCore.getBuffBonus('meleeAtt'), damageType: 'fire', speed: 14, range: 18, color: '#fb923c', owner: 'player', statusEffect: { type: 'burning', duration: 3, tickDamage: 2 } });
+    window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'FIRE SHOT', pos: player.visual.position, color: '#fb923c' });
+    window.EventBus.emit('UI_UPDATE_HUD');
+});
+window.EventBus.on('PLAYER_PROJECTILE_HIT', ({ target, damage, damageType, position, statusEffect }) => {
+    const actualDamage = Math.max(1, damage - (target.def.armor || 0));
+    target.hp -= actualDamage;
+    target.poise = Math.max(0, target.poise - actualDamage);
+    window.EventBus.emit('ENTITY_DAMAGED', { damage: actualDamage, position, isPlayer: false });
+    window.EventBus.emit('SPAWN_HIT_VFX', { type: damageType === 'fire' ? 'Fire' : 'Void', pos: position });
+    if (statusEffect) {
+        target.statusEffects = target.statusEffects || [];
+        const activeEffect = target.statusEffects.find(effect => effect.type === statusEffect.type);
+        if (activeEffect) activeEffect.remaining = Math.max(activeEffect.remaining, statusEffect.duration);
+        else target.statusEffects.push({ ...statusEffect, remaining: statusEffect.duration, tickTimer: 1 });
+    }
+    if (target.hp <= 0) {
+        playEntityAnimation(target, 'die');
+        window.AdventurerManager?.markDefeated(target);
+        spawnGroundLoot(target.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', target.visual.position);
+        awardMonsterKill(target);
+        window.GameState.inventory.gold += target.def.faction === 'monster' ? 10 : 50;
+        window.EventBus.emit('UI_UPDATE_HUD');
+        setTimeout(() => {
+            if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(target.id);
+            window.GameCore.releaseEntityIndex(target.memoryIndex);
+            if (target.visual) window.GameCore.scene.remove(target.visual);
+            if (target.body) {
+                window.GameCore.world.removeRigidBody(target.body);
+                target.body = null;
+            }
+            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => entity.id !== target.id);
+        }, 2000);
+    } else if (target.poise <= 0) {
+        target.poise = target.maxPoise;
+        target.staggeredUntil = performance.now() + 800;
+        playEntityAnimation(target, 'hit');
+        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'STAGGERED', pos: target.visual.position, color: '#fbbf24' });
+    } else {
+        playEntityAnimation(target, 'hit');
+    }
+});
+window.EventBus.on('SPAWN_HIT_VFX', ({type, pos}) => window.VFXManager.spawnHit(type, pos));
+window.EventBus.on('SPAWN_INVASION', () => { const p = window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : new THREE.Vector3(); for(let i=0; i<3; i++) instantiatePrefab('Ghoul', p.x + (Math.random()-0.5)*15, window.WorldGenerator.getTerrainHeight(p.x, p.z), p.z + (Math.random()-0.5)*15); window.EventBus.emit('UI_LOG', "Ghoul Invasion Spawned!"); });
+window.EventBus.on('SPAWN_BLIGHT', () => {
+    if (!window.GameCore.playerObj) return; const p = window.GameCore.playerObj.visual.position; const pts = window.RoadManager.getRoadPointsNear(Math.floor(p.x/60), Math.floor(p.z/60));
+        if (pts.length > 0) { const pt = pts[Math.floor(Math.random() * pts.length)]; const root = instantiatePrefab('Blight Root', pt.x, window.WorldGenerator.getTerrainHeight(pt.x, pt.z), pt.z, 'persistent'); if (root) { root.hp = 150; window.EventBus.emit('UI_LOG', "A Blight Root has corrupted a nearby road!"); } } 
+ 
+    else window.EventBus.emit('UI_LOG', "No roads nearby to corrupt!");
+});
+window.EventBus.on('CLEAR_MAP', () => { 
+    window.GameCore.activeEntities.forEach(en => { 
+        if(en.def.faction === 'player') return; 
+        if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(en.id);
+        window.GameCore.releaseEntityIndex(en.memoryIndex); 
+        if (en.visual) window.GameCore.scene.remove(en.visual);
+        if (en.body) {
+            window.GameCore.world.removeRigidBody(en.body); 
+            en.body = null;
+        }
+    }); 
+    window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => en.def.faction === 'player'); 
+    window.GameState.questBoard = []; window.EventBus.emit('UI_LOG', "World Entities Cleared."); 
+});
+window.EventBus.on('CLAIM_PLAYER_CAMP', () => {
+    const base = window.GameState.base;
+    if (base.owned || !window.GameCore.playerObj) {
+        window.EventBus.emit('UI_LOG', base.owned ? 'You already control a camp.' : 'No valid camp location.');
+        return;
+    }
+    const pack = window.GameState.inventory.backpack;
+    if (pack.filter(itemId => itemId === 'wood').length < 3 || pack.filter(itemId => itemId === 'stone').length < 2) {
+        window.EventBus.emit('UI_LOG', 'Claiming a camp requires 3 timber and 2 stone.');
+        return;
+    }
+    const playerPosition = window.GameCore.playerObj.visual.position;
+    if (window.EngineParams.isPlayerSafe || window.RoadManager.isVillageProtected(playerPosition)) {
+        window.EventBus.emit('UI_LOG', 'Claim camps away from settlements and protected paths.');
+        return;
+    }
+    let woodNeeded = 3; let stoneNeeded = 2;
+    window.GameState.inventory.backpack = pack.filter(itemId => {
+        if (itemId === 'wood' && woodNeeded > 0) { woodNeeded--; return false; }
+        if (itemId === 'stone' && stoneNeeded > 0) { stoneNeeded--; return false; }
+        return true;
+    });
+    const camp = instantiatePrefab('Iron Fire Pit', playerPosition.x, window.WorldGenerator.getTerrainHeight(playerPosition.x, playerPosition.z), playerPosition.z, 'persistent');
+    if (!camp) return;
+    camp.playerBase = true;
+    base.owned = true;
+    base.position = { x: playerPosition.x, z: playerPosition.z };
+    base.structures.push({ prefab: 'Iron Fire Pit', x: playerPosition.x, z: playerPosition.z });
+    window.EventBus.emit('UI_LOG', 'Wayfarer Camp claimed. The fire marks your territory.');
+    window.EventBus.emit('RENDER_INVENTORY');
+});
+window.EventBus.on('BUILD_BASE_STRUCTURE', prefab => {
+    const base = window.GameState.base;
+    const blueprints = { 'Camp Storage Cache': { wood: 5, stone: 2 }, 'Camp Farm Plot': { wood: 4, stone: 1 }, 'Rune Tower': { wood: 12, stone: 10, research: 5 } };
+    const cost = blueprints[prefab];
+    if (!base.owned || !cost) return;
+    if ((cost.research && (base.researchPoints || 0) < cost.research) || Object.entries(cost).filter(([resource]) => resource !== 'research').some(([resource, amount]) => base.storage.filter(itemId => itemId === resource).length < amount)) {
+        window.EventBus.emit('UI_LOG', `Camp storage lacks materials for ${prefab}.`);
+        return;
+    }
+    Object.entries(cost).filter(([resource]) => resource !== 'research').forEach(([resource, amount]) => {
+        for (let index = 0; index < amount; index++) base.storage.splice(base.storage.indexOf(resource), 1);
+    });
+    if (cost.research) base.researchPoints -= cost.research;
+    const buildIndex = base.structures.length;
+    const x = base.position.x + 4 + (buildIndex % 3) * 4; const z = base.position.z + Math.floor(buildIndex / 3) * 4;
+    const entity = instantiatePrefab(prefab, x, window.WorldGenerator.getTerrainHeight(x, z), z, 'persistent');
+    if (!entity) return;
+    entity.playerBase = true;
+    base.structures.push({ prefab, x, z });
+        if (prefab === 'Camp Farm Plot') base.farms.push({ x, z });
+    if (prefab === 'Rune Tower') base.wardRadius = 30;
+    
+    window.CareerManager?.addXP('builder', 50);
+    
+    window.EventBus.emit('UI_LOG', `[CAMP] Built ${prefab}.`);
+});
+window.EventBus.on('WORLD_REGENERATE', () => {
+    window.EventBus.emit('CLEAR_MAP'); const keys = Array.from(ChunkManager.activeChunks.keys()); keys.forEach(k => ChunkManager.unloadChunk(k)); ChunkManager.currentChunkX = null; 
+    window.currentPrng = alea(window.EngineParams?.worldSeed ?? 1337); window.currentNoise2D = window.createNoise2D(window.currentPrng);
+    if (window.GameCore.playerObj && window.GameCore.playerObj.body) { 
+        ChunkManager.forceUpdatePosition(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, 0, window.GameCore.playerObj.visual.position.z));
+        const vy = window.WorldGenerator.getTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 5.0; 
+        window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true);
+        window.GameCore.playerObj.body.setAngvel({x:0, y:0, z:0}, true);
+        window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); 
+        spawnPartyMembers(); syncCaravanAgents(); syncPlayerBase(); 
+    }
+    window.EventBus.emit('UI_LOG', `World Math Regenerated with Seed: ${window.EngineParams.worldSeed}`);
+});
+
+function punishExposedActors() {
+    const player = window.GameCore.playerObj;
+    const playerSafe = player && (window.RoadManager.isSafeZone(player.visual.position) || window.RoadManager.isVillageProtected(player.visual.position));
+    const destination = () => window.RoadManager.getRandomPathPoint() || { x: 0, z: 0 };
+    
+    if (player && player.body && !playerSafe) {
+        if (window.GameCore.getForestLuck() > 0 && Math.random() < (window.GameState.forestBlessing.teleportLuck || 0)) {
+            window.EventBus.emit('UI_LOG', '[THE CROW] The woods reach for you, but the landing bends away.');
+        } else {
+            const point = destination(); 
+            ChunkManager.forceUpdatePosition(new THREE.Vector3(point.x, 0, point.z));
+            const y = window.WorldGenerator.getTerrainHeight(point.x, point.z) + 5.0;
+            
+            player.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+            player.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+            player.body.setTranslation({ x: point.x, y, z: point.z }, true); 
+            window.EventBus.emit('UI_LOG', '[THE WOODS] The shift catches you. You are thrown across the new landscape.');
+        }
+    }
+    
+    window.GameCore.activeEntities.filter(entity => entity.body && entity.def.type === 'npc' && !window.RoadManager.isVillageProtected(entity.visual.position)).forEach(entity => {
+        if (window.GameCore.getForestLuck(entity) > 0 && Math.random() < (entity.forestBlessing.teleportLuck || 0)) return;
+        const point = destination(); 
+        const y = window.WorldGenerator.getTerrainHeight(point.x, point.z) + 2.0;
+        entity.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        entity.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        entity.body.setTranslation({ x: point.x, y, z: point.z }, true); 
+    });
+}
+
+function regenerateWorldCycle() {
+    if (window.EngineParams.suppressWorldRegenerate) return;
+    
+    const uiOverlay = document.createElement('div');
+    uiOverlay.style.position = 'fixed';
+    uiOverlay.style.top = '0'; uiOverlay.style.left = '0';
+    uiOverlay.style.width = '100vw'; uiOverlay.style.height = '100vh';
+    uiOverlay.style.backgroundColor = 'white';
+    uiOverlay.style.opacity = '0';
+    uiOverlay.style.transition = 'opacity 3s ease-in-out';
+    uiOverlay.style.zIndex = '9999';
+    uiOverlay.style.pointerEvents = 'none';
+    document.body.appendChild(uiOverlay);
+
+    setTimeout(() => {
+        uiOverlay.style.opacity = '1';
+        
+        setTimeout(() => {
+            punishExposedActors();
+            
+            const newEpoch = window.EpochManagerInstance.advanceEpoch();
+            
+            window.EngineParams.worldSeed = window.EpochManagerInstance.currentSeed;
+            window.EngineParams.lastCycleDay = window.EngineParams.worldDay;
+            
+            if (window.VillageManager && window.VillageManager.villages.length > 0) {
+                window.VillageManager.shiftLocations();
+            }
+
+            let playerShiftedSafely = false;
+            
+            if (window.GameCore.playerObj && window.GameCore.playerObj.body) {
+              const playerPos = window.GameCore.playerObj.visual.position;
+                
+              const protectedVillage = window.VillageManager.villages.find(v => {
+                  const distSq = Math.pow(playerPos.x - v.x, 2) + Math.pow(playerPos.z - v.z, 2);
+                  return distSq <= Math.pow(v.territory?.barrierRadius || 90, 2);
+              });
+                
+              const hasAnchorItem = window.GameState.inventory.equipment.waist === 'epoch_anchor' || 
+                                    window.GameState.inventory.backpack.includes('epoch_anchor');
+                
+              if (protectedVillage) {
+                  ChunkManager.forceUpdatePosition(new THREE.Vector3(protectedVillage.x, 0, protectedVillage.z));
+                  const newY = window.WorldGenerator.getTerrainHeight(protectedVillage.x, protectedVillage.z) + 5.0;
+                  window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
+                  window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
+                  window.GameCore.playerObj.body.setTranslation({x: protectedVillage.x, y: newY, z: protectedVillage.z}, true);
+                  playerShiftedSafely = true;
+                  window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The ward held. You shifted safely with ${protectedVillage.name}.`);
+              } 
+              else if (hasAnchorItem) {
+                  const nearestRoadPt = window.RoadManager.getRandomPathPoint();
+                  if (nearestRoadPt) {
+                      ChunkManager.forceUpdatePosition(new THREE.Vector3(nearestRoadPt.x, 0, nearestRoadPt.z));
+                      const newY = window.WorldGenerator.getTerrainHeight(nearestRoadPt.x, nearestRoadPt.z) + 5.0;
+                      window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
+                      window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
+                      window.GameCore.playerObj.body.setTranslation({x: nearestRoadPt.x, y: newY, z: nearestRoadPt.z}, true);
+                      playerShiftedSafely = true;
+                      window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The Anchor burns in your pocket, pulling you to the nearest road.`);
+                  }
+              }
+            }
+            
+            if (!playerShiftedSafely && !window.EngineParams.isPlayerSafe && window.GameCore.playerObj?.body) {
+              const forestExtent = window.WorldGenConfig.darkForestSideMeters / 2 - 1000;
+              let newX, newZ;
+              let valid = false;
+              while(!valid) {
+                  newX = (Math.random() * 2 - 1) * forestExtent;
+                  newZ = (Math.random() * 2 - 1) * forestExtent;
+                  if (Math.abs(newX) > 500 || Math.abs(newZ) > 500) valid = true;
+              }
+              ChunkManager.forceUpdatePosition(new THREE.Vector3(newX, 0, newZ));
+              const newY = window.WorldGenerator.getTerrainHeight(newX, newZ) + 5.0;
+              window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
+              window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
+              window.GameCore.playerObj.body.setTranslation({x: newX, y: newY, z: newZ}, true);
+              window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] You were caught unprotected. You are lost in the deep forest.`);
+            }
+
+            window.EventBus.emit('WORLD_REGENERATE');
+            
+            window.CareerManager?.addXP('navigator', 100);
+            window.CareerManager?.addXP('archivist', 50);
+            
+            window.EventBus.emit('UI_LOG', `[EPOCH ${newEpoch}] The white wave passed. The forest has shifted.`);
+
+            setTimeout(() => {
+                uiOverlay.style.opacity = '0';
+                setTimeout(() => { document.body.removeChild(uiOverlay); }, 3000);
+            }, 1000); 
+
+        }, 3000); 
+    }, 100);
 }
 
 function fixedUpdateLogic(delta) {
@@ -830,7 +1148,7 @@ const ChunkManager = {
 
         const chunkData = window.ForestManager?.generateChunk(cx, cz) || { tierA: [], tierB: [] };
         
-        if (window.ForestRenderer) {
+        if (window.ForestRenderer?.setChunkInstances) {
             const redwoodPoints = [];
             const bushPoints = [];
 
@@ -871,7 +1189,7 @@ const ChunkManager = {
             chunk.body = null;
         }
 
-        if (window.ForestRenderer) {
+        if (window.ForestRenderer?.clearChunkInstances) {
             window.ForestRenderer.clearChunkInstances(key);
         }
         
@@ -1485,7 +1803,7 @@ window.GameCore.swapPlayerModel = function() {
 async function bootEngine() {
     try {
         document.getElementById('loading-bar').style.width = "50%"; 
-        await RAPIER.init({}); 
+        await RAPIER.init(); 
         document.getElementById('loading-bar').style.width = "100%"; document.getElementById('loading-container').classList.add('hidden'); document.getElementById('btn-start').classList.remove('hidden');
         
         window.GameCore.scene = new THREE.Scene(); window.GameCore.scene.fog = new THREE.FogExp2(0x040608, 0.00008); window.GameCore.scene.background = new THREE.Color(0x040608);
@@ -1663,6 +1981,7 @@ async function bootEngine() {
         const startY = window.WorldGenerator.getTerrainHeight(0, 0); const safeY = isNaN(startY) ? 1 : startY;
         spawnPlayer(0, safeY + 3.0, 0); spawnPartyMembers(); ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
 
+        // Auto-generate Capital City on engine boot
         if (window.CapitalCityManager) {
             window.CapitalCityManager.generateCapital();
         }
