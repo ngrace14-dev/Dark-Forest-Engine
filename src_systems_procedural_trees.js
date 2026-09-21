@@ -1,273 +1,345 @@
+// ============================================================================
+// Dark Forest Engine - Procedural Tree Builder System
+// File: src_systems_procedural_trees.js
+// ============================================================================
+
 import * as THREE from 'three';
 
 class ProceduralTreeBuilder {
     constructor() {
         this.trunkMaterial = null;
         this.foliageMaterial = null;
+        this.redwoodMaterial = null;
         this.dummy = new THREE.Object3D();
         this.tierDummy = new THREE.Object3D();
         this.initialized = false;
         this.time = 0;
+        this.windUniforms = [];
     }
 
+    /**
+     * Initializes unified bark and foliage materials, patching shaders for GPU wind,
+     * derivative bark grooves, and volumetric fog integration.
+     */
     initMaterials() {
         if (this.initialized) return;
 
-        // --- TRUNK MATERIAL ---
-        this.trunkMaterial = new THREE.MeshStandardMaterial({
-            roughness: 0.9,
-            metalness: 0.05
+        // --- 1. UNIFIED REDWOOD MATERIAL (Worker Archetype Compatible) ---
+        this.redwoodMaterial = new THREE.MeshStandardMaterial({
+            color: 0x3d2015,
+            roughness: 0.85,
+            metalness: 0.05,
+            vertexColors: true,
+            side: THREE.DoubleSide
         });
 
-        this.trunkMaterial.onBeforeCompile = (shader) => {
+        this.redwoodMaterial.onBeforeCompile = (shader) => {
             shader.uniforms.uTime = { value: 0 };
-            this.trunkShader = shader; // Save reference to update uTime
+            this.windUniforms.push(shader.uniforms.uTime);
 
-            shader.vertexShader = `
-                varying vec3 vWorldPos;
-                varying vec3 vWorldNormal;
-                ${shader.vertexShader}
-            `;
+            shader.vertexShader = shader.vertexShader.replace(
+                `#include <common>`,
+                `#include <common>
+                 uniform float uTime;
+                 varying vec3 vWorldNormalVec;
+                 varying vec3 vWorldPosVec;
+                 varying vec3 vCustomColorData;`
+            );
 
             shader.vertexShader = shader.vertexShader.replace(
                 `#include <begin_vertex>`,
-                `
-                #include <begin_vertex>
-                #ifdef USE_INSTANCING
-                    vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
-                    vWorldNormal = normalize(mat3(modelMatrix * instanceMatrix) * normal);
-                #else
-                    vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-                    vWorldNormal = normalize(mat3(modelMatrix) * normal);
-                #endif
+                `#include <begin_vertex>
+                 vCustomColorData = color;
 
-                float heightFactor = clamp(position.y / 25.0, 0.0, 1.0);
-                float sway = sin(vWorldPos.x * 0.1 + vWorldPos.z * 0.1) * 0.3 * pow(heightFactor, 2.0);
-                transformed.x += sway;
-                `
+                 #ifdef USE_INSTANCING
+                     vWorldPosVec = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
+                     vWorldNormalVec = normalize(mat3(modelMatrix * instanceMatrix) * normal);
+                 #else
+                     vWorldPosVec = (modelMatrix * vec4(position, 1.0)).xyz;
+                     vWorldNormalVec = normalize(mat3(modelMatrix) * normal);
+                 #endif
+
+                 float heightFactor = clamp(position.y / 90.0, 0.0, 1.0);
+                 
+                 // 1. Rigid Trunk Sway (Minimal low-frequency motion)
+                 float trunkSway = sin(uTime * 1.2 + vWorldPosVec.x * 0.01 + vWorldPosVec.z * 0.01) * 0.4 * pow(heightFactor, 2.5);
+                 
+                 // 2. Primary Branch Movement (Driven by Vertex Color R)
+                 float branchSway = sin(uTime * 2.8 + vWorldPosVec.y * 0.2) * 0.8 * color.r;
+                 
+                 // 3. Foliage High-Frequency Flutter (Driven by Vertex Color G)
+                 float leafFlutter = cos(uTime * 8.0 + vWorldPosVec.x) * 0.15 * color.g;
+
+                 transformed.x += trunkSway + branchSway + leafFlutter;
+                 transformed.z += (trunkSway * 0.6) + branchSway;`
             );
 
-            shader.fragmentShader = `
-                varying vec3 vWorldPos;
-                varying vec3 vWorldNormal;
-                ${shader.fragmentShader}
-            `;
+            shader.fragmentShader = shader.fragmentShader.replace(
+                `#include <common>`,
+                `#include <common>
+                 varying vec3 vWorldNormalVec;
+                 varying vec3 vWorldPosVec;
+                 varying vec3 vCustomColorData;`
+            );
 
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <color_fragment>`,
-                `
-                #include <color_fragment>
+                `#include <color_fragment>
+                 
+                 // Derivative procedural bark grooves
+                 float h1 = sin(vWorldPosVec.y * 4.0 + sin(vWorldPosVec.x * 2.0) * 0.5);
+                 float h2 = cos(atan(vWorldNormalVec.z, vWorldNormalVec.x) * 20.0);
+                 float barkGroove = h1 * h2;
 
-                vec3 norm = length(vWorldNormal) > 0.0001 ? normalize(vWorldNormal) : vec3(0.0, 1.0, 0.0);
-                
-                float h1 = sin(vWorldPos.y * 3.0 + sin(vWorldPos.x * 4.0) * 0.5);
-                float h2 = cos(atan(norm.z, norm.x) * 16.0);
-                float barkHeight = h1 * h2;
+                 vec3 deepBarkColor = vec3(0.08, 0.03, 0.01);
+                 vec3 surfaceBarkColor = vec3(0.28, 0.14, 0.08);
+                 vec3 baseBark = mix(deepBarkColor, surfaceBarkColor, smoothstep(-0.4, 0.4, barkGroove));
 
-                // Safe Derivative Bump Normal calculation
-                vec3 dX = dFdx(vWorldPos);
-                vec3 dY = dFdy(vWorldPos);
-                vec3 crossN = cross(dX, dY);
-                vec3 bumpNorm = length(crossN) > 0.00001 ? normalize(crossN) : norm;
+                 // Foliage needles albedo selection
+                 vec3 darkNeedle = vec3(0.03, 0.09, 0.04);
+                 vec3 brightNeedle = vec3(0.14, 0.28, 0.11);
+                 vec3 foliageColor = mix(darkNeedle, brightNeedle, clamp(vWorldPosVec.y / 90.0, 0.0, 1.0));
 
-                vec3 darkBark = vec3(0.12, 0.06, 0.03);
-                vec3 lightBark = vec3(0.32, 0.18, 0.10);
-                vec3 mossColor = vec3(0.10, 0.25, 0.06);
+                 vec3 finalAlbedo = mix(baseBark, foliageColor, step(0.1, vCustomColorData.g));
 
-                vec3 finalBark = mix(darkBark, lightBark, smoothstep(-0.5, 0.5, barkHeight));
+                 // Moss layer applied to North/Up facing surfaces (Blue channel)
+                 float upNorm = clamp(vWorldNormalVec.y, 0.0, 1.0);
+                 float mossMask = smoothstep(0.3, 0.8, vCustomColorData.b + upNorm * 0.4);
+                 vec3 mossColor = vec3(0.11, 0.26, 0.07);
 
-                float mossMask = smoothstep(0.2, 0.85, norm.y) + smoothstep(0.3, 0.9, norm.z);
-                diffuseColor.rgb = mix(finalBark, mossColor, clamp(mossMask * 0.5, 0.0, 0.85));
-                `
+                 diffuseColor.rgb = mix(finalAlbedo, mossColor, mossMask * 0.75);`
             );
         };
 
-        // --- FOLIAGE MATERIAL ---
+        // Fog system patch
+        if (window.VolumetricFogSystem?.patchMaterial) {
+            window.VolumetricFogSystem.patchMaterial(this.redwoodMaterial);
+        }
+
+        // --- 2. LEGACY TRUNK MATERIAL (Backwards Compatibility) ---
+        this.trunkMaterial = this.redwoodMaterial;
+
+        // --- 3. LEGACY FOLIAGE MATERIAL (Backwards Compatibility) ---
         this.foliageMaterial = new THREE.MeshStandardMaterial({
+            color: 0x173820,
             roughness: 0.75,
             metalness: 0.0,
             side: THREE.DoubleSide
         });
 
-        this.foliageMaterial.onBeforeCompile = (shader) => {
-            shader.uniforms.uTime = { value: 0 };
-            this.foliageShader = shader; // Save reference to update uTime
-
-            shader.vertexShader = `
-                varying vec3 vWorldPos;
-                varying vec3 vWorldNormal;
-                varying float vHeight;
-                uniform float uTime;
-                ${shader.vertexShader}
-            `;
-
-            shader.vertexShader = shader.vertexShader.replace(
-                `#include <begin_vertex>`,
-                `
-                #include <begin_vertex>
-                vHeight = position.y;
-
-                #ifdef USE_INSTANCING
-                    vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
-                    vWorldNormal = normalize(mat3(modelMatrix * instanceMatrix) * normal);
-                #else
-                    vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-                    vWorldNormal = normalize(mat3(modelMatrix) * normal);
-                #endif
-
-                float heightFactor = clamp(position.y / 20.0, 0.0, 1.0);
-                
-                // Animated Wind integration (using uTime)
-                float windMain = sin(vWorldPos.x * 0.2 + vWorldPos.z * 0.2 + (uTime * 1.5)) * 0.5 * heightFactor;
-                float windJitter = cos(vWorldPos.y * 3.0 + (uTime * 3.0)) * 0.12 * heightFactor;
-
-                transformed.x += windMain + windJitter;
-                transformed.z += (windMain * 0.5) + windJitter;
-                `
-            );
-
-            shader.fragmentShader = `
-                varying vec3 vWorldPos;
-                varying vec3 vWorldNormal;
-                varying float vHeight;
-                ${shader.fragmentShader}
-            `;
-
-            shader.fragmentShader = shader.fragmentShader.replace(
-                `#include <color_fragment>`,
-                `
-                #include <color_fragment>
-
-                vec3 innerNeedle = vec3(0.04, 0.12, 0.05);
-                vec3 outerNeedle = vec3(0.12, 0.32, 0.11);
-                vec3 tipHighlight = vec3(0.25, 0.48, 0.18);
-
-                float gradient = clamp(vHeight / 18.0, 0.0, 1.0);
-                vec3 baseFoliage = mix(innerNeedle, outerNeedle, gradient);
-                baseFoliage = mix(baseFoliage, tipHighlight, pow(gradient, 2.0) * 0.5);
-
-                diffuseColor.rgb = baseFoliage;
-                `
-            );
-        };
+        if (window.VolumetricFogSystem?.patchMaterial) {
+            window.VolumetricFogSystem.patchMaterial(this.foliageMaterial);
+        }
 
         this.initialized = true;
     }
 
-    createTrunkGeometry(height = 22, baseRadius = 1.6) {
-        const trunkGeo = new THREE.CylinderGeometry(baseRadius * 0.4, baseRadius, height, 12, 16);
+    /**
+     * Generates a procedural trunk BufferGeometry with exponential taper and root flare buttresses.
+     * @param {number} height - Trunk height in meters (default 80m for mature redwood)
+     * @param {number} baseRadius - Base trunk radius in meters (default 3.5m)
+     * @returns {THREE.BufferGeometry}
+     */
+    createTrunkGeometry(height = 80.0, baseRadius = 3.5) {
+        const topRadius = 0.3;
+        const radialSegments = 20;
+        const heightSegments = 32;
+
+        const trunkGeo = new THREE.CylinderGeometry(topRadius, baseRadius, height, radialSegments, heightSegments);
         const posAttr = trunkGeo.attributes.position;
+        const colorAttr = new THREE.Float32BufferAttribute(posAttr.count * 3, 3);
+
+        const positions = posAttr.array;
+        const colors = colorAttr.array;
 
         for (let i = 0; i < posAttr.count; i++) {
             let x = posAttr.getX(i);
             let y = posAttr.getY(i);
             let z = posAttr.getZ(i);
 
-            // Base flare mapping
-            if (y < -height * 0.3) {
-                let angle = Math.atan2(z, x);
-                let flare = (1.0 + Math.sin(angle * 5.0) * 0.35) * (( -y - (height * 0.3) ) / (height * 0.2));
-                x += x * flare * 0.25;
-                z += z * flare * 0.25;
+            // Shift pivot to base ground line
+            y += height / 2.0;
+
+            const v = y / height;
+
+            // Exponential taper math: slow mid-trunk taper, sharp upper taper
+            const taperPower = 3.5;
+            const currentRadius = baseRadius * (1.0 - Math.pow(v, taperPower)) + topRadius;
+
+            const currentLen = Math.sqrt(x * x + z * z);
+            if (currentLen > 0.0001) {
+                const nx = x / currentLen;
+                const nz = z / currentLen;
+
+                // Root flare noise application on bottom 18% of trunk
+                let flareAmount = 0.0;
+                if (v < 0.18) {
+                    const flareIntensity = Math.pow(1.0 - (v / 0.18), 2.0);
+                    const angle = Math.atan2(nz, nx);
+                    const noise = Math.max(0.0, Math.sin(angle * 5.0) * 0.4 + Math.cos(angle * 3.0 + 1.2) * 0.3);
+                    flareAmount = noise * flareIntensity * 3.5;
+                }
+
+                const finalRadius = currentRadius + flareAmount;
+                x = nx * finalRadius;
+                z = nz * finalRadius;
             }
 
-            // Pivot shift to base
-            posAttr.setXYZ(i, x, y + height / 2, z);
+            posAttr.setXYZ(i, x, y, z);
+
+            // Vertex Color encoding: R=Branch sway, G=Foliage flutter, B=Moss mask
+            const isNorth = z < -0.1 ? Math.abs(z / (currentRadius || 1.0)) : 0.0;
+            const mossWeight = (v < 0.18 ? (1.0 - v / 0.18) * 0.8 : 0.0) + isNorth * (1.0 - v);
+            
+            colors[i * 3] = 0.0;
+            colors[i * 3 + 1] = 0.0;
+            colors[i * 3 + 2] = Math.min(1.0, mossWeight);
         }
+
+        trunkGeo.setAttribute('color', colorAttr);
         trunkGeo.computeVertexNormals();
+        trunkGeo.computeBoundingBox();
+        trunkGeo.computeBoundingSphere();
+
         return trunkGeo;
     }
 
+    /**
+     * Generates normalized foliage cluster geometry cards.
+     * @returns {THREE.BufferGeometry}
+     */
     createFoliageGeometry() {
-        // Base cone geometry normalized for reuse across tiers
         const coneGeo = new THREE.ConeGeometry(1, 1, 8, 4);
         coneGeo.translate(0, 0.5, 0); // Pivot at base of cone
         return coneGeo;
     }
 
-    spawnProceduralGrove(scene, centerX, centerZ, count = 40, radius = 50) {
+    /**
+     * Spawns a procedural grove around a world center using either Web Worker archetypes
+     * or procedural fallback geometry, clustered into natural "Fairy Rings".
+     * @param {THREE.Scene} scene 
+     * @param {number} centerX 
+     * @param {number} centerZ 
+     * @param {number} count 
+     * @param {number} radius 
+     * @returns {THREE.Group}
+     */
+    spawnProceduralGrove(scene, centerX, centerZ, count = 40, radius = 60) {
         this.initMaterials();
 
-        const height = 22;
-        const tiers = 5;
-
-        // 1. Initialize Geometries
-        const trunkGeo = this.createTrunkGeometry(height, 1.6);
-        const foliageGeo = this.createFoliageGeometry();
-
-        // 2. Setup Instanced Meshes (The Core Optimization)
-        // Draw Calls: 2 (1 for all trunks, 1 for all foliage across all trees)
-        const instancedTrunks = new THREE.InstancedMesh(trunkGeo, this.trunkMaterial, count);
-        instancedTrunks.castShadow = true;
-        instancedTrunks.receiveShadow = true;
-
-        const instancedFoliage = new THREE.InstancedMesh(foliageGeo, this.foliageMaterial, count * tiers);
-        instancedFoliage.castShadow = true;
-        instancedFoliage.receiveShadow = true;
+        const group = new THREE.Group();
 
         const getTerrainY = (x, z) => {
             const h = window.WorldGenerator?.getTerrainHeight?.(x, z) ?? 0;
             return Number.isFinite(h) ? h : 0;
         };
 
-        let foliageIndex = 0;
+        // Use RedwoodGenerator worker archetypes if initialized
+        if (window.RedwoodGenerator?.isInitialized) {
+            const ageStates = ['ANCIENT', 'MATURE', 'YOUNG', 'DYING'];
 
-        // 3. Populate Instance Matrices
-        for (let i = 0; i < count; i++) {
-            // Tree Transform
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.sqrt(Math.random()) * radius;
-            const wx = centerX + Math.cos(angle) * dist;
-            const wz = centerZ + Math.sin(angle) * dist;
-            const wy = getTerrainY(wx, wz);
+            // Divide grove count into clustered "Fairy Rings"
+            const ringsCount = Math.max(1, Math.floor(count / 6));
+            for (let r = 0; r < ringsCount; r++) {
+                const ringAngle = Math.random() * Math.PI * 2;
+                const ringDist = Math.sqrt(Math.random()) * radius;
+                const ringX = centerX + Math.cos(ringAngle) * ringDist;
+                const ringZ = centerZ + Math.sin(ringAngle) * ringDist;
 
-            const scale = 0.75 + Math.random() * 0.5;
+                const ringPoints = window.RedwoodGenerator.generateFairyRingCluster(
+                    ringX, ringZ, Math.floor(count / ringsCount), 10.0, getTerrainY
+                );
 
-            // Compute Trunk Matrix
-            this.dummy.position.set(wx, wy, wz);
-            this.dummy.rotation.set((Math.random() - 0.5) * 0.08, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.08);
-            this.dummy.scale.set(scale, scale, scale);
-            this.dummy.updateMatrix();
+                ringPoints.forEach(pt => {
+                    const geo = window.RedwoodGenerator.getArchetype(pt.ageState, Math.floor(Math.random() * 4));
+                    if (!geo) return;
 
-            instancedTrunks.setMatrixAt(i, this.dummy.matrix);
+                    const mesh = new THREE.Mesh(geo, this.redwoodMaterial);
+                    mesh.position.set(pt.x, pt.y, pt.z);
+                    mesh.rotation.y = pt.rotation;
+                    mesh.scale.setScalar(pt.scale);
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
 
-            // Compute Foliage Tier Matrices
-            for (let t = 0; t < tiers; t++) {
-                const tierRatio = t / tiers;
-                const coneRadius = (1.0 - tierRatio * 0.6) * 5.5;
-                const coneHeight = 6.0 - tierRatio * 1.5;
-                const yPos = (height * 0.35) + (t * (height * 0.14));
-
-                // Local tier transform
-                this.tierDummy.position.set(0, yPos, 0);
-                this.tierDummy.rotation.set(0, t * 0.75, 0);
-                this.tierDummy.scale.set(coneRadius, coneHeight, coneRadius);
-                this.tierDummy.updateMatrix();
-
-                // Multiply local tier matrix by global tree matrix
-                this.tierDummy.matrix.premultiply(this.dummy.matrix);
-
-                instancedFoliage.setMatrixAt(foliageIndex, this.tierDummy.matrix);
-                foliageIndex++;
+                    group.add(mesh);
+                });
             }
+        } else {
+            // Fallback Instanced System for immediate rendering
+            const height = 80.0;
+            const tiers = 5;
+
+            const trunkGeo = this.createTrunkGeometry(height, 3.5);
+            const foliageGeo = this.createFoliageGeometry();
+
+            const instancedTrunks = new THREE.InstancedMesh(trunkGeo, this.trunkMaterial, count);
+            instancedTrunks.castShadow = true;
+            instancedTrunks.receiveShadow = true;
+
+            const instancedFoliage = new THREE.InstancedMesh(foliageGeo, this.foliageMaterial, count * tiers);
+            instancedFoliage.castShadow = true;
+            instancedFoliage.receiveShadow = true;
+
+            let foliageIndex = 0;
+
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.sqrt(Math.random()) * radius;
+                const wx = centerX + Math.cos(angle) * dist;
+                const wz = centerZ + Math.sin(angle) * dist;
+                const wy = getTerrainY(wx, wz);
+
+                const scale = 0.85 + Math.random() * 0.4;
+
+                this.dummy.position.set(wx, wy, wz);
+                this.dummy.rotation.set((Math.random() - 0.5) * 0.04, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.04);
+                this.dummy.scale.set(scale, scale, scale);
+                this.dummy.updateMatrix();
+
+                instancedTrunks.setMatrixAt(i, this.dummy.matrix);
+
+                // Populate Redwood Upper Canopy Tiers
+                for (let t = 0; t < tiers; t++) {
+                    const tierRatio = t / tiers;
+                    const coneRadius = (1.0 - tierRatio * 0.5) * 12.0;
+                    const coneHeight = 10.0 - tierRatio * 2.0;
+                    const yPos = (height * 0.55) + (t * (height * 0.08));
+
+                    this.tierDummy.position.set(0, yPos, 0);
+                    this.tierDummy.rotation.set(0, t * 1.2, 0);
+                    this.tierDummy.scale.set(coneRadius, coneHeight, coneRadius);
+                    this.tierDummy.updateMatrix();
+
+                    this.tierDummy.matrix.premultiply(this.dummy.matrix);
+
+                    instancedFoliage.setMatrixAt(foliageIndex, this.tierDummy.matrix);
+                    foliageIndex++;
+                }
+            }
+
+            instancedTrunks.instanceMatrix.needsUpdate = true;
+            instancedFoliage.instanceMatrix.needsUpdate = true;
+
+            group.add(instancedTrunks);
+            group.add(instancedFoliage);
         }
 
-        instancedTrunks.instanceMatrix.needsUpdate = true;
-        instancedFoliage.instanceMatrix.needsUpdate = true;
-
-        const group = new THREE.Group();
-        group.add(instancedTrunks);
-        group.add(instancedFoliage);
         scene.add(group);
-
         return group;
     }
 
+    /**
+     * Updates frame time uniforms for wind animation shaders.
+     * @param {number} delta - Frame delta time in seconds
+     */
     update(delta) {
         this.time += delta;
-        if (this.trunkShader) this.trunkShader.uniforms.uTime.value = this.time;
-        if (this.foliageShader) this.foliageShader.uniforms.uTime.value = this.time;
+        for (let i = 0; i < this.windUniforms.length; i++) {
+            this.windUniforms[i].value = this.time;
+        }
     }
 }
 
+// Global Singleton Binding
 window.ProceduralTreeBuilder = new ProceduralTreeBuilder();
+export default ProceduralTreeBuilder;
