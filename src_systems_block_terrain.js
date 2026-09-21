@@ -7,15 +7,17 @@ import * as THREE from 'three';
 
 class BlockTerrainSystem {
     constructor() {
-        this.chunkSize = 120.0; // 120m x 120m terrain chunks
+        this.chunkSize = 60.0; // Synchronized with Engine ChunkManager (60m x 60m)
         this.activeChunks = new Set();
         this.chunkVegetationMap = new Map();
+        this.initialized = false;
+        this.scene = null;
 
         // Calibration parameters for Climax Ancient Redwood Ecosystem
         this.calibration = {
-            gridStep: 28.0,            // 28m spacing for 100m trees
+            gridStep: 24.0,             // 24m grid spacing for massive 100m trees
             fairyRingProbability: 0.35, // 35% chance a cluster forms a fairy ring
-            clearingNoiseThreshold: 0.28, // Noise threshold for natural glades
+            clearingNoiseThreshold: 0.25, // Threshold for natural forest clearings
             ageDistribution: {
                 ANCIENT: 0.10,
                 MATURE: 0.35,
@@ -23,6 +25,41 @@ class BlockTerrainSystem {
                 DYING: 0.20
             }
         };
+
+        this.bindEvents();
+    }
+
+    /**
+     * Initializes the system and binds to the main scene.
+     * @param {THREE.Scene} scene 
+     */
+    init(scene) {
+        if (this.initialized) return;
+        this.scene = scene;
+        this.initialized = true;
+        console.log('[BlockTerrainSystem] Initialized successfully.');
+    }
+
+    /**
+     * Binds lifecycle event listeners for automatic startup and resets.
+     */
+    bindEvents() {
+        window.EventBus?.on('ENGINE_READY', () => {
+            if (window.GameCore?.scene) {
+                this.init(window.GameCore.scene);
+            }
+        });
+
+        window.EventBus?.on('GAME_STARTED', () => {
+            if (window.GameCore?.playerObj?.visual) {
+                const pos = window.GameCore.playerObj.visual.position;
+                this.updateStreaming(pos.x, pos.z, 6);
+            }
+        });
+
+        window.EventBus?.on('WORLD_REGENERATE', () => {
+            this.clearAll();
+        });
     }
 
     /**
@@ -40,12 +77,15 @@ class BlockTerrainSystem {
      * @returns {number}
      */
     getTerrainHeight(x, z) {
-        const h = window.WorldGenerator?.getTerrainHeight?.(x, z) ?? 0;
-        return Number.isFinite(h) ? h : 0;
+        if (window.WorldGenerator?.getTerrainHeight) {
+            const h = window.WorldGenerator.getTerrainHeight(x, z);
+            if (Number.isFinite(h)) return h;
+        }
+        return 0;
     }
 
     /**
-     * Generates vegetation scattering points for a chunk key (e.g. "chunk_3_-2").
+     * Generates vegetation scattering points for a chunk.
      * @param {number} chunkX - Chunk coordinate X
      * @param {number} chunkZ - Chunk coordinate Z
      */
@@ -72,12 +112,14 @@ class BlockTerrainSystem {
 
         for (let x = startX; x < endX; x += step) {
             for (let z = startZ; z < endZ; z += step) {
-                // Jitter position within cell
+                // Jitter position within grid cell
                 const wx = x + (this.hash2D(x, z) - 0.5) * (step * 0.7);
                 const wz = z + (this.hash2D(z, x) - 0.5) * (step * 0.7);
 
-                // Safe zone check (roads, villages)
-                if (window.RoadManager?.isSafeZone?.({ x: wx, z: wz })) continue;
+                // Safe zone check (roads, villages, capital city)
+                const isSafe = window.RoadManager?.isSafeZone?.({ x: wx, z: wz }) || 
+                               window.CapitalCityManager?.isInsideCapital?.(wx, wz);
+                if (isSafe) continue;
 
                 // Natural Forest Clearing Glade Noise
                 const gladeNoise = this.hash2D(wx * 0.003, wz * 0.003);
@@ -95,18 +137,20 @@ class BlockTerrainSystem {
                     const ringRadius = 8.0 + this.hash2D(wz, wx) * 6.0;
 
                     const ringPoints = window.RedwoodGenerator.generateFairyRingCluster(
-                        wx, wz, ringCount, ringRadius, this.getTerrainHeight.bind(this)
+                        wx, wz, ringCount, ringRadius, (rx, rz) => this.getTerrainHeight(rx, rz)
                     );
 
-                    ringPoints.forEach(pt => {
-                        addPoint(pt.prefabKey, {
-                            x: pt.x,
-                            y: pt.y,
-                            z: pt.z,
-                            rotation: pt.rotation,
-                            scale: pt.scale
+                    if (Array.isArray(ringPoints)) {
+                        ringPoints.forEach(pt => {
+                            addPoint(pt.prefabKey || 'Redwood_ANCIENT_0', {
+                                x: pt.x,
+                                y: pt.y,
+                                z: pt.z,
+                                rotation: pt.rotation || 0,
+                                scale: pt.scale || 1.0
+                            });
                         });
-                    });
+                    }
                 } else {
                     // Spawn Individual Redwood Tree based on Age State distribution
                     const ageRoll = this.hash2D(wx * 0.1, wz * 0.1);
@@ -173,9 +217,13 @@ class BlockTerrainSystem {
      * Synchronizes chunk streaming around player position.
      * @param {number} playerX 
      * @param {number} playerZ 
-     * @param {number} viewRadiusChunks - Load radius in chunks (default 6 chunks / ~720m)
+     * @param {number} viewRadiusChunks - Load radius in chunks (default 6 chunks / ~360m)
      */
     updateStreaming(playerX, playerZ, viewRadiusChunks = 6) {
+        if (!this.initialized && window.GameCore?.scene) {
+            this.init(window.GameCore.scene);
+        }
+
         const centerChunkX = Math.floor(playerX / this.chunkSize);
         const centerChunkZ = Math.floor(playerZ / this.chunkSize);
 
@@ -200,11 +248,31 @@ class BlockTerrainSystem {
         for (const activeKey of Array.from(this.activeChunks)) {
             if (!neededChunkKeys.has(activeKey)) {
                 const parts = activeKey.split('_');
-                const cx = parseInt(parts[1], 10);
-                const cz = parseInt(parts[2], 10);
-                this.unloadChunkVegetation(cx, cz);
+                if (parts.length === 3) {
+                    const cx = parseInt(parts[1], 10);
+                    const cz = parseInt(parts[2], 10);
+                    this.unloadChunkVegetation(cx, cz);
+                }
             }
         }
+    }
+
+    /**
+     * Clears all active chunk vegetation data.
+     */
+    clearAll() {
+        for (const activeKey of Array.from(this.activeChunks)) {
+            const parts = activeKey.split('_');
+            if (parts.length === 3) {
+                const cx = parseInt(parts[1], 10);
+                const cz = parseInt(parts[2], 10);
+                if (window.ForestRenderer?.clearChunkInstances) {
+                    window.ForestRenderer.clearChunkInstances(activeKey);
+                }
+            }
+        }
+        this.chunkVegetationMap.clear();
+        this.activeChunks.clear();
     }
 }
 
