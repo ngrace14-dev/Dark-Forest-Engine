@@ -1,31 +1,39 @@
 import * as THREE from 'three';
 
-// ==========================================
-// 1. PROCEDURAL BLOCK SHADER MATERIAL (GLSL)
-// ==========================================
 export function createProceduralBlockMaterial(options = {}) {
+    const {
+        topColor = '#2e5a27',
+        sideColor = '#4a4740',
+        bottomColor = '#241c15',
+        noiseScale = 0.12,
+        displacement = 0.75,
+        triplanarScale = 0.15,
+        roughness = 0.85,
+        metalness = 0.1,
+        ...standardOptions
+    } = options;
+
     const mat = new THREE.MeshStandardMaterial({
-        roughness: options.roughness ?? 0.85,
-        metalness: options.metalness ?? 0.1,
+        roughness,
+        metalness,
         flatShading: false,
-        ...options
+        ...standardOptions
     });
 
     mat.userData.uniforms = {
         uTime: { value: 0 },
-        uNoiseScale: { value: options.noiseScale || 0.12 },
-        uDisplacementAmount: { value: options.displacement || 0.75 },
-        uTriplanarScale: { value: options.triplanarScale || 0.15 },
-        uRainIntensity: { value: 0.0 }, // 0.0 = Dry, 1.0 = Soaking wet
-        uTopColor: { value: new THREE.Color(options.topColor || '#2e5a27') },     // Moss / Grass
-        uSideColor: { value: new THREE.Color(options.sideColor || '#4a4740') },    // Rock / Cliff Face
-        uBottomColor: { value: new THREE.Color(options.bottomColor || '#241c15') }  // Mud / Crevice Soil
+        uNoiseScale: { value: noiseScale },
+        uDisplacementAmount: { value: displacement },
+        uTriplanarScale: { value: triplanarScale },
+        uRainIntensity: { value: 0.0 },
+        uTopColor: { value: new THREE.Color(topColor) },
+        uSideColor: { value: new THREE.Color(sideColor) },
+        uBottomColor: { value: new THREE.Color(bottomColor) }
     };
 
     mat.onBeforeCompile = (shader) => {
         Object.assign(shader.uniforms, mat.userData.uniforms);
 
-        // --- VERTEX SHADER: WORLD NOISE DISPLACEMENT ---
         shader.vertexShader = `
             uniform float uTime;
             uniform float uNoiseScale;
@@ -33,7 +41,6 @@ export function createProceduralBlockMaterial(options = {}) {
             varying vec3 vWorldPosition;
             varying vec3 vWorldNormal;
 
-            // GLSL 3D Simplex Noise for Organic Box Distortion
             vec3 mod289_v(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
             vec4 mod289_v(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
             vec4 permute_v(vec4 x) { return mod289_v(((x*34.0)+1.0)*x); }
@@ -98,13 +105,11 @@ export function createProceduralBlockMaterial(options = {}) {
                 vWorldNormal = normalize(mat3(modelMatrix) * normal);
             #endif
 
-            // Warp straight block edges into organic cliffs / weathered ruins
             float displacement = snoise3D(vWorldPosition * uNoiseScale);
             transformed += normal * displacement * uDisplacementAmount;
             `
         );
 
-        // --- FRAGMENT SHADER: TRIPLANAR & SLOPE LAYERING & MOISTURE ---
         shader.fragmentShader = `
             uniform float uTriplanarScale;
             uniform float uRainIntensity;
@@ -123,13 +128,11 @@ export function createProceduralBlockMaterial(options = {}) {
             #include <color_fragment>
 
             vec3 norm = normalize(vWorldNormal);
-            float slope = norm.y; // 1.0 = Upward face, 0.0 = Vertical cliff, -1.0 = Underside
+            float slope = norm.y;
 
-            // Slope Material Layering: Moss on top, Crag on sides, Soil on bottom
             vec3 matColor = mix(uSideColor, uTopColor, smoothstep(0.45, 0.78, slope));
             matColor = mix(uBottomColor, matColor, smoothstep(-0.5, 0.1, slope));
 
-            // Triplanar Noise Blend (No UV coordinates required)
             vec3 triWeight = abs(norm);
             triWeight = pow(triWeight, vec3(6.0));
             triWeight /= (triWeight.x + triWeight.y + triWeight.z);
@@ -141,7 +144,6 @@ export function createProceduralBlockMaterial(options = {}) {
 
             diffuseColor.rgb = matColor + (triplanarTex * 0.07);
 
-            // Dynamic Rain Moisture (Darkens wet surfaces)
             if (uRainIntensity > 0.01) {
                 float wetness = clamp(slope, 0.0, 1.0) * uRainIntensity;
                 diffuseColor.rgb *= mix(1.0, 0.60, wetness);
@@ -153,8 +155,6 @@ export function createProceduralBlockMaterial(options = {}) {
             `#include <roughnessmap_fragment>`,
             `
             #include <roughnessmap_fragment>
-            
-            // Dynamic Rain Moisture (Increases glossiness on top faces when wet)
             if (uRainIntensity > 0.01) {
                 float wetness = clamp(vWorldNormal.y, 0.0, 1.0) * uRainIntensity;
                 roughnessFactor = mix(roughnessFactor, 0.05, wetness);
@@ -166,9 +166,6 @@ export function createProceduralBlockMaterial(options = {}) {
     return mat;
 }
 
-// ==========================================
-// 2. INSTANCED BLOCK TERRAIN CHUNK
-// ==========================================
 export class BlockTerrainChunk {
     constructor(blockCount, geometry, material) {
         this.mesh = new THREE.InstancedMesh(geometry, material, blockCount);
@@ -193,12 +190,9 @@ export class BlockTerrainChunk {
     }
 }
 
-// ==========================================
-// 3. PROCEDURAL BLOCK TERRAIN MANAGER
-// ==========================================
 class BlockTerrainManager {
     constructor() {
-        this.cubeGeometry = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8); // Subdivided for smooth noise vertex bending
+        this.cubeGeometry = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
         this.materials = {
             cliff: createProceduralBlockMaterial({
                 topColor: '#2d4a22',
@@ -236,7 +230,6 @@ class BlockTerrainManager {
         }
     }
 
-    // Procedural Cliff Generation Example
     spawnProceduralCliffCluster(scene, centerX, centerZ, count = 120) {
         const blockData = [];
         for (let i = 0; i < count; i++) {
