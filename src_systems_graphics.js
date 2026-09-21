@@ -16,14 +16,21 @@ class RenderPipeline {
         this.pocketPass = null;
         this.renderer = null;
         this.camera = null;
-        this.qualityTier = 'medium'; // Default to balanced performance
+        this.qualityTier = 'medium'; // Default quality level
+
+        // Register Ctrl + F shortcut listener
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+                e.preventDefault();
+                this.cycleQuality();
+            }
+        });
     }
 
     init(renderer, scene, pocketScene, camera) {
         this.renderer = renderer;
         this.camera = camera;
 
-        // Cap pixel ratio to 1.0 during dev to prevent 4K screen lag
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.0));
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
@@ -37,7 +44,6 @@ class RenderPipeline {
         this.dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
         this.dirLight.position.set(20, 60, 20);
         this.dirLight.castShadow = true;
-        // Optimized Shadow Resolution (1024 vs 2048 cuts shadow VRAM/GPU cost by 75%)
         this.dirLight.shadow.mapSize.width = 1024;
         this.dirLight.shadow.mapSize.height = 1024;
         this.dirLight.shadow.camera.left = -100;
@@ -53,16 +59,16 @@ class RenderPipeline {
         this.pocketPass = new RenderPass(pocketScene, camera);
         this.composer.addPass(this.worldPass);
 
-        // --- Optimized SSAO Pass ---
+        // --- SSAO Pass ---
         this.passes.ssao = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
-        this.passes.ssao.kernelRadius = 8; // Reduced from 16 for better speed
+        this.passes.ssao.kernelRadius = 8;
         this.passes.ssao.minDistance = 0.001;
         this.passes.ssao.maxDistance = 0.1;
         this.composer.addPass(this.passes.ssao);
 
         // --- Bloom Pass ---
         this.passes.bloom = new UnrealBloomPass(
-            new THREE.Vector2(window.innerWidth * 0.25, window.innerHeight * 0.25), // Reduced resolution target
+            new THREE.Vector2(window.innerWidth * 0.25, window.innerHeight * 0.25),
             0.8, 0.2, 0.9
         );
         this.composer.addPass(this.passes.bloom);
@@ -76,7 +82,7 @@ class RenderPipeline {
         this.passes.vignette = new ShaderPass(VignetteShader);
         this.composer.addPass(this.passes.vignette);
 
-        // --- Fast Anti-Aliasing (SMAA) ---
+        // --- Anti-Aliasing (SMAA) ---
         this.passes.smaa = new SMAAPass(
             window.innerWidth,
             window.innerHeight
@@ -87,6 +93,11 @@ class RenderPipeline {
         this.setQuality(this.qualityTier);
     }
 
+    cycleQuality() {
+        const next = { 'low': 'medium', 'medium': 'high', 'high': 'low' };
+        this.setQuality(next[this.qualityTier] || 'medium');
+    }
+
     setQuality(tier) {
         this.qualityTier = tier;
         if (!this.composer) return;
@@ -95,18 +106,22 @@ class RenderPipeline {
             this.passes.ssao.enabled = false;
             this.passes.bloom.enabled = false;
             this.passes.smaa.enabled = false;
-            this.dirLight.castShadow = false;
+            if (this.dirLight) this.dirLight.castShadow = false;
         } else if (tier === 'medium') {
             this.passes.ssao.enabled = true;
             this.passes.bloom.enabled = true;
             this.passes.smaa.enabled = false;
-            this.dirLight.castShadow = true;
+            if (this.dirLight) this.dirLight.castShadow = true;
         } else if (tier === 'high') {
             this.passes.ssao.enabled = true;
             this.passes.bloom.enabled = true;
             this.passes.smaa.enabled = true;
-            this.dirLight.castShadow = true;
+            if (this.dirLight) this.dirLight.castShadow = true;
         }
+
+        const msg = `[GRAPHICS] Quality Preset Switched to: ${tier.toUpperCase()}`;
+        console.log(msg);
+        window.EventBus?.emit('UI_LOG', msg);
     }
 
     resize(width, height) {
