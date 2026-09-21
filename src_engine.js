@@ -751,12 +751,20 @@ function fixedUpdateLogic(delta) {
     
     if (window.GameCore?.AnimationSystem) window.GameCore.AnimationSystem.update(delta);
     if (window.ForestRenderer) window.ForestRenderer.update(delta);
-if (window.GrassSystem) {
+    if (window.GrassSystem) {
         if (!window.GrassSystem.initialized && window.GameCore?.scene) {
             window.GrassSystem.init(window.GameCore.scene);
         }
         window.GrassSystem.update(delta);
     }
+    
+    if (window.ForestImpostorSystem) {
+        if (!window.ForestImpostorSystem.initialized && window.GameCore?.scene) {
+            window.ForestImpostorSystem.init(window.GameCore.scene);
+        }
+        window.ForestImpostorSystem.update(window.GameCore?.worldTimerAbsolute || 0);
+    }
+
     updatePlayerStats(delta);
     updateEntities(delta);
 
