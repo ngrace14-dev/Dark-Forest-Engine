@@ -1,5 +1,3 @@
-import * as Tone from 'tone';
-
 class ProceduralAudioEngine {
     constructor() {
         this.isInitialized = false;
@@ -7,7 +5,9 @@ class ProceduralAudioEngine {
     }
 
     init() {
-        if (this.isInitialized) return;
+        if (this.isInitialized || !window.Tone) return;
+
+        const Tone = window.Tone;
 
         // 1. Procedural Snare / Impact Synth (Replaces snare-analog.mp3)
         this.synths.impact = new Tone.NoiseSynth({
@@ -35,7 +35,9 @@ class ProceduralAudioEngine {
     }
 
     playHitSound(type = 'impact') {
-        if (!this.isInitialized) return;
+        if (!this.isInitialized || !window.Tone) return;
+        const Tone = window.Tone;
+        
         if (type === 'heavy') {
             this.synths.thud.triggerAttackRelease('C1', '8n');
             this.synths.impact.triggerAttackRelease('16n');
@@ -45,7 +47,7 @@ class ProceduralAudioEngine {
     }
 
     startAmbientBreeze() {
-        if (!this.isInitialized) return;
+        if (!this.isInitialized || !window.Tone) return;
         this.synths.breeze.triggerAttack();
     }
 }
@@ -54,9 +56,11 @@ window.AudioEngine = new ProceduralAudioEngine();
 
 window.EventBus?.on('GAME_STARTED', async () => {
     try {
-        await Tone.start();
-        window.AudioEngine.init();
-        window.AudioEngine.startAmbientBreeze();
+        if (window.Tone) {
+            await window.Tone.start();
+            window.AudioEngine.init();
+            window.AudioEngine.startAmbientBreeze();
+        }
     } catch (e) {
         console.warn('Audio start delayed until user gesture.', e);
     }
