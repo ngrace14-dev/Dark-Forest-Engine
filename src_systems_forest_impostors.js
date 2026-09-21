@@ -51,9 +51,12 @@ class ForestImpostorSystem {
                     vWorldPos = worldOrigin;
                     vDist = length(cameraPosition.xz - worldOrigin.xz);
 
+                    // Safe cylindrical billboarding look calculation
                     vec3 look = cameraPosition - worldOrigin;
                     look.y = 0.0;
-                    look = normalize(look);
+                    float lookLen = length(look);
+                    look = lookLen > 0.001 ? look / lookLen : vec3(0.0, 0.0, 1.0);
+                    
                     vec3 up = vec3(0.0, 1.0, 0.0);
                     vec3 right = cross(up, look);
 
