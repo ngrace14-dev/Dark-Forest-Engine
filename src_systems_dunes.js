@@ -1,15 +1,10 @@
 import * as THREE from 'three';
 
-/**
- * Endless Dunes System
- * Reference: IMG_3348.jpeg Architecture
- */
 export class DunesSystem {
     constructor(engine) {
         this.engine = engine;
         this.time = 0;
         this.epochState = 0.0; 
-        
         this.initMaterials();
         this.initGeometries();
         this.duneChunks = [];
@@ -156,14 +151,11 @@ export class DunesSystem {
     initGeometries() {
         this.cubeGeo = new THREE.BoxGeometry(1, 1, 1);
         this.cubeGeo.translate(0, 0.5, 0); 
-        
         this.wedgeGeo = new THREE.CylinderGeometry(1, 1, 1, 3);
         this.wedgeGeo.rotateZ(Math.PI / 2); 
         this.wedgeGeo.translate(0, 0.5, 0);
-
         this.oasisGeo = new THREE.PlaneGeometry(60, 60, 16, 16);
         this.oasisGeo.rotateX(-Math.PI / 2);
-
         this.scrubGeo = new THREE.PlaneGeometry(1.5, 1.5, 1, 2);
         this.scrubGeo.translate(0, 0.75, 0);
     }
