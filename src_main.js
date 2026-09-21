@@ -22,6 +22,7 @@ import './src_systems_procedural_trees.js';  // <-- ADDED: High-Quality Procedur
 import './src_systems_forest_impostors.js';   // <-- ADDED: 3km Distant Canopy Impostor System
 import { WetlandsSystem } from './src_systems_wetlands.js';
 import { MountainSystem } from './src_systems_mountains.js';
+import { DunesSystem } from './src_systems_dunes.js';
 import './src_systems_input.js';
 import './src_systems_audio.js';
 import './src_systems_vfx.js';
