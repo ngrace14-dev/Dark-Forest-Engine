@@ -14,7 +14,6 @@ class VolumetricFogSystem {
         this.initialized = false;
     }
 
-    // Patch Three.js Standard Materials to inject atmospheric height-fog GLSL
     patchMaterial(material) {
         if (!material || material.userData.hasVolumetricFog) return;
         material.userData.hasVolumetricFog = true;
@@ -59,20 +58,16 @@ class VolumetricFogSystem {
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <fog_fragment>`,
                 `
-                // Calculate distance and height-based volumetric fog density
                 vec3 viewVector = vWorldPositionFog - cameraPosition;
                 float viewDistance = length(viewVector);
                 vec3 rayDir = viewVector / viewDistance;
 
-                // Height attenuation (fog settles thick in low valleys, clears on peaks)
                 float deltaY = vWorldPositionFog.y - cameraPosition.y;
                 float heightFactor = exp(- (cameraPosition.y - uHeightFogFloor) * uHeightFogFalloff);
                 float heightFog = heightFactor * (1.0 - exp(-viewDistance * rayDir.y * uHeightFogFalloff)) / max(rayDir.y, 0.0001);
 
-                // Combine distance fog with height fog
                 float fogFactor = 1.0 - exp(-viewDistance * uFogDensity * clamp(heightFog, 0.2, 3.0));
 
-                // Sun scattering (in-scattering glow when looking toward the sun)
                 float sunScatter = max(0.0, dot(rayDir, uSunDirection));
                 vec3 finalFogColor = mix(uFogColor, uSunColor, pow(sunScatter, 4.0) * 0.45);
 
@@ -87,7 +82,6 @@ class VolumetricFogSystem {
     update(timeSecs, timeOfDayHours) {
         this.fogUniforms.uTime.value = timeSecs;
 
-        // Dynamic Time-of-Day Atmospheric Tint Shift
         if (timeOfDayHours !== undefined) {
             const isNight = timeOfDayHours < 6 || timeOfDayHours > 19;
             const isSunset = (timeOfDayHours >= 17 && timeOfDayHours <= 19) || (timeOfDayHours >= 5 && timeOfDayHours <= 7);
