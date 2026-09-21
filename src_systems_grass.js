@@ -54,13 +54,13 @@ class GrassSystem {
                     vec3 worldOrigin = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
                 #endif
 
-                // Dynamic Player Trampling / Interaction
+                // Safe Player Trampling (Guards against NaN division by zero)
                 vec3 playerVec = worldOrigin - uPlayerPos;
                 float playerDist = length(playerVec.xz);
                 float pushRadius = 2.2;
                 if (playerDist < pushRadius) {
                     float pushStrength = (1.0 - (playerDist / pushRadius)) * heightFactor * 1.2;
-                    vec3 pushDir = normalize(vec3(playerVec.x, 0.0, playerVec.z));
+                    vec3 pushDir = playerDist > 0.001 ? normalize(vec3(playerVec.x, 0.0, playerVec.z)) : vec3(0.0, 0.0, 1.0);
                     transformed.xz += pushDir.xz * pushStrength;
                     transformed.y -= pushStrength * 0.4;
                 }
