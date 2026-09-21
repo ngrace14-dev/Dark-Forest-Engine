@@ -198,8 +198,9 @@ function updateEntities(delta) {
         
         try {
             const eTrans = entity.body.translation();
-            const halfHeight = (entity.def?.height || 2.0) / 2.0;
-            entity.visual.position.set(eTrans.x, eTrans.y - halfHeight, eTrans.z);
+            const totalHeight = entity.def?.height || 2.0;
+            // Align feet to exact ground surface (Bottom of capsule collider)
+            entity.visual.position.set(eTrans.x, eTrans.y - (totalHeight / 2), eTrans.z);
         } catch (e) {
             entity.body = null;
             continue;
@@ -348,8 +349,9 @@ function updatePlayerMovement(delta) {
     }
 
     const pDef = window.GameCore.playerObj.def || { height: 2 };
-    const pHalfHeight = (pDef.height || 2) / 2;
-    window.GameCore.playerObj.visual.position.set(p.x, p.y - pHalfHeight, p.z);
+    const totalHeight = pDef.height || 2.0;
+    // Align feet to exact ground surface (Bottom of capsule collider)
+    window.GameCore.playerObj.visual.position.set(p.x, p.y - (totalHeight / 2), p.z);
 
     const moveDir = _v1.set(0, 0, 0); 
     if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') {
@@ -367,7 +369,6 @@ function updatePlayerMovement(delta) {
     if (window.Input.isMoving) {
         moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle || Math.PI); 
         
-        // RECALIBRATED 15-MINUTE MILE BASE SPEED: ~1.7882 m/s
         const BASE_STARTING_SPEED = 1609.344 / 900.0; 
         const athleticsLvl = window.GameState.pStats?.athletics?.level || 0;
         const athleticsBonus = window.GameCore.getBuffBonus?.('athletics') || 0;
@@ -1323,34 +1324,48 @@ function getVisualMesh(def) {
 
     } else {
         if (def.type === 'character' || def.type === 'npc') {
+            const h = def.height || 2.0;
+            const r = def.radius || 0.5;
+
+            // Legs: bottom at y = 0
             const legs = new THREE.Mesh(
-                new THREE.BoxGeometry(def.radius * 0.8, def.height * 0.3, def.radius * 0.8),
+                new THREE.BoxGeometry(r * 0.8, h * 0.3, r * 0.8),
                 new THREE.MeshStandardMaterial({ color: def.color || 0xcccccc, roughness: 0.8 })
             );
-            legs.position.y = def.height * 0.15 - def.height/2;
+            legs.position.y = h * 0.15;
             legs.castShadow = true; legs.receiveShadow = true;
             meshGroup.add(legs);
 
+            // Torso: center at 0.55*h
             const torso = new THREE.Mesh(
-                new THREE.BoxGeometry(def.radius * 1.5, def.height * 0.5, def.radius * 1.2),
+                new THREE.BoxGeometry(r * 1.5, h * 0.5, r * 1.2),
                 new THREE.MeshStandardMaterial({ color: def.color || 0xcccccc, roughness: 0.8 })
             );
-            torso.position.y = def.height * 0.55 - def.height/2;
+            torso.position.y = h * 0.55;
             torso.castShadow = true; torso.receiveShadow = true;
             meshGroup.add(torso);
 
+            // Head: center at 0.85*h
             const head = new THREE.Mesh(
-                new THREE.BoxGeometry(def.radius, def.radius, def.radius),
+                new THREE.BoxGeometry(r, r, r),
                 new THREE.MeshStandardMaterial({ color: def.color || 0xcccccc, roughness: 0.8 })
             );
-            head.position.y = def.height * 0.85 - def.height/2;
+            head.position.y = h * 0.85;
             head.castShadow = true; head.receiveShadow = true;
             meshGroup.add(head);
         } else {
             let mesh; 
-            if(def.type === 'structure' || def.type === 'hub') mesh = new THREE.Mesh(new THREE.BoxGeometry(def.radius*2, def.height, def.radius*2), new THREE.MeshStandardMaterial({ color: def.color || 0x888888 })); 
-            else if(def.type === 'mountain') mesh = new THREE.Mesh(new THREE.ConeGeometry(def.radius, def.height, 16), new THREE.MeshStandardMaterial({ color: def.color || 0x444444 })); 
-            else mesh = new THREE.Mesh(new THREE.CylinderGeometry(def.radius, def.radius, def.height, 8), new THREE.MeshStandardMaterial({ color: def.color || 0x666666 }));
+            const h = def.height || 2.0;
+            if(def.type === 'structure' || def.type === 'hub') {
+                mesh = new THREE.Mesh(new THREE.BoxGeometry(def.radius*2, h, def.radius*2), new THREE.MeshStandardMaterial({ color: def.color || 0x888888 }));
+                mesh.position.y = h / 2;
+            } else if(def.type === 'mountain') {
+                mesh = new THREE.Mesh(new THREE.ConeGeometry(def.radius, h, 16), new THREE.MeshStandardMaterial({ color: def.color || 0x444444 }));
+                mesh.position.y = h / 2;
+            } else {
+                mesh = new THREE.Mesh(new THREE.CylinderGeometry(def.radius, def.radius, h, 8), new THREE.MeshStandardMaterial({ color: def.color || 0x666666 }));
+                mesh.position.y = h / 2;
+            }
             mesh.castShadow = true; mesh.receiveShadow = true; 
             meshGroup.add(mesh);
         }
@@ -1427,9 +1442,9 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     
     const height = def.height || 2.0;
     const halfHeight = height / 2.0;
-    const spawnY = y + halfHeight + 0.5;
+    const spawnY = y + halfHeight;
 
-    mesh.position.set(x, spawnY - halfHeight, z); 
+    mesh.position.set(x, y, z); // Feet at terrain y
     window.GameCore.scene.add(mesh);
 
     let rigidBodyDesc = (def.type === 'structure' || def.type === 'hub' || def.type === 'mountain' || def.type === 'runeTower' || def.type === 'powerStone' || def.type === 'firePit' || def.type === 'streetLight' || def.type === 'merchantChest') ? RAPIER.RigidBodyDesc.fixed() : RAPIER.RigidBodyDesc.dynamic().lockRotations();
@@ -1629,7 +1644,7 @@ window.EventBus.on('EXIT_ARENA_TEST', () => window.ArenaTestManager.exit());
 function spawnPlayer(x, y, z) {
     const def = window.AssetManager?.prefabs?.['Player'] || { height: 2, radius: 0.5 };
     const halfHeight = (def.height || 2) / 2;
-    const spawnY = y + halfHeight + 2.0;
+    const spawnY = y + halfHeight + 0.1;
 
     let rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
         .lockRotations()
