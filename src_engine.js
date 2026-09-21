@@ -7,6 +7,7 @@ import alea from 'alea';
 // Your new AAA system imports
 import { WetlandsSystem } from './src_systems_wetlands.js';
 import { MountainSystem } from './src_systems_mountains.js';
+import { DunesSystem } from './src_systems_dunes.js';
 
 window.THREE = THREE;
 window.SkeletonUtils = SkeletonUtils;
@@ -769,13 +770,21 @@ function fixedUpdateLogic(delta) {
         window.GrassSystem.update(delta, activePos);
     }
 
-    // NEW HOOKS: WETLANDS AND MOUNTAIN SYSTEMS
+    // NEW HOOKS: WETLANDS, MOUNTAINS, AND DUNES SYSTEMS
     if (window.GameCore?.wetlandsSystem && window.GameCore.camera) {
         window.GameCore.wetlandsSystem.update(delta, window.GameCore.camera);
     }
     
     if (window.GameCore?.mountainSystem && window.GameCore.camera) {
         window.GameCore.mountainSystem.update(delta, window.GameCore.camera);
+    }
+
+    if (window.GameCore?.dunesSystem && window.GameCore.camera) {
+        window.GameCore.dunesSystem.update(
+            delta, 
+            window.GameCore.camera, 
+            window.EngineParams?.worldDay || 0
+        );
     }
 
     if (window.ForestImpostorSystem) {
@@ -1869,6 +1878,11 @@ async function bootEngine() {
         if (MountainSystem) {
             window.GameCore.mountainSystem = new MountainSystem(window.GameCore, 300000);
             window.GameCore.mountainSystem.spawnMountainChunk(window.GameCore.scene, 0, 0);
+        }
+
+        if (DunesSystem) {
+            window.GameCore.dunesSystem = new DunesSystem(window.GameCore);
+            window.GameCore.dunesSystem.spawnDuneChunk(window.GameCore.scene, 0, 0);
         }
 
         initLightPool(window.GameCore.scene);
