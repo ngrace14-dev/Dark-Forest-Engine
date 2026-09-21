@@ -4,13 +4,13 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import RAPIER from 'rapier';
 import alea from 'alea';
 
-window.THREE = THREE; 
+window.THREE = THREE;
 window.SkeletonUtils = SkeletonUtils;
 window.BufferGeometryUtils = BufferGeometryUtils;
 window.RAPIER = RAPIER;
 
 let renderer, clock;
-const fixedTimeStep = 1.0 / 60.0; 
+const fixedTimeStep = 1.0 / 60.0;
 let accumulator = 0.0;
 
 const _v1 = new THREE.Vector3();
@@ -145,7 +145,7 @@ function updateWorldClock(delta) {
             window.EngineParams.worldDay += elapsedDays;
             
             for (let day = 0; day < elapsedDays; day++) {
-                window.processCompanionNeeds?.(); 
+                window.processCompanionNeeds?.();
                 window.processBaseJobs?.();
                 window.AdventurerManager?.advanceDay();
                 window.GameState?.processCrowDay?.();
@@ -170,7 +170,7 @@ function updatePeriodicSystems() {
 function updatePlayerStats(delta) {
     if (!window.GameState?.pStats || !window.Input) return;
     
-    window.EngineParams.isPlayerSafe = false; 
+    window.EngineParams.isPlayerSafe = false;
     window.EngineParams.isPlayerHidden = false;
     
     const staminaMultiplier = 1 + (window.GameState.forestBlessing?.staminaRegen || 0);
@@ -191,7 +191,7 @@ function updatePlayerStats(delta) {
     
     if (window.GameState.statusEffects) {
         window.GameState.statusEffects = window.GameState.statusEffects.filter(effect => {
-            effect.remaining -= delta; 
+            effect.remaining -= delta;
             effect.tickTimer -= delta;
             
             if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
@@ -957,7 +957,7 @@ const ChunkManager = {
             window.VolumetricFogSystem.patchMaterial(mat);
         }
 
-    mat.onBeforeCompile = (shader) => {
+        mat.onBeforeCompile = (shader) => {
             shader.vertexShader = shader.vertexShader.replace(
                 `#include <common>`,
                 `#include <common>
@@ -1002,8 +1002,8 @@ const ChunkManager = {
         
         this.activeChunks.set(key, { mesh, body: groundBody, collider, lod });
         if (window.RoadRenderer && window.GameCore?.scene) {
-    window.RoadRenderer.buildDecorationsForChunk(key, cx, cz, window.GameCore.scene);
-}
+            window.RoadRenderer.buildDecorationsForChunk(key, cx, cz, window.GameCore.scene);
+        }
         
         if (isInsideAethelgard) {
             window.EventBus?.emit('CHUNK_GENERATED');
