@@ -1,179 +1,186 @@
 import * as THREE from 'three';
 
-class GrassSystem {
-    constructor() {
-        this.instancedMesh = null;
-        this.maxBlades = 100000;
-        this.windUniforms = { 
-            uTime: { value: 0 },
-            uMaxRadius: { value: 60.0 }, // Culling horizon
-            uPlayerPos: { value: new THREE.Vector3() }
-        };
-        this.dummy = new THREE.Object3D();
-        this.initialized = false;
-        this.lastPos = null;
+/**
+ * Hyper-Realistic Grass Engine Generation
+ * Reference: IMG_3344.jpeg
+ */
+export class GrassRenderer {
+    constructor(engine, maxInstances = 500000) {
+        this.engine = engine;
+        this.maxInstances = maxInstances;
+        this.time = 0;
+        
+        this.initMaterials();
+        this.initGeometry();
+        this.grassChunks = [];
     }
 
-    init(scene) {
-        if (this.initialized) return;
-
-        const bladeGeo = new THREE.PlaneGeometry(0.3, 1.4, 1, 3);
-        bladeGeo.translate(0, 0.7, 0); 
-
-        const bladeMat = new THREE.MeshStandardMaterial({
-            roughness: 0.8,
-            metalness: 0.02,
-            side: THREE.DoubleSide
+    initMaterials() {
+        // [ALPHA-TESTED EVERGREEN TEXTURE]
+        // Base material with Alpha Cutout enabled
+        this.grassMaterial = new THREE.MeshStandardMaterial({
+            color: 0x4a7c29, // Vibrant evergreen base
+            roughness: 0.6,
+            side: THREE.DoubleSide,
+            alphaTest: 0.5, 
+            transparent: false, // Must be false for depth buffer sorting speed
+            // map: this.engine.assets.get('grass_blade_atlas') // Assume loaded atlas
         });
 
-        bladeMat.onBeforeCompile = (shader) => {
-            shader.uniforms.uTime = this.windUniforms.uTime;
-            shader.uniforms.uMaxRadius = this.windUniforms.uMaxRadius;
-            shader.uniforms.uPlayerPos = this.windUniforms.uPlayerPos;
-
+        this.grassMaterial.onBeforeCompile = (shader) => {
+            shader.uniforms.uTime = { value: 0 };
+            
+            // --- VERTEX SHADER ---
             shader.vertexShader = `
                 uniform float uTime;
-                uniform float uMaxRadius;
-                uniform vec3 uPlayerPos;
-                varying float vHeightFactor;
-                varying float vDistFade;
+                varying float vHeight;
+                varying vec3 vWorldPos;
                 ${shader.vertexShader}
             `;
 
             shader.vertexShader = shader.vertexShader.replace(
-                `#include <begin_vertex>`,
+                '#include <begin_vertex>',
                 `
                 #include <begin_vertex>
-
-                float heightFactor = clamp(position.y / 1.4, 0.0, 1.0);
-                vHeightFactor = heightFactor;
+                
+                // Height mapping (0.0 at root, 1.0 at tip) based on UVs
+                vHeight = uv.y; 
 
                 #ifdef USE_INSTANCING
-                    vec3 worldOrigin = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+                    vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
                 #else
-                    vec3 worldOrigin = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+                    vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
                 #endif
 
-                // --- 1. PLAYER-FOLIAGE INTERACTION ---
-                vec3 playerVec = worldOrigin - uPlayerPos;
-                float playerDist = length(playerVec.xz);
-                float pushRadius = 2.5; // Interaction radius around player
-                if (playerDist < pushRadius) {
-                    float pushStrength = (1.0 - (playerDist / pushRadius)) * heightFactor * 1.4;
-                    vec3 pushDir = playerDist > 0.001 ? normalize(vec3(playerVec.x, 0.0, playerVec.z)) : vec3(0.0, 0.0, 1.0);
-                    transformed.xz += pushDir.xz * pushStrength;
-                    transformed.y -= pushStrength * 0.5; // Bend downward underfoot
-                }
-
-                // Curved Geometry Bend
-                transformed.z += pow(heightFactor, 2.0) * 0.25;
-
-                // --- 2. DISTANCE-BASED LOD / DENSITY FADE (30m+) ---
-                float dist = length(cameraPosition.xz - worldOrigin.xz);
-                vDistFade = 1.0 - smoothstep(30.0, uMaxRadius, dist);
-
-                // Wind Sway
-                float wave = sin(uTime * 2.8 + worldOrigin.x * 0.15 + worldOrigin.z * 0.15) * 0.35 * heightFactor;
-                transformed.x += wave;
-                transformed.z += wave * 0.4;
+                // [WORLD-SPACE WIND DISTORTION]
+                // Simplex Noise proxy: sine waves interacting in world space
+                float windWave = sin(vWorldPos.x * 0.5 + uTime) * cos(vWorldPos.z * 0.5 + (uTime * 0.8));
+                float gust = sin(uTime * 2.0 + vWorldPos.x * 0.1) * 0.5 + 0.5;
+                
+                // Apply vertex offset (WindWave Shader), stronger at the tips
+                float swayAmount = windWave * (0.2 + gust * 0.3) * pow(vHeight, 2.0);
+                
+                transformed.x += swayAmount;
+                transformed.z += swayAmount;
+                // Parabolic drop: Grass blades arc downwards as they bend
+                transformed.y -= abs(swayAmount) * 0.5 * vHeight; 
                 `
             );
 
+            // --- FRAGMENT SHADER ---
             shader.fragmentShader = `
-                varying float vHeightFactor;
-                varying float vDistFade;
+                varying float vHeight;
+                varying vec3 vWorldPos;
                 ${shader.fragmentShader}
             `;
 
+            // 1. Damp Soil Root Blending & Distance Culling
             shader.fragmentShader = shader.fragmentShader.replace(
-                `#include <color_fragment>`,
+                '#include <color_fragment>',
                 `
                 #include <color_fragment>
 
-                // --- 3. GROUND MATERIAL BLENDING (Dark Soil Root Transition) ---
-                vec3 dampSoilRoot = vec3(0.04, 0.03, 0.02); // Dark earth tint at ground line
-                vec3 midGrass     = vec3(0.08, 0.28, 0.08); // Forest green mid-section
-                vec3 sunlitTip    = vec3(0.22, 0.52, 0.14); // Light top blade
+                // [GROUND CLIPPING FADE] (Distance Culling / LOD)
+                float dist = distance(vWorldPos, cameraPosition);
+                // Hard clip blades beyond 150 units to save fragment processing
+                if (dist > 150.0) discard; 
 
-                vec3 bladeGrad = mix(dampSoilRoot, midGrass, smoothstep(0.0, 0.25, vHeightFactor));
-                bladeGrad = mix(bladeGrad, sunlitTip, smoothstep(0.25, 1.0, vHeightFactor));
-
-                diffuseColor.rgb = bladeGrad;
+                // [DAMP SOIL ROOT BLENDING]
+                // Height-Based Blend Shader: RootShadow
+                vec3 rootColor = vec3(0.06, 0.08, 0.02); // Dark, damp soil green/brown
+                vec3 tipColor = diffuseColor.rgb;
+                
+                // Mix base color with root shadow based on height
+                diffuseColor.rgb = mix(rootColor, tipColor, smoothstep(0.0, 0.4, vHeight));
                 `
             );
 
+            // 2. Subsurface Scattering (SSS) Light Pass
             shader.fragmentShader = shader.fragmentShader.replace(
-                `#include <dither_fragment>`,
+                '#include <lights_physical_pars_fragment>',
                 `
-                #include <dither_fragment>
-                // Fragment density discard past 30m threshold
-                if (vDistFade < 0.05) discard;
+                #include <lights_physical_pars_fragment>
+                
+                // [SUBSURFACE SCATTERING (SSS)]
+                // Custom backlighting injects light transmission through the quad planes
+                void RE_Direct_GrassSSS(const in IncidentLight directLight, const in GeometricContext geometry, const in PhysicalMaterial material, inout ReflectedLight reflectedLight) {
+                    float backLight = max(0.0, dot(-geometry.normal, directLight.direction));
+                    float scatter = pow(backLight, 4.0) * 0.5; // Narrow, intense transmission
+                    
+                    // Add yellow-green glow based on light color and blade height
+                    vec3 sssGlow = directLight.color * vec3(0.6, 0.9, 0.2) * scatter * vHeight;
+                    reflectedLight.directDiffuse += sssGlow;
+                }
                 `
             );
+            
+            this.grassShader = shader;
         };
-
-        this.instancedMesh = new THREE.InstancedMesh(bladeGeo, bladeMat, this.maxBlades);
-        this.instancedMesh.receiveShadow = true;
-        this.instancedMesh.castShadow = false;
-        this.instancedMesh.count = 0;
-
-        scene.add(this.instancedMesh);
-        this.initialized = true;
     }
 
-    generateAroundPlayer(centerX, centerZ, radius = 60) {
-        if (!this.initialized || !this.instancedMesh) return;
+    initGeometry() {
+        // [BLADE STRUCTURE]
+        // Simple Quad Plane. Using 1x3 segments allows for the Parabolic Geometry bend 
+        // in the vertex shader without excessive poly count.
+        // Thickness (0.1mm) is implied visually via DoubleSide rendering.
+        this.bladeGeo = new THREE.PlaneGeometry(0.1, 0.6, 1, 3);
+        
+        // Pivot from the bottom (root) instead of the center
+        this.bladeGeo.translate(0, 0.3, 0); 
+    }
 
-        let index = 0;
-        const hash = (x, z) => {
-            let h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
-            return h - Math.floor(h);
-        };
+    /**
+     * Spawns a chunk of the Foliage Canopy - Grass Field
+     * @param {THREE.Scene} scene 
+     * @param {number} startX 
+     * @param {number} startZ 
+     * @param {number} patchSize 
+     * @param {number} density target blades per patch area
+     */
+    spawnGrassChunk(scene, startX, startZ, patchSize = 20, density = 40000) {
+        // [FOLIAGE CANOPY - GRASS FIELD] -> Instanced Quad Planes
+        const instancedGrass = new THREE.InstancedMesh(this.bladeGeo, this.grassMaterial, density);
+        instancedGrass.instanceMatrix.setUsage(THREE.StaticDrawUsage); // Static until regenerated
+        instancedGrass.receiveShadow = true;
 
+        const dummy = new THREE.Object3D();
+        
         const getTerrainY = (x, z) => {
-            const h = window.WorldGenerator?.getTerrainHeight?.(x, z) ?? 0;
-            return Number.isFinite(h) ? h : 0;
+            return window.WorldGenerator?.getTerrainHeight?.(x, z) ?? 0;
         };
 
-        for (let i = 0; i < this.maxBlades; i++) {
-            const r = Math.sqrt(hash(i, centerX)) * radius;
-            const theta = hash(centerZ, i) * Math.PI * 2;
+        for (let i = 0; i < density; i++) {
+            // Distribute across patch
+            const wx = startX + (Math.random() - 0.5) * patchSize;
+            const wz = startZ + (Math.random() - 0.5) * patchSize;
+            const wy = getTerrainY(wx, wz);
 
-            const worldX = centerX + r * Math.cos(theta);
-            const worldZ = centerZ + r * Math.sin(theta);
-
-            if (window.RoadManager?.isSafeZone?.({ x: worldX, z: worldZ })) continue;
-
-            const worldY = getTerrainY(worldX, worldZ);
-            const baseScale = 0.7 + hash(worldX, worldZ) * 0.5;
-
-            this.dummy.position.set(worldX, worldY, worldZ);
-            this.dummy.rotation.set(0, hash(i, i) * Math.PI * 2, 0);
-            this.dummy.scale.set(baseScale, baseScale, baseScale);
-            this.dummy.updateMatrix();
-
-            this.instancedMesh.setMatrixAt(index, this.dummy.matrix);
-            index++;
+            dummy.position.set(wx, wy, wz);
+            
+            // Randomize rotation and add slight random scaling for organic look
+            dummy.rotation.y = Math.random() * Math.PI * 2;
+            const scale = 0.7 + Math.random() * 0.6;
+            dummy.scale.set(scale, scale, scale);
+            
+            dummy.updateMatrix();
+            instancedGrass.setMatrixAt(i, dummy.matrix);
         }
 
-        this.instancedMesh.count = index;
-        this.instancedMesh.instanceMatrix.needsUpdate = true;
-        this.instancedMesh.computeBoundingSphere();
+        instancedGrass.instanceMatrix.needsUpdate = true;
+        
+        // Compute bounding sphere for proper frustum culling
+        instancedGrass.computeBoundingSphere();
+        
+        scene.add(instancedGrass);
+        this.grassChunks.push(instancedGrass);
+        
+        return instancedGrass;
     }
 
     update(delta) {
-        this.windUniforms.uTime.value = performance.now() / 1000;
-
-        if (window.GameCore?.playerObj?.visual && this.initialized) {
-            const pos = window.GameCore.playerObj.visual.position;
-            this.windUniforms.uPlayerPos.value.copy(pos);
-
-            if (!this.lastPos || this.lastPos.distanceToSquared(pos) > 64) {
-                this.generateAroundPlayer(pos.x, pos.z, 60);
-                this.lastPos = pos.clone();
-            }
+        this.time += delta;
+        if (this.grassShader) {
+            this.grassShader.uniforms.uTime.value = this.time;
         }
     }
 }
-
-window.GrassSystem = new GrassSystem();
