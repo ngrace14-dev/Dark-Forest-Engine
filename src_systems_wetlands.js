@@ -1,3 +1,8 @@
+// ============================================================================
+// Dark Forest Engine - Wetlands & Submerged Marsh System
+// File: src_systems_wetlands.js
+// ============================================================================
+
 import * as THREE from 'three';
 
 export class WetlandsSystem {
@@ -5,20 +10,60 @@ export class WetlandsSystem {
         this.engine = engine;
         this.maxInstances = maxInstances;
         this.time = 0;
-        
+        this.initialized = false;
+        this.marshChunks = [];
+
+        // Shared uniform objects across all material instances
+        this.sharedUniforms = {
+            uTime: { value: 0 },
+            uCameraPos: { value: new THREE.Vector3() },
+            uWaterLevel: { value: 0.0 }
+        };
+
         this.initMaterials();
         this.initGeometries();
-        this.marshChunks = [];
+        this.bindEvents();
     }
 
+    /**
+     * Binds engine lifecycle event listeners.
+     */
+    bindEvents() {
+        if (typeof window !== 'undefined' && window.EventBus) {
+            window.EventBus.on('ENGINE_READY', () => {
+                if (window.GameCore?.scene && !this.initialized) {
+                    this.init(window.GameCore.scene);
+                }
+            });
+
+            window.EventBus.on('WORLD_REGENERATE', () => {
+                this.clearAll();
+            });
+        }
+    }
+
+    /**
+     * System initialization hook.
+     * @param {THREE.Scene} scene 
+     */
+    init(scene) {
+        if (this.initialized) return;
+        this.initialized = true;
+        console.log('[WetlandsSystem] Initialized successfully.');
+    }
+
+    /**
+     * Initializes standard PBR materials and GLSL shader hooks.
+     */
     initMaterials() {
+        // --- 1. SUBMERGED MANGROVE ROOT MATERIAL ---
         this.rootMaterial = new THREE.MeshStandardMaterial({
             roughness: 0.7,
-            metalness: 0.1, 
+            metalness: 0.1
         });
 
         this.rootMaterial.onBeforeCompile = (shader) => {
-            shader.uniforms.uWaterLevel = { value: 0.0 };
+            Object.assign(shader.uniforms, this.sharedUniforms);
 
             shader.vertexShader = `
                 varying vec3 vWorldPos;
@@ -68,6 +113,7 @@ export class WetlandsSystem {
             );
         };
 
+        // --- 2. WATER & MUD SURFACE MATERIAL ---
         this.waterMudMaterial = new THREE.MeshStandardMaterial({
             color: 0x2a2520, 
             roughness: 0.1,  
@@ -77,8 +123,7 @@ export class WetlandsSystem {
         });
 
         this.waterMudMaterial.onBeforeCompile = (shader) => {
-            shader.uniforms.uTime = { value: 0 };
-            shader.uniforms.uCameraPos = { value: new THREE.Vector3() };
+            Object.assign(shader.uniforms, this.sharedUniforms);
 
             shader.vertexShader = `
                 uniform float uTime;
@@ -119,17 +164,35 @@ export class WetlandsSystem {
                 diffuseColor.a *= 1.0 - smoothstep(2500.0, 3000.0, distToCam);
                 `
             );
-            this.waterShader = shader;
         };
+
+        // Patch materials with Volumetric Fog if active
+        if (typeof window !== 'undefined' && window.VolumetricFogSystem?.patchMaterial) {
+            window.VolumetricFogSystem.patchMaterial(this.rootMaterial);
+            window.VolumetricFogSystem.patchMaterial(this.waterMudMaterial);
+        }
     }
 
+    /**
+     * Initializes geometries used for marsh surfaces and instanced root systems.
+     */
     initGeometries() {
         this.marshPlaneGeo = new THREE.PlaneGeometry(100, 100, 64, 64);
         this.marshPlaneGeo.rotateX(-Math.PI / 2);
         this.rootGeo = new THREE.TetrahedronGeometry(1.5, 2); 
     }
 
+    /**
+     * Spawns a wetlands marsh chunk.
+     * @param {THREE.Scene} scene 
+     * @param {number} centerX 
+     * @param {number} centerZ 
+     * @param {number} baseWaterLevel 
+     * @returns {THREE.Group}
+     */
     spawnWetlandsChunk(scene, centerX, centerZ, baseWaterLevel = 0.0) {
+        if (!scene) return null;
+
         const chunkGroup = new THREE.Group();
         chunkGroup.position.set(centerX, 0, centerZ);
 
@@ -152,7 +215,6 @@ export class WetlandsSystem {
 
             dummy.position.set(wx, wy, wz);
             dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-            
             dummy.scale.set(1.0 + Math.random(), 0.5 + Math.random(), 1.0 + Math.random());
             dummy.updateMatrix();
             
@@ -169,11 +231,42 @@ export class WetlandsSystem {
         return chunkGroup;
     }
 
+    /**
+     * Updates frame uniforms, time counters, and camera tracking.
+     * @param {number} delta 
+     * @param {THREE.Camera} camera 
+     */
     update(delta, camera) {
         this.time += delta;
-        if (this.waterShader) {
-            this.waterShader.uniforms.uTime.value = this.time;
-            this.waterShader.uniforms.uCameraPos.value.copy(camera.position);
+        this.sharedUniforms.uTime.value = this.time;
+
+        if (camera && camera.position) {
+            this.sharedUniforms.uCameraPos.value.copy(camera.position);
         }
     }
+
+    /**
+     * Clears all wetlands marsh chunks and disposes of allocated resources.
+     */
+    clearAll() {
+        this.marshChunks.forEach(chunk => {
+            if (chunk.group) {
+                chunk.group.traverse(child => {
+                    if (child.isMesh || child.isInstancedMesh) {
+                        child.geometry?.dispose();
+                    }
+                });
+                if (chunk.group.parent) {
+                    chunk.group.parent.remove(chunk.group);
+                }
+            }
+        });
+        this.marshChunks = [];
+    }
 }
+
+// Global Singleton Binding
+if (typeof window !== 'undefined') {
+    window.WetlandsSystem = WetlandsSystem;
+}
+export default WetlandsSystem;
