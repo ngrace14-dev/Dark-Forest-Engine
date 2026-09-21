@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js'; // <-- NEW SSAO IMPORT
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import RAPIER from 'rapier';
@@ -1818,12 +1819,10 @@ window.EventBus?.on('PLAYER_RESPAWN', () => {
 });
 
 window.EventBus?.on('GAME_STARTED', () => {
-    // 1. Force Capital City Generation
     if (window.CapitalCityManager && !window.CapitalCityManager.isGenerated) {
         window.CapitalCityManager.generateCapital();
     }
     
-    // 2. Clear all potentially corrupted boot chunks and explicitly rebuild them 
     if (window.GameCore?.playerObj && window.GameCore.playerObj.body) {
         ChunkManager.activeChunks.forEach((chunk, key) => ChunkManager.unloadChunk(key));
         ChunkManager.currentChunkX = null;
@@ -1983,6 +1982,20 @@ async function bootEngine() {
         const pocketPass = new RenderPass(window.GameCore.pocketScene, window.GameCore.camera);
         composer.addPass(worldPass);
 
+        // --- SSAO: Screen Space Ambient Occlusion ---
+        window.GameCore.passes = window.GameCore.passes || {};
+        window.GameCore.passes.ssao = new SSAOPass(
+            window.GameCore.scene, 
+            window.GameCore.camera, 
+            window.innerWidth, 
+            window.innerHeight
+        );
+        window.GameCore.passes.ssao.kernelRadius = 16;
+        window.GameCore.passes.ssao.minDistance = 0.001;
+        window.GameCore.passes.ssao.maxDistance = 0.1;
+        composer.addPass(window.GameCore.passes.ssao);
+        // ---------------------------------------------
+
         window.EventBus?.on('SCENE_SWAP', ({ target, pos }) => {
             if (target === 'establishment') {
                 composer.removePass(worldPass);
@@ -2010,7 +2023,6 @@ async function bootEngine() {
             window.EventBus?.emit('ENV_UPDATE');
         });
 
-        window.GameCore.passes = window.GameCore.passes || {};
         window.GameCore.passes.bloom = new UnrealBloomPass(
             new THREE.Vector2((window.innerWidth || 800) * 0.5, (window.innerHeight || 600) * 0.5), 
             window.EngineParams?.bloom || 1.5, 
@@ -2136,6 +2148,11 @@ window.addEventListener('DOMContentLoaded', () => {
             if(renderer) {
                 renderer.setSize(window.innerWidth, window.innerHeight); 
                 if(composer) composer.setSize(window.innerWidth, window.innerHeight); 
+                
+                // SSAO Resize Logic
+                if(window.GameCore.passes?.ssao) {
+                    window.GameCore.passes.ssao.setSize(window.innerWidth, window.innerHeight);
+                }
             }
         });
     
