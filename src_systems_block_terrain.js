@@ -5,6 +5,18 @@
 
 import * as THREE from 'three';
 
+// Export stub expected by src_systems_ruins.js
+export class BlockTerrainChunk {
+    constructor(cx, cz, chunkSize = 60.0) {
+        this.cx = cx;
+        this.cz = cz;
+        this.chunkSize = chunkSize;
+        this.key = `chunk_${cx}_${cz}`;
+        this.mesh = null;
+        this.vegetation = new Map();
+    }
+}
+
 class BlockTerrainSystem {
     constructor() {
         this.chunkSize = 60.0; // Synchronized with Engine ChunkManager (60m x 60m)
@@ -29,10 +41,6 @@ class BlockTerrainSystem {
         this.bindEvents();
     }
 
-    /**
-     * Initializes the system and binds to the main scene.
-     * @param {THREE.Scene} scene 
-     */
     init(scene) {
         if (this.initialized) return;
         this.scene = scene;
@@ -40,42 +48,32 @@ class BlockTerrainSystem {
         console.log('[BlockTerrainSystem] Initialized successfully.');
     }
 
-    /**
-     * Binds lifecycle event listeners for automatic startup and resets.
-     */
     bindEvents() {
-        window.EventBus?.on('ENGINE_READY', () => {
-            if (window.GameCore?.scene) {
-                this.init(window.GameCore.scene);
-            }
-        });
+        if (typeof window !== 'undefined' && window.EventBus) {
+            window.EventBus.on('ENGINE_READY', () => {
+                if (window.GameCore?.scene) {
+                    this.init(window.GameCore.scene);
+                }
+            });
 
-        window.EventBus?.on('GAME_STARTED', () => {
-            if (window.GameCore?.playerObj?.visual) {
-                const pos = window.GameCore.playerObj.visual.position;
-                this.updateStreaming(pos.x, pos.z, 6);
-            }
-        });
+            window.EventBus.on('GAME_STARTED', () => {
+                if (window.GameCore?.playerObj?.visual) {
+                    const pos = window.GameCore.playerObj.visual.position;
+                    this.updateStreaming(pos.x, pos.z, 6);
+                }
+            });
 
-        window.EventBus?.on('WORLD_REGENERATE', () => {
-            this.clearAll();
-        });
+            window.EventBus.on('WORLD_REGENERATE', () => {
+                this.clearAll();
+            });
+        }
     }
 
-    /**
-     * Deterministic pseudo-random hash based on world coordinates.
-     */
     hash2D(x, z) {
         let h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
         return h - Math.floor(h);
     }
 
-    /**
-     * Evaluates terrain height at world coordinates (x, z).
-     * @param {number} x 
-     * @param {number} z 
-     * @returns {number}
-     */
     getTerrainHeight(x, z) {
         if (window.WorldGenerator?.getTerrainHeight) {
             const h = window.WorldGenerator.getTerrainHeight(x, z);
@@ -84,11 +82,6 @@ class BlockTerrainSystem {
         return 0;
     }
 
-    /**
-     * Generates vegetation scattering points for a chunk.
-     * @param {number} chunkX - Chunk coordinate X
-     * @param {number} chunkZ - Chunk coordinate Z
-     */
     generateChunkVegetation(chunkX, chunkZ) {
         const chunkKey = `chunk_${chunkX}_${chunkZ}`;
         if (this.chunkVegetationMap.has(chunkKey)) return;
@@ -98,7 +91,6 @@ class BlockTerrainSystem {
         const endX = startX + this.chunkSize;
         const endZ = startZ + this.chunkSize;
 
-        // Container map: archetypeKey -> array of point transforms
         const prefabPointsMap = new Map();
 
         const addPoint = (prefabKey, pt) => {
@@ -112,27 +104,22 @@ class BlockTerrainSystem {
 
         for (let x = startX; x < endX; x += step) {
             for (let z = startZ; z < endZ; z += step) {
-                // Jitter position within grid cell
                 const wx = x + (this.hash2D(x, z) - 0.5) * (step * 0.7);
                 const wz = z + (this.hash2D(z, x) - 0.5) * (step * 0.7);
 
-                // Safe zone check (roads, villages, capital city)
                 const isSafe = window.RoadManager?.isSafeZone?.({ x: wx, z: wz }) || 
                                window.CapitalCityManager?.isInsideCapital?.(wx, wz);
                 if (isSafe) continue;
 
-                // Natural Forest Clearing Glade Noise
                 const gladeNoise = this.hash2D(wx * 0.003, wz * 0.003);
                 if (gladeNoise < this.calibration.clearingNoiseThreshold) continue;
 
                 const wy = this.getTerrainHeight(wx, wz);
                 if (!Number.isFinite(wy)) continue;
 
-                // Determine whether to spawn a Fairy Ring cluster or an individual tree
                 const ringRoll = this.hash2D(wx * 0.05, wz * 0.05);
 
                 if (ringRoll < this.calibration.fairyRingProbability && window.RedwoodGenerator?.generateFairyRingCluster) {
-                    // Spawn Fairy Ring Cluster (4 to 7 trees around an old central burl)
                     const ringCount = 4 + Math.floor(this.hash2D(wx, wz) * 4);
                     const ringRadius = 8.0 + this.hash2D(wz, wx) * 6.0;
 
@@ -152,7 +139,6 @@ class BlockTerrainSystem {
                         });
                     }
                 } else {
-                    // Spawn Individual Redwood Tree based on Age State distribution
                     const ageRoll = this.hash2D(wx * 0.1, wz * 0.1);
                     let ageState = 'MATURE';
 
@@ -166,7 +152,6 @@ class BlockTerrainSystem {
                         ageState = 'DYING';
                     }
 
-                    // Select variation index (0 to 3)
                     const varIdx = Math.floor(this.hash2D(wz * 0.3, wx * 0.3) * 4);
                     const prefabKey = `Redwood_${ageState}_${varIdx}`;
 
@@ -184,11 +169,9 @@ class BlockTerrainSystem {
             }
         }
 
-        // Store chunk vegetation data
         this.chunkVegetationMap.set(chunkKey, prefabPointsMap);
         this.activeChunks.add(chunkKey);
 
-        // Upload instance matrices to ForestRenderer
         if (window.ForestRenderer?.setChunkInstances) {
             for (const [prefabKey, points] of prefabPointsMap.entries()) {
                 window.ForestRenderer.setChunkInstances(chunkKey, prefabKey, points);
@@ -196,11 +179,6 @@ class BlockTerrainSystem {
         }
     }
 
-    /**
-     * Unloads vegetation instances for a chunk when streamed out.
-     * @param {number} chunkX 
-     * @param {number} chunkZ 
-     */
     unloadChunkVegetation(chunkX, chunkZ) {
         const chunkKey = `chunk_${chunkX}_${chunkZ}`;
         if (!this.chunkVegetationMap.has(chunkKey)) return;
@@ -213,12 +191,6 @@ class BlockTerrainSystem {
         this.activeChunks.delete(chunkKey);
     }
 
-    /**
-     * Synchronizes chunk streaming around player position.
-     * @param {number} playerX 
-     * @param {number} playerZ 
-     * @param {number} viewRadiusChunks - Load radius in chunks (default 6 chunks / ~360m)
-     */
     updateStreaming(playerX, playerZ, viewRadiusChunks = 6) {
         if (!this.initialized && window.GameCore?.scene) {
             this.init(window.GameCore.scene);
@@ -244,7 +216,6 @@ class BlockTerrainSystem {
             }
         }
 
-        // Unload out-of-range chunks
         for (const activeKey of Array.from(this.activeChunks)) {
             if (!neededChunkKeys.has(activeKey)) {
                 const parts = activeKey.split('_');
@@ -257,18 +228,10 @@ class BlockTerrainSystem {
         }
     }
 
-    /**
-     * Clears all active chunk vegetation data.
-     */
     clearAll() {
         for (const activeKey of Array.from(this.activeChunks)) {
-            const parts = activeKey.split('_');
-            if (parts.length === 3) {
-                const cx = parseInt(parts[1], 10);
-                const cz = parseInt(parts[2], 10);
-                if (window.ForestRenderer?.clearChunkInstances) {
-                    window.ForestRenderer.clearChunkInstances(activeKey);
-                }
+            if (window.ForestRenderer?.clearChunkInstances) {
+                window.ForestRenderer.clearChunkInstances(activeKey);
             }
         }
         this.chunkVegetationMap.clear();
@@ -276,6 +239,7 @@ class BlockTerrainSystem {
     }
 }
 
-// Global Singleton Binding
+// Global Singleton Binding & Named/Default Exports
 window.BlockTerrainSystem = new BlockTerrainSystem();
+export { BlockTerrainSystem };
 export default BlockTerrainSystem;
