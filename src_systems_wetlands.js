@@ -1,9 +1,5 @@
 import * as THREE from 'three';
 
-/**
- * Dark Forest Wetlands System
- * Reference: IMG_3352.jpeg Architecture
- */
 export class WetlandsSystem {
     constructor(engine, maxInstances = 300000) {
         this.engine = engine;
