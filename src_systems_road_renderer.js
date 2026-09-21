@@ -10,11 +10,17 @@ class RoadRenderer {
             sideColor: '#2d302a',     
             bottomColor: '#1a1c18',   
             noiseScale: 0.3,
-            displacement: 0.05
+            displacement: 0.02
         });
+
+        // Store active road decoration chunks to clean up on chunk unload
+        this.activeRoadChunks = new Map();
     }
 
     buildDecorationsForChunk(chunkKey, chunkX, chunkZ, scene) {
+        // Remove existing decorations for this chunk if re-generating
+        this.removeDecorationsForChunk(chunkKey, scene);
+
         const roadPoints = window.RoadManager?.getRoadPointsNear(chunkX, chunkZ, 45);
         if (!roadPoints || roadPoints.length === 0) return;
 
@@ -31,14 +37,16 @@ class RoadRenderer {
 
         for (let i = 0; i < roadPoints.length; i++) {
             const pt = roadPoints[i];
-            if (!Number.isFinite(pt.x) || !Number.isFinite(pt.z)) continue;
+            if (!pt || !Number.isFinite(pt.x) || !Number.isFinite(pt.z)) continue;
 
             for (let s = 0; s < 3; s++) {
                 const offsetX = (hash(pt.x + s, pt.z) - 0.5) * 4.0;
                 const offsetZ = (hash(pt.x, pt.z + s) - 0.5) * 4.0;
                 const wx = pt.x + offsetX;
                 const wz = pt.z + offsetZ;
-                const wy = getTerrainY(wx, wz) + 0.06;
+                
+                // Lift flagstones slightly (0.12m) to prevent Z-fighting with terrain ground mesh
+                const wy = getTerrainY(wx, wz) + 0.12;
 
                 if (!Number.isFinite(wy)) continue;
 
@@ -60,7 +68,19 @@ class RoadRenderer {
             const chunk = new BlockTerrainChunk(blockData.length, this.cubeGeo, this.flagstoneMat);
             chunk.buildChunk(blockData);
             scene.add(chunk.mesh);
+            this.activeRoadChunks.set(chunkKey, chunk);
         }
+    }
+
+    removeDecorationsForChunk(chunkKey, scene) {
+        const chunk = this.activeRoadChunks.get(chunkKey);
+        if (!chunk) return;
+
+        if (chunk.mesh) {
+            if (scene) scene.remove(chunk.mesh);
+            chunk.mesh.geometry?.dispose();
+        }
+        this.activeRoadChunks.delete(chunkKey);
     }
 }
 
