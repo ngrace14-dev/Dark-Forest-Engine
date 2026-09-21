@@ -237,6 +237,15 @@ function updateEntities(delta) {
         
         try {
             const eTrans = entity.body.translation();
+            
+            // [NEW] VOID CATCHER FOR NPCs
+            const groundY = safeGetTerrainHeight(eTrans.x, eTrans.z);
+            if (eTrans.y < groundY - 2.0) {
+                entity.body.setTranslation({ x: eTrans.x, y: groundY + 3.0, z: eTrans.z }, true);
+                entity.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                eTrans.y = groundY + 3.0; 
+            }
+
             const totalHeight = entity.def?.height || 2.0;
             entity.visual.position.set(eTrans.x, eTrans.y - (totalHeight / 2), eTrans.z);
         } catch (e) {
@@ -424,6 +433,15 @@ function updatePlayerMovement(delta) {
         p = window.GameCore.playerObj.body.translation();
     } catch (e) {
         return;
+    }
+
+    // [NEW] VOID CATCHER: Prevent falling through unloaded terrain chunks
+    const groundY = safeGetTerrainHeight(p.x, p.z);
+    if (p.y < groundY - 2.0) { 
+        // Player fell through! Snap them back to the surface and kill downward momentum.
+        window.GameCore.playerObj.body.setTranslation({ x: p.x, y: groundY + 5.0, z: p.z }, true);
+        window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        p.y = groundY + 5.0; // Update local reference
     }
 
     const pDef = window.GameCore.playerObj.def || { height: 2 };
@@ -1152,7 +1170,7 @@ function getVisualMesh(def) {
         meshGroup.add(trunkMesh);
 
         const coneGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 8);
-        const coneMat = new THREE.MeshStandardMaterial({ color: 0x173820, roughness: 0.8 });
+        const coneMat = new MeshStandardMaterial({ color: 0x173820, roughness: 0.8 });
         const coneMesh = new THREE.Mesh(coneGeo, coneMat);
         coneMesh.position.y = trunkHeight + (coneHeight / 2) - overlap;
         coneMesh.castShadow = true;
