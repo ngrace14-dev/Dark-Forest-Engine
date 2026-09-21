@@ -1,25 +1,67 @@
+// ============================================================================
+// Dark Forest Engine - Dunes & Desert Oasis System
+// File: src_systems_dunes.js
+// ============================================================================
+
 import * as THREE from 'three';
 
 export class DunesSystem {
     constructor(engine) {
         this.engine = engine;
         this.time = 0;
-        this.epochState = 0.0; 
+        this.epochState = 0.0;
+        this.initialized = false;
+        this.duneChunks = [];
+
+        // Shared uniform objects across all material instances
+        this.sharedUniforms = {
+            uCameraPos: { value: new THREE.Vector3() },
+            uEpochState: { value: 0.0 }
+        };
+
         this.initMaterials();
         this.initGeometries();
-        this.duneChunks = [];
+        this.bindEvents();
     }
 
+    /**
+     * Binds engine lifecycle event listeners.
+     */
+    bindEvents() {
+        window.EventBus?.on('ENGINE_READY', () => {
+            if (window.GameCore?.scene && !this.initialized) {
+                this.init(window.GameCore.scene);
+            }
+        });
+
+        window.EventBus?.on('WORLD_REGENERATE', () => {
+            this.clearAll();
+        });
+    }
+
+    /**
+     * System initialization hook.
+     * @param {THREE.Scene} scene 
+     */
+    init(scene) {
+        if (this.initialized) return;
+        this.initialized = true;
+        console.log('[DunesSystem] Initialized successfully.');
+    }
+
+    /**
+     * Initializes standard PBR materials and GLSL shader hooks.
+     */
     initMaterials() {
+        // --- 1. DUNE SAND MATERIAL ---
         this.duneMaterial = new THREE.MeshStandardMaterial({
             roughness: 0.95,
             metalness: 0.0,
-            transparent: true, 
+            transparent: true
         });
 
         this.duneMaterial.onBeforeCompile = (shader) => {
-            shader.uniforms.uCameraPos = { value: new THREE.Vector3() };
-            shader.uniforms.uEpochState = { value: 0.0 };
+            Object.assign(shader.uniforms, this.sharedUniforms);
 
             shader.vertexShader = `
                 varying vec3 vWorldPos;
@@ -67,9 +109,14 @@ export class DunesSystem {
                 diffuseColor.a *= 1.0 - smoothstep(2500.0, 3000.0, distToCam);
                 `
             );
-            this.duneShader = shader;
         };
 
+        // Patch with Volumetric Fog if available
+        if (window.VolumetricFogSystem?.patchMaterial) {
+            window.VolumetricFogSystem.patchMaterial(this.duneMaterial);
+        }
+
+        // --- 2. OASIS WATER MATERIAL ---
         this.oasisMaterial = new THREE.MeshStandardMaterial({
             color: 0x1a2b22, 
             roughness: 0.05,
@@ -79,7 +126,7 @@ export class DunesSystem {
         });
 
         this.oasisMaterial.onBeforeCompile = (shader) => {
-            shader.uniforms.uCameraPos = { value: new THREE.Vector3() };
+            Object.assign(shader.uniforms, this.sharedUniforms);
 
             shader.vertexShader = `
                 varying vec3 vWorldPos;
@@ -107,9 +154,9 @@ export class DunesSystem {
                 diffuseColor.rgb = mix(diffuseColor.rgb, skyReflectColor, fresnel * 0.8);
                 `
             );
-            this.oasisShader = shader;
         };
 
+        // --- 3. DESERT SCRUB MATERIAL ---
         this.scrubMaterial = new THREE.MeshStandardMaterial({
             color: 0x3d4a2b, 
             roughness: 0.8,
@@ -148,6 +195,9 @@ export class DunesSystem {
         };
     }
 
+    /**
+     * Initializes primitive geometries used for instanced dune scattering.
+     */
     initGeometries() {
         this.cubeGeo = new THREE.BoxGeometry(1, 1, 1);
         this.cubeGeo.translate(0, 0.5, 0); 
@@ -160,7 +210,16 @@ export class DunesSystem {
         this.scrubGeo.translate(0, 0.75, 0);
     }
 
+    /**
+     * Spawns a procedural dune chunk group in the scene.
+     * @param {THREE.Scene} scene 
+     * @param {number} centerX 
+     * @param {number} centerZ 
+     * @returns {THREE.Group}
+     */
     spawnDuneChunk(scene, centerX, centerZ) {
+        if (!scene) return null;
+
         const chunkGroup = new THREE.Group();
         chunkGroup.position.set(centerX, 0, centerZ);
 
@@ -174,8 +233,10 @@ export class DunesSystem {
         const instancedCubes = new THREE.InstancedMesh(this.cubeGeo, this.duneMaterial, totalCubes);
         const instancedWedges = new THREE.InstancedMesh(this.wedgeGeo, this.duneMaterial, totalWedges);
         
-        instancedCubes.castShadow = true; instancedCubes.receiveShadow = true;
-        instancedWedges.castShadow = true; instancedWedges.receiveShadow = true;
+        instancedCubes.castShadow = true; 
+        instancedCubes.receiveShadow = true;
+        instancedWedges.castShadow = true; 
+        instancedWedges.receiveShadow = true;
 
         const dummy = new THREE.Object3D();
         let cubeIdx = 0;
@@ -193,7 +254,7 @@ export class DunesSystem {
                     -1.0, 
                     clusterZ + (Math.random() - 0.5) * clusterScale
                 );
-                dummy.rotation.set(0, clusterRot + (Math.random()-0.5)*0.5, 0);
+                dummy.rotation.set(0, clusterRot + (Math.random() - 0.5) * 0.5, 0);
                 dummy.scale.set(clusterScale * 0.8, clusterScale * Math.random(), clusterScale * 0.8);
                 dummy.updateMatrix();
                 instancedCubes.setMatrixAt(cubeIdx++, dummy.matrix);
@@ -244,16 +305,39 @@ export class DunesSystem {
         return chunkGroup;
     }
 
+    /**
+     * Updates frame time uniforms, camera tracking vectors, and epoch states.
+     * @param {number} delta 
+     * @param {THREE.Camera} camera 
+     * @param {number} worldDay 
+     */
     update(delta, camera, worldDay = 0) {
         this.time += delta;
         this.epochState = (worldDay % 14) / 14.0 * Math.PI * 2.0;
 
-        if (this.duneShader) {
-            this.duneShader.uniforms.uCameraPos.value.copy(camera.position);
-            this.duneShader.uniforms.uEpochState.value = this.epochState;
+        if (camera && camera.position) {
+            this.sharedUniforms.uCameraPos.value.copy(camera.position);
         }
-        if (this.oasisShader) {
-            this.oasisShader.uniforms.uCameraPos.value.copy(camera.position);
-        }
+        this.sharedUniforms.uEpochState.value = this.epochState;
+    }
+
+    /**
+     * Clears all dune chunks and disposes of Three.js objects.
+     */
+    clearAll() {
+        this.duneChunks.forEach(chunkGroup => {
+            chunkGroup.traverse(child => {
+                if (child.isMesh || child.isInstancedMesh) {
+                    child.geometry?.dispose();
+                }
+            });
+            if (chunkGroup.parent) {
+                chunkGroup.parent.remove(chunkGroup);
+            }
+        });
+        this.duneChunks = [];
     }
 }
+
+// Global Singleton Binding
+window.DunesSystem = DunesSystem;
