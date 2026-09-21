@@ -1,5 +1,6 @@
 // ====================================================================
 // DARK FOREST ENGINE — ASYNC TERRAIN WEB WORKER
+// File: src_workers_terrain_worker.js
 // ====================================================================
 
 // 2D Simplex Noise generator self-contained inside the worker
@@ -75,6 +76,7 @@ function createSimplexNoise(seed = 1337) {
 }
 
 let noiseFn = null;
+let currentSeed = null;
 
 function getTerrainHeight(x, z) {
     if (!noiseFn) noiseFn = createSimplexNoise(1337);
@@ -85,96 +87,119 @@ function getTerrainHeight(x, z) {
 }
 
 self.onmessage = function (e) {
-    const { id, cx, cz, segments, chunkSize, seed, roadPoints } = e.data;
+    try {
+        const { id, cx, cz, segments, chunkSize, seed, roadPoints } = e.data;
 
-    if (!noiseFn) noiseFn = createSimplexNoise(seed || 1337);
+        // Re-initialize noise function if seed changes or isn't set yet
+        const taskSeed = seed || 1337;
+        if (!noiseFn || currentSeed !== taskSeed) {
+            noiseFn = createSimplexNoise(taskSeed);
+            currentSeed = taskSeed;
+        }
 
-    const chunkX = cx * chunkSize + chunkSize / 2;
-    const chunkZ = cz * chunkSize + chunkSize / 2;
-    const vertCount = (segments + 1) * (segments + 1);
+        const chunkX = cx * chunkSize + chunkSize / 2;
+        const chunkZ = cz * chunkSize + chunkSize / 2;
+        const vertCount = (segments + 1) * (segments + 1);
 
-    const positions = new Float32Array(vertCount * 3);
-    const normals = new Float32Array(vertCount * 3);
-    const colors = new Float32Array(vertCount * 3);
-    const clutter = new Float32Array(vertCount);
+        const positions = new Float32Array(vertCount * 3);
+        const normals = new Float32Array(vertCount * 3);
+        const colors = new Float32Array(vertCount * 3);
+        const clutter = new Float32Array(vertCount);
 
-    const ROAD_WIDTH = 5;
-    const halfSize = chunkSize / 2;
-    const step = chunkSize / segments;
+        const ROAD_WIDTH = 5;
+        const halfSize = chunkSize / 2;
+        const step = chunkSize / segments;
 
-    let vertIdx = 0;
-    let clutterIdx = 0;
-
-    for (let j = 0; j <= segments; j++) {
-        const zLocal = -halfSize + j * step;
-        const wz = zLocal + chunkZ;
-
-        for (let i = 0; i <= segments; i++) {
-            const xLocal = -halfSize + i * step;
-            const wx = xLocal + chunkX;
-
-            const wy = getTerrainHeight(wx, wz);
-
-            positions[vertIdx] = xLocal;
-            positions[vertIdx + 1] = wy;
-            positions[vertIdx + 2] = zLocal;
-
-            // Road proximity check
-            let minRoadDistSq = 999999;
-            if (roadPoints && roadPoints.length > 0) {
-                for (let r = 0; r < roadPoints.length; r++) {
-                    const pt = roadPoints[r];
-                    if (!pt || !Number.isFinite(pt.x) || !Number.isFinite(pt.z)) continue;
-                    const dx = wx - pt.x;
-                    const dz = wz - pt.z;
-                    const distSq = dx * dx + dz * dz;
-                    if (distSq < minRoadDistSq) minRoadDistSq = distSq;
+        // Pre-filter road points to only those within chunk bounding area + margin
+        const localRoadPoints = [];
+        if (Array.isArray(roadPoints) && roadPoints.length > 0) {
+            const margin = halfSize + ROAD_WIDTH + 10;
+            for (let r = 0; r < roadPoints.length; r++) {
+                const pt = roadPoints[r];
+                if (pt && Number.isFinite(pt.x) && Number.isFinite(pt.z)) {
+                    if (Math.abs(pt.x - chunkX) <= margin && Math.abs(pt.z - chunkZ) <= margin) {
+                        localRoadPoints.push(pt);
+                    }
                 }
             }
-
-            const minRoadDist = Math.sqrt(minRoadDistSq);
-
-            // Terrain base color (#4ade80 grass green base)
-            let rCol = 0.29;
-            let gCol = 0.87;
-            let bCol = 0.50;
-
-            if (Number.isFinite(minRoadDist) && minRoadDist < ROAD_WIDTH + 2) {
-                const dirtInfluence = Math.max(0, 1.0 - minRoadDist / (ROAD_WIDTH + 2));
-                // Lerp towards dirt color (#4a3e31)
-                rCol = rCol + (0.29 - rCol) * (dirtInfluence * 0.55);
-                gCol = gCol + (0.24 - gCol) * (dirtInfluence * 0.55);
-                bCol = bCol + (0.19 - bCol) * (dirtInfluence * 0.55);
-            }
-
-            const cNoise = noiseFn(wx * 0.1, wz * 0.1) * 0.04;
-            colors[vertIdx] = Math.min(1.0, Math.max(0.0, rCol + cNoise));
-            colors[vertIdx + 1] = Math.min(1.0, Math.max(0.0, gCol + cNoise));
-            colors[vertIdx + 2] = Math.min(1.0, Math.max(0.0, bCol + cNoise));
-
-            // Surface Normal Finite Differences
-            const hL = getTerrainHeight(wx - 0.1, wz);
-            const hR = getTerrainHeight(wx + 0.1, wz);
-            const hD = getTerrainHeight(wx, wz - 0.1);
-            const hU = getTerrainHeight(wx, wz + 0.1);
-
-            const nx = hL - hR;
-            const ny = 0.2;
-            const nz = hD - hU;
-            const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1.0;
-
-            normals[vertIdx] = nx / len;
-            normals[vertIdx + 1] = ny / len;
-            normals[vertIdx + 2] = nz / len;
-
-            clutter[clutterIdx++] = noiseFn(wx * 0.5, wz * 0.5);
-            vertIdx += 3;
         }
-    }
 
-    // Zero-copy transfer of typed array memory back to main thread
-    self.postMessage(
-        { id, key: `${cx},${cz}`, cx, cz, positions, normals, colors, clutter },
-        [positions.buffer, normals.buffer, colors.buffer, clutter.buffer]
-    );
+        let vertIdx = 0;
+        let clutterIdx = 0;
+
+        for (let j = 0; j <= segments; j++) {
+            const zLocal = -halfSize + j * step;
+            const wz = zLocal + chunkZ;
+
+            for (let i = 0; i <= segments; i++) {
+                const xLocal = -halfSize + i * step;
+                const wx = xLocal + chunkX;
+
+                const wy = getTerrainHeight(wx, wz);
+
+                positions[vertIdx] = xLocal;
+                positions[vertIdx + 1] = wy;
+                positions[vertIdx + 2] = zLocal;
+
+                // Fast road proximity check using pre-filtered points
+                let minRoadDistSq = 999999;
+                if (localRoadPoints.length > 0) {
+                    for (let r = 0; r < localRoadPoints.length; r++) {
+                        const pt = localRoadPoints[r];
+                        const dx = wx - pt.x;
+                        const dz = wz - pt.z;
+                        const distSq = dx * dx + dz * dz;
+                        if (distSq < minRoadDistSq) minRoadDistSq = distSq;
+                    }
+                }
+
+                const minRoadDist = Math.sqrt(minRoadDistSq);
+
+                // Terrain base color (#4ade80 grass green base)
+                let rCol = 0.29;
+                let gCol = 0.87;
+                let bCol = 0.50;
+
+                if (minRoadDist < ROAD_WIDTH + 2) {
+                    const dirtInfluence = Math.max(0, 1.0 - minRoadDist / (ROAD_WIDTH + 2));
+                    // Lerp towards dirt color (#4a3e31)
+                    rCol = rCol + (0.29 - rCol) * (dirtInfluence * 0.55);
+                    gCol = gCol + (0.24 - gCol) * (dirtInfluence * 0.55);
+                    bCol = bCol + (0.19 - bCol) * (dirtInfluence * 0.55);
+                }
+
+                const cNoise = noiseFn(wx * 0.1, wz * 0.1) * 0.04;
+                colors[vertIdx] = Math.min(1.0, Math.max(0.0, rCol + cNoise));
+                colors[vertIdx + 1] = Math.min(1.0, Math.max(0.0, gCol + cNoise));
+                colors[vertIdx + 2] = Math.min(1.0, Math.max(0.0, bCol + cNoise));
+
+                // Surface Normal Finite Differences
+                const hL = getTerrainHeight(wx - 0.1, wz);
+                const hR = getTerrainHeight(wx + 0.1, wz);
+                const hD = getTerrainHeight(wx, wz - 0.1);
+                const hU = getTerrainHeight(wx, wz + 0.1);
+
+                const nx = hL - hR;
+                const ny = 0.2;
+                const nz = hD - hU;
+                const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1.0;
+
+                normals[vertIdx] = nx / len;
+                normals[vertIdx + 1] = ny / len;
+                normals[vertIdx + 2] = nz / len;
+
+                clutter[clutterIdx++] = noiseFn(wx * 0.5, wz * 0.5);
+                vertIdx += 3;
+            }
+        }
+
+        // Zero-copy transfer of typed array memory back to main thread
+        self.postMessage(
+            { id, key: `${cx},${cz}`, cx, cz, positions, normals, colors, clutter },
+            [positions.buffer, normals.buffer, colors.buffer, clutter.buffer]
+        );
+    } catch (err) {
+        // Unblock main thread pool if worker execution fails
+        self.postMessage({ id: e.data?.id, error: err.message || 'Worker Error' });
+    }
 };
