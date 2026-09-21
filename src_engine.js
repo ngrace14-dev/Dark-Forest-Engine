@@ -1,9 +1,4 @@
 import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js'; // <-- NEW SSAO IMPORT
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import RAPIER from 'rapier';
@@ -14,7 +9,7 @@ window.SkeletonUtils = SkeletonUtils;
 window.BufferGeometryUtils = BufferGeometryUtils;
 window.RAPIER = RAPIER;
 
-let renderer, clock, composer, ambientLight, dirLight;
+let renderer, clock;
 const fixedTimeStep = 1.0 / 60.0; 
 let accumulator = 0.0;
 
@@ -128,6 +123,7 @@ function updateCameraAndShadows(delta) {
     _currentCamTarget.lerp(_v1, lerpFactor);
     window.GameCore.camera.lookAt(_currentCamTarget);
 
+    const dirLight = window.RenderPipeline?.dirLight;
     if (dirLight && dirLight.castShadow) {
         dirLight.target.position.copy(playerPos);
         dirLight.target.updateMatrixWorld();
@@ -178,7 +174,6 @@ function updatePlayerStats(delta) {
     
     const staminaMultiplier = 1 + (window.GameState.forestBlessing?.staminaRegen || 0);
     
-    // Regenerate stamina when not sprinting or blocking
     if (!window.Input.isSprinting && !window.Input.isBlocking) {
         window.GameState.pStats.stamina = Math.min(
             window.GameState.pStats.maxStamina, 
@@ -186,7 +181,6 @@ function updatePlayerStats(delta) {
         );
     }
 
-    // Regenerate poise
     if (performance.now() >= (window.GameState.pStats.guardBrokenUntil || 0)) {
         window.GameState.pStats.poise = Math.min(
             window.GameState.pStats.maxPoise, 
@@ -194,7 +188,6 @@ function updatePlayerStats(delta) {
         );
     }
     
-    // Process status effects (poison, burning, etc)
     if (window.GameState.statusEffects) {
         window.GameState.statusEffects = window.GameState.statusEffects.filter(effect => {
             effect.remaining -= delta; 
@@ -239,7 +232,6 @@ function updateEntities(delta) {
         try {
             const eTrans = entity.body.translation();
             const totalHeight = entity.def?.height || 2.0;
-            // Align base to the terrain surface
             entity.visual.position.set(eTrans.x, eTrans.y - (totalHeight / 2), eTrans.z);
         } catch (e) {
             entity.body = null;
@@ -295,7 +287,6 @@ function updateEntities(delta) {
             const p = window.GameCore.playerObj.body.translation(); 
             window.EngineParams.isPlayerSafe = window.RoadManager?.isSafeZone?.(p) || window.CapitalCityManager?.isInsideCapital?.(p.x, p.z) || false;
 
-            // Punish player for wandering off safe paths if hostile nearby
             if (!window.EngineParams.isPlayerSafe && !window.EngineParams.isPlayerHidden && hostileNearby && !window.EngineParams.godMode && window.EngineParams.offPathCaptureCooldown <= 0) {
                 const pathPoint = window.RoadManager?.getRandomPathPoint?.();
                 if (pathPoint) {
@@ -449,7 +440,6 @@ function updatePlayerMovement(delta) {
     if (window.Input.isMoving) {
         moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle || Math.PI); 
         
-        // CALIBRATED 15-MINUTE MILE BASE SPEED: ~1.7882 m/s
         const BASE_STARTING_SPEED = 1609.344 / 900.0; 
         const athleticsLvl = window.GameState?.pStats?.athletics?.level || 0;
         const athleticsBonus = window.GameCore?.getBuffBonus?.('athletics') || 0;
@@ -467,7 +457,7 @@ function updatePlayerMovement(delta) {
                 window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 8 * delta);
             }
         } else if (window.Input.isSprinting) {
-            maxSpeed *= 1.75; // Sprint multiplier
+            maxSpeed *= 1.75; 
             if (window.GameState?.pStats) {
                 window.GameState.pStats.stamina = Math.max(0, window.GameState.pStats.stamina - 15 * delta); 
             }
@@ -497,7 +487,7 @@ function updatePlayerMovement(delta) {
                 window.GameCore.playerObj.visual.quaternion.setFromEuler(euler);
                 
                 if (window.Input.isSprinting) {
-                    playEntityAnimation(window.GameCore.playerObj, 'dash'); // Assuming dash serves as sprint animation
+                    playEntityAnimation(window.GameCore.playerObj, 'dash');
                 } else {
                     playEntityAnimation(window.GameCore.playerObj, 'walk'); 
                 }
@@ -1854,10 +1844,6 @@ async function bootEngine() {
         renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); 
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); 
         renderer.setSize(window.innerWidth || 800, window.innerHeight || 600); 
-        renderer.shadowMap.enabled = true; 
-        renderer.shadowMap.type = THREE.PCFShadowMap; 
-        renderer.toneMapping = THREE.ACESFilmicToneMapping; 
-        renderer.toneMappingExposure = 1.25; 
         document.body.appendChild(renderer.domElement);
 
         if (window.RenderOptimizer?.prewarmShaders) {
@@ -1866,12 +1852,7 @@ async function bootEngine() {
 
         window.GameCore.pocketScene = new THREE.Scene();
         window.GameCore.pocketScene.background = new THREE.Color(0x020617);
-        const pAmbient = new THREE.AmbientLight(0xffffff, 0.8);
-        window.GameCore.pocketScene.add(pAmbient);
-        const pPoint = new THREE.PointLight(0x6366f1, 5, 50);
-        pPoint.position.set(0, 10, 0);
-        window.GameCore.pocketScene.add(pPoint);
-
+        
         if (window.ForestRenderer) {
             window.ForestRenderer.ensureAssets();
             window.GameCore.scene.add(window.ForestRenderer.group);
@@ -1889,7 +1870,6 @@ async function bootEngine() {
         clock = new THREE.Clock(); 
         window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
   
-        // 128,000 SQ MILE CIRCULAR BASIN BOUNDED BY EVEREST-SCALE MOUNTAINS (2,000,000m x 2,000,000m)
         const horizonGeo = new THREE.PlaneGeometry(2000000, 2000000, 512, 512); 
         horizonGeo.rotateX(-Math.PI / 2);
           
@@ -1917,7 +1897,6 @@ async function bootEngine() {
                     vWorldPos = worldPosition.xyz;
                       
                     float dist = length(worldPosition.xz);
-                    
                     float mountainMask = smoothstep(315000.0, 345000.0, dist); 
                       
                     vec2 p = worldPosition.xz;
@@ -1960,47 +1939,28 @@ async function bootEngine() {
         window.GameCore.scene.add(horizonMesh);
         window.GameCore.horizonMaterial = horizonMat;
 
-        ambientLight = new THREE.AmbientLight(0xffffff, 1.5); 
-        window.GameCore.scene.add(ambientLight);
+        // --- ALL LIGHTING & POST PROCESSING DELEGATED TO GRAPHICS SYSTEM ---
+        if (window.RenderPipeline) {
+            window.RenderPipeline.init(renderer, window.GameCore.scene, window.GameCore.pocketScene, window.GameCore.camera);
+            window.RenderPipeline.updateEnvironment(window.GameCore.scene, window.GameCore.scene.fog, window.EngineParams, window.GameCore.horizonMaterial);
+        }
 
-        dirLight = new THREE.DirectionalLight(0xffffff, 2.5); 
-        dirLight.position.set(20, 60, 20); 
-        dirLight.castShadow = true; 
-        
-        dirLight.shadow.mapSize.width = 1024;
-        dirLight.shadow.mapSize.height = 1024;
-        
-        dirLight.shadow.camera.left = -150; 
-        dirLight.shadow.camera.right = 150; 
-        dirLight.shadow.camera.top = 150; 
-        dirLight.shadow.camera.bottom = -150; 
-        dirLight.shadow.bias = -0.0005;
-        window.GameCore.scene.add(dirLight);
+        const startY = safeGetTerrainHeight(0, 0); 
+        const safeY = isNaN(startY) ? 1 : startY;
+        window.spawnPlayer?.(0, safeY + 3.0, 0); 
+        window.spawnPartyMembers?.(); 
+        ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
 
-        composer = new EffectComposer(renderer); 
-        const worldPass = new RenderPass(window.GameCore.scene, window.GameCore.camera);
-        const pocketPass = new RenderPass(window.GameCore.pocketScene, window.GameCore.camera);
-        composer.addPass(worldPass);
-
-        // --- SSAO: Screen Space Ambient Occlusion ---
-        window.GameCore.passes = window.GameCore.passes || {};
-        window.GameCore.passes.ssao = new SSAOPass(
-            window.GameCore.scene, 
-            window.GameCore.camera, 
-            window.innerWidth, 
-            window.innerHeight
-        );
-        window.GameCore.passes.ssao.kernelRadius = 16;
-        window.GameCore.passes.ssao.minDistance = 0.001;
-        window.GameCore.passes.ssao.maxDistance = 0.1;
-        composer.addPass(window.GameCore.passes.ssao);
-        // ---------------------------------------------
+        window.EventBus?.on('ENV_UPDATE', () => {
+            if (window.RenderPipeline && window.EngineParams) {
+                window.RenderPipeline.updateEnvironment(window.GameCore.scene, window.GameCore.scene.fog, window.EngineParams, window.GameCore.horizonMaterial);
+            }
+        });
 
         window.EventBus?.on('SCENE_SWAP', ({ target, pos }) => {
+            if (window.RenderPipeline) window.RenderPipeline.swapScene(target);
+
             if (target === 'establishment') {
-                composer.removePass(worldPass);
-                composer.insertPass(pocketPass, 0);
-                  
                 if (window.GameCore.playerObj && window.GameCore.playerObj.body) {
                     window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
@@ -2008,9 +1968,6 @@ async function bootEngine() {
                     if (window.EngineParams) window.EngineParams.suppressChunkLoading = true;
                 }
             } else if (target === 'world') {
-                composer.removePass(pocketPass);
-                composer.insertPass(worldPass, 0);
-                  
                 if (window.GameCore.playerObj && window.GameCore.playerObj.body && pos) {
                     ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, 0, pos.z));
                     const groundY = safeGetTerrainHeight(pos.x, pos.z) + 5.0;
@@ -2021,86 +1978,6 @@ async function bootEngine() {
                 }
             }
             window.EventBus?.emit('ENV_UPDATE');
-        });
-
-        window.GameCore.passes.bloom = new UnrealBloomPass(
-            new THREE.Vector2((window.innerWidth || 800) * 0.5, (window.innerHeight || 600) * 0.5), 
-            window.EngineParams?.bloom || 1.5, 
-            0.25, 
-            0.9
-        ); 
-        composer.addPass(window.GameCore.passes.bloom);
-        
-        const VignetteShader = { 
-            uniforms: { "tDiffuse": { value: null }, "darkness": { value: 0.35 } }, 
-            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`, 
-            fragmentShader: `uniform float darkness; uniform sampler2D tDiffuse; varying vec2 vUv; void main() { vec4 texel = texture2D( tDiffuse, vUv ); float dist = distance(vUv, vec2(0.5)); float edge = smoothstep(0.25, 0.75, dist); texel.rgb *= 1.0 - edge * clamp(darkness, 0.0, 0.85); gl_FragColor = texel; }` 
-        };
-        window.GameCore.passes.vignette = new ShaderPass(VignetteShader); 
-        composer.addPass(window.GameCore.passes.vignette);
-        
-        const ColorTintShader = { 
-            uniforms: { "tDiffuse": { value: null }, "tintColor": { value: new THREE.Color('#2b4461') }, "tintIntensity": { value: 0.65 } }, 
-            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`, 
-            fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 tintColor; uniform float tintIntensity; varying vec2 vUv; void main() { vec4 texel = texture2D( tDiffuse, vUv ); vec3 tinted = texel.rgb * tintColor * 2.0; vec3 finalColor = mix(texel.rgb, tinted, tintIntensity); gl_FragColor = vec4( finalColor, texel.a ); }` 
-        };
-        window.GameCore.passes.colorTint = new ShaderPass(ColorTintShader); 
-        composer.addPass(window.GameCore.passes.colorTint);
-
-        const startY = safeGetTerrainHeight(0, 0); 
-        const safeY = isNaN(startY) ? 1 : startY;
-        window.spawnPlayer?.(0, safeY + 3.0, 0); 
-        window.spawnPartyMembers?.(); 
-        ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
-
-        window.EventBus?.on('ENV_UPDATE', () => {
-            if(!window.EngineParams) return;
-            const hourNormalized = (window.EngineParams.timeOfDay % 24) / 24;
-            const angle = hourNormalized * Math.PI * 2 - (Math.PI / 2); 
-            
-            const sunRadius = 200;
-            dirLight.position.x = Math.cos(angle) * sunRadius;
-            dirLight.position.y = Math.sin(angle) * sunRadius;
-            dirLight.position.z = Math.cos(angle) * 100; 
-            
-            const sunHeight = Math.sin(angle); 
-            let baseDirIntensity = 2.5; 
-            let baseAmbientIntensity = 1.8;
-            
-            if (sunHeight > 0.3) { 
-                baseDirIntensity = 3.0; 
-                baseAmbientIntensity = 2.0;
-                dirLight.color.setHex(0xffffff); 
-                ambientLight.color.setHex(0xffffff); 
-                window.GameCore.scene.fog.color.setHex(0x94a3b8); 
-                window.GameCore.scene.background = new THREE.Color(0x94a3b8);
-            }
-            else if (sunHeight > -0.1) { 
-                baseDirIntensity = 1.8; 
-                baseAmbientIntensity = 1.4; 
-                dirLight.color.setHex(0xffccaa); 
-                ambientLight.color.setHex(0x7c2d12); 
-                window.GameCore.scene.fog.color.setHex(0x451a03); 
-                window.GameCore.scene.background = new THREE.Color(0x451a03);
-            }
-            else { 
-                baseDirIntensity = 0.5; 
-                baseAmbientIntensity = 0.6; 
-                dirLight.color.setHex(0x1e293b); 
-                ambientLight.color.setHex(0x0f172a); 
-                window.GameCore.scene.fog.color.setHex(0x020617); 
-                window.GameCore.scene.background = new THREE.Color(0x020617);
-            }
-            
-            dirLight.intensity = baseDirIntensity * window.EngineParams.globalBrightness; 
-            ambientLight.intensity = baseAmbientIntensity * window.EngineParams.globalBrightness; 
-            renderer.toneMappingExposure = Math.max(1.0, window.EngineParams.globalBrightness * 1.5); 
-            window.GameCore.scene.fog.density = window.EngineParams.fogDensity * (sunHeight < 0 ? 1.5 : 1.0);
-
-            if (window.GameCore.horizonMaterial) {
-                window.GameCore.horizonMaterial.uniforms.sunPos.value.copy(dirLight.position);
-                window.GameCore.horizonMaterial.uniforms.fogColor.value.copy(window.GameCore.scene.fog.color);
-            }
         });
 
         window.EventBus?.emit('ENGINE_READY'); 
@@ -2147,12 +2024,7 @@ window.addEventListener('DOMContentLoaded', () => {
             }
             if(renderer) {
                 renderer.setSize(window.innerWidth, window.innerHeight); 
-                if(composer) composer.setSize(window.innerWidth, window.innerHeight); 
-                
-                // SSAO Resize Logic
-                if(window.GameCore.passes?.ssao) {
-                    window.GameCore.passes.ssao.setSize(window.innerWidth, window.innerHeight);
-                }
+                if (window.RenderPipeline) window.RenderPipeline.resize(window.innerWidth, window.innerHeight);
             }
         });
     
@@ -2172,7 +2044,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
             updateCameraAndShadows(delta);
 
-            if(composer) composer.render(); 
+            if (window.RenderPipeline) window.RenderPipeline.render();
         }
     
         animate();
