@@ -28,6 +28,12 @@ const _colorScratch = new THREE.Color();
 const _targetCamPos = new THREE.Vector3();
 const _currentCamTarget = new THREE.Vector3();
 
+function safeGetTerrainHeight(x, z) {
+    if (!window.WorldGenerator?.getTerrainHeight) return 0;
+    const h = window.WorldGenerator.getTerrainHeight(x, z);
+    return Number.isFinite(h) ? h : 0;
+}
+
 // ==========================================
 // LIGHT POOL SYSTEM
 // ==========================================
@@ -243,7 +249,7 @@ function updateEntities(delta) {
                 const pathPoint = window.RoadManager.getRandomPathPoint();
                 if (pathPoint) {
                     ChunkManager.forceUpdatePosition(new THREE.Vector3(pathPoint.x, 0, pathPoint.z));
-                    const safeY = window.WorldGenerator.getTerrainHeight(pathPoint.x, pathPoint.z) + 5.0;
+                    const safeY = safeGetTerrainHeight(pathPoint.x, pathPoint.z) + 5.0;
                     window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setTranslation({ x: pathPoint.x, y: safeY, z: pathPoint.z }, true);
@@ -263,17 +269,13 @@ function processEntityStatusEffects(entity, delta) {
         effect.remaining -= delta; effect.tickTimer -= delta;
         if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
             effect.tickTimer = 1;
-            entity.hp = Math.max(0, entity.hp - effect.tickDamage);
-            window.EventBus.emit('ENTITY_DAMAGED', { damage: effect.tickDamage, position: entity.visual.position, isPlayer: true });
-            window.EventBus.emit('SPAWN_HIT_VFX', { type: effect.type === 'burning' ? 'Fire' : 'Void', pos: entity.visual.position });
-            
-            if (entity.hp <= 0) {
-                handleEntityDeath(entity);
-                break;
-            }
+            const resistance = window.GameCore.getResistance(effect.type);
+            const tickDamage = Math.max(1, effect.tickDamage - resistance);
+            window.GameState.pStats.hp = Math.max(0, window.GameState.pStats.hp - tickDamage);
+            window.EventBus.emit('ENTITY_DAMAGED', { damage: tickDamage, position: window.GameCore.playerObj.visual.position, isPlayer: true });
         }
-        if (effect.remaining <= 0) entity.statusEffects.splice(j, 1);
-    }
+        return effect.remaining > 0;
+    });
 }
 
 function alignEntityToGround(entity, delta, raycaster, downVector) {
@@ -690,10 +692,10 @@ window.EventBus.on('PLAYER_PROJECTILE_HIT', ({ target, damage, damageType, posit
     }
 });
 window.EventBus.on('SPAWN_HIT_VFX', ({type, pos}) => window.VFXManager.spawnHit(type, pos));
-window.EventBus.on('SPAWN_INVASION', () => { const p = window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : new THREE.Vector3(); for(let i=0; i<3; i++) instantiatePrefab('Ghoul', p.x + (Math.random()-0.5)*15, window.WorldGenerator.getTerrainHeight(p.x, p.z), p.z + (Math.random()-0.5)*15); window.EventBus.emit('UI_LOG', "Ghoul Invasion Spawned!"); });
+window.EventBus.on('SPAWN_INVASION', () => { const p = window.GameCore.playerObj ? window.GameCore.playerObj.visual.position : new THREE.Vector3(); for(let i=0; i<3; i++) instantiatePrefab('Ghoul', p.x + (Math.random()-0.5)*15, safeGetTerrainHeight(p.x, p.z), p.z + (Math.random()-0.5)*15); window.EventBus.emit('UI_LOG', "Ghoul Invasion Spawned!"); });
 window.EventBus.on('SPAWN_BLIGHT', () => {
     if (!window.GameCore.playerObj) return; const p = window.GameCore.playerObj.visual.position; const pts = window.RoadManager.getRoadPointsNear(Math.floor(p.x/60), Math.floor(p.z/60));
-        if (pts.length > 0) { const pt = pts[Math.floor(Math.random() * pts.length)]; const root = instantiatePrefab('Blight Root', pt.x, window.WorldGenerator.getTerrainHeight(pt.x, pt.z), pt.z, 'persistent'); if (root) { root.hp = 150; window.EventBus.emit('UI_LOG', "A Blight Root has corrupted a nearby road!"); } } 
+        if (pts.length > 0) { const pt = pts[Math.floor(Math.random() * pts.length)]; const root = instantiatePrefab('Blight Root', pt.x, safeGetTerrainHeight(pt.x, pt.z), pt.z, 'persistent'); if (root) { root.hp = 150; window.EventBus.emit('UI_LOG', "A Blight Root has corrupted a nearby road!"); } } 
  
     else window.EventBus.emit('UI_LOG', "No roads nearby to corrupt!");
 });
@@ -733,7 +735,7 @@ window.EventBus.on('CLAIM_PLAYER_CAMP', () => {
         if (itemId === 'stone' && stoneNeeded > 0) { stoneNeeded--; return false; }
         return true;
     });
-    const camp = instantiatePrefab('Iron Fire Pit', playerPosition.x, window.WorldGenerator.getTerrainHeight(playerPosition.x, playerPosition.z), playerPosition.z, 'persistent');
+    const camp = instantiatePrefab('Iron Fire Pit', playerPosition.x, safeGetTerrainHeight(playerPosition.x, playerPosition.z), playerPosition.z, 'persistent');
     if (!camp) return;
     camp.playerBase = true;
     base.owned = true;
@@ -757,7 +759,7 @@ window.EventBus.on('BUILD_BASE_STRUCTURE', prefab => {
     if (cost.research) base.researchPoints -= cost.research;
     const buildIndex = base.structures.length;
     const x = base.position.x + 4 + (buildIndex % 3) * 4; const z = base.position.z + Math.floor(buildIndex / 3) * 4;
-    const entity = instantiatePrefab(prefab, x, window.WorldGenerator.getTerrainHeight(x, z), z, 'persistent');
+    const entity = instantiatePrefab(prefab, x, safeGetTerrainHeight(x, z), z, 'persistent');
     if (!entity) return;
     entity.playerBase = true;
     base.structures.push({ prefab, x, z });
@@ -773,7 +775,7 @@ window.EventBus.on('WORLD_REGENERATE', () => {
     window.currentPrng = alea(window.EngineParams?.worldSeed ?? 1337); window.currentNoise2D = window.createNoise2D(window.currentPrng);
     if (window.GameCore.playerObj && window.GameCore.playerObj.body) { 
         ChunkManager.forceUpdatePosition(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, 0, window.GameCore.playerObj.visual.position.z));
-        const vy = window.WorldGenerator.getTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 5.0; 
+        const vy = safeGetTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 5.0; 
         window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true);
         window.GameCore.playerObj.body.setAngvel({x:0, y:0, z:0}, true);
         window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); 
@@ -785,7 +787,7 @@ window.EventBus.on('WORLD_REGENERATE', () => {
 // SAFE WARP & TELEPORT HANDLERS
 window.EventBus.on('CMD_TELEPORT', (pos) => { 
     if (window.GameCore.playerObj?.body) {
-        const groundY = window.WorldGenerator.getTerrainHeight(pos.x, pos.z);
+        const groundY = safeGetTerrainHeight(pos.x, pos.z);
         const safeY = (isNaN(groundY) ? 10 : groundY) + 5.0; 
 
         window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -805,7 +807,7 @@ window.EventBus.on('PLAYER_RESPAWN', () => {
         window.GameCore.recordCombatDefeat({ source: 'open-world', injury: `open-world defeat on day ${window.EngineParams.worldDay}` });
     }
     
-    const respawnY = window.WorldGenerator.getTerrainHeight(0, 0) + 5.0; 
+    const respawnY = safeGetTerrainHeight(0, 0) + 5.0; 
     
     if (window.GameCore.playerObj?.body) {
         window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -830,7 +832,7 @@ function punishExposedActors() {
             window.EventBus.emit('UI_LOG', '[THE CROW] The woods reach for you, but the landing bends away.');
         } else {
             const point = destination(); 
-            const y = window.WorldGenerator.getTerrainHeight(point.x, point.z) + 5.0;
+            const y = safeGetTerrainHeight(point.x, point.z) + 5.0;
             
             player.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
             player.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
@@ -843,7 +845,7 @@ function punishExposedActors() {
     window.GameCore.activeEntities.filter(entity => entity.body && entity.def.type === 'npc' && !window.RoadManager.isVillageProtected(entity.visual.position)).forEach(entity => {
         if (window.GameCore.getForestLuck(entity) > 0 && Math.random() < (entity.forestBlessing.teleportLuck || 0)) return;
         const point = destination(); 
-        const y = window.WorldGenerator.getTerrainHeight(point.x, point.z) + 2.0;
+        const y = safeGetTerrainHeight(point.x, point.z) + 2.0;
         entity.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
         entity.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
         entity.body.setTranslation({ x: point.x, y, z: point.z }, true); 
@@ -893,7 +895,7 @@ function regenerateWorldCycle() {
                                     window.GameState.inventory.backpack.includes('epoch_anchor');
                 
               if (protectedVillage) {
-                  const newY = window.WorldGenerator.getTerrainHeight(protectedVillage.x, protectedVillage.z) + 5.0;
+                  const newY = safeGetTerrainHeight(protectedVillage.x, protectedVillage.z) + 5.0;
                   window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
                   window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
                   window.GameCore.playerObj.body.setTranslation({x: protectedVillage.x, y: newY, z: protectedVillage.z}, true);
@@ -904,7 +906,7 @@ function regenerateWorldCycle() {
               else if (hasAnchorItem) {
                   const nearestRoadPt = window.RoadManager.getRandomPathPoint();
                   if (nearestRoadPt) {
-                      const newY = window.WorldGenerator.getTerrainHeight(nearestRoadPt.x, nearestRoadPt.z) + 5.0;
+                      const newY = safeGetTerrainHeight(nearestRoadPt.x, nearestRoadPt.z) + 5.0;
                       window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
                       window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
                       window.GameCore.playerObj.body.setTranslation({x: nearestRoadPt.x, y: newY, z: nearestRoadPt.z}, true);
@@ -924,7 +926,7 @@ function regenerateWorldCycle() {
                   newZ = (Math.random() * 2 - 1) * forestExtent;
                   if (Math.abs(newX) > 500 || Math.abs(newZ) > 500) valid = true;
               }
-              const newY = window.WorldGenerator.getTerrainHeight(newX, newZ) + 5.0;
+              const newY = safeGetTerrainHeight(newX, newZ) + 5.0;
               window.GameCore.playerObj.body.setLinvel({x: 0, y: 0, z: 0}, true);
               window.GameCore.playerObj.body.setAngvel({x: 0, y: 0, z: 0}, true);
               window.GameCore.playerObj.body.setTranslation({x: newX, y: newY, z: newZ}, true);
@@ -1013,7 +1015,7 @@ const ChunkManager = {
         
         const dx = playerPos.x - _lastChunkCheckPos.x;
         const dz = playerPos.z - _lastChunkCheckPos.z;
-        if ((dx * dx + dz * dz) < 25) return; // 2D distance threshold
+        if ((dx * dx + dz * dz) < 25) return; 
         _lastChunkCheckPos.set(playerPos.x, 0, playerPos.z);
 
         const cx = Math.floor(playerPos.x / 60); 
@@ -1102,7 +1104,7 @@ const ChunkManager = {
                     c.lerp(_colorScratch.set('#38281d'), dirtInfluence); 
                 }
 
-                vertices[i+1] = window.WorldGenerator.getTerrainHeight(vx, vz); 
+                vertices[i+1] = safeGetTerrainHeight(vx, vz); 
                 
                 let edgeGlow = 0.0;
                 const distFromEdge = Math.abs(minRoadDist - ROAD_WIDTH);
@@ -1129,10 +1131,10 @@ const ChunkManager = {
             const vz = vertices[i+2] + chunkZ;
             clutterData[i/3] = isInsideAethelgard ? 0 : window.WorldGenerator.getNoise(vx * 0.5, vz * 0.5); 
             
-            const hL = window.WorldGenerator.getTerrainHeight(vx - 0.1, vz);
-            const hR = window.WorldGenerator.getTerrainHeight(vx + 0.1, vz);
-            const hD = window.WorldGenerator.getTerrainHeight(vx, vz - 0.1);
-            const hU = window.WorldGenerator.getTerrainHeight(vx, vz + 0.1);
+            const hL = safeGetTerrainHeight(vx - 0.1, vz);
+            const hR = safeGetTerrainHeight(vx + 0.1, vz);
+            const hD = safeGetTerrainHeight(vx, vz - 0.1);
+            const hU = safeGetTerrainHeight(vx, vz + 0.1);
             const n = _v1.set(hL - hR, 0.2, hD - hU).normalize();
             normalArray[i] = n.x;
             normalArray[i+1] = n.y;
@@ -1196,14 +1198,14 @@ const ChunkManager = {
             chunkData.tierA.forEach(point => {
                 const px = point.x;
                 const pz = point.z;
-                const py = window.WorldGenerator.getTerrainHeight(px, pz);
+                const py = safeGetTerrainHeight(px, pz);
                 redwoodPoints.push({ x: px, y: py, z: pz, scale: 0.8 + Math.random() * 0.4, rotation: Math.random() * Math.PI * 2 });
             });
 
             chunkData.tierB.forEach(point => {
                 const px = point.x;
                 const pz = point.z;
-                const py = window.WorldGenerator.getTerrainHeight(px, pz);
+                const py = safeGetTerrainHeight(px, pz);
                 bushPoints.push({ x: px, y: py, z: pz, scale: 0.7 + Math.random() * 0.5, rotation: Math.random() * Math.PI * 2 });
             });
 
@@ -1491,7 +1493,7 @@ window.ArenaTestManager = {
     match: null,
     ensureArena: function() {
         if (this.walls.length > 0) return;
-        const groundY = window.WorldGenerator.getTerrainHeight(this.center.x, this.center.z);
+        const groundY = safeGetTerrainHeight(this.center.x, this.center.z);
         const wallHeight = 8;
         const wallThickness = 1;
         const wallSpecs = [
@@ -1540,7 +1542,7 @@ window.ArenaTestManager = {
             const x = this.center.x + Math.cos(angle) * radius;
             const z = this.center.z + Math.sin(angle) * radius;
             const prefab = prefabs[(wave + index) % prefabs.length];
-            const entity = instantiatePrefab(prefab, x, window.WorldGenerator.getTerrainHeight(x, z), z, 'arena');
+            const entity = instantiatePrefab(prefab, x, safeGetTerrainHeight(x, z), z, 'arena');
             if (entity) { entity.arenaEntity = true; entity.arenaWave = wave; }
         }
         window.EventBus.emit('UI_LOG', `[ARENA] Monster wave ${wave} spawned.`);
@@ -1678,7 +1680,7 @@ window.GameCore.applyForestBlessing = applyForestBlessing;
 function spawnGroundLoot(itemId, position) {
     if (!window.ItemDatabase?.[itemId]) return;
     
-    const groundY = window.WorldGenerator.getTerrainHeight(position.x, position.z);
+    const groundY = safeGetTerrainHeight(position.x, position.z);
     const finalPos = new THREE.Vector3(position.x, groundY + 0.4, position.z);
     
     const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.25), new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0x8a5a00, emissiveIntensity: 1 }));
@@ -1714,7 +1716,7 @@ function spawnPartyMembers() {
         if (window.GameCore.activeEntities.some(entity => entity.companionId === member.id || entity.recruitId === member.id)) return;
         const companionX = playerPosition.x + 2 + index * 2;
         const companionZ = playerPosition.z + 2;
-        const companion = instantiatePrefab(member.prefab, companionX, window.WorldGenerator.getTerrainHeight(companionX, companionZ), companionZ, 'persistent');
+        const companion = instantiatePrefab(member.prefab, companionX, safeGetTerrainHeight(companionX, companionZ), companionZ, 'persistent');
         if (companion) {
             if (member.recruited) companion.companionId = member.id; else companion.recruitId = member.id;
             companion.hp = member.hp || member.maxHp || 100;
@@ -1800,7 +1802,7 @@ function syncCaravanAgents() {
         village.caravans?.filter(caravan => caravan.status === 'traveling').forEach(caravan => {
             if (window.GameCore.activeEntities.some(entity => entity.caravanId === caravan.id)) return;
             const position = caravan.position || { x: village.x + 3, z: village.z };
-            const agent = instantiatePrefab('Merchant Caravan', position.x, window.WorldGenerator.getTerrainHeight(position.x, position.z), position.z, 'persistent');
+            const agent = instantiatePrefab('Merchant Caravan', position.x, safeGetTerrainHeight(position.x, position.z), position.z, 'persistent');
             if (agent) { agent.caravanId = caravan.id; agent.villageId = village.id; }
         });
     });
@@ -1812,7 +1814,7 @@ function syncPlayerBase() {
     if (!base.owned) return;
     base.structures.forEach(structure => {
         if (window.GameCore.activeEntities.some(entity => entity.playerBase && entity.name === structure.prefab)) return;
-        const entity = instantiatePrefab(structure.prefab, structure.x, window.WorldGenerator.getTerrainHeight(structure.x, structure.z), structure.z, 'persistent');
+        const entity = instantiatePrefab(structure.prefab, structure.x, safeGetTerrainHeight(structure.x, structure.z), structure.z, 'persistent');
         if (entity) entity.playerBase = true;
     });
 }
@@ -1872,6 +1874,7 @@ async function bootEngine() {
         window.GameCore.pocketScene.add(pPoint);
 
         if (window.ForestRenderer) {
+            window.ForestRenderer.ensureAssets();
             window.GameCore.scene.add(window.ForestRenderer.group);
         }
         if (window.BillboardManager) {
@@ -1995,7 +1998,7 @@ async function bootEngine() {
                   
                 if (window.GameCore.playerObj && window.GameCore.playerObj.body && pos) {
                     ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, 0, pos.z));
-                    const groundY = window.WorldGenerator.getTerrainHeight(pos.x, pos.z) + 5.0;
+                    const groundY = safeGetTerrainHeight(pos.x, pos.z) + 5.0;
                     window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: groundY, z: pos.z }, true);
@@ -2019,7 +2022,7 @@ async function bootEngine() {
         const ColorTintShader = { uniforms: { "tDiffuse": { value: null }, "tintColor": { value: new THREE.Color('#2b4461') }, "tintIntensity": { value: 0.65 } }, vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`, fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 tintColor; uniform float tintIntensity; varying vec2 vUv; void main() { vec4 texel = texture2D( tDiffuse, vUv ); vec3 tinted = texel.rgb * tintColor * 2.0; vec3 finalColor = mix(texel.rgb, tinted, tintIntensity); gl_FragColor = vec4( finalColor, texel.a ); }` };
         window.GameCore.passes.colorTint = new ShaderPass(ColorTintShader); composer.addPass(window.GameCore.passes.colorTint);
 
-        const startY = window.WorldGenerator.getTerrainHeight(0, 0); const safeY = isNaN(startY) ? 1 : startY;
+        const startY = safeGetTerrainHeight(0, 0); const safeY = isNaN(startY) ? 1 : startY;
         spawnPlayer(0, safeY + 3.0, 0); spawnPartyMembers(); ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
 
         if (window.CapitalCityManager) {
