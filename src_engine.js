@@ -941,35 +941,29 @@ const ChunkManager = {
         geo.attributes.normal.needsUpdate = true;
 
         const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
-        
-        mat.onBeforeCompile = (shader) => {
+
+    mat.onBeforeCompile = (shader) => {
             shader.vertexShader = shader.vertexShader.replace(
                 `#include <common>`,
                 `#include <common>
                  attribute float clutter;
-                 attribute float roadEdge;
-                 varying float vClutter;
-                 varying float vRoadEdge;`
+                 varying float vClutter;`
             );
             shader.vertexShader = shader.vertexShader.replace(
                 `#include <begin_vertex>`,
                 `#include <begin_vertex>
-                 vClutter = clutter;
-                 vRoadEdge = roadEdge;`
+                 vClutter = clutter;`
             );
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <common>`,
                 `#include <common>
-                 varying float vClutter;
-                 varying float vRoadEdge;`
+                 varying float vClutter;`
             );
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <color_fragment>`,
                 `#include <color_fragment>
                  vec3 grassColor = vec3(0.1, 0.3, 0.1);
-                 diffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);
-                 vec3 pathGlowColor = vec3(0.1, 0.75, 1.0);
-                 diffuseColor.rgb += pathGlowColor * vRoadEdge * 2.5;`
+                 diffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);`
             );
         };
         
