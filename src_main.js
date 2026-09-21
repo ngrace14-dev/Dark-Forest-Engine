@@ -15,6 +15,7 @@ import './src_systems_render_optimizer.js';
 import './src_systems_graphics.js';         // Dedicated AAA Graphics Pipeline & Post-Processing
 import './src_systems_block_terrain.js';     // NEW: Procedural Block Terrain & Shader System
 import './src_systems_grass.js';
+import './src_systems_ruins.js';            // <-- ADDED: Procedural Stone Ruins & Cobblestones
 import './src_systems_input.js';
 import './src_systems_audio.js';
 import './src_systems_vfx.js';
