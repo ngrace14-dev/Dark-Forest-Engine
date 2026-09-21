@@ -3,7 +3,10 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import RAPIER from 'rapier';
 import alea from 'alea';
+
+// Your new AAA system imports
 import { WetlandsSystem } from './src_systems_wetlands.js';
+import { MountainSystem } from './src_systems_mountains.js';
 
 window.THREE = THREE;
 window.SkeletonUtils = SkeletonUtils;
@@ -766,9 +769,13 @@ function fixedUpdateLogic(delta) {
         window.GrassSystem.update(delta, activePos);
     }
 
-    // NEW WETLANDS HOOK
+    // NEW HOOKS: WETLANDS AND MOUNTAIN SYSTEMS
     if (window.GameCore?.wetlandsSystem && window.GameCore.camera) {
         window.GameCore.wetlandsSystem.update(delta, window.GameCore.camera);
+    }
+    
+    if (window.GameCore?.mountainSystem && window.GameCore.camera) {
+        window.GameCore.mountainSystem.update(delta, window.GameCore.camera);
     }
 
     if (window.ForestImpostorSystem) {
@@ -1854,9 +1861,14 @@ async function bootEngine() {
         window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 2000000); 
 
         // INITIALIZE NEW SYSTEMS
-        if (window.WetlandsSystem) {
-            window.GameCore.wetlandsSystem = new window.WetlandsSystem(window.GameCore, 300000);
+        if (WetlandsSystem) {
+            window.GameCore.wetlandsSystem = new WetlandsSystem(window.GameCore, 300000);
             window.GameCore.wetlandsSystem.spawnWetlandsChunk(window.GameCore.scene, 0, 0, 0.0);
+        }
+        
+        if (MountainSystem) {
+            window.GameCore.mountainSystem = new MountainSystem(window.GameCore, 300000);
+            window.GameCore.mountainSystem.spawnMountainChunk(window.GameCore.scene, 0, 0);
         }
 
         initLightPool(window.GameCore.scene);
