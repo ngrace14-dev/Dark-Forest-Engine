@@ -147,14 +147,14 @@ function updateWorldClock(delta) {
             window.EngineParams.worldDay += elapsedDays;
             
             for (let day = 0; day < elapsedDays; day++) {
-                processCompanionNeeds(); 
-                processBaseJobs();
+                window.processCompanionNeeds?.(); 
+                window.processBaseJobs?.();
                 window.AdventurerManager?.advanceDay();
                 window.GameState?.processCrowDay?.();
             }
             
             if (window.EngineParams.worldDay > 0 && window.EngineParams.worldDay % (window.EngineParams.cycleLengthDays || 14) === 0) {
-                regenerateWorldCycle();
+                window.regenerateWorldCycle?.();
             }
         }
     }
@@ -385,7 +385,7 @@ function handleEntityDeath(entity) {
         window.GameCore.spawnGroundLoot(lootType, entity.visual.position);
     }
 
-    awardMonsterKill(entity);
+    window.awardMonsterKill?.(entity);
     
     if (window.GameState?.inventory) {
         window.GameState.inventory.gold += entity.def?.faction === 'monster' ? 10 : 50;
@@ -742,7 +742,7 @@ function fixedUpdateLogic(delta) {
         
         const checkInterval = (4 / 24) * (window.EngineParams?.dayLengthSeconds || 1200); 
         if (!window.GameCore.lastNeedsCheck || (window.GameCore.worldTimerAbsolute || 0) > window.GameCore.lastNeedsCheck + checkInterval) {
-             processCompanionNeeds();
+             window.processCompanionNeeds?.();
              window.GameCore.lastNeedsCheck = window.GameCore.worldTimerAbsolute || 0;
         }
 
@@ -1350,7 +1350,7 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     if (window.GameState?.narrator && !window.GameState.narrator.targetId && (def.faction === 'village' || def.faction === 'adventurer')) {
         window.GameState.narrator.targetId = entity.id;
         window.GameState.narrator.targetName = entity.name;
-        applyForestBlessing(entity);
+        window.applyForestBlessing?.(entity);
         window.EventBus?.emit('UI_LOG', `[THE CROW] It chooses ${entity.name} as the story's main character.`);
     }
     return entity;
@@ -1630,8 +1630,8 @@ window.EventBus?.on('PLAYER_PROJECTILE_HIT', ({ target, damage, damageType, posi
     if (target.hp <= 0) {
         playEntityAnimation(target, 'die');
         window.AdventurerManager?.markDefeated(target);
-        spawnGroundLoot(target.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', target.visual.position);
-        awardMonsterKill(target);
+        window.GameCore?.spawnGroundLoot?.(target.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', target.visual.position);
+        window.awardMonsterKill?.(target);
         window.GameState.inventory.gold += target.def.faction === 'monster' ? 10 : 50;
         window.EventBus.emit('UI_UPDATE_HUD');
         setTimeout(() => {
@@ -1773,9 +1773,9 @@ window.EventBus?.on('WORLD_REGENERATE', () => {
         window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true);
         window.GameCore.playerObj.body.setAngvel({x:0, y:0, z:0}, true);
         window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); 
-        spawnPartyMembers(); 
-        syncCaravanAgents(); 
-        syncPlayerBase(); 
+        window.spawnPartyMembers?.(); 
+        window.syncCaravanAgents?.(); 
+        window.syncPlayerBase?.(); 
     }
     window.EventBus.emit('UI_LOG', `World Math Regenerated with Seed: ${window.EngineParams.worldSeed}`);
 });
@@ -2037,8 +2037,8 @@ async function bootEngine() {
 
         const startY = safeGetTerrainHeight(0, 0); 
         const safeY = isNaN(startY) ? 1 : startY;
-        spawnPlayer(0, safeY + 3.0, 0); 
-        spawnPartyMembers(); 
+        window.spawnPlayer?.(0, safeY + 3.0, 0); 
+        window.spawnPartyMembers?.(); 
         ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
 
         window.EventBus?.on('ENV_UPDATE', () => {
