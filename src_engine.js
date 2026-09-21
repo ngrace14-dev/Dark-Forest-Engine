@@ -20,7 +20,7 @@ const _q1 = new THREE.Quaternion();
 const _e1 = new THREE.Euler();
 const _m1 = new THREE.Matrix4();
 const _colorScratch = new THREE.Color();
-const _dirtColorScratch = new THREE.Color('#4a3e31'); // Dedicated dirt road color scratch
+const _dirtColorScratch = new THREE.Color('#4a3e31');
 
 const _targetCamPos = new THREE.Vector3();
 const _currentCamTarget = new THREE.Vector3();
@@ -869,211 +869,160 @@ const ChunkManager = {
         const chunkZ = cz * 60 + 30;
 
         const isInsideAethelgard = window.CapitalCityManager?.isInsideCapital?.(chunkX, chunkZ) || false;
-        
-        const segments = lod === 'A' ? 30 : (lod === 'B' ? 10 : 2);
-        const geo = new THREE.PlaneGeometry(60, 60, segments, segments); 
-        geo.rotateX(-Math.PI / 2);
+        const localRoadPoints = window.RoadManager?.getRoadPointsNear?.(cx, cz) || [];
 
-        const vertices = geo.attributes.position.array; 
-        const colors = [];
-        const roadEdgeData = new Float32Array(geo.attributes.position.count);
-        const localRoadPoints = window.RoadManager?.getRoadPointsNear?.(cx, cz) || []; 
-        const ROAD_WIDTH = 5;
-        
-        for (let i = 0; i < vertices.length; i += 3) {
-            const vx = vertices[i] + chunkX; 
-            const vz = vertices[i+2] + chunkZ;
-            
-            let c = _colorScratch;
+        // Reserve chunk slot while Web Worker processes calculation off main thread
+        this.activeChunks.set(key, { mesh: null, body: null, collider: null, lod });
 
-            if (isInsideAethelgard) {
-                vertices[i+1] = 0; 
-                c.set('#1e293b'); 
-            } else {
-                const biomeKey = window.WorldGenerator?.getBiome?.(vx, vz) || 'plains'; 
-                const biome = window.WorldGenConfig?.biomes?.[biomeKey] || { color: '#4ade80' }; 
-                c.set(biome.color);
-                
-                let minRoadDistSq = 999999;
-                for(let r = 0; r < localRoadPoints.length; r++) { 
-                    const pt = localRoadPoints[r];
-                    if (!pt || !Number.isFinite(pt.x) || !Number.isFinite(pt.z)) continue;
+        window.TerrainWorkerPool.requestChunkData(
+            cx, cz, lod, 60, window.EngineParams?.worldSeed || 1337, localRoadPoints,
+            ({ positions, normals, colors, clutter }) => {
+                if (!this.activeChunks.has(key)) return;
 
-                    const dx = vx - pt.x;
-                    const dz = vz - pt.z;
-                    const distSq = (dx * dx) + (dz * dz);
-                    if (Number.isFinite(distSq) && distSq < minRoadDistSq) {
-                        minRoadDistSq = distSq; 
+                const segments = lod === 'A' ? 30 : (lod === 'B' ? 10 : 2);
+                const geo = new THREE.BufferGeometry();
+
+                // Zero-copy assignment of transferred ArrayBuffers
+                geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+                geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                geo.setAttribute('clutter', new THREE.BufferAttribute(clutter, 1));
+
+                const indices = [];
+                const gridX = segments + 1;
+                for (let j = 0; j < segments; j++) {
+                    for (let i = 0; i < segments; i++) {
+                        const a = i + gridX * j;
+                        const b = i + gridX * (j + 1);
+                        const c = (i + 1) + gridX * (j + 1);
+                        const d = (i + 1) + gridX * j;
+                        indices.push(a, b, d);
+                        indices.push(b, c, d);
                     }
                 }
-                
-                const minRoadDist = Math.sqrt(minRoadDistSq);
-                
-                if (Number.isFinite(minRoadDist) && minRoadDist < ROAD_WIDTH + 2) { 
-                    const dirtInfluence = Math.max(0, 1.0 - (minRoadDist / (ROAD_WIDTH + 2))); 
-                    c.lerp(_dirtColorScratch, dirtInfluence * 0.55); 
+                geo.setIndex(indices);
+
+                const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
+
+                mat.onBeforeCompile = (shader) => {
+                    shader.vertexShader = shader.vertexShader.replace(
+                        `#include <common>`,
+                        `#include <common>
+                         attribute float clutter;
+                         varying float vClutter;
+                         varying vec3 vWorldPos;`
+                    );
+                    shader.vertexShader = shader.vertexShader.replace(
+                        `#include <begin_vertex>`,
+                        `#include <begin_vertex>
+                         vClutter = clutter;
+                         vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;`
+                    );
+                    shader.fragmentShader = shader.fragmentShader.replace(
+                        `#include <common>`,
+                        `#include <common>
+                         varying float vClutter;
+                         varying vec3 vWorldPos;`
+                    );
+                    shader.fragmentShader = shader.fragmentShader.replace(
+                        `#include <color_fragment>`,
+                        `#include <color_fragment>
+                         vec3 grassColor = vec3(0.08, 0.28, 0.08);
+                         diffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);
+
+                         float puddleNoise = sin(vWorldPos.x * 0.12) * cos(vWorldPos.z * 0.12);
+                         float puddleMask = smoothstep(0.45, 0.65, puddleNoise) * (1.0 - vClutter);
+
+                         if (puddleMask > 0.01) {
+                             vec3 waterBedColor = vec3(0.08, 0.06, 0.04);
+                             diffuseColor.rgb = mix(diffuseColor.rgb, waterBedColor, puddleMask * 0.85);
+                         }`
+                    );
+                    shader.fragmentShader = shader.fragmentShader.replace(
+                        `#include <roughnessmap_fragment>`,
+                        `#include <roughnessmap_fragment>
+                         float puddleNoiseRough = sin(vWorldPos.x * 0.12) * cos(vWorldPos.z * 0.12);
+                         float puddleMaskRough = smoothstep(0.45, 0.65, puddleNoiseRough) * (1.0 - vClutter);
+                         roughnessFactor = mix(roughnessFactor, 0.03, puddleMaskRough);`
+                    );
+                };
+
+                if (window.VolumetricFogSystem) {
+                    window.VolumetricFogSystem.patchMaterial(mat);
                 }
 
-                vertices[i+1] = safeGetTerrainHeight(vx, vz); 
-                
-                let edgeGlow = 0.0;
-                const distFromEdge = Math.abs(minRoadDist - ROAD_WIDTH);
-                if (distFromEdge < 1.2) {
-                    edgeGlow = Math.pow(1.0 - (distFromEdge / 1.2), 2.0);
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(chunkX, 0, chunkZ);
+                mesh.receiveShadow = true;
+                mesh.userData.isTerrain = true;
+                mesh.userData.chunkKey = key;
+                if (window.GameCore?.scene) window.GameCore.scene.add(mesh);
+
+                let groundBody = null;
+                let collider = null;
+                if (window.GameCore?.world) {
+                    const indicesU32 = new Uint32Array(indices);
+                    groundBody = window.GameCore.world.createRigidBody(
+                        RAPIER.RigidBodyDesc.fixed().setTranslation(chunkX, 0, chunkZ)
+                    );
+                    collider = window.GameCore.world.createCollider(
+                        RAPIER.ColliderDesc.trimesh(positions, indicesU32),
+                        groundBody
+                    );
                 }
-                roadEdgeData[i / 3] = edgeGlow;
+
+                const activeRecord = this.activeChunks.get(key);
+                if (activeRecord) {
+                    activeRecord.mesh = mesh;
+                    activeRecord.body = groundBody;
+                    activeRecord.collider = collider;
+                }
+
+                if (window.RoadRenderer && window.GameCore?.scene) {
+                    window.RoadRenderer.buildDecorationsForChunk(key, cx, cz, window.GameCore.scene);
+                }
+
+                if (isInsideAethelgard) {
+                    window.EventBus?.emit('CHUNK_GENERATED');
+                    return;
+                }
+
+                const chunkData = window.ForestManager?.generateChunk?.(cx, cz) || { tierA: [], tierB: [] };
+
+                if (window.ForestRenderer?.setChunkInstances) {
+                    const redwoodPoints = [];
+                    const bushPoints = [];
+
+                    chunkData.tierA.forEach(point => {
+                        const px = point.x;
+                        const pz = point.z;
+                        const py = safeGetTerrainHeight(px, pz);
+                        redwoodPoints.push({ x: px, y: py, z: pz, scale: 0.8 + Math.random() * 0.4, rotation: Math.random() * Math.PI * 2 });
+                    });
+
+                    chunkData.tierB.forEach(point => {
+                        const px = point.x;
+                        const pz = point.z;
+                        const py = safeGetTerrainHeight(px, pz);
+                        bushPoints.push({ x: px, y: py, z: pz, scale: 0.7 + Math.random() * 0.5, rotation: Math.random() * Math.PI * 2 });
+                    });
+
+                    window.ForestRenderer.setChunkInstances(key, 'Redwood Tree', redwoodPoints);
+                    window.ForestRenderer.setChunkInstances(key, 'Bramble Bush', bushPoints);
+
+                    if (lod === 'A' && window.GameCore?.world) {
+                        redwoodPoints.forEach(pt => {
+                            const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(pt.x, pt.y + 15.0, pt.z));
+                            window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(15.0, 1.8), body);
+                            if (!this.activeChunks.get(key).instanceBodies) this.activeChunks.get(key).instanceBodies = [];
+                            this.activeChunks.get(key).instanceBodies.push(body);
+                        });
+                    }
+                }
+
+                window.EventBus?.emit('CHUNK_GENERATED');
             }
-
-            const colorNoise = window.currentNoise2D ? window.currentNoise2D(vx * 0.1, vz * 0.1) * 0.04 : 0; 
-            c.r = Math.min(1.0, Math.max(0.0, c.r + colorNoise)); 
-            c.g = Math.min(1.0, Math.max(0.0, c.g + colorNoise)); 
-            c.b = Math.min(1.0, Math.max(0.0, c.b + colorNoise));
-            
-            colors.push(c.r, c.g, c.b);
-        }
-        
-        geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); 
-        geo.setAttribute('roadEdge', new THREE.BufferAttribute(roadEdgeData, 1));
-        geo.attributes.position.needsUpdate = true; 
-        geo.computeVertexNormals();
-        
-        const normalArray = geo.attributes.normal.array;
-        
-        const clutterData = new Float32Array(geo.attributes.position.count);
-        const noiseFn = window.WorldGenerator?.getNoise || (() => 0);
-
-        for (let i = 0; i < vertices.length; i += 3) {
-            const vx = vertices[i] + chunkX; 
-            const vz = vertices[i+2] + chunkZ;
-            
-            clutterData[i/3] = isInsideAethelgard ? 0 : noiseFn(vx * 0.5, vz * 0.5); 
-            
-            const hL = safeGetTerrainHeight(vx - 0.1, vz);
-            const hR = safeGetTerrainHeight(vx + 0.1, vz);
-            const hD = safeGetTerrainHeight(vx, vz - 0.1);
-            const hU = safeGetTerrainHeight(vx, vz + 0.1);
-            
-            const n = _v1.set(hL - hR, 0.2, hD - hU).normalize();
-            normalArray[i] = n.x;
-            normalArray[i+1] = n.y;
-            normalArray[i+2] = n.z;
-        }
-        
-        geo.setAttribute('clutter', new THREE.BufferAttribute(clutterData, 1));
-        geo.attributes.normal.needsUpdate = true;
-
-        const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
-
-        mat.onBeforeCompile = (shader) => {
-            shader.vertexShader = shader.vertexShader.replace(
-                `#include <common>`,
-                `#include <common>
-                 attribute float clutter;
-                 varying float vClutter;
-                 varying vec3 vWorldPos;`
-            );
-            shader.vertexShader = shader.vertexShader.replace(
-                `#include <begin_vertex>`,
-                `#include <begin_vertex>
-                 vClutter = clutter;
-                 vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;`
-            );
-            shader.fragmentShader = shader.fragmentShader.replace(
-                `#include <common>`,
-                `#include <common>
-                 varying float vClutter;
-                 varying vec3 vWorldPos;`
-            );
-            shader.fragmentShader = shader.fragmentShader.replace(
-                `#include <color_fragment>`,
-                `#include <color_fragment>
-                 vec3 grassColor = vec3(0.08, 0.28, 0.08);
-                 diffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);
-
-                 float puddleNoise = sin(vWorldPos.x * 0.12) * cos(vWorldPos.z * 0.12);
-                 float puddleMask = smoothstep(0.45, 0.65, puddleNoise) * (1.0 - vClutter);
-
-                 if (puddleMask > 0.01) {
-                     vec3 waterBedColor = vec3(0.08, 0.06, 0.04);
-                     diffuseColor.rgb = mix(diffuseColor.rgb, waterBedColor, puddleMask * 0.85);
-                 }`
-            );
-            shader.fragmentShader = shader.fragmentShader.replace(
-                `#include <roughnessmap_fragment>`,
-                `#include <roughnessmap_fragment>
-                 float puddleNoiseRough = sin(vWorldPos.x * 0.12) * cos(vWorldPos.z * 0.12);
-                 float puddleMaskRough = smoothstep(0.45, 0.65, puddleNoiseRough) * (1.0 - vClutter);
-                 roughnessFactor = mix(roughnessFactor, 0.03, puddleMaskRough);`
-            );
-        };
-
-        if (window.VolumetricFogSystem) {
-            window.VolumetricFogSystem.patchMaterial(mat);
-        }
-        
-        const mesh = new THREE.Mesh(geo, mat);  
-        mesh.position.set(chunkX, 0, chunkZ); 
-        mesh.receiveShadow = true; 
-        mesh.userData.isTerrain = true; 
-        mesh.userData.chunkKey = key; 
-        if (window.GameCore?.scene) window.GameCore.scene.add(mesh);
-
-        const physicsVertices = new Float32Array(vertices); 
-        const indicesU32 = new Uint32Array(geo.index.array); 
-
-        let groundBody = null;
-        let collider = null;
-        
-        if (window.GameCore?.world) {
-            groundBody = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(chunkX, 0, chunkZ));
-            collider = window.GameCore.world.createCollider(RAPIER.ColliderDesc.trimesh(physicsVertices, indicesU32), groundBody);
-        }
-        
-        this.activeChunks.set(key, { mesh, body: groundBody, collider, lod });
-        
-        if (window.RoadRenderer && window.GameCore?.scene) {
-            window.RoadRenderer.buildDecorationsForChunk(key, cx, cz, window.GameCore.scene);
-        }
-        
-        if (isInsideAethelgard) {
-            window.EventBus?.emit('CHUNK_GENERATED');
-            return;
-        }
-
-        const chunkData = window.ForestManager?.generateChunk?.(cx, cz) || { tierA: [], tierB: [] };
-        
-        if (window.ForestRenderer?.setChunkInstances) {
-            const redwoodPoints = [];
-            const bushPoints = [];
-
-            chunkData.tierA.forEach(point => {
-                const px = point.x;
-                const pz = point.z;
-                const py = safeGetTerrainHeight(px, pz);
-                redwoodPoints.push({ x: px, y: py, z: pz, scale: 0.8 + Math.random() * 0.4, rotation: Math.random() * Math.PI * 2 });
-            });
-
-            chunkData.tierB.forEach(point => {
-                const px = point.x;
-                const pz = point.z;
-                const py = safeGetTerrainHeight(px, pz);
-                bushPoints.push({ x: px, y: py, z: pz, scale: 0.7 + Math.random() * 0.5, rotation: Math.random() * Math.PI * 2 });
-            });
-
-            window.ForestRenderer.setChunkInstances(key, 'Redwood Tree', redwoodPoints);
-            window.ForestRenderer.setChunkInstances(key, 'Bramble Bush', bushPoints);
-
-            if (lod === 'A' && window.GameCore?.world) {
-                redwoodPoints.forEach(pt => {
-                    const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(pt.x, pt.y + 15.0, pt.z));
-                    window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(15.0, 1.8), body);
-                    if (!this.activeChunks.get(key).instanceBodies) this.activeChunks.get(key).instanceBodies = [];
-                    this.activeChunks.get(key).instanceBodies.push(body);
-                });
-            }
-        }
-
-        window.EventBus?.emit('CHUNK_GENERATED');
+        );
     },
     unloadChunk: function(key) {
         const chunk = this.activeChunks.get(key); 
@@ -1084,10 +1033,11 @@ const ChunkManager = {
 
         if(!chunk) return;
         
-        chunk.mesh.geometry.dispose(); 
-        chunk.mesh.material.dispose(); 
-        
-        if (window.GameCore?.scene) window.GameCore.scene.remove(chunk.mesh); 
+        if (chunk.mesh) {
+            chunk.mesh.geometry?.dispose(); 
+            chunk.mesh.material?.dispose(); 
+            if (window.GameCore?.scene) window.GameCore.scene.remove(chunk.mesh); 
+        }
         
         if (chunk.body && window.GameCore?.world) {
             window.GameCore.world.removeRigidBody(chunk.body);
