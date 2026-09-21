@@ -67,6 +67,7 @@ export class WetlandsSystem {
 
             shader.vertexShader = `
                 varying vec3 vWorldPos;
+                varying vec3 vWorldNormalVec;
                 ${shader.vertexShader}
             `.replace(
                 '#include <begin_vertex>',
@@ -74,8 +75,10 @@ export class WetlandsSystem {
                 #include <begin_vertex>
                 #ifdef USE_INSTANCING
                     vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
+                    vWorldNormalVec = normalize(mat3(modelMatrix * instanceMatrix) * normal);
                 #else
                     vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+                    vWorldNormalVec = normalize(mat3(modelMatrix) * normal);
                 #endif
                 `
             );
@@ -83,6 +86,7 @@ export class WetlandsSystem {
             shader.fragmentShader = `
                 uniform float uWaterLevel;
                 varying vec3 vWorldPos;
+                varying vec3 vWorldNormalVec;
                 ${shader.fragmentShader}
             `.replace(
                 '#include <color_fragment>',
@@ -90,8 +94,9 @@ export class WetlandsSystem {
                 #include <color_fragment>
                 vec3 dX = dFdx(vWorldPos * 10.0);
                 vec3 dY = dFdy(vWorldPos * 10.0);
-                vec3 bumpNormal = normalize(cross(dX, dY));
-                vec3 finalNormal = normalize(mix(vNormal, bumpNormal, 0.4));
+                vec3 crossN = cross(dX, dY);
+                vec3 bumpNormal = length(crossN) > 0.00001 ? normalize(crossN) : vWorldNormalVec;
+                vec3 finalNormal = normalize(mix(vWorldNormalVec, bumpNormal, 0.4));
 
                 vec3 dryMossColor = vec3(0.18, 0.25, 0.12);
                 vec3 submergedRootColor = vec3(0.12, 0.08, 0.05);
@@ -152,13 +157,15 @@ export class WetlandsSystem {
                 float rippleNoise = sin(vWorldPos.x * 8.0 + uTime * 2.0) * cos(vWorldPos.z * 8.0 + uTime * 1.5);
                 vec3 surfaceDx = dFdx(vec3(vWorldPos.x, rippleNoise * 0.1, vWorldPos.z));
                 vec3 surfaceDy = dFdy(vec3(vWorldPos.x, rippleNoise * 0.1, vWorldPos.z));
-                vec3 rippleNormal = normalize(cross(surfaceDx, surfaceDy));
+                vec3 crossR = cross(surfaceDx, surfaceDy);
+                vec3 rippleNormal = length(crossR) > 0.00001 ? normalize(crossR) : vec3(0.0, 1.0, 0.0);
 
                 float waterDepth = smoothstep(0.1, -0.4, vWorldPos.y); 
                 vec3 mudColor = vec3(0.15, 0.12, 0.08);
                 vec3 waterColor = vec3(0.1, 0.12, 0.15); 
                 
                 diffuseColor.rgb = mix(mudColor, waterColor, waterDepth);
+                diffuseColor.rgb += rippleNormal * 0.03; // Apply subtle surface shimmer
                 
                 float distToCam = distance(vWorldPos, uCameraPos);
                 diffuseColor.a *= 1.0 - smoothstep(2500.0, 3000.0, distToCam);
@@ -192,6 +199,9 @@ export class WetlandsSystem {
      */
     spawnWetlandsChunk(scene, centerX, centerZ, baseWaterLevel = 0.0) {
         if (!scene) return null;
+
+        // Update shared water level uniform to match current spawn height
+        this.sharedUniforms.uWaterLevel.value = baseWaterLevel;
 
         const chunkGroup = new THREE.Group();
         chunkGroup.position.set(centerX, 0, centerZ);
