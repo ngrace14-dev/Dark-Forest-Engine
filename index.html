@@ -8,13 +8,14 @@
     <!-- Fixes the 404 Favicon error -->
     <link rel="icon" href="data:,">
     
-    <!-- RESTORED: Tailwind CSS. This brings your UI back! -->
+    <!-- RESTORED: Tailwind CSS (Required for your UI styling to render) -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
+    <!-- FIXED: Import Map strictly enforcing a single Three.js instance -->
     <script type="importmap">
         {
             "imports": {
@@ -23,7 +24,7 @@
                 "rapier": "https://cdn.skypack.dev/@dimforge/rapier3d-compat",
                 "simplex-noise": "https://esm.sh/simplex-noise@4.0.1",
                 "alea": "https://esm.sh/alea@1.0.1",
-                "three-pathfinding": "https://unpkg.com/three-pathfinding@1.3.0/dist/three-pathfinding.module.js"
+                "three-pathfinding": "https://esm.sh/three-pathfinding@1.3.0?external=three"
             }
         }
     </script>
