@@ -450,6 +450,221 @@ function updatePlayerMovement(delta) {
 }
 
 // ==========================================
+// COMBAT ENGINE
+// ==========================================
+
+function performAttack(isHeavy = false) {
+    if (!window.GameCore?.playerObj?.visual) return;
+    if (window.Input?.isBlocking || window.Input?.isAttacking) return; 
+    if (window.GameCore.playerObj.currentAnimState === 'hit' || window.GameCore.playerObj.currentAnimState === 'die') return;
+    
+    const isDashStrike = !isHeavy && window.Input?.isSprinting;
+    
+    const profile = isHeavy ? 
+        { stamina: 35, cooldown: 1.2, reach: 4.5, radius: 1.5, angle: Math.PI * 0.8, multiplier: 2.2, poise: 2.5, windup: 0.15, duration: 0.35 } : 
+        isDashStrike ? 
+        { stamina: 20, cooldown: 1.0, reach: 5.0, radius: 1.2, angle: Math.PI * 0.4, multiplier: 1.6, poise: 1.8, windup: 0.1, duration: 0.25 } : 
+        { stamina: 15, cooldown: 0.8, reach: 3.5, radius: 1.0, angle: Math.PI * 0.6, multiplier: 1.0, poise: 1.0, windup: 0.1, duration: 0.25 };
+        
+    const currentStamina = window.GameState?.pStats?.stamina ?? 100;
+    if (currentStamina < profile.stamina) { 
+        window.EventBus?.emit('UI_LOG', 'Too exhausted to attack.'); 
+        return; 
+    }
+
+    if (window.NetworkSession?.connected) window.NetworkSession.sendAttack(isHeavy);
+
+    if (window.GameState?.pStats) window.GameState.pStats.stamina = Math.max(0, currentStamina - profile.stamina); 
+    
+    if (window.Input) {
+        window.Input.isAttacking = true; 
+        window.Input.attackCooldown = profile.cooldown;
+    }
+    
+    playEntityAnimation(window.GameCore.playerObj, 'attack');
+    
+    if (window.Input) {
+        window.Input.activeSweep = {
+            profile: profile,
+            timer: profile.windup + profile.duration,
+            activeAt: profile.duration, 
+            alreadyHit: new Set(),
+            isHeavy: isHeavy,
+            playerPos: new THREE.Vector3(), 
+            playerForward: new THREE.Vector3()
+        };
+    }
+
+    window.GameCore?.addXP?.('meleeAtt', isHeavy ? 4 : 2); 
+}
+
+function performGuardbreaker() {
+    if (!window.Input || window.Input.isBlocking || window.Input.isAttacking || window.Input.guardbreakerCooldown > 0 || !window.GameCore?.playerObj?.visual) return;
+    const currentStamina = window.GameState?.pStats?.stamina ?? 100;
+    if (currentStamina < 30) { window.EventBus?.emit('UI_LOG', 'Too exhausted to use Guardbreaker.'); return; }
+    
+    const profile = { stamina: 30, cooldown: 0.7, reach: 3.5, radius: 1.0, angle: Math.PI * 0.4, multiplier: 0.7, poise: 999, windup: 0.2, duration: 0.2, isGuardbreaker: true };
+    
+    if (window.GameState?.pStats) window.GameState.pStats.stamina -= profile.stamina;
+    window.Input.guardbreakerCooldown = 5;
+    window.Input.isAttacking = true;
+    window.Input.attackCooldown = profile.cooldown;
+    
+    playEntityAnimation(window.GameCore.playerObj, 'attack');
+    window.EventBus?.emit('SPAWN_FLOATING_TEXT', { text: 'GUARDBREAKER', pos: window.GameCore.playerObj.visual.position, color: '#fbbf24' });
+    
+    window.Input.activeSweep = {
+        profile: profile,
+        timer: profile.windup + profile.duration,
+        activeAt: profile.duration,
+        alreadyHit: new Set(),
+        isHeavy: true 
+    };
+}
+
+function updateCombatHitboxes(delta) {
+    if (!window.Input?.activeSweep || !window.GameCore?.playerObj?.body) return;
+    
+    const sweep = window.Input.activeSweep;
+    sweep.timer -= delta;
+
+    if (sweep.timer <= 0) {
+        window.Input.activeSweep = null;
+        return;
+    }
+
+    if (sweep.timer <= sweep.activeAt) {
+        let pTrans;
+        try {
+            pTrans = window.GameCore.playerObj.body.translation();
+        } catch (e) {
+            return;
+        }
+
+        if (!sweep.playerPos) sweep.playerPos = new THREE.Vector3();
+        if (!sweep.playerForward) sweep.playerForward = new THREE.Vector3();
+
+        sweep.playerPos.set(pTrans.x, pTrans.y, pTrans.z);
+        sweep.playerForward.set(0, 0, 1).applyQuaternion(window.GameCore.playerObj.visual.quaternion).normalize();
+        
+        let candidates = [];
+        if (window.GameCore.SpatialGrid?.getNearbyEntities) {
+            candidates = window.GameCore.SpatialGrid.getNearbyEntities(sweep.playerPos.x, sweep.playerPos.z, sweep.profile.reach + 2);
+        }
+        if (!candidates || candidates.length === 0) {
+            candidates = window.GameCore.activeEntities || [];
+        }
+
+        for (let i = candidates.length - 1; i >= 0; i--) {
+            const en = candidates[i];
+            if (!en || en === window.GameCore.playerObj || en.hp <= 0 || sweep.alreadyHit.has(en.id)) continue;
+            if (en.def?.faction === 'player') continue;
+
+            let ePos = en.visual ? en.visual.position : null;
+            if (!ePos && en.body) {
+                try {
+                    const t = en.body.translation();
+                    ePos = _v3.set(t.x, t.y, t.z);
+                } catch(e) { continue; }
+            }
+            if (!ePos) continue;
+
+            const dx = ePos.x - sweep.playerPos.x;
+            const dz = ePos.z - sweep.playerPos.z;
+            const distSq = dx * dx + dz * dz;
+            const reachSq = (sweep.profile.reach + (en.def?.radius || 0.5)) ** 2;
+
+            if (distSq <= reachSq) {
+                _v1.set(dx, 0, dz).normalize();
+                const angleToTarget = sweep.playerForward.angleTo(_v1);
+                
+                if (angleToTarget <= (sweep.profile.angle / 2) || distSq < 1.0) {
+                    sweep.alreadyHit.add(en.id);
+                    
+                    let damageMultiplier = sweep.profile.multiplier;
+                    if (window.Input.isStealth && sweep.isHeavy) {
+                        damageMultiplier *= 5.0;
+                        window.EventBus?.emit('SPAWN_FLOATING_TEXT', {text: "ASSASSINATION!", pos: ePos, color: '#ff0000'});
+                        window.EventBus?.emit('UI_LOG', `[CRITICAL] You assassinated ${en.name}!`);
+                        window.EventBus?.emit('TOGGLE_STEALTH');
+                    }
+
+                    const weaponDmg = window.GameState?.derivedStats?.weaponDamage ?? 10;
+                    const strLvl = window.GameState?.pStats?.strength?.level ?? 1;
+                    const strBuff = window.GameCore?.getBuffBonus?.('strength') ?? 0;
+                    const attBuff = window.GameCore?.getBuffBonus?.('meleeAtt') ?? 0;
+                    const injuryMult = window.GameCore?.getCombatInjuryMultiplier?.() ?? 1.0;
+
+                    const rawDamage = weaponDmg + ((strLvl + strBuff) * 2) + attBuff;
+                    const damage = Math.max(1, Math.floor(rawDamage * damageMultiplier * injuryMult) - (en.def?.armor || 0)); 
+                    
+                    en.hp = Math.max(0, en.hp - damage); 
+                    en.poise = Math.max(0, (en.poise || 10) - (sweep.profile.poise || 10));
+
+                    window.EventBus?.emit('ENTITY_DAMAGED', { damage: damage, position: ePos, isPlayer: false });
+                    window.EventBus?.emit('SPAWN_HIT_VFX', { type: en.def?.vfx?.onHit || 'Blood', pos: ePos.clone().add(_v1.set(0, 1, 0)) });
+                    
+                    if (sweep.isHeavy || sweep.profile.isGuardbreaker) {
+                        window.Input.hitPauseTimer = 0.08; 
+                        window.Input.camShake = 0.5;
+                        const recoilDir = sweep.playerForward.clone().negate();
+                        if (window.GameCore.playerObj.body) {
+                            window.GameCore.playerObj.body.applyImpulse(_v2.set(recoilDir.x * 5, 0, recoilDir.z * 5), true);
+                        }
+                    } else {
+                        window.Input.hitPauseTimer = 0.03;
+                    }
+
+                    if (en.hp <= 0) {
+                        handleEntityDeath(en);
+                    }
+                }
+            }
+        }
+    }
+}
+
+function fixedUpdateLogic(delta) {
+    if (window.GameCore?.playerObj) ChunkManager.update(window.GameCore.playerObj.visual.position);
+    if (window.EngineParams?.offPathCaptureCooldown > 0) window.EngineParams.offPathCaptureCooldown = Math.max(0, window.EngineParams.offPathCaptureCooldown - delta);
+    
+    if (window.GameCore) window.GameCore.worldTimer = (window.GameCore.worldTimer || 0) + delta;
+
+    updateWorldClock(delta);
+    
+    if (window.GameCore && window.GameCore.worldTimer > 0.25) { 
+        updatePeriodicSystems();
+        updateLightPool(); 
+        
+        const checkInterval = (4 / 24) * (window.EngineParams?.dayLengthSeconds || 1200); 
+        if (!window.GameCore.lastNeedsCheck || (window.GameCore.worldTimerAbsolute || 0) > window.GameCore.lastNeedsCheck + checkInterval) {
+             processCompanionNeeds();
+             window.GameCore.lastNeedsCheck = window.GameCore.worldTimerAbsolute || 0;
+        }
+
+        window.GameCore.worldTimer = 0; 
+    }
+
+    if (window.GameCore) window.GameCore.worldTimerAbsolute = (window.GameCore.worldTimerAbsolute || 0) + delta;
+
+    window.ArenaTestManager?.update?.(delta);
+    window.VATManager?.update?.(delta);
+    window.EncounterDirector?.update?.(delta);
+    if (window.GameCore?.AnimationSystem) window.GameCore.AnimationSystem.update(delta);
+    if (window.ForestRenderer) window.ForestRenderer.update(delta);
+
+    updatePlayerStats(delta);
+    updateEntities(delta);
+
+    if (window.RenderOptimizer && window.GameCore?.camera) {
+        window.RenderOptimizer.updateEntityLOD(window.GameCore.activeEntities || [], window.GameCore.camera.position);
+    }
+
+    updatePlayerMovement(delta);
+    updateCombatHitboxes(delta);
+}
+
+// ==========================================
 // CHUNK & SCENERY MANAGERS
 // ==========================================
 
@@ -981,6 +1196,139 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
 window.GameCore.instantiatePrefab = instantiatePrefab;
 window.GameCore.ChunkManager = ChunkManager;
 
+window.ArenaTestManager = {
+    center: { x: 120, z: 120 },
+    size: 40,
+    walls: [],
+    match: null,
+    ensureArena: function() {
+        if (this.walls.length > 0) return;
+        const groundY = safeGetTerrainHeight(this.center.x, this.center.z);
+        const wallHeight = 8;
+        const wallThickness = 1;
+        const wallSpecs = [
+            { x: this.center.x, z: this.center.z - this.size / 2, width: this.size + 2, depth: wallThickness },
+            { x: this.center.x, z: this.center.z + this.size / 2, width: this.size + 2, depth: wallThickness },
+            { x: this.center.x - this.size / 2, z: this.center.z, width: wallThickness, depth: this.size },
+            { x: this.center.x + this.size / 2, z: this.center.z, width: wallThickness, depth: this.size }
+        ];
+        wallSpecs.forEach(spec => {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(spec.width, wallHeight, spec.depth), new THREE.MeshStandardMaterial({ color: 0x171b22, roughness: 0.9 }));
+            mesh.position.set(spec.x, groundY + wallHeight / 2, spec.z);
+            mesh.castShadow = true; mesh.receiveShadow = true; window.GameCore.scene.add(mesh);
+            const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(spec.x, groundY + wallHeight / 2, spec.z));
+            window.GameCore.world.createCollider(RAPIER.ColliderDesc.cuboid(spec.width / 2, wallHeight / 2, spec.depth / 2), body);
+            this.walls.push({ mesh, body });
+        });
+    },
+    enter: function() {
+        this.ensureArena();
+        window.EngineParams.arenaMode = true;
+        window.EventBus?.emit('CMD_TELEPORT', this.center);
+        window.EventBus?.emit('UI_LOG', '[ARENA] Locked gladiator test arena entered.');
+    },
+    startMatch: function(totalWaves = 3) {
+        if (this.match?.state === 'fighting') {
+            window.EventBus?.emit('UI_LOG', '[ARENA] A match is already in progress.');
+            return;
+        }
+        this.enter();
+        this.clear();
+        this.match = { state: 'fighting', totalWaves, transitionTimer: 0, waveCleared: false };
+        window.EngineParams.arenaWave = 0;
+        window.GameState.gladiator.matchState = 'fighting';
+        window.GameState.gladiator.objective = `Survive ${totalWaves} waves`;
+        window.EventBus?.emit('UI_LOG', `[ARENA] ${window.GameState.gladiator.name} enters the arena.`);
+        this.spawnWave();
+    },
+    spawnWave: function() {
+        if (!window.EngineParams.arenaMode) this.enter();
+        const wave = ++window.EngineParams.arenaWave;
+        const prefabs = ['Ghoul', 'Flesh Horror', 'Wendigo'];
+        const count = Math.min(8, 2 + wave);
+        for (let index = 0; index < count; index++) {
+            const angle = (index / count) * Math.PI * 2;
+            const radius = this.size * 0.35;
+            const x = this.center.x + Math.cos(angle) * radius;
+            const z = this.center.z + Math.sin(angle) * radius;
+            const prefab = prefabs[(wave + index) % prefabs.length];
+            const entity = instantiatePrefab(prefab, x, safeGetTerrainHeight(x, z), z, 'arena');
+            if (entity) { entity.arenaEntity = true; entity.arenaWave = wave; }
+        }
+        window.EventBus?.emit('UI_LOG', `[ARENA] Monster wave ${wave} spawned.`);
+    },
+    update: function(delta) {
+        if (!this.match || this.match.state !== 'fighting') return;
+        if (window.GameState.pStats.hp <= 0) { this.defeat(); return; }
+        const living = window.GameCore.activeEntities.filter(entity => entity.arenaEntity && entity.hp > 0);
+        if (living.length > 0) { this.match.waveCleared = false; return; }
+        if (!this.match.waveCleared) {
+            this.match.waveCleared = true;
+            this.match.transitionTimer = 2;
+            window.EventBus?.emit('UI_LOG', `[ARENA] Wave ${window.EngineParams.arenaWave} cleared.`);
+        }
+        this.match.transitionTimer -= delta;
+        if (this.match.transitionTimer > 0) return;
+        if (window.EngineParams.arenaWave >= this.match.totalWaves) this.victory();
+        else { this.match.waveCleared = false; this.spawnWave(); }
+    },
+    victory: function() {
+        if (!this.match || this.match.state !== 'fighting') return;
+        this.match.state = 'victory';
+        const reward = 50 + this.match.totalWaves * 25;
+        window.GameCore.recordCombatVictory({ source: 'arena', reward, fame: this.match.totalWaves * 5, label: 'won an arena match' });
+        window.GameState.gladiator.matchState = 'victory';
+        window.GameState.gladiator.objective = `Victory. Reward: ${reward} gold`;
+        window.EventBus?.emit('UI_LOG', `[ARENA] Victory. ${reward} gold awarded.`);
+        window.EventBus?.emit('OPEN_ARENA_RESULT', { result: 'victory', reward });
+        window.EventBus?.emit('UI_UPDATE_HUD');
+    },
+    defeat: function() {
+        if (!this.match || this.match.state !== 'fighting') return;
+        this.match.state = 'defeat';
+        window.GameCore.recordCombatDefeat({ source: 'arena', injury: `arena defeat on day ${window.EngineParams.worldDay}` });
+        window.GameState.gladiator.matchState = 'defeat';
+        window.GameState.gladiator.objective = 'Defeated. Recover before the next match.';
+        this.clear();
+        window.EventBus?.emit('UI_LOG', '[ARENA] Defeat. The gladiator is dragged from the sand.');
+        window.EventBus?.emit('OPEN_ARENA_RESULT', { result: 'defeat', reward: 0 });
+        window.EventBus?.emit('UI_UPDATE_HUD');
+    },
+    clear: function() {
+        window.GameCore.activeEntities.filter(entity => entity.arenaEntity).forEach(entity => {
+            if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(entity.id);
+            window.GameCore.releaseEntityIndex(entity.memoryIndex);
+            if (entity.visual) window.GameCore.scene.remove(entity.visual);
+            if (entity.body) {
+                window.GameCore.world.removeRigidBody(entity.body);
+                entity.body = null;
+            }
+        });
+        window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => !entity.arenaEntity);
+        window.EventBus?.emit('UI_LOG', '[ARENA] Arena monsters cleared.');
+    },
+    exit: function() {
+        this.clear();
+        this.walls.forEach(wall => { 
+            window.GameCore.scene.remove(wall.mesh); 
+            if (wall.body) window.GameCore.world.removeRigidBody(wall.body); 
+        });
+        this.walls = [];
+        window.EngineParams.arenaMode = false;
+        window.EngineParams.arenaWave = 0;
+        this.match = null;
+        window.GameState.gladiator.matchState = 'hub';
+        window.GameState.gladiator.objective = 'Awaiting a match';
+        window.EventBus?.emit('CMD_TELEPORT', { x: 0, z: 0 });
+        window.EventBus?.emit('UI_LOG', '[ARENA] Returned to the open world.');
+    }
+};
+window.EventBus?.on('ENTER_ARENA_TEST', () => window.ArenaTestManager.enter());
+window.EventBus?.on('START_ARENA_MATCH', () => window.ArenaTestManager.startMatch());
+window.EventBus?.on('SPAWN_ARENA_WAVE', () => window.ArenaTestManager.spawnWave());
+window.EventBus?.on('CLEAR_ARENA_TEST', () => window.ArenaTestManager.clear());
+window.EventBus?.on('EXIT_ARENA_TEST', () => window.ArenaTestManager.exit());
+
 function spawnPlayer(x, y, z) {
     const def = window.AssetManager?.prefabs?.['Player'] || { height: 2, radius: 0.5 };
     const halfHeight = (def.height || 2) / 2;
@@ -1020,51 +1368,6 @@ function spawnPlayer(x, y, z) {
     window.GameCore.playerObj.node_id = 'player_node';
 }
 
-function fixedUpdateLogic(delta) {
-    if (window.GameCore?.playerObj) ChunkManager.update(window.GameCore.playerObj.visual.position);
-    if (window.EngineParams?.offPathCaptureCooldown > 0) window.EngineParams.offPathCaptureCooldown = Math.max(0, window.EngineParams.offPathCaptureCooldown - delta);
-    
-    window.GameCore.worldTimer += delta;
-
-    updateWorldClock(delta);
-    
-    if (window.GameCore.worldTimer > 0.25) { 
-        updatePeriodicSystems();
-        updateLightPool(); 
-        
-        const checkInterval = (4 / 24) * (window.EngineParams?.dayLengthSeconds || 1200); 
-        if (!window.GameCore.lastNeedsCheck || window.GameCore.worldTimerAbsolute > window.GameCore.lastNeedsCheck + checkInterval) {
-             processCompanionNeeds();
-             window.GameCore.lastNeedsCheck = window.GameCore.worldTimerAbsolute || 0;
-        }
-
-        window.GameCore.worldTimer = 0; 
-    }
-
-    window.GameCore.worldTimerAbsolute = (window.GameCore.worldTimerAbsolute || 0) + delta;
-
-    window.ArenaTestManager?.update?.(delta);
-    window.VATManager?.update?.(delta);
-    window.EncounterDirector?.update?.(delta);
-    if (window.GameCore?.AnimationSystem) window.GameCore.AnimationSystem.update(delta);
-    if (window.ForestRenderer) window.ForestRenderer.update(delta);
-
-    updatePlayerStats(delta);
-    updateEntities(delta);
-
-    if (window.RenderOptimizer && window.GameCore?.camera) {
-        window.RenderOptimizer.updateEntityLOD(window.GameCore.activeEntities || [], window.GameCore.camera.position);
-    }
-
-    updatePlayerMovement(delta);
-    updateCombatHitboxes(delta);
-}
-
-// RESTORED EVENT BUS LISTENERS
-window.EventBus?.on('PRIMARY_CLICK_DOWN', () => { if(window.Input?.attackCooldown <= 0) performAttack(); });
-window.EventBus?.on('SECONDARY_CLICK_DOWN', () => { if(window.Input?.attackCooldown <= 0) performAttack(true); });
-window.EventBus?.on('GUARDBREAKER', performGuardbreaker);
-
 window.EventBus?.on('GAME_STARTED', () => {
     // 1. Force Capital City Generation
     if (window.CapitalCityManager && !window.CapitalCityManager.isGenerated) {
@@ -1072,7 +1375,6 @@ window.EventBus?.on('GAME_STARTED', () => {
     }
     
     // 2. Clear all potentially corrupted boot chunks and explicitly rebuild them 
-    //    now that we are 100% sure window.WorldGenerator and RoadManager are fully loaded.
     if (window.GameCore?.playerObj && window.GameCore.playerObj.body) {
         ChunkManager.activeChunks.forEach((chunk, key) => ChunkManager.unloadChunk(key));
         ChunkManager.currentChunkX = null;
