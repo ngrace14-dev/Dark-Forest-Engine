@@ -22,6 +22,7 @@ import './src_systems_audio.js';
 import './src_systems_vfx.js';
 import './src_systems_navigation_v2.js';
 import './src_systems_roads.js';
+import './src_systems_road_renderer.js';     // <-- ADDED: Procedural Road Decor & Lanterns
 import './src_systems_villages.js';
 import './src_systems_adventurers.js';
 import './src_systems_ai.js';
