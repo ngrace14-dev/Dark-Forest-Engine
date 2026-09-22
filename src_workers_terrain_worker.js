@@ -79,8 +79,9 @@ let currentSeed = null;
 
 function getTerrainHeight(x, z) {
     if (!noiseFn) noiseFn = createSimplexNoise(1337);
-    const elevation = noiseFn(x * 0.003, z * 0.003) * 18.0;
-    const detail = noiseFn(x * 0.015, z * 0.015) * 3.5;
+    // PRIORITY 2 FIX: Reduced macro elevation (18.0 -> 8.0) and micro detail (3.5 -> 2.0)
+    const elevation = noiseFn(x * 0.003, z * 0.003) * 8.0;
+    const detail = noiseFn(x * 0.015, z * 0.015) * 2.0;
     const h = elevation + detail;
     return Number.isFinite(h) ? h : 0;
 }
@@ -151,7 +152,7 @@ self.onmessage = function (e) {
 
                 const minRoadDist = Math.sqrt(minRoadDistSq);
 
-                // FIX: Replaced "Golf Course Green" with "Dark Redwood Humus" baseline
+                // Baseline: Dark Redwood Humus
                 let rCol = 0.10;
                 let gCol = 0.08;
                 let bCol = 0.05;
