@@ -1,6 +1,6 @@
 // ============================================================================
-// Dark Forest Engine - Calibrated Hero Redwood Geometry Worker
-// File: src_workers_tree_worker.js
+// Dark Forest Engine - Calibrated Hero Redwood Geometry Worker Thread
+// File: src/workers/tree_worker.js
 // ============================================================================
 
 class FastRandom {
@@ -134,8 +134,8 @@ function buildRedwoodMesh(ageState, seed) {
 
     switch (ageState) {
         case 'COLOSSAL_ANCIENT':
-            height = prng.range(118.0, 132.0);   // Landmark 390ft+ titans
-            baseRadius = prng.range(6.8, 8.8);   // Massive 14m–18m buttress base
+            height = prng.range(118.0, 132.0);
+            baseRadius = prng.range(6.8, 8.8);
             topRadius = 0.80;
             flareAggression = 7.5;
             bareTrunkRatio = 0.48;
@@ -144,8 +144,8 @@ function buildRedwoodMesh(ageState, seed) {
             break;
 
         case 'ANCIENT':
-            height = prng.range(95.0, 115.0);    // 310ft–375ft Old Growth
-            baseRadius = prng.range(5.8, 7.5);   // 12m–15m buttress base
+            height = prng.range(95.0, 115.0);
+            baseRadius = prng.range(5.8, 7.5);
             topRadius = 0.60;
             flareAggression = 6.2;
             bareTrunkRatio = 0.52;
@@ -185,11 +185,9 @@ function buildRedwoodMesh(ageState, seed) {
             break;
     }
 
-    // PRIORITY 3: BROKEN CROWN / LIGHTNING STRIKE LOGIC (12% chance for Ancient/Dying)
     const hasBrokenCrown = (ageState === 'ANCIENT' || ageState === 'COLOSSAL_ANCIENT' || ageState === 'DYING') && (prng.next() < 0.12);
     const effectiveHeight = hasBrokenCrown ? height * prng.range(0.72, 0.85) : height;
 
-    // PRIORITY 2: TRUNK LEAN & ASYMMETRIC DRIFT
     const leanAngleX = (prng.range(-0.05, 0.05)) * (ageState.includes('ANCIENT') ? 1.5 : 0.8);
     const leanAngleZ = (prng.range(-0.05, 0.05)) * (ageState.includes('ANCIENT') ? 1.5 : 0.8);
     const trunkTwistRate = prng.range(-0.15, 0.15);
@@ -203,12 +201,10 @@ function buildRedwoodMesh(ageState, seed) {
     const radialSegs = 32;
     const heightSegs = 64;
 
-    // --- 1. TRUNK MESH GENERATION ---
     for (let y = 0; y <= heightSegs; y++) {
         const v = y / heightSegs;
         const currentY = v * effectiveHeight;
 
-        // Apply lean drift offset as height increases
         const driftX = Math.sin(v * Math.PI * 0.5) * (effectiveHeight * leanAngleX);
         const driftZ = Math.sin(v * Math.PI * 0.5) * (effectiveHeight * leanAngleZ);
 
@@ -216,14 +212,14 @@ function buildRedwoodMesh(ageState, seed) {
         let radius = baseRadius * (1.0 - Math.pow(v, taperPower)) + topRadius;
 
         if (hasBrokenCrown && v > 0.88) {
-            radius *= (1.0 + (v - 0.88) * 2.5); // Jagged splintered fracture top
+            radius *= (1.0 + (v - 0.88) * 2.5);
         }
 
         const flareIntensity = v < 0.24 ? Math.pow(1.0 - (v / 0.24), 2.6) : 0.0;
 
         for (let r = 0; r <= radialSegs; r++) {
             const u = r / radialSegs;
-            const theta = u * Math.PI * 2.0 + (v * trunkTwistRate); // Spiral bark twist
+            const theta = u * Math.PI * 2.0 + (v * trunkTwistRate);
 
             const cosT = Math.cos(theta);
             const sinT = Math.sin(theta);
@@ -260,7 +256,6 @@ function buildRedwoodMesh(ageState, seed) {
         }
     }
 
-    // Trunk Triangles
     for (let y = 0; y < heightSegs; y++) {
         for (let r = 0; r < radialSegs; r++) {
             const i1 = (y * (radialSegs + 1)) + r;
@@ -273,7 +268,6 @@ function buildRedwoodMesh(ageState, seed) {
 
     let vertexOffset = positions.length / 3;
 
-    // PRIORITY 4: 6-SIDED CYLINDRICAL BRANCHES FOR COLOSSAL LANDMARKS
     const addBranchTube = (startX, startY, startZ, endX, endY, endZ, startRad, endRad, bV, useCylinder = false) => {
         const segs = 6;
         if (useCylinder) {
@@ -310,7 +304,6 @@ function buildRedwoodMesh(ageState, seed) {
             }
             vertexOffset += (segs + 1) * (sides + 1);
         } else {
-            // Standard Quad Ribbon
             for (let s = 0; s <= segs; s++) {
                 const t = s / segs;
                 const cx = startX + (endX - startX) * t;
@@ -339,11 +332,9 @@ function buildRedwoodMesh(ageState, seed) {
         }
     };
 
-    // PRIORITY 1: BUG FIX & CANOPY VOLUME EXPANSION (numCards: 8 for Colossal, 6 for Ancient)
     const addFoliageClusterGroup = (originX, originY, originZ, radius, bV, clusterDensityMult) => {
         const subClusterCount = Math.floor(prng.range(3, 7) * clusterDensityMult);
 
-        // BUG FIX #1: Correct loop condition (sc < subClusterCount)
         for (let sc = 0; sc < subClusterCount; sc++) {
             const scOffsetR = (sc / subClusterCount) * radius * 0.7;
             const scAngle = prng.range(0, Math.PI * 2);
@@ -353,8 +344,6 @@ function buildRedwoodMesh(ageState, seed) {
             const cZ = originZ + Math.sin(scAngle) * scOffsetR;
 
             const subSize = radius * prng.range(0.50, 0.80);
-
-            // PRIORITY 1: Expand card count for volumetric density
             const numCards = (ageState === 'COLOSSAL_ANCIENT') ? 8 : (ageState === 'ANCIENT') ? 6 : 4;
 
             for (let c = 0; c < numCards; c++) {
@@ -387,7 +376,6 @@ function buildRedwoodMesh(ageState, seed) {
         }
     };
 
-    // --- 2. PRIMARY BRANCHES, ZONED CANOPY & REITERATIONS ---
     const effectiveBranchCount = hasBrokenCrown ? Math.floor(branchCount * 0.70) : branchCount;
 
     for (let b = 0; b < effectiveBranchCount; b++) {
