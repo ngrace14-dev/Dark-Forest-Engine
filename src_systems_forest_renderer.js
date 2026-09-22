@@ -4,15 +4,15 @@
 // ============================================================================
 
 import * as THREE from 'three';
-import { createForestFloorMaterial } from './block_terrain.js'; // Phase 3 FIX: Import explicit floor material
+// FIX: Removed ES6 import for block_terrain.js that was causing 404 errors
 
 class ForestRenderer {
     constructor() {
         this.group = new THREE.Group();
         this.materials = new Map();
         this.instancedMeshes = new Map();
-        this.terrainMeshes = new Map(); // Phase 3 FIX: Track terrain chunks
-        this.forestFloorMaterial = null; // Phase 3 FIX: Cached floor material
+        this.terrainMeshes = new Map(); 
+        this.forestFloorMaterial = null; 
         this.initialized = false;
 
         this.sharedUniforms = {
@@ -115,11 +115,16 @@ class ForestRenderer {
         console.log('[ForestRenderer] Foliage shading & bloom-clamped materials loaded.');
     }
 
-    // Phase 3 FIX: Enforce forest floor material binding on chunk mesh instantiation
     setTerrainMesh(chunkKey, geometry) {
         if (!this.forestFloorMaterial) {
-            // Lazy load and cache the specialized duff/humus shader material
-            this.forestFloorMaterial = createForestFloorMaterial();
+            // FIX: Retrieve material generator dynamically from the window object to bypass 404 import error
+            if (window.createForestFloorMaterial) {
+                this.forestFloorMaterial = window.createForestFloorMaterial();
+            } else {
+                // Safe fallback if terrain system boots late
+                this.forestFloorMaterial = new THREE.MeshStandardMaterial({ color: 0x1a120b });
+                console.warn('[ForestRenderer] BlockTerrainSystem global not found. Using generic floor material.');
+            }
         }
 
         if (this.terrainMeshes.has(chunkKey)) {
