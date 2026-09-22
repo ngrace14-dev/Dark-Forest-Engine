@@ -321,7 +321,7 @@ export class BlockTerrainSystem {
                     leanX: 0, leanZ: 0
                 });
 
-                if (loreRoll < 0.05 || true) {
+                if (loreRoll < 0.05) {
                     this.loreTreeRegistry.set(landmarkId, {
                         id: landmarkId, name: title, x: node.x, y: node.y, z: node.z,
                         category: 'Lore Champion',
