@@ -16,14 +16,8 @@ window.AssetManager = {
         'Flesh Horror': { type: 'npc', category: 'npcs', radius: 0.8, height: 3.2, modelScale: 1.0, color: 0x7f1d3a, faction: 'forest', behavior: 'wander_aggro', speed: 2.7, damageType: 'void', role: 'forestHorror', customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'Void', onHit: 'Blood' } },
         'Wendigo': { 
             type: 'npc', category: 'npcs', radius: 0.9, height: 3.4, modelScale: 1.0, color: 0x9ca3af, faction: 'monster', 
-            behavior: 'stalking', // Specialized AI behavior
-            speed: 8.5,           // Faster than the player
-            hp: 450, 
-            attackDamage: 45, 
-            poiseDamage: 40,
-            role: 'apexPredator', 
-            habitat: 'mountain', 
-            customModel: null, 
+            behavior: 'stalking', speed: 8.5, hp: 450, attackDamage: 45, poiseDamage: 40,
+            role: 'apexPredator', habitat: 'mountain', customModel: null, 
             animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, 
             vfx: { aura: 'Void', onHit: 'Blood' } 
         },
@@ -94,13 +88,10 @@ window.AssetManager = {
         'Rune Tower': { type: 'runeTower', category: 'terrain', radius: 2, height: 12, modelScale: 1.0, color: 0x64748b, isObstacle: true, active: true, protectionRadius: 18, customModel: null, animMap: {}, vfx: { aura: 'Holy', onHit: 'Sparks' } },
         'Blight Root': { type: 'structure', category: 'terrain', radius: 1.5, height: 6, modelScale: 1.0, color: 0x8b5cf6, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'Void', onHit: 'Blood' } },
         'Arcane Door': { type: 'arcaneDoor', category: 'terrain', radius: 1.5, height: 3.5, modelScale: 1.0, color: 0x6366f1, isObstacle: true, emitsLight: true, customModel: null, animMap: {}, vfx: { aura: 'Holy', onHit: 'Sparks' } },
-        
-        // Phase 4 FIX: Mid-Story Vegetation Registrations
         'Fern_Cluster': { type: 'structure', category: 'terrain', radius: 1.5, height: 0.8, modelScale: 1.0, color: 0x3a5a3a, isObstacle: false, decorative: true, habitat: 'darkForest', customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Sword_Fern_Large': { type: 'structure', category: 'terrain', radius: 2.5, height: 1.4, modelScale: 1.0, color: 0x2b4c2b, isObstacle: false, decorative: true, habitat: 'darkForest', customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Forest_Shrub_Dense': { type: 'structure', category: 'terrain', radius: 3.0, height: 2.2, modelScale: 1.0, color: 0x2d3a29, isObstacle: true, concealment: true, hideRadius: 3.0, habitat: 'darkForest', customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Moss_Mound_Big': { type: 'structure', category: 'terrain', radius: 4.0, height: 1.2, modelScale: 1.0, color: 0x3c4f2e, isObstacle: false, decorative: true, habitat: 'darkForest', customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
-
         'Huntsman': { 
             type: 'npc', category: 'npcs', radius: 0.6, height: 2.2, modelScale: 1.0, color: 0x111111, faction: 'monster', 
             behavior: 'stalking', speed: 9.0, hp: 1200, armor: 40, attackDamage: 65, poiseDamage: 80,
@@ -112,8 +103,6 @@ window.AssetManager = {
         'Iron Sword': { type: 'weapon', category: 'weapons', radius: 0.2, height: 1, modelScale: 1.0, color: 0xcccccc, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Sparks' } },
         'Berry Bush': { type: 'structure', category: 'terrain', radius: 1.5, height: 1.2, modelScale: 1.0, color: 0x1e3a1e, gatherable: 'food', gatherAmount: 5, gatherCooldown: 300, isObstacle: true, customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Dust' } },
         'Deer': { type: 'npc', category: 'npcs', radius: 0.6, height: 1.8, modelScale: 1.0, color: 0x8b4513, faction: 'forest', behavior: 'flee', hp: 40, loot: 'food', lootAmount: 15, speed: 7.0, customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'None', onHit: 'Blood' } }
-
-
     }
 };
 
@@ -443,15 +432,22 @@ window.renderAssetManager = function() {
 
             animSettingsHTML = `<div class="flex-1 pr-4"><span class="text-[10px] font-bold text-indigo-400 block mb-1">ANIMATIONS:</span><div class="grid grid-cols-4 gap-2">`;
             states.forEach(state => {
-                animSettingsHTML += `<div class="flex flex-col gap-1 w-full"><label class="text-[9px] text-gray-500 capitalize">${state}</label><select class="anim-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-indigo-500 outline-none w-full" data-prefab="${name}" data-state="${state}">${animOptions.replace(`value="${def.animMap[state]}"`, `value="${def.animMap[state]}" selected`)}</select></div>`;
+                // FIX: Removed nested template literal inside the replace() method to prevent parser failure
+                animSettingsHTML += `<div class="flex flex-col gap-1 w-full"><label class="text-[9px] text-gray-500 capitalize">${state}</label><select class="anim-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-indigo-500 outline-none w-full" data-prefab="${name}" data-state="${state}">${animOptions.replace('value="' + def.animMap[state] + '"', 'value="' + def.animMap[state] + '" selected')}</select></div>`;
             });
             animSettingsHTML += `</div></div>`;
         }
 
-        const presetOptions = Object.entries(window.AnimationPresetManager.presetLabels).map(([id, label]) => `<option value="${id}" ${def.animationPreset === id ? 'selected' : ''}>${label}</option>`).join('');
+        // FIX: Re-wrote complex inner map/join logic using simple string concatenation to avoid Uncaught SyntaxError: Missing }
+        const presetOptions = Object.entries(window.AnimationPresetManager.presetLabels).map(([id, label]) => '<option value="' + id + '" ' + (def.animationPreset === id ? 'selected' : '') + '>' + label + '</option>').join('');
         const presetControlsHTML = (def.type === 'character' || def.type === 'npc') ? `<div class="flex flex-col gap-1"><label class="text-[9px] text-gray-500 uppercase font-bold">Animation Preset</label><div class="flex gap-1"><select class="anim-preset-select bg-gray-900 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 w-36" data-prefab="${name}"><option value="None">Manual</option>${presetOptions}</select><button class="anim-preset-apply-btn bg-orange-900/60 hover:bg-orange-700 border border-orange-700 text-orange-100 text-[10px] px-2 rounded" data-prefab="${name}">APPLY</button></div></div>` : '';
+        
         if (!def.vfx) def.vfx = { aura: 'None', onHit: 'None' };
-        let vfxSettingsHTML = `<div class="w-48 pl-4 border-l border-gray-700"><span class="text-[10px] font-bold text-red-400 block mb-1">PARTICLES & VFX:</span><div class="flex flex-col gap-1"><label class="text-[9px] text-gray-500">Aura (Passive)</label><select class="vfx-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-red-500 outline-none w-full" data-prefab="${name}" data-type="aura">${window.VFXManager.auras.map(v => `<option value="${v}" ${def.vfx.aura === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div class="flex flex-col gap-1 mt-1"><label class="text-[9px] text-gray-500">On Hit (Transient)</label><select class="vfx-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-red-500 outline-none w-full" data-prefab="${name}" data-type="onHit">${window.VFXManager.onHits.map(v => `<option value="${v}" ${def.vfx.onHit === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>`;
+        
+        const auraOptions = window.VFXManager.auras.map(v => '<option value="' + v + '" ' + (def.vfx.aura === v ? 'selected' : '') + '>' + v + '</option>').join('');
+        const onHitOptions = window.VFXManager.onHits.map(v => '<option value="' + v + '" ' + (def.vfx.onHit === v ? 'selected' : '') + '>' + v + '</option>').join('');
+        
+        let vfxSettingsHTML = `<div class="w-48 pl-4 border-l border-gray-700"><span class="text-[10px] font-bold text-red-400 block mb-1">PARTICLES & VFX:</span><div class="flex flex-col gap-1"><label class="text-[9px] text-gray-500">Aura (Passive)</label><select class="vfx-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-red-500 outline-none w-full" data-prefab="${name}" data-type="aura">${auraOptions}</select></div><div class="flex flex-col gap-1 mt-1"><label class="text-[9px] text-gray-500">On Hit (Transient)</label><select class="vfx-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-red-500 outline-none w-full" data-prefab="${name}" data-type="onHit">${onHitOptions}</select></div></div>`;
         
         row.innerHTML = `<div class="flex justify-between items-center w-full mb-2">
             <div class="flex items-center gap-4">
@@ -579,9 +575,6 @@ function loadModel(url, modelName) {
     const loading = new Promise(async (resolve) => {
         let finalUrl = url;
 
-        // --- FIREBASE GLB STREAMING INTEGRATION ---
-        // If the URL starts with 'gs://' or a specific Firebase path marker, 
-        // we intercept it and swap it for a signed Firebase Download URL.
         if (url.startsWith('gs://') || url.includes('firebase')) {
             try {
                 if (window.getFirebaseUrl) {
