@@ -14,7 +14,11 @@ window.EventBus.on('ENGINE_READY', () => {
             filterColor: 0xffffff,
             filterIntensity: 0.2,
             godMode: false,
-            worldDay: 1
+            worldDay: 1,
+            
+            // Phase 8 FIX: Rendering Isolation Defaults
+            rawRenderMode: false,
+            renderLayer: 'Full Scene'
         };
 
         for (const [key, val] of Object.entries(defaults)) {
@@ -38,6 +42,63 @@ window.EventBus.on('ENGINE_READY', () => {
             toggleEditor: () => window.EventBus.emit('TOGGLE_EDITOR')
         }, 'toggleEditor').name('2️⃣ Open Animation/World Editor');
 
+        // ====================================================================
+        // Phase 8 FIX: Isolation & Diagnostic Tools (RAW_RENDER_MODE)
+        // ====================================================================
+        const diagnosticFolder = gui.addFolder('🔬 Render Diagnostics');
+        
+        diagnosticFolder.add(window.EngineParams, 'rawRenderMode').name('🔎 RAW RENDER MODE').onChange((isRaw) => {
+            const passSystem = window.GameCore?.passes;
+            const fogSystem = window.VolumetricFogSystem;
+            
+            if (isRaw) {
+                // Strip all atmospherics & post-processing that obscure terrain/canopies
+                if (passSystem?.bloom) passSystem.bloom.strength = 0;
+                if (passSystem?.vignette) passSystem.vignette.uniforms.darkness.value = 0;
+                if (passSystem?.colorTint) passSystem.colorTint.uniforms.tintIntensity.value = 0;
+                if (fogSystem) fogSystem.setFogDensity(0);
+                window.EngineParams.globalBrightness = 1.0;
+                
+                // If using the updated canopy shader from Phase 6, zero out the fog mix manually
+                if (window.ForestRenderer?.sharedUniforms?.uRawDebugMode) {
+                    window.ForestRenderer.sharedUniforms.uRawDebugMode.value = 1.0;
+                }
+                
+                window.EventBus.emit('UI_LOG', '🔎 RAW MODE ON: Atmos/PostProc bypassed.');
+            } else {
+                // Restore state
+                if (passSystem?.bloom) passSystem.bloom.strength = window.EngineParams.bloom;
+                if (passSystem?.vignette) passSystem.vignette.uniforms.darkness.value = window.EngineParams.vignette;
+                if (passSystem?.colorTint) passSystem.colorTint.uniforms.tintIntensity.value = window.EngineParams.filterIntensity;
+                if (fogSystem) fogSystem.setFogDensity(window.EngineParams.fogDensity);
+                
+                if (window.ForestRenderer?.sharedUniforms?.uRawDebugMode) {
+                    window.ForestRenderer.sharedUniforms.uRawDebugMode.value = 0.0;
+                }
+                
+                window.EventBus.emit('UI_LOG', '🎨 RAW MODE OFF: Cinematics restored.');
+            }
+            window.EventBus.emit('ENV_UPDATE');
+        });
+
+        diagnosticFolder.add(window.EngineParams, 'renderLayer', [
+            'Full Scene', 
+            'Terrain Only', 
+            'Forest Floor Only', 
+            'Mid Story Only', 
+            'Trees Only', 
+            'Canopies Only', 
+            'Deadfall Only', 
+            'Fog Only', 
+            'Lighting Only'
+        ]).name('👁️ Render Layer').onChange((layer) => {
+            // Note: Full mesh isolation requires the engine's object registry to support grouped visibility toggles.
+            // This hooks into the intent of Phase 8 for future expansion.
+            window.EventBus.emit('SET_RENDER_LAYER', layer);
+            window.EventBus.emit('UI_LOG', `Switched render isolation to: ${layer}`);
+        });
+        // ====================================================================
+
         const envFolder = gui.addFolder('🌍 World & Environment');
         safeAdd(envFolder, window.EngineParams, 'playMode').name('▶️ Play Mode');
         safeAdd(envFolder, window.EngineParams, 'timeScale', 0.1, 3).name('⏱️ Time Scale');
@@ -54,13 +115,13 @@ window.EventBus.on('ENGINE_READY', () => {
         envFolder.add({ tp5: () => window.EventBus.emit('CMD_TELEPORT', {x:288000, z:0}) }, 'tp5').name('🚀 Warp: Deep Desert');
 
         const fxFolder = gui.addFolder('✨ Cinematic FX');
-        safeAdd(fxFolder, window.EngineParams, 'bloom', 0, 3).name('Bloom').onChange(v => { if(window.GameCore?.passes?.bloom) window.GameCore.passes.bloom.strength = v; });
-        safeAdd(fxFolder, window.EngineParams, 'vignette', 0, 3).name('Vignette').onChange(v => { if(window.GameCore?.passes?.vignette) window.GameCore.passes.vignette.uniforms.darkness.value = v; });
+        safeAdd(fxFolder, window.EngineParams, 'bloom', 0, 3).name('Bloom').onChange(v => { if(!window.EngineParams.rawRenderMode && window.GameCore?.passes?.bloom) window.GameCore.passes.bloom.strength = v; });
+        safeAdd(fxFolder, window.EngineParams, 'vignette', 0, 3).name('Vignette').onChange(v => { if(!window.EngineParams.rawRenderMode && window.GameCore?.passes?.vignette) window.GameCore.passes.vignette.uniforms.darkness.value = v; });
         
         if (window.EngineParams.filterColor !== undefined) {
             fxFolder.addColor(window.EngineParams, 'filterColor').name('🎨 Filter Tint').onChange(c => { if(window.GameCore?.passes?.colorTint) window.GameCore.passes.colorTint.uniforms.tintColor.value.set(c); });
         }
-        safeAdd(fxFolder, window.EngineParams, 'filterIntensity', 0, 1).name('🎚️ Filter Intensity').onChange(v => { if(window.GameCore?.passes?.colorTint) window.GameCore.passes.colorTint.uniforms.tintIntensity.value = v; });
+        safeAdd(fxFolder, window.EngineParams, 'filterIntensity', 0, 1).name('🎚️ Filter Intensity').onChange(v => { if(!window.EngineParams.rawRenderMode && window.GameCore?.passes?.colorTint) window.GameCore.passes.colorTint.uniforms.tintIntensity.value = v; });
 
         const animationFolder = gui.addFolder('🎞️ Animation Presets');
         animationFolder.add({ player: () => window.AnimationPresetManager?.applyToPrefab('Player', 'swordShield') }, 'player').name('⚔️ Player Sword and Shield');
