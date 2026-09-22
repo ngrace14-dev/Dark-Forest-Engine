@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export class GrassRenderer {
-    constructor(engine, maxInstances = 500000) {
+    constructor(engine, maxInstances = 200000) { // Phase 7 FIX: Reduced global cap to reflect shift to duff/moss
         this.engine = engine;
         this.maxInstances = maxInstances;
         this.time = 0;
@@ -17,8 +17,9 @@ export class GrassRenderer {
 
     initMaterials() {
         this.grassMaterial = new THREE.MeshStandardMaterial({
-            color: 0x4a7c29, 
-            roughness: 0.6,
+            // Phase 7 FIX: Muted color to blend better with dark humus and duff
+            color: 0x3d4f29, 
+            roughness: 0.8,
             side: THREE.DoubleSide,
             alphaTest: 0.5, 
             transparent: false, 
@@ -115,7 +116,9 @@ export class GrassRenderer {
         this.bladeGeo.translate(0, 0.3, 0); 
     }
 
-    spawnGrassChunk(scene, startX, startZ, patchSize = 20, density = 40000) {
+    // Phase 7 FIX: Changed default density from 40000 to 12000 per patch
+    // Allocates density budget away from uniform lawn grass to make room for moss/detritus 
+    spawnGrassChunk(scene, startX, startZ, patchSize = 20, density = 12000) {
         const instancedGrass = new THREE.InstancedMesh(this.bladeGeo, this.grassMaterial, density);
         instancedGrass.instanceMatrix.setUsage(THREE.StaticDrawUsage);
         instancedGrass.receiveShadow = true;
