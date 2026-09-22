@@ -14,7 +14,7 @@ class ForestRenderer {
         this.forestFloorMaterial = null; 
         this.initialized = false;
 
-        // FIX: Renamed uniforms to bypass naming collisions with VolumetricFogSystem
+        // PRIORITY 1 FIX: Unique uniform names to prevent variable redefinition collisions with VolumetricFogSystem
         this.sharedUniforms = {
             uTime: { value: 0 },
             uWindSpeed: { value: 1.0 },
@@ -39,7 +39,7 @@ class ForestRenderer {
                     metalness: 0.03,
                     side: THREE.DoubleSide,
                     alphaTest: 0.18,
-                    vertexColors: true // FIX: CRITICAL - Tells Three.js to declare the 'color' vertex attribute
+                    vertexColors: true // PRIORITY 1 FIX: Declares 'color' vertex attribute in GLSL
                 });
 
                 mat.onBeforeCompile = (shader) => {
@@ -55,7 +55,7 @@ class ForestRenderer {
                         `#include <begin_vertex>`,
                         `
                         #include <begin_vertex>
-                        vColorAttr = color; // Now perfectly valid because vertexColors is true
+                        vColorAttr = color;
 
                         #ifdef USE_INSTANCING
                             vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
@@ -71,7 +71,6 @@ class ForestRenderer {
                         `
                     );
 
-                    // FIX: Replaced uSunDirection with uForestSunDir
                     shader.fragmentShader = `
                         uniform vec3 uForestSunDir;
                         uniform vec3 uForestSunCol;
@@ -123,7 +122,6 @@ class ForestRenderer {
                 this.forestFloorMaterial = window.createForestFloorMaterial();
             } else {
                 this.forestFloorMaterial = new THREE.MeshStandardMaterial({ color: 0x1a120b });
-                console.warn('[ForestRenderer] BlockTerrainSystem global not found. Using generic floor material.');
             }
         }
 
@@ -160,17 +158,39 @@ class ForestRenderer {
         if (this.instancedMeshes.has(meshKey)) {
             const oldMesh = this.instancedMeshes.get(meshKey);
             this.group.remove(oldMesh);
-            oldMesh.geometry.dispose();
+            if (oldMesh.geometry && !oldMesh.geometry.isShared) oldMesh.geometry.dispose();
             this.instancedMeshes.delete(meshKey);
         }
 
-        let geo = window.RedwoodGenerator?.getArchetypeGeometry?.(prefabKey);
-        if (!geo) {
-            geo = new THREE.CylinderGeometry(0.5, 2.5, 40, 12);
-            geo.translate(0, 20, 0);
+        let geo = null;
+
+        // PRIORITY 4 & 5 FIX: Route geometry sources correctly based on asset category
+        if (prefabKey.startsWith('Redwood_')) {
+            geo = window.RedwoodGenerator?.getArchetypeGeometry?.(prefabKey);
+        } else if (window.AssetManager?.prefabs[prefabKey]) {
+            const customModelName = window.AssetManager.prefabs[prefabKey].customModel;
+            if (customModelName && window.AssetManager.models[customModelName]) {
+                const modelScene = window.AssetManager.models[customModelName];
+                modelScene.traverse(child => {
+                    if (child.isMesh && !geo) geo = child.geometry;
+                });
+            }
         }
 
-        const mat = this.materials.get(prefabKey) || new THREE.MeshStandardMaterial({ color: 0x3d2015 });
+        // PRIORITY 5 FIX: Eliminate placeholder tree cylinders for mid-story vegetation assets
+        if (!geo) {
+            console.warn(`[ForestRenderer] Missing geometry for "${prefabKey}". Deploying low-profile fallback.`);
+            if (prefabKey.includes('Fern') || prefabKey.includes('Shrub') || prefabKey.includes('Moss')) {
+                geo = new THREE.BoxGeometry(1.8, 0.8, 1.8);
+                geo.translate(0, 0.4, 0);
+            } else {
+                geo = new THREE.CylinderGeometry(0.5, 2.5, 40, 12);
+                geo.translate(0, 20, 0);
+            }
+            geo.isShared = true;
+        }
+
+        const mat = this.materials.get(prefabKey) || new THREE.MeshStandardMaterial({ color: 0x2d3a29 });
         const imesh = new THREE.InstancedMesh(geo, mat, points.length);
 
         imesh.castShadow = true;
