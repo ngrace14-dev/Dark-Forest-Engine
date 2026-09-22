@@ -151,9 +151,10 @@ self.onmessage = function (e) {
 
                 const minRoadDist = Math.sqrt(minRoadDistSq);
 
-                let rCol = 0.29;
-                let gCol = 0.87;
-                let bCol = 0.50;
+                // FIX: Replaced "Golf Course Green" with "Dark Redwood Humus" baseline
+                let rCol = 0.10;
+                let gCol = 0.08;
+                let bCol = 0.05;
 
                 if (minRoadDist < ROAD_WIDTH + 2) {
                     const dirtInfluence = Math.max(0, 1.0 - minRoadDist / (ROAD_WIDTH + 2));
