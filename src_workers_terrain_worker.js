@@ -79,7 +79,7 @@ let currentSeed = null;
 
 function getTerrainHeight(x, z) {
     if (!noiseFn) noiseFn = createSimplexNoise(1337);
-    // PRIORITY 2 FIX: Reduced macro elevation (18.0 -> 8.0) and micro detail (3.5 -> 2.0)
+    // FIX: Reduced macro elevation and micro detail to flatten steep trenches
     const elevation = noiseFn(x * 0.003, z * 0.003) * 8.0;
     const detail = noiseFn(x * 0.015, z * 0.015) * 2.0;
     const h = elevation + detail;
@@ -152,7 +152,7 @@ self.onmessage = function (e) {
 
                 const minRoadDist = Math.sqrt(minRoadDistSq);
 
-                // Baseline: Dark Redwood Humus
+                // FIX: Dark Redwood Humus Baseline
                 let rCol = 0.10;
                 let gCol = 0.08;
                 let bCol = 0.05;
