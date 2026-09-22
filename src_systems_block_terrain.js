@@ -532,6 +532,8 @@ export class BlockTerrainSystem {
 
 if (typeof window !== 'undefined') {
     window.BlockTerrainSystem = new BlockTerrainSystem();
+    // FIX: Expose material creation explicitly to the global window object to bypass ES6 import errors
+    window.createForestFloorMaterial = createForestFloorMaterial;
 }
 
 export default BlockTerrainSystem;
