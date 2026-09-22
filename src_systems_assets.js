@@ -209,14 +209,14 @@ window.renderAssetManager = function() {
     const content = document.getElementById('asset-content'); content.innerHTML = '';
     
     if (window.EngineState.currentAssetTab === 'mods') {
-        content.innerHTML = `<div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2"><div class="text-pink-400 font-bold text-sm uppercase tracking-widest">🧩 Engine Extensions & Mods</div></div>
-        <div class="bg-gray-800 p-4 rounded border border-gray-700 shadow-lg mb-4">
-            <p class="text-xs text-gray-400 mb-4 font-mono">Upload custom JavaScript (.js) files to instantly inject new features, UI panels, logic, or procedural animations into the live engine.</p>
-            <div class="flex gap-4">
-                <button id="btn-upload-mod" class="bg-pink-700 hover:bg-pink-600 text-white px-4 py-2 rounded text-xs font-bold transition-colors shadow-lg">Inject Mod File (.js)</button>
-                <input type="file" id="mod-file-input" class="hidden" accept=".js,.txt">
-            </div>
-        </div>`;
+        content.innerHTML = '<div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2"><div class="text-pink-400 font-bold text-sm uppercase tracking-widest">🧩 Engine Extensions & Mods</div></div>' +
+        '<div class="bg-gray-800 p-4 rounded border border-gray-700 shadow-lg mb-4">' +
+            '<p class="text-xs text-gray-400 mb-4 font-mono">Upload custom JavaScript (.js) files to instantly inject new features, UI panels, logic, or procedural animations into the live engine.</p>' +
+            '<div class="flex gap-4">' +
+                '<button id="btn-upload-mod" class="bg-pink-700 hover:bg-pink-600 text-white px-4 py-2 rounded text-xs font-bold transition-colors shadow-lg">Inject Mod File (.js)</button>' +
+                '<input type="file" id="mod-file-input" class="hidden" accept=".js,.txt">' +
+            '</div>' +
+        '</div>';
         
         setTimeout(() => {
             document.getElementById('btn-upload-mod').addEventListener('click', () => { document.getElementById('mod-file-input').click(); });
@@ -242,11 +242,11 @@ window.renderAssetManager = function() {
 
     if (window.EngineState.currentAssetTab === 'world') {
         const headerRow = document.createElement('div'); headerRow.className = "flex justify-between items-center mb-4 border-b border-gray-700 pb-2";
-        headerRow.innerHTML = `<div><div class="text-green-400 font-bold text-sm tracking-widest uppercase flex items-center gap-2">🌍 NorCal 1:1 Scale Terrain Generator</div><div class="text-gray-400 text-[10px] mt-1">Assign custom prefabs to regional biomes. Adjust scale for realistic sprawling landscapes.</div></div><button id="btn-regen-world-ui" class="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded text-xs font-bold transition-colors shadow-[0_0_15px_rgba(21,128,61,0.4)]">🔄 Regenerate World</button>`;
+        headerRow.innerHTML = '<div><div class="text-green-400 font-bold text-sm tracking-widest uppercase flex items-center gap-2">🌍 NorCal 1:1 Scale Terrain Generator</div><div class="text-gray-400 text-[10px] mt-1">Assign custom prefabs to regional biomes. Adjust scale for realistic sprawling landscapes.</div></div><button id="btn-regen-world-ui" class="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded text-xs font-bold transition-colors shadow-[0_0_15px_rgba(21,128,61,0.4)]">🔄 Regenerate World</button>';
         content.appendChild(headerRow);
         
         const simRow = document.createElement('div'); simRow.className = "flex gap-4 mb-4 bg-gray-900/50 p-4 border border-indigo-900 rounded-lg shadow-inner";
-        simRow.innerHTML = `<div class="flex-1"><h3 class="text-purple-400 text-[10px] font-bold mb-2 uppercase tracking-wider border-b border-gray-700 pb-1">🏘️ Phase 1: Settlement Web</h3><button id="test-village-gen" class="bg-gray-800 hover:bg-purple-700 text-white font-bold text-xs py-1.5 px-3 rounded border border-gray-600 w-full transition-colors">⚙️ Generate Nodes (Check Log)</button></div><div class="flex-1"><h3 class="text-green-300 text-[10px] font-bold mb-2 uppercase tracking-wider border-b border-gray-700 pb-1">🛤️ Phase 2: Safe Roads</h3><button id="test-road-gen" class="bg-gray-800 hover:bg-green-700 text-white font-bold text-xs py-1.5 px-3 rounded border border-gray-600 w-full transition-colors">⚙️ Test Meander Math (Check Log)</button></div>`;
+        simRow.innerHTML = '<div class="flex-1"><h3 class="text-purple-400 text-[10px] font-bold mb-2 uppercase tracking-wider border-b border-gray-700 pb-1">🏘️ Phase 1: Settlement Web</h3><button id="test-village-gen" class="bg-gray-800 hover:bg-purple-700 text-white font-bold text-xs py-1.5 px-3 rounded border border-gray-600 w-full transition-colors">⚙️ Generate Nodes (Check Log)</button></div><div class="flex-1"><h3 class="text-green-300 text-[10px] font-bold mb-2 uppercase tracking-wider border-b border-gray-700 pb-1">🛤️ Phase 2: Safe Roads</h3><button id="test-road-gen" class="bg-gray-800 hover:bg-green-700 text-white font-bold text-xs py-1.5 px-3 rounded border border-gray-600 w-full transition-colors">⚙️ Test Meander Math (Check Log)</button></div>';
         content.appendChild(simRow);
 
         setTimeout(() => {
@@ -256,7 +256,7 @@ window.renderAssetManager = function() {
         }, 0);
         
         const globalSettings = document.createElement('div'); globalSettings.className = "flex gap-4 mb-4 bg-gray-900/50 p-3 border border-gray-800 rounded";
-        globalSettings.innerHTML = `<div class="flex flex-col flex-1"><label class="text-[10px] text-gray-500 uppercase font-bold mb-1">Master World Seed</label><input type="text" id="world-seed-input" class="bg-gray-950 border border-gray-700 text-gray-300 text-xs rounded px-2 py-1.5 outline-none focus:border-green-500 font-mono" value="${window.EngineParams.worldSeed}"></div><div class="flex flex-col flex-1"><label class="text-[10px] text-gray-500 uppercase font-bold mb-1">Biome Scale (Lower = Larger Geography)</label><input type="range" id="biome-scale-slider" class="accent-green-500 mt-1" min="0.0001" max="0.02" step="0.0001" value="${window.WorldGenConfig.noiseScale}"><div class="text-[9px] text-gray-600 text-right mt-1" id="scale-val-disp">${window.WorldGenConfig.noiseScale}</div></div>`;
+        globalSettings.innerHTML = '<div class="flex flex-col flex-1"><label class="text-[10px] text-gray-500 uppercase font-bold mb-1">Master World Seed</label><input type="text" id="world-seed-input" class="bg-gray-950 border border-gray-700 text-gray-300 text-xs rounded px-2 py-1.5 outline-none focus:border-green-500 font-mono" value="' + window.EngineParams.worldSeed + '"></div><div class="flex flex-col flex-1"><label class="text-[10px] text-gray-500 uppercase font-bold mb-1">Biome Scale (Lower = Larger Geography)</label><input type="range" id="biome-scale-slider" class="accent-green-500 mt-1" min="0.0001" max="0.02" step="0.0001" value="' + window.WorldGenConfig.noiseScale + '"><div class="text-[9px] text-gray-600 text-right mt-1" id="scale-val-disp">' + window.WorldGenConfig.noiseScale + '</div></div>';
         content.appendChild(globalSettings);
 
         setTimeout(() => {
@@ -267,8 +267,8 @@ window.renderAssetManager = function() {
         const availableTerrain = ['None', ...Object.keys(window.AssetManager.prefabs).filter(k => window.AssetManager.prefabs[k].category === 'terrain')];
         Object.entries(window.WorldGenConfig.biomes).forEach(([bKey, biome]) => {
             const row = document.createElement('div'); row.className = 'flex justify-between items-center bg-gray-800/80 p-3 rounded border border-gray-700 hover:border-gray-500 transition-colors mb-2';
-            let optionsHTML = availableTerrain.map(t => `<option value="${t}" ${biome.prefab === t ? 'selected' : ''}>${t}</option>`).join('');
-            row.innerHTML = `<div class="flex items-center gap-4"><div class="w-10 h-10 rounded border border-gray-600 shadow-inner" style="background-color: #${biome.color.toString(16).padStart(6, '0')}"></div><div><div class="font-bold text-gray-200 text-xs uppercase tracking-wide">${biome.name}</div><div class="text-[9px] text-gray-500 font-mono mt-0.5">Biome ID: ${bKey}</div></div></div><div class="flex items-center gap-6 pr-2"><div class="flex flex-col gap-1 w-48"><label class="text-[9px] text-gray-500 uppercase font-bold">Terrain Prefab Assignment</label><select class="biome-prefab-select bg-gray-950 border border-gray-700 text-gray-300 text-xs rounded px-2 py-1 outline-none focus:border-green-500" data-biome="${bKey}">${optionsHTML}</select></div><div class="flex flex-col gap-1 w-32"><label class="text-[9px] text-gray-500 uppercase font-bold spawn-label">Spawn Density (${biome.density})</label><input type="range" class="biome-density-slider accent-green-500" data-biome="${bKey}" min="0" max="150" step="1" value="${biome.density}"></div></div>`;
+            let optionsHTML = availableTerrain.map(t => '<option value="' + t + '" ' + (biome.prefab === t ? 'selected' : '') + '>' + t + '</option>').join('');
+            row.innerHTML = '<div class="flex items-center gap-4"><div class="w-10 h-10 rounded border border-gray-600 shadow-inner" style="background-color: #' + biome.color.toString(16).padStart(6, '0') + '"></div><div><div class="font-bold text-gray-200 text-xs uppercase tracking-wide">' + biome.name + '</div><div class="text-[9px] text-gray-500 font-mono mt-0.5">Biome ID: ' + bKey + '</div></div></div><div class="flex items-center gap-6 pr-2"><div class="flex flex-col gap-1 w-48"><label class="text-[9px] text-gray-500 uppercase font-bold">Terrain Prefab Assignment</label><select class="biome-prefab-select bg-gray-950 border border-gray-700 text-gray-300 text-xs rounded px-2 py-1 outline-none focus:border-green-500" data-biome="' + bKey + '">' + optionsHTML + '</select></div><div class="flex flex-col gap-1 w-32"><label class="text-[9px] text-gray-500 uppercase font-bold spawn-label">Spawn Density (' + biome.density + ')</label><input type="range" class="biome-density-slider accent-green-500" data-biome="' + bKey + '" min="0" max="150" step="1" value="' + biome.density + '"></div></div>';
             content.appendChild(row);
         });
 
@@ -280,7 +280,22 @@ window.renderAssetManager = function() {
     }
 
     if (window.EngineState.currentAssetTab === 'biomes') {
-        content.innerHTML = `<div class="text-blue-400 font-bold mb-4 text-sm uppercase tracking-widest border-b border-gray-700 pb-2">🏞️ Biome Material Editor</div><div class="grid grid-cols-3 gap-6">${Object.keys(window.WorldGenConfig.biomes).map(biome => `<div class="bg-gray-800 p-4 rounded border border-gray-700 flex flex-col items-center shadow-lg"><div class="text-white font-bold mb-2 capitalize text-xs">${window.WorldGenConfig.biomes[biome].name}</div><div class="w-full h-32 bg-gray-900 border-2 border-dashed border-gray-600 rounded flex items-center justify-center mb-4 relative overflow-hidden">${window.EngineState.biomeTextures[biome] ? `<img src="${window.EngineState.biomeTextures[biome]}" class="w-full h-full object-cover">` : `<span class="text-gray-500 text-[10px] text-center px-2">Procedural Voxel Noise Active</span>`}</div><div class="upload-btn-wrapper w-full relative overflow-hidden inline-block text-center cursor-pointer"><button class="bg-blue-600/20 text-blue-400 border border-blue-600 w-full py-1.5 rounded text-[10px] hover:bg-blue-600 hover:text-white transition-colors uppercase font-bold">Upload Texture</button><input type="file" accept="image/*" class="biome-upload absolute left-0 top-0 opacity-0 cursor-pointer h-full" data-biome="${biome}"></div></div>`).join('')}</div>`;
+        let biomeGridHtml = '';
+        Object.keys(window.WorldGenConfig.biomes).forEach(biome => {
+            let imageContent = window.EngineState.biomeTextures[biome] 
+                ? '<img src="' + window.EngineState.biomeTextures[biome] + '" class="w-full h-full object-cover">'
+                : '<span class="text-gray-500 text-[10px] text-center px-2">Procedural Voxel Noise Active</span>';
+            
+            biomeGridHtml += '<div class="bg-gray-800 p-4 rounded border border-gray-700 flex flex-col items-center shadow-lg">' +
+                '<div class="text-white font-bold mb-2 capitalize text-xs">' + window.WorldGenConfig.biomes[biome].name + '</div>' +
+                '<div class="w-full h-32 bg-gray-900 border-2 border-dashed border-gray-600 rounded flex items-center justify-center mb-4 relative overflow-hidden">' + imageContent + '</div>' +
+                '<div class="upload-btn-wrapper w-full relative overflow-hidden inline-block text-center cursor-pointer">' +
+                    '<button class="bg-blue-600/20 text-blue-400 border border-blue-600 w-full py-1.5 rounded text-[10px] hover:bg-blue-600 hover:text-white transition-colors uppercase font-bold">Upload Texture</button>' +
+                    '<input type="file" accept="image/*" class="biome-upload absolute left-0 top-0 opacity-0 cursor-pointer h-full" data-biome="' + biome + '">' +
+                '</div></div>';
+        });
+
+        content.innerHTML = '<div class="text-blue-400 font-bold mb-4 text-sm uppercase tracking-widest border-b border-gray-700 pb-2">🏞️ Biome Material Editor</div><div class="grid grid-cols-3 gap-6">' + biomeGridHtml + '</div>';
         setTimeout(() => {
             document.querySelectorAll('.biome-upload').forEach(input => {
                 input.addEventListener('change', (e) => {
@@ -293,37 +308,49 @@ window.renderAssetManager = function() {
 
     if (window.EngineState.currentAssetTab === 'villages') {
         if(window.VillageManager.villages.length === 0) {
-            content.innerHTML = `<div class="text-center text-gray-500 py-10 font-mono flex flex-col items-center gap-4"><span class="text-4xl block">🌍</span><div>The Settlement Web has not been generated yet.</div><button class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded text-xs font-bold transition-colors shadow-lg" onclick="document.querySelector('[data-tab=world]').click()">Go to World Gen Tab</button></div>`; return;
+            content.innerHTML = '<div class="text-center text-gray-500 py-10 font-mono flex flex-col items-center gap-4"><span class="text-4xl block">🌍</span><div>The Settlement Web has not been generated yet.</div><button class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded text-xs font-bold transition-colors shadow-lg" onclick="document.querySelector(\'[data-tab=world]\').click()">Go to World Gen Tab</button></div>'; return;
         } 
         if (window.EngineState.editingVillageId !== null) {
             const v = window.VillageManager.villages.find(vil => vil.id === window.EngineState.editingVillageId); if (!v) { window.EngineState.editingVillageId = null; window.EventBus.emit('RENDER_ASSETS'); return; }
             const placeablePrefabs = Object.keys(window.AssetManager.prefabs).filter(k => window.AssetManager.prefabs[k].category === 'terrain' || window.AssetManager.prefabs[k].category === 'npcs');
-            content.innerHTML = `<div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-700"><div class="flex items-center gap-4"><button onclick="window.closeLayoutEditor()" class="text-gray-400 hover:text-white bg-gray-800 px-3 py-1 rounded text-xs border border-gray-600 transition-colors">&larr; Back</button><h3 class="text-yellow-400 font-bold uppercase tracking-widest text-lg">📐 Blueprint: ${v.name}</h3></div><button onclick="window.EventBus.emit('WORLD_REGENERATE')" class="bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-bold transition-colors shadow-[0_0_15px_rgba(21,128,61,0.4)]">🔄 Render Changes in World</button></div><div class="flex gap-4 h-[450px]"><div class="w-1/3 bg-gray-800/80 p-4 rounded-lg border border-gray-700 flex flex-col gap-4 shadow-lg"><h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-600 pb-1">Spawn Structure / NPC</h4><div class="flex flex-col gap-1"><label class="text-[10px] text-gray-500 uppercase font-bold">Select Asset</label><select id="layout-prefab-select" class="bg-gray-950 border border-gray-600 text-gray-300 text-xs rounded px-2 py-2 outline-none focus:border-yellow-500 transition-colors w-full">${placeablePrefabs.map(p => `<option value="${p}">${p}</option>`).join('')}</select></div><div class="grid grid-cols-2 gap-2"><div class="flex flex-col gap-1"><label class="text-[10px] text-gray-500 uppercase font-bold">X Offset (m)</label><input type="number" id="layout-ox" placeholder="0" value="0" class="bg-gray-950 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 outline-none focus:border-yellow-500"></div><div class="flex flex-col gap-1"><label class="text-[10px] text-gray-500 uppercase font-bold">Z Offset (m)</label><input type="number" id="layout-oz" placeholder="0" value="0" class="bg-gray-950 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 outline-none focus:border-yellow-500"></div></div><button onclick="window.addLayoutItem(${v.id})" class="mt-2 bg-yellow-600 hover:bg-yellow-500 text-white py-2 rounded text-xs font-bold transition-colors uppercase tracking-widest border border-yellow-800 shadow-md">➕ Add to Blueprint</button><div class="mt-auto bg-gray-900/50 border border-gray-700 p-3 rounded text-[10px] text-gray-400"><p class="mb-1"><strong class="text-yellow-500">Note:</strong> Offsets are in meters relative to the Village Hub (Center). Height is calculated automatically to rest on terrain.</p></div></div><div class="w-2/3 bg-gray-900/80 p-4 rounded-lg border border-gray-700 flex flex-col shadow-inner"><h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-700 pb-1 mb-3">Saved Layout Entities (${v.layout.length})</h4><div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2">${v.layout.length === 0 ? `<div class="text-center text-gray-600 py-10 font-mono text-xs">No custom structures added. Layout is empty.</div>` : ''}${v.layout.map(item => `<div class="bg-gray-800 p-2 rounded border border-gray-700 flex justify-between items-center hover:border-gray-500 transition-colors group"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded bg-gray-900 border border-gray-600 flex items-center justify-center text-[10px] font-bold text-gray-500">${window.AssetManager.prefabs[item.prefab].type === 'npc' ? '👤' : '🧱'}</div><div><div class="text-white text-xs font-bold">${item.prefab}</div><div class="text-gray-500 text-[10px] font-mono">Offset: X: ${item.ox}m \vert{} Z:${item.oz}m</div></div></div><button onclick="window.removeLayoutItem(${v.id}, '${item.id}')" class="text-gray-600 hover:text-red-500 font-bold px-2 py-1 bg-gray-900 rounded border border-gray-700 opacity-0 group-hover:opacity-100 transition-all text-xs">&times; Remove</button></div>`).join('')}</div></div></div>`;
+            
+            let prefabSelectHtml = placeablePrefabs.map(p => '<option value="' + p + '">' + p + '</option>').join('');
+            let emptyLayoutHtml = v.layout.length === 0 ? '<div class="text-center text-gray-600 py-10 font-mono text-xs">No custom structures added. Layout is empty.</div>' : '';
+            let savedItemsHtml = v.layout.map(item => '<div class="bg-gray-800 p-2 rounded border border-gray-700 flex justify-between items-center hover:border-gray-500 transition-colors group"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded bg-gray-900 border border-gray-600 flex items-center justify-center text-[10px] font-bold text-gray-500">' + (window.AssetManager.prefabs[item.prefab].type === 'npc' ? '👤' : '🧱') + '</div><div><div class="text-white text-xs font-bold">' + item.prefab + '</div><div class="text-gray-500 text-[10px] font-mono">Offset: X: ' + item.ox + 'm | Z: ' + item.oz + 'm</div></div></div><button onclick="window.removeLayoutItem(' + v.id + ', \'' + item.id + '\')" class="text-gray-600 hover:text-red-500 font-bold px-2 py-1 bg-gray-900 rounded border border-gray-700 opacity-0 group-hover:opacity-100 transition-all text-xs">&times; Remove</button></div>').join('');
+
+            content.innerHTML = '<div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-700"><div class="flex items-center gap-4"><button onclick="window.closeLayoutEditor()" class="text-gray-400 hover:text-white bg-gray-800 px-3 py-1 rounded text-xs border border-gray-600 transition-colors">&larr; Back</button><h3 class="text-yellow-400 font-bold uppercase tracking-widest text-lg">📐 Blueprint: ' + v.name + '</h3></div><button onclick="window.EventBus.emit(\'WORLD_REGENERATE\')" class="bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-bold transition-colors shadow-[0_0_15px_rgba(21,128,61,0.4)]">🔄 Render Changes in World</button></div>' +
+                '<div class="flex gap-4 h-[450px]"><div class="w-1/3 bg-gray-800/80 p-4 rounded-lg border border-gray-700 flex flex-col gap-4 shadow-lg"><h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-600 pb-1">Spawn Structure / NPC</h4><div class="flex flex-col gap-1"><label class="text-[10px] text-gray-500 uppercase font-bold">Select Asset</label><select id="layout-prefab-select" class="bg-gray-950 border border-gray-600 text-gray-300 text-xs rounded px-2 py-2 outline-none focus:border-yellow-500 transition-colors w-full">' + prefabSelectHtml + '</select></div><div class="grid grid-cols-2 gap-2"><div class="flex flex-col gap-1"><label class="text-[10px] text-gray-500 uppercase font-bold">X Offset (m)</label><input type="number" id="layout-ox" placeholder="0" value="0" class="bg-gray-950 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 outline-none focus:border-yellow-500"></div><div class="flex flex-col gap-1"><label class="text-[10px] text-gray-500 uppercase font-bold">Z Offset (m)</label><input type="number" id="layout-oz" placeholder="0" value="0" class="bg-gray-950 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 outline-none focus:border-yellow-500"></div></div><button onclick="window.addLayoutItem(' + v.id + ')" class="mt-2 bg-yellow-600 hover:bg-yellow-500 text-white py-2 rounded text-xs font-bold transition-colors uppercase tracking-widest border border-yellow-800 shadow-md">➕ Add to Blueprint</button><div class="mt-auto bg-gray-900/50 border border-gray-700 p-3 rounded text-[10px] text-gray-400"><p class="mb-1"><strong class="text-yellow-500">Note:</strong> Offsets are in meters relative to the Village Hub (Center). Height is calculated automatically to rest on terrain.</p></div></div><div class="w-2/3 bg-gray-900/80 p-4 rounded-lg border border-gray-700 flex flex-col shadow-inner"><h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-700 pb-1 mb-3">Saved Layout Entities (' + v.layout.length + ')</h4><div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2">' + emptyLayoutHtml + savedItemsHtml + '</div></div></div>';
             return;
         }
         const availableModels = ['None', ...Object.keys(window.AssetManager.models)];
-        let html = `<div class="text-yellow-400 font-bold mb-4 text-sm uppercase tracking-widest border-b border-gray-700 pb-2 flex justify-between items-center"><span>🏘️ Major Settlements (20 Nodes)</span></div><div class="grid grid-cols-2 gap-4">`;
+        let html = '<div class="text-yellow-400 font-bold mb-4 text-sm uppercase tracking-widest border-b border-gray-700 pb-2 flex justify-between items-center"><span>🏘️ Major Settlements (20 Nodes)</span></div><div class="grid grid-cols-2 gap-4">';
         window.VillageManager.villages.forEach(v => {
-            let optionsHTML = availableModels.map(m => `<option value="${m}" ${v.assignedModel === m ? 'selected' : ''}>${m}</option>`).join('');
-            html += `<div class="bg-gray-800 p-3 rounded border border-gray-700 shadow-lg flex flex-col justify-between group relative"><div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onclick="window.renameVillage(${v.id})" class="bg-gray-700 hover:bg-blue-600 text-white text-[10px] px-2 py-1 rounded border border-gray-600 transition-colors">✏️ Rename</button><button onclick="window.openLayoutEditor(${v.id})" class="bg-yellow-700 hover:bg-yellow-600 text-white text-[10px] px-2 py-1 rounded border border-yellow-900 font-bold shadow-md transition-colors">📐 Layout</button></div><div class="flex justify-between items-start mb-2 mt-1"><div><div class="text-white font-bold text-sm flex items-center gap-2">${v.name} ${v.layout.length > 0 ? `<span class="bg-yellow-600 text-white text-[9px] px-1.5 py-0.5 rounded-full">Modified</span>` : ''}</div><div class="text-gray-400 text-[10px] font-mono mt-1">Pos: X:${v.x} Z:${v.z}</div></div></div><div class="grid grid-cols-2 gap-2 mt-1 mb-2 text-[10px] bg-gray-900/50 p-1.5 rounded border border-gray-700"><div class="text-indigo-400 font-bold">🛡️ AP: ${v.stats.ap}</div><div class="text-gray-500 text-right">Links: [${v.connections.join(', ')}]</div></div><div class="flex items-center gap-2 mt-auto border-t border-gray-700 pt-2"><label class="text-[9px] text-gray-400 uppercase font-bold">Override 3D Model:</label><select class="village-model-select bg-gray-950 border border-gray-600 text-gray-300 text-[10px] rounded px-1.5 py-1 flex-1 outline-none focus:border-yellow-500 transition-colors" data-vid="${v.id}">${optionsHTML}</select></div></div>`;
+            let optionsHTML = availableModels.map(m => '<option value="' + m + '" ' + (v.assignedModel === m ? 'selected' : '') + '>' + m + '</option>').join('');
+            let modifiedBadge = v.layout.length > 0 ? '<span class="bg-yellow-600 text-white text-[9px] px-1.5 py-0.5 rounded-full">Modified</span>' : '';
+            
+            html += '<div class="bg-gray-800 p-3 rounded border border-gray-700 shadow-lg flex flex-col justify-between group relative"><div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onclick="window.renameVillage(' + v.id + ')" class="bg-gray-700 hover:bg-blue-600 text-white text-[10px] px-2 py-1 rounded border border-gray-600 transition-colors">✏️ Rename</button><button onclick="window.openLayoutEditor(' + v.id + ')" class="bg-yellow-700 hover:bg-yellow-600 text-white text-[10px] px-2 py-1 rounded border border-yellow-900 font-bold shadow-md transition-colors">📐 Layout</button></div><div class="flex justify-between items-start mb-2 mt-1"><div><div class="text-white font-bold text-sm flex items-center gap-2">' + v.name + ' ' + modifiedBadge + '</div><div class="text-gray-400 text-[10px] font-mono mt-1">Pos: X:' + v.x + ' Z:' + v.z + '</div></div></div><div class="grid grid-cols-2 gap-2 mt-1 mb-2 text-[10px] bg-gray-900/50 p-1.5 rounded border border-gray-700"><div class="text-indigo-400 font-bold">🛡️ AP: ' + v.stats.ap + '</div><div class="text-gray-500 text-right">Links: [' + v.connections.join(', ') + ']</div></div><div class="flex items-center gap-2 mt-auto border-t border-gray-700 pt-2"><label class="text-[9px] text-gray-400 uppercase font-bold">Override 3D Model:</label><select class="village-model-select bg-gray-950 border border-gray-600 text-gray-300 text-[10px] rounded px-1.5 py-1 flex-1 outline-none focus:border-yellow-500 transition-colors" data-vid="' + v.id + '">' + optionsHTML + '</select></div></div>';
         });
-        html += `</div>`; content.innerHTML = html;
+        html += '</div>'; content.innerHTML = html;
         setTimeout(() => { document.querySelectorAll('.village-model-select').forEach(sel => { sel.addEventListener('change', (e) => { const vId = parseInt(e.target.getAttribute('data-vid')); const v = window.VillageManager.villages.find(vil => vil.id === vId); if(v) { v.assignedModel = e.target.value === 'None' ? null : e.target.value; } }); }); }, 0); return;
     }
 
     if (window.EngineState.currentAssetTab === 'factions') {
-        content.innerHTML = `<div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2"><div class="text-purple-400 font-bold text-sm uppercase tracking-widest">🛡️ Factions & Alignments</div><button class="bg-purple-600 hover:bg-purple-500 transition-colors text-white px-3 py-1 rounded text-[10px] uppercase font-bold shadow-lg">+ New Faction</button></div><div class="space-y-3">${window.EngineState.factions.map(f => `<div class="flex justify-between items-center bg-gray-800 p-3 rounded border border-gray-700 shadow-lg"><div class="flex items-center gap-4"><div class="w-6 h-6 rounded border border-gray-600" style="background-color: ${f.color}"></div><span class="text-white font-bold tracking-wider">${f.name}</span></div><button class="text-[10px] font-bold uppercase bg-gray-700 px-3 py-1.5 rounded text-gray-300 border border-gray-600 hover:bg-gray-600 transition-colors">Manage NPCS</button></div>`).join('')}</div>`; return;
+        let factionListHtml = window.EngineState.factions.map(f => '<div class="flex justify-between items-center bg-gray-800 p-3 rounded border border-gray-700 shadow-lg"><div class="flex items-center gap-4"><div class="w-6 h-6 rounded border border-gray-600" style="background-color: ' + f.color + '"></div><span class="text-white font-bold tracking-wider">' + f.name + '</span></div><button class="text-[10px] font-bold uppercase bg-gray-700 px-3 py-1.5 rounded text-gray-300 border border-gray-600 hover:bg-gray-600 transition-colors">Manage NPCS</button></div>').join('');
+        content.innerHTML = '<div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2"><div class="text-purple-400 font-bold text-sm uppercase tracking-widest">🛡️ Factions & Alignments</div><button class="bg-purple-600 hover:bg-purple-500 transition-colors text-white px-3 py-1 rounded text-[10px] uppercase font-bold shadow-lg">+ New Faction</button></div><div class="space-y-3">' + factionListHtml + '</div>'; return;
     }
 
     if (window.EngineState.currentAssetTab === 'vfx') {
         const headerRow = document.createElement('div'); headerRow.className = "flex justify-between items-center mb-4 border-b border-gray-700 pb-2";
-        headerRow.innerHTML = `<div><div class="text-red-400 font-bold text-sm tracking-widest uppercase flex items-center gap-2">✨ Particle & VFX Editor</div><div class="text-gray-400 text-[10px] mt-1">Create custom particle systems, apply textures, and tune visual properties.</div></div><button id="btn-add-vfx" class="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded text-xs font-bold transition-colors shadow-[0_0_15px_rgba(185,28,28,0.4)]">➕ New Custom VFX</button>`;
+        headerRow.innerHTML = '<div><div class="text-red-400 font-bold text-sm tracking-widest uppercase flex items-center gap-2">✨ Particle & VFX Editor</div><div class="text-gray-400 text-[10px] mt-1">Create custom particle systems, apply textures, and tune visual properties.</div></div><button id="btn-add-vfx" class="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded text-xs font-bold transition-colors shadow-[0_0_15px_rgba(185,28,28,0.4)]">➕ New Custom VFX</button>';
         content.appendChild(headerRow);
         setTimeout(() => { document.getElementById('btn-add-vfx').addEventListener('click', () => { const newId = 'Custom_' + Math.floor(Math.random() * 1000); window.VFXManager.defs[newId] = { type: 'aura', color: '#ffffff', size: 0.2, blend: THREE.AdditiveBlending, sprite: null }; window.EventBus.emit('RENDER_ASSETS'); }); }, 0);
 
         Object.entries(window.VFXManager.defs).forEach(([vName, vDef]) => {
             const row = document.createElement('div'); row.className = 'flex justify-between items-center bg-gray-800/80 p-3 rounded border border-gray-700 hover:border-gray-500 transition-colors mb-2 gap-4';
-            row.innerHTML = `<div class="flex items-center gap-2 group w-1/4"><input type="text" class="vfx-name-input bg-transparent text-white font-bold tracking-wide border-b border-dashed border-gray-600 focus:border-solid focus:border-red-500 focus:bg-gray-800 outline-none w-full px-1 py-0.5 transition-all rounded-t-sm" value="${vName}" data-oldname="${vName}"><span class="text-[10px] text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">✏️</span></div><div class="flex items-center gap-4 flex-1 justify-end"><div class="flex flex-col gap-1 w-32"><label class="text-[9px] text-gray-500 uppercase font-bold">Type</label><select class="vfx-type-select bg-gray-950 border border-gray-700 text-gray-300 text-xs rounded px-2 py-1 outline-none focus:border-red-500" data-vfx="${vName}"><option value="aura" ${vDef.type === 'aura' ? 'selected' : ''}>Aura (Passive)</option><option value="onHit" ${vDef.type === 'onHit' ? 'selected' : ''}>On-Hit (Burst)</option></select></div><div class="flex flex-col gap-1 w-20"><label class="text-[9px] text-gray-500 uppercase font-bold">Color</label><input type="color" class="vfx-color-picker bg-gray-950 border border-gray-700 rounded h-7 w-full cursor-pointer" value="${vDef.color}" data-vfx="${vName}"></div><div class="flex flex-col gap-1 w-24"><label class="text-[9px] text-gray-500 uppercase font-bold">Size (${vDef.size})</label><input type="range" class="vfx-size-slider accent-red-500" data-vfx="${vName}" min="0.05" max="1.0" step="0.05" value="${vDef.size}"></div><button class="vfx-sprite-btn bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-1" data-vfx="${vName}">🖼️ Sprite</button></div>`;
+            let auraSelected = vDef.type === 'aura' ? 'selected' : '';
+            let hitSelected = vDef.type === 'onHit' ? 'selected' : '';
+            
+            row.innerHTML = '<div class="flex items-center gap-2 group w-1/4"><input type="text" class="vfx-name-input bg-transparent text-white font-bold tracking-wide border-b border-dashed border-gray-600 focus:border-solid focus:border-red-500 focus:bg-gray-800 outline-none w-full px-1 py-0.5 transition-all rounded-t-sm" value="' + vName + '" data-oldname="' + vName + '"><span class="text-[10px] text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">✏️</span></div><div class="flex items-center gap-4 flex-1 justify-end"><div class="flex flex-col gap-1 w-32"><label class="text-[9px] text-gray-500 uppercase font-bold">Type</label><select class="vfx-type-select bg-gray-950 border border-gray-700 text-gray-300 text-xs rounded px-2 py-1 outline-none focus:border-red-500" data-vfx="' + vName + '"><option value="aura" ' + auraSelected + '>Aura (Passive)</option><option value="onHit" ' + hitSelected + '>On-Hit (Burst)</option></select></div><div class="flex flex-col gap-1 w-20"><label class="text-[9px] text-gray-500 uppercase font-bold">Color</label><input type="color" class="vfx-color-picker bg-gray-950 border border-gray-700 rounded h-7 w-full cursor-pointer" value="' + vDef.color + '" data-vfx="' + vName + '"></div><div class="flex flex-col gap-1 w-24"><label class="text-[9px] text-gray-500 uppercase font-bold">Size (' + vDef.size + ')</label><input type="range" class="vfx-size-slider accent-red-500" data-vfx="' + vName + '" min="0.05" max="1.0" step="0.05" value="' + vDef.size + '"></div><button class="vfx-sprite-btn bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-1" data-vfx="' + vName + '">🖼️ Sprite</button></div>';
             content.appendChild(row);
         });
 
@@ -365,7 +392,7 @@ window.renderAssetManager = function() {
                 window.GameCore.instantiatePrefab(prefabName, x, window.WorldGenerator.getTerrainHeight(x, z), z, 'persistent');
             }
             window.EventBus.emit('UI_LOG', `Created ${prefabName} from ${modelName}.`);
-            document.querySelector(`.asset-tab[data-tab="${category}"]`).click();
+            document.querySelector('.asset-tab[data-tab="' + category + '"]').click();
         };
 
         modelNames.forEach((modelName, index) => {
@@ -373,7 +400,10 @@ window.renderAssetManager = function() {
             const loaded = Boolean(window.AssetManager.models[modelName]);
             const row = document.createElement('div');
             row.className = 'flex items-center justify-between gap-4 bg-gray-800/80 p-3 rounded border border-gray-700 hover:border-cyan-600 transition-colors';
-            row.innerHTML = `<div class="min-w-0"><div class="text-cyan-200 font-bold text-sm truncate">${modelName}</div><div class="text-[10px] text-gray-500 mt-1">${loaded ? `${meta.rigged ? 'Rigged' : 'Static'} | ${meta.animationCount \vert{}\vert{} 0} animation${meta.animationCount === 1 ? '' : 's'}` : 'Available - loads on use'}</div></div><div class="flex gap-2 shrink-0"><button class="model-use-player bg-cyan-900/50 hover:bg-cyan-600 border border-cyan-700 text-cyan-100 px-3 py-1.5 rounded text-xs font-bold" data-model="${modelName}">Use as Player</button><button class="model-create-npc bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-3 py-1.5 rounded text-xs" data-model="${modelName}" data-index="${index}">Create + Place NPC</button><button class="model-create-terrain bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-3 py-1.5 rounded text-xs" data-model="${modelName}" data-index="${index}">Create + Place Terrain</button></div>`;
+            
+            let modelStatus = loaded ? (meta.rigged ? 'Rigged' : 'Static') + ' | ' + (meta.animationCount || 0) + ' animation' + (meta.animationCount === 1 ? '' : 's') : 'Available - loads on use';
+            
+            row.innerHTML = '<div class="min-w-0"><div class="text-cyan-200 font-bold text-sm truncate">' + modelName + '</div><div class="text-[10px] text-gray-500 mt-1">' + modelStatus + '</div></div><div class="flex gap-2 shrink-0"><button class="model-use-player bg-cyan-900/50 hover:bg-cyan-600 border border-cyan-700 text-cyan-100 px-3 py-1.5 rounded text-xs font-bold" data-model="' + modelName + '">Use as Player</button><button class="model-create-npc bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-3 py-1.5 rounded text-xs" data-model="' + modelName + '" data-index="' + index + '">Create + Place NPC</button><button class="model-create-terrain bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-3 py-1.5 rounded text-xs" data-model="' + modelName + '" data-index="' + index + '">Create + Place Terrain</button></div>';
             content.appendChild(row);
         });
 
@@ -410,9 +440,9 @@ window.renderAssetManager = function() {
 
     relevantPrefabs.forEach(([name, def]) => {
         const row = document.createElement('div'); row.className = 'flex flex-col bg-gray-800/80 p-3 rounded border border-gray-700 hover:border-gray-500 transition-colors gap-2';
-        let optionsHTML = availableModels.map(m => `<option value="${m}" ${def.customModel === m ? 'selected' : ''}>${m}</option>`).join('');
+        let optionsHTML = availableModels.map(m => '<option value="' + m + '" ' + (def.customModel === m ? 'selected' : '') + '>' + m + '</option>').join('');
         
-        let animSettingsHTML = `<div class="flex-1 pr-4 flex items-center justify-center border border-dashed border-gray-700 rounded bg-gray-900/30"><span class="text-[10px] text-gray-600">No Animations Available</span></div>`;
+        let animSettingsHTML = '<div class="flex-1 pr-4 flex items-center justify-center border border-dashed border-gray-700 rounded bg-gray-900/30"><span class="text-[10px] text-gray-600">No Animations Available</span></div>';
         
         let allAnims = [];
         if (def.customModel && def.customModel !== 'None' && window.AssetManager.animations[def.customModel]) {
@@ -424,55 +454,60 @@ window.renderAssetManager = function() {
 
         if (allAnims.length > 0) {
             let animOptions = '<option value="None">None</option>'; 
-            allAnims.forEach(anim => { animOptions += `<option value="${anim.name}">${anim.name}</option>`; });
+            allAnims.forEach(anim => { animOptions += '<option value="' + anim.name + '">' + anim.name + '</option>'; });
             
             if (!def.animMap) def.animMap = {};
             const states = ['idle', 'walk', 'attack', 'block', 'dash', 'hit', 'die'];
             states.forEach(s => { if(!def.animMap[s]) def.animMap[s] = 'None'; });
 
-            animSettingsHTML = `<div class="flex-1 pr-4"><span class="text-[10px] font-bold text-indigo-400 block mb-1">ANIMATIONS:</span><div class="grid grid-cols-4 gap-2">`;
+            animSettingsHTML = '<div class="flex-1 pr-4"><span class="text-[10px] font-bold text-indigo-400 block mb-1">ANIMATIONS:</span><div class="grid grid-cols-4 gap-2">';
             states.forEach(state => {
-                // FIX: Removed nested template literal inside the replace() method to prevent parser failure
-                animSettingsHTML += `<div class="flex flex-col gap-1 w-full"><label class="text-[9px] text-gray-500 capitalize">${state}</label><select class="anim-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-indigo-500 outline-none w-full" data-prefab="${name}" data-state="${state}">${animOptions.replace('value="' + def.animMap[state] + '"', 'value="' + def.animMap[state] + '" selected')}</select></div>`;
+                let currentAnimOption = animOptions.replace('value="' + def.animMap[state] + '"', 'value="' + def.animMap[state] + '" selected');
+                animSettingsHTML += '<div class="flex flex-col gap-1 w-full"><label class="text-[9px] text-gray-500 capitalize">' + state + '</label><select class="anim-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-indigo-500 outline-none w-full" data-prefab="' + name + '" data-state="' + state + '">' + currentAnimOption + '</select></div>';
             });
-            animSettingsHTML += `</div></div>`;
+            animSettingsHTML += '</div></div>';
         }
 
-        // FIX: Re-wrote complex inner map/join logic using simple string concatenation to avoid Uncaught SyntaxError: Missing }
         const presetOptions = Object.entries(window.AnimationPresetManager.presetLabels).map(([id, label]) => '<option value="' + id + '" ' + (def.animationPreset === id ? 'selected' : '') + '>' + label + '</option>').join('');
-        const presetControlsHTML = (def.type === 'character' || def.type === 'npc') ? `<div class="flex flex-col gap-1"><label class="text-[9px] text-gray-500 uppercase font-bold">Animation Preset</label><div class="flex gap-1"><select class="anim-preset-select bg-gray-900 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 w-36" data-prefab="${name}"><option value="None">Manual</option>${presetOptions}</select><button class="anim-preset-apply-btn bg-orange-900/60 hover:bg-orange-700 border border-orange-700 text-orange-100 text-[10px] px-2 rounded" data-prefab="${name}">APPLY</button></div></div>` : '';
-        
+        let presetControlsHTML = '';
+        if (def.type === 'character' || def.type === 'npc') {
+            presetControlsHTML = '<div class="flex flex-col gap-1"><label class="text-[9px] text-gray-500 uppercase font-bold">Animation Preset</label><div class="flex gap-1"><select class="anim-preset-select bg-gray-900 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 w-36" data-prefab="' + name + '"><option value="None">Manual</option>' + presetOptions + '</select><button class="anim-preset-apply-btn bg-orange-900/60 hover:bg-orange-700 border border-orange-700 text-orange-100 text-[10px] px-2 rounded" data-prefab="' + name + '">APPLY</button></div></div>';
+        }
+
         if (!def.vfx) def.vfx = { aura: 'None', onHit: 'None' };
         
         const auraOptions = window.VFXManager.auras.map(v => '<option value="' + v + '" ' + (def.vfx.aura === v ? 'selected' : '') + '>' + v + '</option>').join('');
         const onHitOptions = window.VFXManager.onHits.map(v => '<option value="' + v + '" ' + (def.vfx.onHit === v ? 'selected' : '') + '>' + v + '</option>').join('');
         
-        let vfxSettingsHTML = `<div class="w-48 pl-4 border-l border-gray-700"><span class="text-[10px] font-bold text-red-400 block mb-1">PARTICLES & VFX:</span><div class="flex flex-col gap-1"><label class="text-[9px] text-gray-500">Aura (Passive)</label><select class="vfx-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-red-500 outline-none w-full" data-prefab="${name}" data-type="aura">${auraOptions}</select></div><div class="flex flex-col gap-1 mt-1"><label class="text-[9px] text-gray-500">On Hit (Transient)</label><select class="vfx-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-red-500 outline-none w-full" data-prefab="${name}" data-type="onHit">${onHitOptions}</select></div></div>`;
+        let vfxSettingsHTML = '<div class="w-48 pl-4 border-l border-gray-700"><span class="text-[10px] font-bold text-red-400 block mb-1">PARTICLES & VFX:</span><div class="flex flex-col gap-1"><label class="text-[9px] text-gray-500">Aura (Passive)</label><select class="vfx-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-red-500 outline-none w-full" data-prefab="' + name + '" data-type="aura">' + auraOptions + '</select></div><div class="flex flex-col gap-1 mt-1"><label class="text-[9px] text-gray-500">On Hit (Transient)</label><select class="vfx-select bg-gray-950 border border-gray-700 text-gray-300 text-[10px] rounded px-1 py-1 focus:border-red-500 outline-none w-full" data-prefab="' + name + '" data-type="onHit">' + onHitOptions + '</select></div></div>';
         
-        row.innerHTML = `<div class="flex justify-between items-center w-full mb-2">
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded bg-gray-900 border border-gray-600 flex items-center justify-center text-[10px] text-center shadow-inner">${def.customModel ? '<span class="text-green-400 font-bold">3D<br>Model</span>' : (def.type==='mountain' ? '<span class="text-gray-500">Cone<br>Mesh</span>' : '<span class="text-gray-500">Prim<br>Mesh</span>')}</div>
-                <div class="flex flex-col">
-                    <div class="flex items-center gap-1 group">
-                        <input type="text" class="prefab-name-input bg-transparent text-white font-bold tracking-wide border-b border-dashed border-gray-600 focus:border-solid focus:border-indigo-500 focus:bg-gray-800 outline-none w-32 px-1 py-0.5 transition-all rounded-t-sm" value="${name}" data-oldname="${name}" title="Edit Name">
-                        <span class="text-[10px] text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">✏️</span>
-                    </div>
-                    <p class="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5 px-1">TYPE: ${def.type}</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-3">
-                <div class="flex flex-col gap-1">
-                    <label class="text-[9px] text-gray-500 uppercase font-bold">Model Override</label>
-                    <select class="asset-model-select bg-gray-900 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 w-48 focus:border-indigo-500 outline-none transition-colors" data-prefab="${name}">${optionsHTML}</select>
-                </div>
-                <div class="flex flex-col gap-1">
-                    <label class="text-[9px] text-gray-500 uppercase font-bold">Scale Mult.</label>
-                    <input type="number" step="0.001" min="0.001" class="asset-scale-input bg-gray-950 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 w-20 outline-none focus:border-indigo-500" data-prefab="${name}" value="${def.modelScale || 1.0}">
-                </div>
-                ${presetControlsHTML}
-                <button class="asset-apply-btn mt-4 bg-indigo-900/50 hover:bg-indigo-600 text-indigo-200 hover:text-white text-xs px-4 py-1.5 rounded border border-indigo-700 hover:border-indigo-400 transition-all font-bold" data-prefab="${name}">APPLY</button>
-            </div>
-        </div><div class="flex items-stretch bg-gray-900/50 border border-gray-800 p-2 rounded w-full">${animSettingsHTML}${vfxSettingsHTML}</div>`;
+        let meshTypeBadge = def.customModel ? '<span class="text-green-400 font-bold">3D<br>Model</span>' : (def.type === 'mountain' ? '<span class="text-gray-500">Cone<br>Mesh</span>' : '<span class="text-gray-500">Prim<br>Mesh</span>');
+
+        row.innerHTML = '<div class="flex justify-between items-center w-full mb-2">' +
+            '<div class="flex items-center gap-4">' +
+                '<div class="w-12 h-12 rounded bg-gray-900 border border-gray-600 flex items-center justify-center text-[10px] text-center shadow-inner">' + meshTypeBadge + '</div>' +
+                '<div class="flex flex-col">' +
+                    '<div class="flex items-center gap-1 group">' +
+                        '<input type="text" class="prefab-name-input bg-transparent text-white font-bold tracking-wide border-b border-dashed border-gray-600 focus:border-solid focus:border-indigo-500 focus:bg-gray-800 outline-none w-32 px-1 py-0.5 transition-all rounded-t-sm" value="' + name + '" data-oldname="' + name + '" title="Edit Name">' +
+                        '<span class="text-[10px] text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">✏️</span>' +
+                    '</div>' +
+                    '<p class="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5 px-1">TYPE: ' + def.type + '</p>' +
+                '</div>' +
+            '</div>' +
+            '<div class="flex items-center gap-3">' +
+                '<div class="flex flex-col gap-1">' +
+                    '<label class="text-[9px] text-gray-500 uppercase font-bold">Model Override</label>' +
+                    '<select class="asset-model-select bg-gray-900 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 w-48 focus:border-indigo-500 outline-none transition-colors" data-prefab="' + name + '">' + optionsHTML + '</select>' +
+                '</div>' +
+                '<div class="flex flex-col gap-1">' +
+                    '<label class="text-[9px] text-gray-500 uppercase font-bold">Scale Mult.</label>' +
+                    '<input type="number" step="0.001" min="0.001" class="asset-scale-input bg-gray-950 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1.5 w-20 outline-none focus:border-indigo-500" data-prefab="' + name + '" value="' + (def.modelScale || 1.0) + '">' +
+                '</div>' +
+                presetControlsHTML +
+                '<button class="asset-apply-btn mt-4 bg-indigo-900/50 hover:bg-indigo-600 text-indigo-200 hover:text-white text-xs px-4 py-1.5 rounded border border-indigo-700 hover:border-indigo-400 transition-all font-bold" data-prefab="' + name + '">APPLY</button>' +
+            '</div>' +
+        '</div><div class="flex items-stretch bg-gray-900/50 border border-gray-800 p-2 rounded w-full">' + animSettingsHTML + vfxSettingsHTML + '</div>';
+        
         content.appendChild(row);
     });
 
@@ -480,8 +515,8 @@ window.renderAssetManager = function() {
         document.querySelectorAll('.asset-apply-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const pName = e.target.getAttribute('data-prefab'); 
-                const select = document.querySelector(`.asset-model-select[data-prefab="${pName}"]`);
-                const scaleInp = document.querySelector(`.asset-scale-input[data-prefab="${pName}"]`);
+                const select = document.querySelector('.asset-model-select[data-prefab="' + pName + '"]');
+                const scaleInp = document.querySelector('.asset-scale-input[data-prefab="' + pName + '"]');
                 
                 if (window.AssetManager.prefabs[pName]) {
                     const def = window.AssetManager.prefabs[pName]; 
@@ -520,7 +555,7 @@ window.renderAssetManager = function() {
         document.querySelectorAll('.anim-preset-apply-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const prefabName = e.target.getAttribute('data-prefab');
-                const presetName = document.querySelector(`.anim-preset-select[data-prefab="${prefabName}"]`).value;
+                const presetName = document.querySelector('.anim-preset-select[data-prefab="' + prefabName + '"]').value;
                 if (presetName !== 'None') window.AnimationPresetManager.applyToPrefab(prefabName, presetName);
             });
         });
