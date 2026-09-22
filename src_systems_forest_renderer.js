@@ -4,12 +4,15 @@
 // ============================================================================
 
 import * as THREE from 'three';
+import { createForestFloorMaterial } from './block_terrain.js'; // Phase 3 FIX: Import explicit floor material
 
 class ForestRenderer {
     constructor() {
         this.group = new THREE.Group();
         this.materials = new Map();
         this.instancedMeshes = new Map();
+        this.terrainMeshes = new Map(); // Phase 3 FIX: Track terrain chunks
+        this.forestFloorMaterial = null; // Phase 3 FIX: Cached floor material
         this.initialized = false;
 
         this.sharedUniforms = {
@@ -110,6 +113,38 @@ class ForestRenderer {
 
         this.initialized = true;
         console.log('[ForestRenderer] Foliage shading & bloom-clamped materials loaded.');
+    }
+
+    // Phase 3 FIX: Enforce forest floor material binding on chunk mesh instantiation
+    setTerrainMesh(chunkKey, geometry) {
+        if (!this.forestFloorMaterial) {
+            // Lazy load and cache the specialized duff/humus shader material
+            this.forestFloorMaterial = createForestFloorMaterial();
+        }
+
+        if (this.terrainMeshes.has(chunkKey)) {
+            const oldMesh = this.terrainMeshes.get(chunkKey);
+            this.group.remove(oldMesh);
+            if (oldMesh.geometry) oldMesh.geometry.dispose();
+            this.terrainMeshes.delete(chunkKey);
+        }
+
+        const terrainMesh = new THREE.Mesh(geometry, this.forestFloorMaterial);
+        terrainMesh.name = `terrain_${chunkKey}`;
+        terrainMesh.receiveShadow = true;
+        terrainMesh.castShadow = false;
+
+        this.group.add(terrainMesh);
+        this.terrainMeshes.set(chunkKey, terrainMesh);
+    }
+
+    clearTerrainMesh(chunkKey) {
+        if (this.terrainMeshes.has(chunkKey)) {
+            const mesh = this.terrainMeshes.get(chunkKey);
+            this.group.remove(mesh);
+            if (mesh.geometry) mesh.geometry.dispose();
+            this.terrainMeshes.delete(chunkKey);
+        }
     }
 
     setChunkInstances(chunkKey, prefabKey, points) {
