@@ -42,7 +42,7 @@ export class TerrainWorkerPool {
                 geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
                 geometry.computeBoundingSphere();
 
-                // PRIORITY 3 FIX: Bind geometry through ForestRenderer to enforce ForestFloorMaterial
+                // FIX: Bind geometry through ForestRenderer to enforce ForestFloorMaterial
                 if (window.ForestRenderer && window.ForestRenderer.setTerrainMesh) {
                     window.ForestRenderer.setTerrainMesh(key, geometry);
                 } else {
