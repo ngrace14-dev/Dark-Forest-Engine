@@ -4,7 +4,6 @@
 // ============================================================================
 
 import * as THREE from 'three';
-// FIX: Removed ES6 import for block_terrain.js that was causing 404 errors
 
 class RuinsSystem {
     constructor() {
@@ -48,7 +47,6 @@ class RuinsSystem {
     }
 
     initMaterials() {
-        // FIX: Route material generation through global scope, with safe fallbacks
         const generateMaterial = (options) => {
             if (window.BlockTerrainSystem && window.BlockTerrainSystem.createProceduralBlockMaterial) {
                 return window.BlockTerrainSystem.createProceduralBlockMaterial(options);
@@ -174,7 +172,7 @@ class RuinsSystem {
                 dummy.rotation.set(
                     (this.hash2D(pos.x, i) - 0.5) * 0.12,
                     this.hash2D(i, pos.z) * Math.PI * 2,
-                    (this.hash2D(i, pos.y) - 0.5) * 0.12
+                    (this.hash2D(i, pos.z) - 0.5) * 0.12 // FIX: Replaced undefined pos.y with pos.z
                 );
             }
 
