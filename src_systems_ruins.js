@@ -1,22 +1,20 @@
 // ============================================================================
 // Dark Forest Engine - Procedural Stone Ruins & Ancient Cobblestones System
-// File: src_systems_ruins.js
+// File: src/systems/ruins.js
 // ============================================================================
 
 import * as THREE from 'three';
-import { BlockTerrainChunk, createProceduralBlockMaterial } from './src_systems_block_terrain.js';
+import { BlockTerrainChunk, createProceduralBlockMaterial } from './block_terrain.js';
 
 class RuinsSystem {
     constructor() {
-        this.activeRuins = new Map(); // chunkKey -> THREE.Group
+        this.activeRuins = new Map();
         this.initialized = false;
         this.scene = null;
 
-        // Shared materials for stone architecture
         this.stoneMaterial = null;
         this.cobbleMaterial = null;
 
-        // Shared geometries
         this.pillarGeo = null;
         this.wallBlockGeo = null;
         this.cobbleGeo = null;
@@ -24,9 +22,6 @@ class RuinsSystem {
         this.bindEvents();
     }
 
-    /**
-     * Binds engine lifecycle event listeners.
-     */
     bindEvents() {
         if (typeof window !== 'undefined' && window.EventBus) {
             window.EventBus.on('ENGINE_READY', () => {
@@ -41,10 +36,6 @@ class RuinsSystem {
         }
     }
 
-    /**
-     * System initialization hook.
-     * @param {THREE.Scene} scene 
-     */
     init(scene) {
         if (this.initialized) return;
         this.scene = scene;
@@ -56,9 +47,6 @@ class RuinsSystem {
         console.log('[RuinsSystem] Initialized successfully.');
     }
 
-    /**
-     * Initializes procedural materials using BlockTerrain factories.
-     */
     initMaterials() {
         this.stoneMaterial = createProceduralBlockMaterial({
             color: 0x6b7280,
@@ -73,34 +61,22 @@ class RuinsSystem {
         });
     }
 
-    /**
-     * Initializes structural geometries.
-     */
     initGeometries() {
-        // Fluted Stone Pillar Geometry
         this.pillarGeo = new THREE.CylinderGeometry(0.8, 1.1, 7.0, 10);
         this.pillarGeo.translate(0, 3.5, 0);
 
-        // Stone Wall Block
         this.wallBlockGeo = new THREE.BoxGeometry(2.5, 1.2, 1.2);
         this.wallBlockGeo.translate(0, 0.6, 0);
 
-        // Cobblestone Paving Slab
         this.cobbleGeo = new THREE.BoxGeometry(1.2, 0.3, 1.2);
         this.cobbleGeo.translate(0, 0.15, 0);
     }
 
-    /**
-     * Hash function for deterministic ruin distribution.
-     */
     hash2D(x, z) {
         let h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
         return h - Math.floor(h);
     }
 
-    /**
-     * Helper to sample ground elevation safely.
-     */
     getTerrainHeight(x, z) {
         if (typeof window !== 'undefined' && window.WorldGenerator?.getTerrainHeight) {
             const h = window.WorldGenerator.getTerrainHeight(x, z);
@@ -109,12 +85,6 @@ class RuinsSystem {
         return 0;
     }
 
-    /**
-     * Generates ancient ruin sites for a given terrain chunk.
-     * @param {number} cx - Chunk X coordinate
-     * @param {number} cz - Chunk Z coordinate
-     * @param {number} chunkSize - Size of chunk in meters
-     */
     generateRuinsForChunk(cx, cz, chunkSize = 60.0) {
         if (!this.initialized && window.GameCore?.scene) {
             this.init(window.GameCore.scene);
@@ -123,14 +93,12 @@ class RuinsSystem {
         const chunkKey = `chunk_${cx}_${cz}`;
         if (this.activeRuins.has(chunkKey)) return;
 
-        // Deterministic roll for ruin probability in this chunk (12% chance)
         const ruinRoll = this.hash2D(cx * 0.31, cz * 0.31);
         if (ruinRoll > 0.12) return;
 
         const centerX = cx * chunkSize + chunkSize / 2;
         const centerZ = cz * chunkSize + chunkSize / 2;
 
-        // Skip safe zones (roads, capital cities)
         if (window.RoadManager?.isSafeZone?.({ x: centerX, z: centerZ }) ||
             window.CapitalCityManager?.isInsideCapital?.(centerX, centerZ)) {
             return;
@@ -141,7 +109,6 @@ class RuinsSystem {
 
         const groundY = this.getTerrainHeight(centerX, centerZ);
 
-        // 1. Generate Cobblestone Foundation Grid
         const cobbleCount = 25;
         const cobbleMesh = new THREE.InstancedMesh(this.cobbleGeo, this.cobbleMaterial, cobbleCount);
         cobbleMesh.castShadow = true;
@@ -171,7 +138,6 @@ class RuinsSystem {
         cobbleMesh.instanceMatrix.needsUpdate = true;
         chunkGroup.add(cobbleMesh);
 
-        // 2. Generate Crumbling Pillars
         const pillarCount = 4;
         const pillarMesh = new THREE.InstancedMesh(this.pillarGeo, this.stoneMaterial, pillarCount);
         pillarMesh.castShadow = true;
@@ -190,14 +156,12 @@ class RuinsSystem {
 
             dummy.position.set(pos.x, py, pos.z);
             if (isToppled) {
-                // Toppled pillar lying on ground
                 dummy.rotation.set(
                     Math.PI / 2 + (this.hash2D(i, pos.x) - 0.5) * 0.2,
                     this.hash2D(pos.x, pos.z) * Math.PI * 2,
                     0
                 );
             } else {
-                // Standing or slightly tilted pillar
                 dummy.rotation.set(
                     (this.hash2D(pos.x, i) - 0.5) * 0.12,
                     this.hash2D(i, pos.z) * Math.PI * 2,
@@ -211,7 +175,6 @@ class RuinsSystem {
 
             pillarMesh.setMatrixAt(i, dummy.matrix);
 
-            // Add physical rigid body if Rapier is available
             if (window.GameCore?.world && window.RAPIER) {
                 try {
                     const bodyDesc = window.RAPIER.RigidBodyDesc.fixed()
@@ -220,7 +183,6 @@ class RuinsSystem {
                     const colliderDesc = window.RAPIER.ColliderDesc.cylinder(3.5, 0.9);
                     window.GameCore.world.createCollider(colliderDesc, body);
                 } catch (e) {
-                    // Non-fatal physics fallback
                 }
             }
         });
@@ -235,10 +197,6 @@ class RuinsSystem {
         this.activeRuins.set(chunkKey, chunkGroup);
     }
 
-    /**
-     * Unloads ruin objects for a chunk.
-     * @param {string} chunkKey 
-     */
     unloadRuinsForChunk(chunkKey) {
         const group = this.activeRuins.get(chunkKey);
         if (!group) return;
@@ -256,9 +214,6 @@ class RuinsSystem {
         this.activeRuins.delete(chunkKey);
     }
 
-    /**
-     * Clears all generated ruin instances and disposes resources.
-     */
     clearAll() {
         for (const [key, group] of this.activeRuins.entries()) {
             group.traverse(child => {
@@ -274,7 +229,6 @@ class RuinsSystem {
     }
 }
 
-// Global Singleton Binding
 if (typeof window !== 'undefined') {
     window.RuinsSystem = new RuinsSystem();
 }
