@@ -1,9 +1,8 @@
 // ====================================================================
 // DARK FOREST ENGINE — ASYNC TERRAIN WEB WORKER
-// File: src_workers_terrain_worker.js
+// File: src/workers/terrain_worker.js
 // ====================================================================
 
-// 2D Simplex Noise generator self-contained inside the worker
 function createSimplexNoise(seed = 1337) {
     const p = new Uint8Array(256);
     let s = seed;
@@ -90,7 +89,6 @@ self.onmessage = function (e) {
     try {
         const { id, cx, cz, segments, chunkSize, seed, roadPoints } = e.data;
 
-        // Re-initialize noise function if seed changes or isn't set yet
         const taskSeed = seed || 1337;
         if (!noiseFn || currentSeed !== taskSeed) {
             noiseFn = createSimplexNoise(taskSeed);
@@ -110,7 +108,6 @@ self.onmessage = function (e) {
         const halfSize = chunkSize / 2;
         const step = chunkSize / segments;
 
-        // Pre-filter road points to only those within chunk bounding area + margin
         const localRoadPoints = [];
         if (Array.isArray(roadPoints) && roadPoints.length > 0) {
             const margin = halfSize + ROAD_WIDTH + 10;
@@ -141,7 +138,6 @@ self.onmessage = function (e) {
                 positions[vertIdx + 1] = wy;
                 positions[vertIdx + 2] = zLocal;
 
-                // Fast road proximity check using pre-filtered points
                 let minRoadDistSq = 999999;
                 if (localRoadPoints.length > 0) {
                     for (let r = 0; r < localRoadPoints.length; r++) {
@@ -155,14 +151,12 @@ self.onmessage = function (e) {
 
                 const minRoadDist = Math.sqrt(minRoadDistSq);
 
-                // Terrain base color (#4ade80 grass green base)
                 let rCol = 0.29;
                 let gCol = 0.87;
                 let bCol = 0.50;
 
                 if (minRoadDist < ROAD_WIDTH + 2) {
                     const dirtInfluence = Math.max(0, 1.0 - minRoadDist / (ROAD_WIDTH + 2));
-                    // Lerp towards dirt color (#4a3e31)
                     rCol = rCol + (0.29 - rCol) * (dirtInfluence * 0.55);
                     gCol = gCol + (0.24 - gCol) * (dirtInfluence * 0.55);
                     bCol = bCol + (0.19 - bCol) * (dirtInfluence * 0.55);
@@ -173,7 +167,6 @@ self.onmessage = function (e) {
                 colors[vertIdx + 1] = Math.min(1.0, Math.max(0.0, gCol + cNoise));
                 colors[vertIdx + 2] = Math.min(1.0, Math.max(0.0, bCol + cNoise));
 
-                // Surface Normal Finite Differences
                 const hL = getTerrainHeight(wx - 0.1, wz);
                 const hR = getTerrainHeight(wx + 0.1, wz);
                 const hD = getTerrainHeight(wx, wz - 0.1);
@@ -193,13 +186,11 @@ self.onmessage = function (e) {
             }
         }
 
-        // Zero-copy transfer of typed array memory back to main thread
         self.postMessage(
             { id, key: `${cx},${cz}`, cx, cz, positions, normals, colors, clutter },
             [positions.buffer, normals.buffer, colors.buffer, clutter.buffer]
         );
     } catch (err) {
-        // Unblock main thread pool if worker execution fails
         self.postMessage({ id: e.data?.id, error: err.message || 'Worker Error' });
     }
 };
