@@ -4,7 +4,7 @@
 // ============================================================================
 
 import * as THREE from 'three';
-import { BlockTerrainChunk, createProceduralBlockMaterial } from './block_terrain.js';
+// FIX: Removed ES6 import for block_terrain.js that was causing 404 errors
 
 class RuinsSystem {
     constructor() {
@@ -48,13 +48,22 @@ class RuinsSystem {
     }
 
     initMaterials() {
-        this.stoneMaterial = createProceduralBlockMaterial({
+        // FIX: Route material generation through global scope, with safe fallbacks
+        const generateMaterial = (options) => {
+            if (window.BlockTerrainSystem && window.BlockTerrainSystem.createProceduralBlockMaterial) {
+                return window.BlockTerrainSystem.createProceduralBlockMaterial(options);
+            } else {
+                return new THREE.MeshStandardMaterial(options);
+            }
+        };
+
+        this.stoneMaterial = generateMaterial({
             color: 0x6b7280,
             roughness: 0.85,
             metalness: 0.05
         });
 
-        this.cobbleMaterial = createProceduralBlockMaterial({
+        this.cobbleMaterial = generateMaterial({
             color: 0x4b5563,
             roughness: 0.95,
             metalness: 0.02
