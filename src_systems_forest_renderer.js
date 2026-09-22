@@ -4,7 +4,6 @@
 // ============================================================================
 
 import * as THREE from 'three';
-// FIX: Removed ES6 import for block_terrain.js that was causing 404 errors
 
 class ForestRenderer {
     constructor() {
@@ -15,11 +14,12 @@ class ForestRenderer {
         this.forestFloorMaterial = null; 
         this.initialized = false;
 
+        // FIX: Renamed uniforms to bypass naming collisions with VolumetricFogSystem
         this.sharedUniforms = {
             uTime: { value: 0 },
             uWindSpeed: { value: 1.0 },
-            uSunDirection: { value: new THREE.Vector3(0.3, 0.6, 0.7).normalize() },
-            uSunColor: { value: new THREE.Color(0xfef3c7) },
+            uForestSunDir: { value: new THREE.Vector3(0.3, 0.6, 0.7).normalize() },
+            uForestSunCol: { value: new THREE.Color(0xfef3c7) },
             uRawDebugMode: { value: 0.0 }
         };
     }
@@ -38,7 +38,8 @@ class ForestRenderer {
                     roughness: 0.82,
                     metalness: 0.03,
                     side: THREE.DoubleSide,
-                    alphaTest: 0.18
+                    alphaTest: 0.18,
+                    vertexColors: true // FIX: CRITICAL - Tells Three.js to declare the 'color' vertex attribute
                 });
 
                 mat.onBeforeCompile = (shader) => {
@@ -54,7 +55,7 @@ class ForestRenderer {
                         `#include <begin_vertex>`,
                         `
                         #include <begin_vertex>
-                        vColorAttr = color;
+                        vColorAttr = color; // Now perfectly valid because vertexColors is true
 
                         #ifdef USE_INSTANCING
                             vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
@@ -70,9 +71,10 @@ class ForestRenderer {
                         `
                     );
 
+                    // FIX: Replaced uSunDirection with uForestSunDir
                     shader.fragmentShader = `
-                        uniform vec3 uSunDirection;
-                        uniform vec3 uSunColor;
+                        uniform vec3 uForestSunDir;
+                        uniform vec3 uForestSunCol;
                         uniform float uRawDebugMode;
                         varying vec3 vWorldPos;
                         varying vec3 vColorAttr;
@@ -94,9 +96,9 @@ class ForestRenderer {
 
                         if (vColorAttr.g > 0.5 && uRawDebugMode < 0.5) {
                             vec3 viewDir = normalize(cameraPosition - vWorldPos);
-                            float backLight = max(0.0, dot(-viewDir, uSunDirection));
+                            float backLight = max(0.0, dot(-viewDir, uForestSunDir));
                             float sssScatter = pow(backLight, 4.0) * 0.65;
-                            vec3 sssGlow = uSunColor * vec3(0.20, 0.55, 0.10) * sssScatter;
+                            vec3 sssGlow = uForestSunCol * vec3(0.20, 0.55, 0.10) * sssScatter;
                             diffuseColor.rgb += sssGlow;
                         }
                         `
@@ -117,11 +119,9 @@ class ForestRenderer {
 
     setTerrainMesh(chunkKey, geometry) {
         if (!this.forestFloorMaterial) {
-            // FIX: Retrieve material generator dynamically from the window object to bypass 404 import error
             if (window.createForestFloorMaterial) {
                 this.forestFloorMaterial = window.createForestFloorMaterial();
             } else {
-                // Safe fallback if terrain system boots late
                 this.forestFloorMaterial = new THREE.MeshStandardMaterial({ color: 0x1a120b });
                 console.warn('[ForestRenderer] BlockTerrainSystem global not found. Using generic floor material.');
             }
