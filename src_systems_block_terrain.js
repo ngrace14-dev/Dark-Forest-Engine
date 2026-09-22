@@ -1,13 +1,10 @@
 // ============================================================================
-// Dark Forest Engine - Node-Driven Old-Growth Ecosystem Placement Engine
-// File: src_systems_block_terrain.js
+// Dark Forest Engine - Node-Driven Ecosystem Placement & Forest Duff Floor
+// File: src/systems/block_terrain.js
 // ============================================================================
 
 import * as THREE from 'three';
 
-/**
- * Terrain Chunk wrapper required by src_systems_ruins.js
- */
 export class BlockTerrainChunk {
     constructor(cx, cz, chunkSize = 60.0) {
         this.cx = cx;
@@ -19,9 +16,6 @@ export class BlockTerrainChunk {
     }
 }
 
-/**
- * Procedural block material factory required by structural generators.
- */
 export function createProceduralBlockMaterial(options = {}) {
     const mat = new THREE.MeshStandardMaterial({
         vertexColors: true,
@@ -38,26 +32,79 @@ export function createProceduralBlockMaterial(options = {}) {
     return mat;
 }
 
-/**
- * Node-Driven Ecological Forest System
- */
+export function createForestFloorMaterial(options = {}) {
+    const mat = new THREE.MeshStandardMaterial({
+        color: 0x1a120b,
+        roughness: 0.92,
+        metalness: 0.02,
+        vertexColors: true,
+        ...options
+    });
+
+    mat.onBeforeCompile = (shader) => {
+        shader.vertexShader = `
+            varying vec3 vWorldPosFloor;
+            varying vec3 vWorldNormalFloor;
+            ${shader.vertexShader}
+        `.replace(
+            `#include <begin_vertex>`,
+            `
+            #include <begin_vertex>
+            vWorldPosFloor = (modelMatrix * vec4(position, 1.0)).xyz;
+            vWorldNormalFloor = normalize(mat3(modelMatrix) * normal);
+            `
+        );
+
+        shader.fragmentShader = `
+            varying vec3 vWorldPosFloor;
+            varying vec3 vWorldNormalFloor;
+            ${shader.fragmentShader}
+        `.replace(
+            `#include <color_fragment>`,
+            `
+            #include <color_fragment>
+
+            vec2 duffUV = vWorldPosFloor.xz * 0.15;
+            float noiseA = sin(duffUV.x) * cos(duffUV.y);
+            float noiseB = sin(vWorldPosFloor.x * 0.8) * cos(vWorldPosFloor.z * 0.8) * 0.5 + 0.5;
+
+            vec3 darkHumus = vec3(0.08, 0.05, 0.03);
+            vec3 redwoodDuff = vec3(0.18, 0.09, 0.05);
+            vec3 mossPatch = vec3(0.10, 0.18, 0.07);
+
+            float slopeFactor = 1.0 - clamp(vWorldNormalFloor.y, 0.0, 1.0);
+            
+            vec3 groundColor = mix(redwoodDuff, darkHumus, noiseA * 0.5 + 0.5);
+            groundColor = mix(groundColor, mossPatch, smoothstep(0.4, 0.7, noiseB) * (1.0 - slopeFactor));
+            groundColor = mix(groundColor, darkHumus * 0.7, smoothstep(0.3, 0.8, slopeFactor));
+
+            diffuseColor.rgb = groundColor;
+            `
+        );
+    };
+
+    if (typeof window !== 'undefined' && window.VolumetricFogSystem?.patchMaterial) {
+        window.VolumetricFogSystem.patchMaterial(mat);
+    }
+
+    return mat;
+}
+
 export class BlockTerrainSystem {
     constructor() {
         this.chunkSize = 60.0;
         this.activeChunks = new Set();
         this.chunkVegetationMap = new Map();
         
-        // Expanded Information Economy Registries (Queryable by Oracle Board & Rumor System)
         this.loreTreeRegistry = new Map();
         this.landmarkRegistry = new Map();
-        this.activeNodes = new Map(); // Spatial cache for Champion, Grove, and Deadfall nodes
+        this.activeNodes = new Map();
 
         this.initialized = false;
         this.scene = null;
 
-        this.CHAMPION_EXCLUSION_RADIUS = 120.0; // 120m territory isolation for Champions
+        this.CHAMPION_EXCLUSION_RADIUS = 120.0;
 
-        // Curated Lore Archives for Champion Landmarks & Fallen Titans
         this.loreArchives = {
             standingTitles: [
                 "The Widow of Oakhaven", "Crow Root", "The Fallen Saint", "The King's Spine",
@@ -81,7 +128,7 @@ export class BlockTerrainSystem {
         if (this.initialized) return;
         this.scene = scene;
         this.initialized = true;
-        console.log('[BlockTerrainSystem] Node-Driven Ecosystem & Information Economy Initialized.');
+        console.log('[BlockTerrainSystem] Node-Driven Ecosystem & Floor Materials Initialized.');
     }
 
     bindEvents() {
@@ -123,15 +170,12 @@ export class BlockTerrainSystem {
         return 0;
     }
 
-    /**
-     * CRITICAL BUG FIX #1: Fixed scope binding on this.getTerrainHeight
-     */
     getTerrainSlope(x, z) {
         const delta = 1.0;
         const hL = this.getTerrainHeight(x - delta, z);
         const hR = this.getTerrainHeight(x + delta, z);
         const hD = this.getTerrainHeight(x, z - delta);
-        const hU = this.getTerrainHeight(x, z + delta); // FIXED: Added `this.`
+        const hU = this.getTerrainHeight(x, z + delta);
 
         const dx = (hR - hL) / (2 * delta);
         const dz = (hU - hD) / (2 * delta);
@@ -145,9 +189,6 @@ export class BlockTerrainSystem {
         return { slope, valleyMoisture, ridgeExposure };
     }
 
-    /**
-     * PRIORITY 7: BIOME-DEPENDENT TREE LEAN CALCULATIONS
-     */
     calculateTreeLean(ageState, densityMode, wx, wz) {
         let baseLeanMin = 0.5;
         let baseLeanMax = 3.0;
@@ -174,9 +215,6 @@ export class BlockTerrainSystem {
         };
     }
 
-    /**
-     * PRIORITY 1 & 3: NODE GENERATION ENGINE (Champion, Grove, Deadfall, Clearing Nodes)
-     */
     getEcosystemNodesForChunk(chunkX, chunkZ) {
         const chunkNodeKey = `node_chunk_${chunkX}_${chunkZ}`;
         if (this.activeNodes.has(chunkNodeKey)) {
@@ -194,7 +232,6 @@ export class BlockTerrainSystem {
 
         const eco = this.getTerrainEcoProfile(nx, nz, ny);
 
-        // NODE TYPE 1: CHAMPION / LORE TITAN NODE (0.35%)
         if (nodeRoll < 0.0035 && eco.slope < 0.22) {
             nodes.push({
                 type: 'CHAMPION_NODE',
@@ -203,7 +240,6 @@ export class BlockTerrainSystem {
                 exclusionRadius: this.CHAMPION_EXCLUSION_RADIUS
             });
         }
-        // NODE TYPE 2: FALLEN TITAN NODE (0.02% - PRIORITY 4)
         else if (nodeRoll < 0.0055 && eco.valleyMoisture > 0.30) {
             nodes.push({
                 type: 'FALLEN_TITAN_NODE',
@@ -212,7 +248,6 @@ export class BlockTerrainSystem {
                 title: this.loreArchives.fallenTitles[Math.floor(this.hash2D(nx, nz) * this.loreArchives.fallenTitles.length)]
             });
         }
-        // NODE TYPE 3: ANCIENT GROVE NODE (15.0%)
         else if (nodeRoll < 0.155 && eco.valleyMoisture > 0.35) {
             nodes.push({
                 type: 'ANCIENT_GROVE_NODE',
@@ -223,7 +258,6 @@ export class BlockTerrainSystem {
                 canopyDensity: 1.4
             });
         }
-        // NODE TYPE 4: STORIED CLEARING NODE (10.0% - PRIORITY 5)
         else if (nodeRoll < 0.255) {
             const cause = this.loreArchives.clearingCauses[Math.floor(this.hash2D(nx, nz) * this.loreArchives.clearingCauses.length)];
             nodes.push({
@@ -238,9 +272,6 @@ export class BlockTerrainSystem {
         return nodes;
     }
 
-    /**
-     * PRIORITY 2: CHAMPION TERRITORY EXCLUSION CHECK
-     */
     isInsideChampionTerritory(wx, wz) {
         for (const nodes of this.activeNodes.values()) {
             for (const node of nodes) {
@@ -256,14 +287,10 @@ export class BlockTerrainSystem {
         return false;
     }
 
-    /**
-     * MAIN ECOSYSTEM PLACEMENT PIPELINE
-     */
     generateChunkVegetation(chunkX, chunkZ) {
         const chunkKey = `chunk_${chunkX}_${chunkZ}`;
         if (this.chunkVegetationMap.has(chunkKey)) return;
 
-        // Ensure nodes are generated for this chunk and neighbor margin
         const nodes = this.getEcosystemNodesForChunk(chunkX, chunkZ);
 
         const startX = chunkX * this.chunkSize;
@@ -280,7 +307,6 @@ export class BlockTerrainSystem {
             prefabPointsMap.get(prefabKey).push(pt);
         };
 
-        // PROCESS SPECIAL LANDMARK NODES FIRST
         nodes.forEach(node => {
             if (node.type === 'CHAMPION_NODE') {
                 const loreRoll = this.hash3D(node.x, node.y, node.z);
@@ -295,11 +321,11 @@ export class BlockTerrainSystem {
                     leanX: 0, leanZ: 0
                 });
 
-                if (loreRoll < 0.05 || true) { // 0.05% world lore subset registration
+                if (loreRoll < 0.05 || true) {
                     this.loreTreeRegistry.set(landmarkId, {
                         id: landmarkId, name: title, x: node.x, y: node.y, z: node.z,
                         category: 'Lore Champion',
-                        rumorText: `In the deep mist stands ${title}, a ancient titan untouched by centuries.`
+                        rumorText: `In the deep mist stands ${title}, an ancient titan untouched by centuries.`
                     });
                 }
                 this.landmarkRegistry.set(landmarkId, { x: node.x, y: node.y, z: node.z, label: title });
@@ -309,7 +335,7 @@ export class BlockTerrainSystem {
                 addPoint('Redwood_Deadfall_Log', {
                     x: node.x, y: node.y + 1.2, z: node.z,
                     rotation: this.hash2D(node.x, node.z) * Math.PI * 2.0,
-                    scale: 2.2, // Huge fallen titan log
+                    scale: 2.2,
                     leanX: 0, leanZ: 0
                 });
 
@@ -326,7 +352,6 @@ export class BlockTerrainSystem {
             }
         });
 
-        // GRID SCATTERING (Inherits and grows around nodes)
         const step = 24.0;
 
         for (let x = startX; x < endX; x += step) {
@@ -343,7 +368,6 @@ export class BlockTerrainSystem {
 
                 const eco = this.getTerrainEcoProfile(wx, wz, wy);
 
-                // Check node influence for position
                 let activeNodeInfluence = null;
                 for (const node of nodes) {
                     const dx = wx - node.x;
@@ -354,9 +378,7 @@ export class BlockTerrainSystem {
                     }
                 }
 
-                // STORIED CLEARING RULE: Suppress growth inside clearings
                 if (activeNodeInfluence?.type === 'STORIED_CLEARING_NODE') {
-                    // PRIORITY 6: SUCCESSION - Edge regeneration
                     if (this.hash2D(wx * 0.5, wz * 0.5) < 0.20) {
                         const varIdx = Math.floor(this.hash2D(wz, wx) * 4);
                         const lean = this.calculateTreeLean('YOUNG', 'CLEARING', wx, wz);
@@ -370,24 +392,19 @@ export class BlockTerrainSystem {
                     continue;
                 }
 
-                // PRIORITY 2: CHAMPION TERRITORY SUPPRESSION
                 const inChampionTerritory = this.isInsideChampionTerritory(wx, wz);
 
-                // AGE DISTRIBUTION EVALUATION
                 const ageRoll = this.hash2D(wx * 0.1, wz * 0.1);
                 let ageState = 'MATURE';
 
                 if (activeNodeInfluence?.type === 'ANCIENT_GROVE_NODE') {
-                    // Ancient Grove Node boosts Ancient/Colossal density
                     if (ageRoll < 0.20 && !inChampionTerritory) ageState = 'COLOSSAL_ANCIENT';
                     else if (ageRoll < 0.65) ageState = 'ANCIENT';
                     else ageState = 'MATURE';
                 } else if (eco.ridgeExposure > 0.70) {
-                    // Ridge exposure boosts Dying Snags with heavy leans
                     if (ageRoll < 0.35) ageState = 'DYING';
                     else ageState = 'MATURE';
                 } else {
-                    // Standard Forest Succession Balance
                     if (ageRoll < 0.05 && !inChampionTerritory) ageState = 'COLOSSAL_ANCIENT';
                     else if (ageRoll < 0.25) ageState = 'ANCIENT';
                     else if (ageRoll < 0.70) ageState = 'MATURE';
@@ -401,7 +418,6 @@ export class BlockTerrainSystem {
                 const scale = 0.90 + this.hash2D(wx * 0.7, wz * 0.7) * 0.30;
                 const rotation = this.hash2D(wx, wz) * Math.PI * 2.0;
 
-                // PRIORITY 7: Apply Biome-Dependent Lean
                 const lean = this.calculateTreeLean(ageState, eco.ridgeExposure > 0.6 ? 'MOUNTAIN_RIDGE' : 'STANDARD', wx, wz);
 
                 addPoint(prefabKey, {
@@ -412,6 +428,24 @@ export class BlockTerrainSystem {
                     scale: scale,
                     ...lean
                 });
+
+                // MID-STORY & UNDERSTORY LAYER SCATTER
+                const midStoryRoll = this.hash2D(wx * 0.4, wz * 0.4);
+                if (midStoryRoll < 0.45) {
+                    let midStoryType = 'Fern_Cluster';
+                    if (midStoryRoll < 0.18) midStoryType = 'Sword_Fern_Large';
+                    else if (midStoryRoll < 0.32) midStoryType = 'Forest_Shrub_Dense';
+                    else if (midStoryRoll < 0.40) midStoryType = 'Moss_Mound_Big';
+
+                    addPoint(midStoryType, {
+                        x: wx + (this.hash2D(wx, wz) - 0.5) * 4.0,
+                        y: wy,
+                        z: wz + (this.hash2D(wz, wx) - 0.5) * 4.0,
+                        rotation: this.hash2D(wx, wz) * Math.PI * 2.0,
+                        scale: 0.8 + this.hash2D(wx, wz) * 0.6,
+                        leanX: 0, leanZ: 0
+                    });
+                }
             }
         }
 
@@ -474,16 +508,10 @@ export class BlockTerrainSystem {
         }
     }
 
-    /**
-     * Public API: Retrieves all discovered Lore Trees for Oracle Board & UI Rumors.
-     */
     getLoreTrees() {
         return Array.from(this.loreTreeRegistry.values());
     }
 
-    /**
-     * Public API: Retrieves all landmark nodes for map rendering & navigation.
-     */
     getLandmarks() {
         return Array.from(this.landmarkRegistry.values());
     }
@@ -502,7 +530,6 @@ export class BlockTerrainSystem {
     }
 }
 
-// Global Singleton Binding
 if (typeof window !== 'undefined') {
     window.BlockTerrainSystem = new BlockTerrainSystem();
 }
