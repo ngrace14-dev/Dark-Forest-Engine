@@ -42,7 +42,7 @@ export class TerrainWorkerPool {
                 geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
                 geometry.computeBoundingSphere();
 
-                // FIX: Bind geometry through ForestRenderer to enforce ForestFloorMaterial
+                // Bind geometry through ForestRenderer to enforce ForestFloorMaterial
                 if (window.ForestRenderer && window.ForestRenderer.setTerrainMesh) {
                     window.ForestRenderer.setTerrainMesh(key, geometry);
                 } else {
@@ -62,7 +62,8 @@ export class TerrainWorkerPool {
         this.idleWorkers.push(worker);
     }
 
-    requestChunkGeometry(chunkData, callback) {
+    // FIX: Renamed back to requestChunkData to match src_engine.js expectations
+    requestChunkData(chunkData, callback) {
         const taskId = ++this.taskIdCounter;
         this.taskCallbacks.set(taskId, callback);
 
