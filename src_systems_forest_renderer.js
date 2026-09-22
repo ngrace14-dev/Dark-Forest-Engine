@@ -14,7 +14,7 @@ class ForestRenderer {
         this.forestFloorMaterial = null; 
         this.initialized = false;
 
-        // PRIORITY 1 FIX: Unique uniform names to prevent variable redefinition collisions with VolumetricFogSystem
+        // FIX: Unique uniform names to prevent variable redefinition collisions with VolumetricFogSystem
         this.sharedUniforms = {
             uTime: { value: 0 },
             uWindSpeed: { value: 1.0 },
@@ -39,7 +39,7 @@ class ForestRenderer {
                     metalness: 0.03,
                     side: THREE.DoubleSide,
                     alphaTest: 0.18,
-                    vertexColors: true // PRIORITY 1 FIX: Declares 'color' vertex attribute in GLSL
+                    vertexColors: true // FIX: Declares 'color' vertex attribute in GLSL
                 });
 
                 mat.onBeforeCompile = (shader) => {
@@ -164,7 +164,7 @@ class ForestRenderer {
 
         let geo = null;
 
-        // PRIORITY 4 & 5 FIX: Route geometry sources correctly based on asset category
+        // FIX: Route geometry sources correctly based on asset category to prevent dark cones
         if (prefabKey.startsWith('Redwood_')) {
             geo = window.RedwoodGenerator?.getArchetypeGeometry?.(prefabKey);
         } else if (window.AssetManager?.prefabs[prefabKey]) {
@@ -177,7 +177,7 @@ class ForestRenderer {
             }
         }
 
-        // PRIORITY 5 FIX: Eliminate placeholder tree cylinders for mid-story vegetation assets
+        // FIX: Eliminate placeholder tree cylinders for mid-story vegetation assets
         if (!geo) {
             console.warn(`[ForestRenderer] Missing geometry for "${prefabKey}". Deploying low-profile fallback.`);
             if (prefabKey.includes('Fern') || prefabKey.includes('Shrub') || prefabKey.includes('Moss')) {
