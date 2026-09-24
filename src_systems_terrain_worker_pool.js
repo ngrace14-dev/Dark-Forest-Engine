@@ -28,34 +28,24 @@ export class TerrainWorkerPool {
         console.log(`[TerrainWorkerPool] Successfully initialized ${this.poolSize} Web Workers.`);
     }
 
-    handleWorkerMessage(worker, e) {
-        const { id, error, key, positions, normals, colors } = e.data;
+        handleWorkerMessage(worker, e) {
+        const { id, error, key, positions, normals, colors, clutter } = e.data;
         
         if (this.taskCallbacks.has(id)) {
             const callback = this.taskCallbacks.get(id);
             this.taskCallbacks.delete(id);
 
             if (!error && positions) {
-                const geometry = new THREE.BufferGeometry();
-                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-                geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-                geometry.computeBoundingSphere();
-
-                // Bind geometry through ForestRenderer to enforce ForestFloorMaterial
-                if (window.ForestRenderer && window.ForestRenderer.setTerrainMesh) {
-                    window.ForestRenderer.setTerrainMesh(key, geometry);
-                } else {
-                    const fallbackMat = new THREE.MeshStandardMaterial({ vertexColors: true });
-                    const mesh = new THREE.Mesh(geometry, fallbackMat);
-                    if (window.GameCore && window.GameCore.scene) {
-                        window.GameCore.scene.add(mesh);
-                    }
-                }
-
-                callback(null, geometry);
+                // Ensure Single Authority: Engine handles Geometry creation
+                callback({ positions, normals, colors, clutter });
             } else {
-                callback(error || new Error('Worker returned empty geometry.'));
+                console.error('[TerrainWorkerPool] Worker Error:', error);
+                callback({ 
+                    positions: new Float32Array(0), 
+                    normals: new Float32Array(0), 
+                    colors: new Float32Array(0),
+                    clutter: new Float32Array(0)
+                });
             }
         }
 
