@@ -468,11 +468,23 @@ function buildRedwoodMesh(ageState, seed) {
         }
     };
 
-    const effectiveBranchCount = hasBrokenCrown ? Math.floor(branchCount * 0.70) : branchCount;
+        const effectiveBranchCount = hasBrokenCrown ? Math.floor(branchCount * 0.70) : branchCount;
+
+    // Silhouette Modification: Number of massive branch shelves/clusters based on height
+    const numShelves = Math.floor(effectiveHeight / 12.0); 
 
     for (let b = 0; b < effectiveBranchCount; b++) {
-        const bProgress = b / effectiveBranchCount;
-        const bV = bareTrunkRatio + bProgress * (1.0 - bareTrunkRatio);
+        const baseProgress = b / effectiveBranchCount;
+        
+        // Silhouette Modification 1: Shelf Clustering
+        // Use a sine wave to warp the linear progression, pulling branches into dense layers separated by gaps
+        const shelfBias = Math.sin(baseProgress * Math.PI * 2.0 * numShelves);
+        let clusteredProgress = baseProgress + (shelfBias * 0.04);
+        
+        // Clamp to ensure we don't accidentally push branches below the bare trunk line or above the top
+        clusteredProgress = Math.max(0.0, Math.min(1.0, clusteredProgress));
+        
+        const bV = bareTrunkRatio + clusteredProgress * (1.0 - bareTrunkRatio);
         const bY = bV * effectiveHeight;
 
         if (prng.next() < 0.25 && bV < 0.82) {
@@ -485,7 +497,7 @@ function buildRedwoodMesh(ageState, seed) {
             continue;
         }
 
-        let zoneDensityMult = 1.0;
+                let zoneDensityMult = 1.0;
         let isUpperCrown = false;
 
         if (bV >= 0.80) {
@@ -498,16 +510,29 @@ function buildRedwoodMesh(ageState, seed) {
         }
 
         const bAngle = b * 2.39996 + prng.range(-0.15, 0.15);
-        const maxLen = (1.0 - (bV - bareTrunkRatio) / (1.0 - bareTrunkRatio)) * 18.0 + 4.5;
-        const bLength = maxLen * prng.range(0.75, 1.2);
+        
+        // Silhouette Modification 2: Columnar Envelope & Noise Asymmetry
+        const heightProgress = (bV - bareTrunkRatio) / (1.0 - bareTrunkRatio);
+        
+        // Power curve: maintains width high into the canopy before tapering abruptly at the very top
+        const taperCurve = 1.0 - Math.pow(heightProgress, 4.0); 
+        
+        // Low-frequency noise creates massive asymmetric limbs reaching for sunlight
+        const asymmetry = noiseGen.noise(bV * 12.0, bAngle * 2.0, 0) * 0.5 + 0.5; // 0.0 to 1.0
+        
+        // Combine base length, power curve, and asymmetry. Ancient trees get more extreme asymmetry.
+        const baseLength = ageState.includes('ANCIENT') ? 14.0 : 10.0;
+        const maxLen = (taperCurve * baseLength) + (asymmetry * 8.0) + 2.5;
+        
+        const bLength = maxLen * prng.range(0.85, 1.15);
 
         const tRadius = baseRadius * (1.0 - Math.pow(bV, 3.0)) + topRadius;
         const rootX = Math.cos(bAngle) * tRadius;
         const rootZ = Math.sin(bAngle) * tRadius;
 
-        const tipX = rootX + Math.cos(bAngle) * bLength;
-        const droopAmount = isUpperCrown ? prng.range(1.0, 2.5) : prng.range(3.0, 6.0);
-        const tipY = bY - droopAmount + (bProgress * 3.0);
+                const tipX = rootX + Math.cos(bAngle) * bLength;
+        const droopAmount = isUpperCrown ? prng.range(0.5, 1.5) : prng.range(3.0, 6.0); // Less droop at the very top
+        const tipY = bY - droopAmount + (clusteredProgress * 3.0);
         const tipZ = rootZ + Math.sin(bAngle) * bLength;
 
         const use6SideCylinder = (ageState === 'COLOSSAL_ANCIENT') && (bV < 0.75);
