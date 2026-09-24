@@ -55,15 +55,54 @@ export function createForestFloorMaterial(options = {}) {
             `
         );
 
-        shader.fragmentShader = `
+                shader.fragmentShader = `
             varying vec3 vWorldPosFloor;
             varying vec3 vWorldNormalFloor;
+            
+            // 1. Shared noise lifecycle
+            float getForestBump(vec3 pos) {
+                vec2 duffUV = pos.xz * 0.15;
+                float noiseA = sin(duffUV.x) * cos(duffUV.y);
+                float noiseB = sin(pos.x * 0.8) * cos(pos.z * 0.8) * 0.5 + 0.5;
+                float noiseC = sin(pos.x * 4.0) * cos(pos.z * 4.0);
+                
+                // Micro-relief: Duff is bumpy, moss is smoother
+                float duffBump = noiseA * 0.5 + noiseC * 0.1;
+                return mix(duffBump, noiseC * 0.05, smoothstep(0.4, 0.7, noiseB));
+            }
+            
             ${shader.fragmentShader}
         `.replace(
+            `#include <normal_fragment_begin>`,
+            `
+            #include <normal_fragment_begin>
+            
+            // 2. Procedural normal perturbation
+            float bumpVal = getForestBump(vWorldPosFloor);
+            float dbdx = dFdx(bumpVal);
+            float dbdy = dFdy(bumpVal);
+
+            vec3 vPdx = dFdx(vViewPosition);
+            vec3 vPdy = dFdy(vViewPosition);
+
+            vec3 rx = cross(vPdy, normal);
+            vec3 ry = cross(normal, vPdx);
+
+            float det = dot(vPdx, rx);
+            
+            // 3. Distance-faded bump intensity
+            float dist = length(vViewPosition);
+            float bumpIntensity = smoothstep(80.0, 10.0, dist) * 1.5;
+
+            vec3 bumpNormal = (rx * dbdx + ry * dbdy) * sign(det) / max(abs(det), 1e-7);
+            normal = normalize(normal - bumpNormal * bumpIntensity);
+            `
+        ).replace(
             `#include <color_fragment>`,
             `
             #include <color_fragment>
 
+            // 4. Existing color logic reuse
             vec2 duffUV = vWorldPosFloor.xz * 0.15;
             float noiseA = sin(duffUV.x) * cos(duffUV.y);
             float noiseB = sin(vWorldPosFloor.x * 0.8) * cos(vWorldPosFloor.z * 0.8) * 0.5 + 0.5;
