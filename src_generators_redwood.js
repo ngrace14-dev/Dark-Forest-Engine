@@ -79,7 +79,7 @@ export class RedwoodGenerator {
             const archetypesToGenerate = [];
             const ageStates = ['ANCIENT', 'MATURE', 'YOUNG', 'DYING'];
 
-            ageStates.forEach(ageState => {
+                        ageStates.forEach(ageState => {
                 for (let i = 0; i < 4; i++) {
                     const seed = (ageStates.indexOf(ageState) + 1) * 1000 + (i * 257) + 1337;
                     archetypesToGenerate.push({
@@ -88,6 +88,13 @@ export class RedwoodGenerator {
                         seed: seed
                     });
                 }
+            });
+
+            // Inject Mid-Story Procedural Assets
+            archetypesToGenerate.push({
+                key: 'Procedural_Fern_Cluster',
+                type: 'Fern_Cluster',
+                seed: 9999
             });
 
             this.worker.onmessage = (e) => {
@@ -107,14 +114,22 @@ export class RedwoodGenerator {
                     geo.setAttribute('uv', new THREE.BufferAttribute(data.uvs, 2));
                     geo.setAttribute('color', new THREE.BufferAttribute(data.colors, 3)); // Wind/Moss metadata
                     
-                    if (data.indices) {
+                                        if (data.indices) {
                         geo.setIndex(new THREE.BufferAttribute(data.indices, 1));
                     }
 
                     geo.computeBoundingBox();
                     geo.computeBoundingSphere();
 
-                    this.archetypes.set(key, geo);
+                    if (key.startsWith('Procedural_')) {
+                        const dummyGroup = new THREE.Group();
+                        dummyGroup.add(new THREE.Mesh(geo));
+                        if (window.AssetManager) {
+                            window.AssetManager.models[key] = dummyGroup;
+                        }
+                    } else {
+                        this.archetypes.set(key, geo);
+                    }
                 });
 
                 this.isInitialized = true;

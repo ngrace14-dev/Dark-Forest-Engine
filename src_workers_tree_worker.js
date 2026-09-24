@@ -108,9 +108,11 @@ self.onmessage = function (e) {
         const generatedBuffers = {};
         const transferables = [];
 
-        archetypesToGenerate.forEach(task => {
-            const { key, ageState, seed } = task;
-            const meshData = buildRedwoodMesh(ageState || 'ANCIENT', seed || 1337);
+                archetypesToGenerate.forEach(task => {
+            const { key, ageState, seed, type } = task;
+            const meshData = type === 'Fern_Cluster' 
+                ? buildFernMesh(seed || 1337) 
+                : buildRedwoodMesh(ageState || 'ANCIENT', seed || 1337);
             generatedBuffers[key] = meshData;
 
             if (meshData.positions?.buffer) transferables.push(meshData.positions.buffer);
@@ -120,11 +122,95 @@ self.onmessage = function (e) {
             if (meshData.indices?.buffer) transferables.push(meshData.indices.buffer);
         });
 
-        self.postMessage({ generatedBuffers }, transferables);
+                self.postMessage({ generatedBuffers }, transferables);
     } catch (err) {
         self.postMessage({ error: err.message || 'Redwood Worker Exception' });
     }
 };
+
+function buildFernMesh(seed) {
+    const prng = new FastRandom(seed);
+    const positions = [];
+    const normals = [];
+    const uvs = [];
+    const colors = [];
+    const indices = [];
+
+    const frondCount = Math.floor(prng.range(5, 9));
+    let vertexOffset = 0;
+
+    for (let i = 0; i < frondCount; i++) {
+        const angle = (i / frondCount) * Math.PI * 2.0 + prng.range(-0.3, 0.3);
+        const length = prng.range(1.2, 1.8);
+        const height = prng.range(0.6, 1.0);
+        const wBase = 0.05;
+        const wMid = prng.range(0.2, 0.4);
+        const wTip = 0.02;
+
+        const cosA = Math.cos(angle);
+        const sinA = Math.sin(angle);
+        const pCos = Math.cos(angle + Math.PI / 2);
+        const pSin = Math.sin(angle + Math.PI / 2);
+
+        // V0, V1 (Base)
+        positions.push(
+            pCos * wBase, 0, pSin * wBase,
+            -pCos * wBase, 0, -pSin * wBase
+        );
+        normals.push(0, 1, 0, 0, 1, 0);
+        uvs.push(0, 0, 1, 0);
+        colors.push(0, 1.0, 0, 0, 1.0, 0);
+
+        // V2, V3 (Mid)
+        const mDist = length * 0.5;
+        positions.push(
+            cosA * mDist + pCos * wMid, height, sinA * mDist + pSin * wMid,
+            cosA * mDist - pCos * wMid, height, sinA * mDist - pSin * wMid
+        );
+        const nx = cosA * 0.5; const ny = 0.8; const nz = sinA * 0.5;
+        const len = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1.0;
+        normals.push(nx/len, ny/len, nz/len, nx/len, ny/len, nz/len);
+        uvs.push(0, 0.5, 1, 0.5);
+        colors.push(0.5, 1.0, 0, 0.5, 1.0, 0);
+
+        // V4, V5 (Tip)
+        const tDist = length;
+        const tHeight = height * 0.2;
+        positions.push(
+            cosA * tDist + pCos * wTip, tHeight, sinA * tDist + pSin * wTip,
+            cosA * tDist - pCos * wTip, tHeight, sinA * tDist - pSin * wTip
+        );
+        normals.push(0, 1, 0, 0, 1, 0);
+        uvs.push(0, 1, 1, 1);
+        colors.push(1.0, 1.0, 0, 1.0, 1.0, 0);
+
+        // Front faces
+        indices.push(
+            vertexOffset, vertexOffset + 2, vertexOffset + 1,
+            vertexOffset + 1, vertexOffset + 2, vertexOffset + 3,
+            vertexOffset + 2, vertexOffset + 4, vertexOffset + 3,
+            vertexOffset + 3, vertexOffset + 4, vertexOffset + 5
+        );
+        
+        // Back faces
+        indices.push(
+            vertexOffset, vertexOffset + 1, vertexOffset + 2,
+            vertexOffset + 1, vertexOffset + 3, vertexOffset + 2,
+            vertexOffset + 2, vertexOffset + 3, vertexOffset + 4,
+            vertexOffset + 3, vertexOffset + 5, vertexOffset + 4
+        );
+
+        vertexOffset += 6;
+    }
+
+    return {
+        positions: new Float32Array(positions),
+        normals: new Float32Array(normals),
+        uvs: new Float32Array(uvs),
+        colors: new Float32Array(colors),
+        indices: new Uint32Array(indices)
+    };
+}
 
 function buildRedwoodMesh(ageState, seed) {
     const prng = new FastRandom(seed);
