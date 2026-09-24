@@ -424,8 +424,12 @@ function buildRedwoodMesh(ageState, seed) {
         }
     };
 
-    const addFoliageClusterGroup = (originX, originY, originZ, radius, bV, clusterDensityMult) => {
-        const subClusterCount = Math.floor(prng.range(3, 7) * clusterDensityMult);
+        const addFoliageClusterGroup = (originX, originY, originZ, radius, bV, clusterDensityMult, isCandelabra = false) => {
+        // Upper Canopy Mass Expansion: Drastically multiply sub-clusters for upper crown / candelabras
+        let finalDensity = clusterDensityMult;
+        if (isCandelabra) finalDensity *= 2.5;
+        
+        const subClusterCount = Math.floor(prng.range(3, 7) * finalDensity);
 
         for (let sc = 0; sc < subClusterCount; sc++) {
             const scOffsetR = (sc / subClusterCount) * radius * 0.7;
@@ -435,8 +439,13 @@ function buildRedwoodMesh(ageState, seed) {
             const cY = originY + prng.range(-1.2, 1.8);
             const cZ = originZ + Math.sin(scAngle) * scOffsetR;
 
-            const subSize = radius * prng.range(0.50, 0.80);
-            const numCards = (ageState === 'COLOSSAL_ANCIENT') ? 8 : (ageState === 'ANCIENT') ? 6 : 4;
+            // Upper Canopy Mass Expansion: Sub-clusters are significantly larger on candelabras
+            const subSizeMult = isCandelabra ? prng.range(1.2, 1.8) : prng.range(0.50, 0.80);
+            const subSize = radius * subSizeMult;
+            
+            // Upper Canopy Mass Expansion: More cards per cluster on massive trees
+            let numCards = (ageState === 'COLOSSAL_ANCIENT') ? 8 : (ageState === 'ANCIENT') ? 6 : 4;
+            if (isCandelabra) numCards += 2;
 
             for (let c = 0; c < numCards; c++) {
                 const cAngle = (c / numCards) * Math.PI + prng.range(-0.25, 0.25);
@@ -567,7 +576,7 @@ function buildRedwoodMesh(ageState, seed) {
                 const use6SideCylinder = (ageState === 'COLOSSAL_ANCIENT') && (bV < 0.75) || isCandelabraLeader;
                 addBranchTube(rootX, bY, rootZ, tipX, tipY, tipZ, bStartRad, bEndRad, bV, use6SideCylinder);
 
-        if (bV > 0.62 && prng.next() < reitProbability) {
+                if (bV > 0.62 && prng.next() < reitProbability) {
             const reitCount = isUpperCrown ? Math.floor(prng.range(2, 4)) : 1;
 
             for (let rc = 0; rc < reitCount; rc++) {
@@ -584,21 +593,25 @@ function buildRedwoodMesh(ageState, seed) {
                 const rEndZ = rStartZ + prng.range(-2.0, 2.0);
 
                 addBranchTube(rStartX, rStartY, rStartZ, rEndX, rEndY, rEndZ, reitRad, 0.1, bV, use6SideCylinder);
-                addFoliageClusterGroup(rEndX, rEndY, rEndZ, prng.range(6.0, 9.0), bV, 1.6);
+                
+                // Upper Canopy Mass Expansion: Reiterations generate massive foliage clusters
+                addFoliageClusterGroup(rEndX, rEndY, rEndZ, prng.range(10.0, 16.0), bV, 2.0, true);
             }
         }
 
         if (ageState !== 'DYING' || prng.next() > 0.50) {
-            const steps = isUpperCrown ? 3 : 2;
+            const steps = isUpperCrown ? 4 : 2; // Upper Canopy Mass Expansion: 4 foliage steps instead of 3
             for (let st = 1; st <= steps; st++) {
                 const frac = 0.5 + (st / steps) * 0.5;
                 const pX = rootX + (tipX - rootX) * frac;
                 const pY = bY + (tipY - bY) * frac;
                 const pZ = rootZ + (tipZ - rootZ) * frac;
 
-                addFoliageClusterGroup(pX, pY, pZ, prng.range(5.5, 9.0), bV, zoneDensityMult);
+                // Upper Canopy Mass Expansion: Massive radii for upper branches
+                const folRadius = isCandelabraLeader ? prng.range(12.0, 18.0) : prng.range(5.5, 9.0);
+                addFoliageClusterGroup(pX, pY, pZ, folRadius, bV, zoneDensityMult, isCandelabraLeader);
             }
-                }
+        }
     }
 
     const indices = trunkIndices.concat(foliageIndices);
