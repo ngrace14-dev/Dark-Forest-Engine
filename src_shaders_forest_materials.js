@@ -12,7 +12,7 @@ import * as THREE from 'three';
  * adjusting depth-write rules for volumetric fog, and enabling double-sided rendering.
  */
 export function createCanopyMaterial(options = {}) {
-    const mat = new THREE.MeshStandardMaterial({
+        const mat = new THREE.MeshStandardMaterial({
         color: options.color || 0x1e3622, // Dark Redwood Foliage Green
         roughness: 0.85,
         metalness: 0.05,
@@ -29,6 +29,7 @@ export function createCanopyMaterial(options = {}) {
         alphaTest: 0.15, 
         
         depthWrite: true,
+        vertexColors: true, // FIX: Required for injected vColorAttr = color; in ForestRenderer
         ...options
     });
 
@@ -90,10 +91,11 @@ export function createCanopyMaterial(options = {}) {
  * Bark/Trunk material generator for completeness.
  */
 export function createTrunkMaterial(options = {}) {
-    const mat = new THREE.MeshStandardMaterial({
+        const mat = new THREE.MeshStandardMaterial({
         color: options.color || 0x2b170f, // Redwood Bark Base
         roughness: 0.95,
         metalness: 0.02,
+        vertexColors: true, // FIX: Required for injected vColorAttr = color; in ForestRenderer
         ...options
     });
 
