@@ -4,7 +4,7 @@
 // ============================================================================
 
 import * as THREE from 'three';
-import { createTrunkMaterial, createCanopyMaterial } from '../src_shaders_forest_materials.js';
+import { createTrunkMaterial, createCanopyMaterial } from './src_shaders_forest_materials.js';
 
 class ForestRenderer {
     constructor() {
