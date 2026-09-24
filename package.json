@@ -8,6 +8,7 @@
   "dependencies": {
     "alea": "^1.0.1",
     "poisson-disk-sampling": "^2.3.1",
+    "rapier": "^1.0.5",
     "recast-navigation": "^0.43.1",
     "seedrandom": "^3.0.5",
     "simplex-noise": "^4.0.3",
