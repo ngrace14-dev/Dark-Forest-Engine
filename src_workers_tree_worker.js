@@ -276,7 +276,7 @@ function buildRedwoodMesh(ageState, seed) {
             break;
     }
 
-    const hasBrokenCrown = (ageState === 'ANCIENT' || ageState === 'COLOSSAL_ANCIENT' || ageState === 'DYING') && (prng.next() < 0.12);
+        const hasBrokenCrown = (ageState === 'ANCIENT' || ageState === 'COLOSSAL_ANCIENT' || ageState === 'DYING') && (prng.next() < 0.45); // Increased probability for massive visual impact
     const effectiveHeight = hasBrokenCrown ? height * prng.range(0.72, 0.85) : height;
 
         const leanAngleX = (prng.range(-0.05, 0.05)) * (ageState.includes('ANCIENT') ? 1.5 : 0.8);
@@ -511,18 +511,40 @@ function buildRedwoodMesh(ageState, seed) {
 
         const bAngle = b * 2.39996 + prng.range(-0.15, 0.15);
         
-        // Silhouette Modification 2: Columnar Envelope & Noise Asymmetry
+                // Silhouette Modification 2: Columnar Envelope & Noise Asymmetry
         const heightProgress = (bV - bareTrunkRatio) / (1.0 - bareTrunkRatio);
         
-        // Power curve: maintains width high into the canopy before tapering abruptly at the very top
-        const taperCurve = 1.0 - Math.pow(heightProgress, 4.0); 
+        let taperCurve = 1.0 - Math.pow(heightProgress, 4.0);
+        let droopAmount = isUpperCrown ? prng.range(0.5, 1.5) : prng.range(3.0, 6.0); // Less droop at the very top
         
+        // Crown Rewrite: Candelabra Override for Ancient Tops
+        let isCandelabraLeader = false;
+        if (isUpperCrown && ageState.includes('ANCIENT')) {
+            // Force the top 12% of branches into massive vertical leaders
+            if (heightProgress > 0.88) {
+                isCandelabraLeader = true;
+                taperCurve = 1.0; // Override taper completely
+                droopAmount = prng.range(-8.0, -4.0); // Grow steeply UPWARDS (negative droop)
+            }
+        }
+        
+        // Crown Rewrite: Broken Crown Shatter Logic
+        if (hasBrokenCrown && heightProgress > 0.80) {
+            isCandelabraLeader = true;
+            taperCurve = 0.8; // Maintain massive width at the break point
+            droopAmount = prng.range(-12.0, -6.0); // Extreme vertical growth to form a multi-pronged shattered top
+        }
+
         // Low-frequency noise creates massive asymmetric limbs reaching for sunlight
         const asymmetry = noiseGen.noise(bV * 12.0, bAngle * 2.0, 0) * 0.5 + 0.5; // 0.0 to 1.0
         
-        // Combine base length, power curve, and asymmetry. Ancient trees get more extreme asymmetry.
+        // Combine base length, power curve, and asymmetry.
         const baseLength = ageState.includes('ANCIENT') ? 14.0 : 10.0;
-        const maxLen = (taperCurve * baseLength) + (asymmetry * 8.0) + 2.5;
+        let maxLen = (taperCurve * baseLength) + (asymmetry * 8.0) + 2.5;
+        
+        if (isCandelabraLeader) {
+            maxLen *= prng.range(0.6, 1.4); // Erratic lengths for leaders
+        }
         
         const bLength = maxLen * prng.range(0.85, 1.15);
 
@@ -531,12 +553,19 @@ function buildRedwoodMesh(ageState, seed) {
         const rootZ = Math.sin(bAngle) * tRadius;
 
                 const tipX = rootX + Math.cos(bAngle) * bLength;
-        const droopAmount = isUpperCrown ? prng.range(0.5, 1.5) : prng.range(3.0, 6.0); // Less droop at the very top
-        const tipY = bY - droopAmount + (clusteredProgress * 3.0);
-        const tipZ = rootZ + Math.sin(bAngle) * bLength;
+                const tipY = bY - droopAmount + (clusteredProgress * 3.0);
+                const tipZ = rootZ + Math.sin(bAngle) * bLength;
+        
+                // Ensure candelabra leaders are thick like secondary trunks
+                let bStartRad = Math.max(0.15, (1.0 - bV) * 0.6);
+                let bEndRad = 0.06;
+                if (isCandelabraLeader) {
+                    bStartRad = prng.range(0.6, 1.2); // Massive base
+                    bEndRad = prng.range(0.2, 0.4);   // Thick tip
+                }
 
-        const use6SideCylinder = (ageState === 'COLOSSAL_ANCIENT') && (bV < 0.75);
-        addBranchTube(rootX, bY, rootZ, tipX, tipY, tipZ, Math.max(0.15, (1.0 - bV) * 0.6), 0.06, bV, use6SideCylinder);
+                const use6SideCylinder = (ageState === 'COLOSSAL_ANCIENT') && (bV < 0.75) || isCandelabraLeader;
+                addBranchTube(rootX, bY, rootZ, tipX, tipY, tipZ, bStartRad, bEndRad, bV, use6SideCylinder);
 
         if (bV > 0.62 && prng.next() < reitProbability) {
             const reitCount = isUpperCrown ? Math.floor(prng.range(2, 4)) : 1;
