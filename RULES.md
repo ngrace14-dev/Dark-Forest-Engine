@@ -1,141 +1,385 @@
-PROJECT RULES AND HARDENING ADDENDUM (The Engineering Constitution)
+PROJECT RULES AND HARDENING ADDENDUM
+(The Engineering Constitution)
+
 HARDENING MODE ADDENDUM
+
 When modifying, debugging, extending, or correcting systems:
+
 The objective is not only to make code work.
 The objective is to make code remain stable under future expansion.
 
 =================================================================
 SECTION 1: THE 5 PILLARS OF DARK FOREST
+=================================================================
+
 PILLAR 1: WORLD STATE INTEGRITY & SIMULATION FIRST
-Rendering exists to visualize simulation. Rendering must never be the source of simulation truth.
+
+Rendering exists to visualize simulation.
+
+Rendering must never be the source of simulation truth.
+
 The world state must survive and progress independently of:
 
-Chunk unloading
+- Chunk unloading
+- Renderer destruction
+- Player absence
+- Camera absence
+- UI absence
 
-Renderer destruction
+Example:
 
-Player/Camera absence
+Villages must update, trees must grow, and AI must simulate even when not rendered.
 
-UI absence
-Example: Villages must update, trees must grow, and AI must simulate even if they are outside the loaded visual frustum.
+-----------------------------------------------------------------
 
 PILLAR 2: DETERMINISTIC SIMULATION
-Never use uncontrolled randomness (e.g., standard Math.random()) for procedural generation, AI decisions, or simulation logic.
-Every bug should be reproducible via:
 
-Seed
+Never use uncontrolled randomness (e.g. Math.random()) for:
 
-World Day
+- Procedural generation
+- AI decisions
+- Simulation logic
 
-Chunk Coordinate
+Every simulation bug should be reproducible via:
 
-Entity ID
+- Seed
+- World Day
+- Chunk Coordinate
+- Entity ID
+
+-----------------------------------------------------------------
 
 PILLAR 3: LONG-TERM SAVE SAFETY
-Any new system should assume: Worlds may survive for hundreds of in-game days.
-When modifying saved data structures, do not break existing saves. Provide versioning, migration paths, and fallback/default values. Older saves must degrade gracefully, not crash on load.
+
+Any new system should assume:
+
+Worlds may survive for hundreds of in-game days.
+
+When modifying save structures:
+
+- Preserve compatibility
+- Provide versioning
+- Provide migration paths
+- Provide fallback values
+
+Older saves must degrade gracefully and never crash.
+
+-----------------------------------------------------------------
 
 PILLAR 4: OBSERVABILITY RULE
-Every critical system must expose debug information sufficient to verify runtime behavior.
-Mandatory telemetry for major systems includes:
 
-Loaded Count / Active Count
+Every critical system must expose sufficient debug information to verify runtime behavior.
 
-Memory Use
+Mandatory telemetry for major systems:
 
-Queue Depth
+- Loaded Count
+- Active Count
+- Memory Usage
+- Queue Depth
+- Last Tick
 
-Last Tick
-Examples: Terrain Chunks, Villages, Road Nodes, Trees, Workers, Caravans.
-
-PILLAR 5: SINGLE AUTHORITY & OWNERSHIP
-Every major domain has exactly one owner. Shared mutable ownership is forbidden.
 Examples:
 
-Terrain → BlockTerrainSystem
+- Terrain Chunks
+- Villages
+- Roads
+- Trees
+- Workers
+- Caravans
 
-Villages → VillageManager
+-----------------------------------------------------------------
 
-Roads → RoadManager
+PILLAR 5: SINGLE AUTHORITY & OWNERSHIP
 
-Narrator → NarratorSystem
-Always identify: Who creates it? Who updates it? Who consumes it? Who destroys it?
+Every domain has exactly one owner.
+
+Shared mutable ownership is forbidden.
+
+Examples:
+
+Terrain -> BlockTerrainSystem
+
+Villages -> VillageManager
+
+Roads -> RoadManager
+
+Narrator -> NarratorSystem
+
+Always identify:
+
+- Who creates it
+- Who updates it
+- Who consumes it
+- Who destroys it
 
 =================================================================
 SECTION 2: AI ASSISTANCE & SCOPE CONTROL
-NO "WHILE I'M HERE" FIXES (STRICT SCOPE CONTROL)
-Never accept unsolicited refactoring of adjacent code. Unapproved scope creep introduces untested variables and breaks stable architecture. One approved objective per commit.
+=================================================================
 
-CONTEXT LIMIT DISCIPLINE (AVOID AI HALLUCINATION)
-Keep context narrow, specific, and hyper-targeted. Do not dump entire engine modules or broad architectural requests into a single AI prompt.
+NO "WHILE I'M HERE" FIXES
+
+Never accept unsolicited refactoring of adjacent code.
+
+Unapproved scope creep introduces untested variables and breaks stable architecture.
+
+One approved objective per commit.
+
+-----------------------------------------------------------------
+
+CONTEXT LIMIT DISCIPLINE
+
+Keep context narrow and targeted.
+
+Do not dump:
+
+- Massive files
+- Entire subsystems
+- Broad architectural requests
+
+into a single AI prompt.
+
+-----------------------------------------------------------------
 
 THE "JUST MAKE IT COMPILE" WARNING
-Do not accept code that simply "makes the red lines go away" (e.g., empty interfaces, brute-force typecasts). If the solution is fighting the engine's architecture, step back and rethink the logic.
+
+Do not accept code that merely removes compiler errors.
+
+Examples:
+
+- Empty interfaces
+- Fake implementations
+- Type-cast abuse
+- Placeholder logic
+
+If the solution is fighting the architecture:
+
+Stop.
+Re-evaluate.
+Rethink.
+
+-----------------------------------------------------------------
+
+EVIDENCE RULE
+
+Claims about existing code must be supported by source evidence.
+
+Examples:
+
+- API contracts
+- Ownership
+- Dependencies
+- Method signatures
+- Callers
+- Data flow
+
+Every confirmed claim should include:
+
+- File name
+- Location reference
+
+Architecture claims without evidence should be treated as assumptions.
+
+-----------------------------------------------------------------
+
+ASSUMPTION LABELING RULE
+
+All conclusions must be labeled as either:
+
+CONFIRMED
+
+or
+
+ASSUMPTION
+
+CONFIRMED:
+Directly supported by source code.
+
+ASSUMPTION:
+Not yet verified by source evidence.
+
+Assumptions must never be presented as verified facts.
 
 =================================================================
 SECTION 3: RUNTIME VERIFICATION & API CONTRACTS
+=================================================================
+
 RUNTIME VERIFICATION RULE
-A fix is not complete because it compiles. A fix is complete when it is verified running.
-Every change should define the Expected Runtime Result, Verification Steps, and Failure Symptoms.
+
+A fix is not complete because it compiles.
+
+A fix is complete when verified running.
+
+Every change must define:
+
+- Expected Runtime Result
+- Verification Steps
+- Failure Symptoms
+
+Visual changes should include screenshot verification whenever practical.
+
+-----------------------------------------------------------------
 
 PUBLIC API CONTRACT RULE
-Public methods used by other systems are contracts (e.g., requestChunkData(), spawnVillage()).
-Before renaming, modifying, or removing core APIs, verify ALL callers. Breaking a public contract requires updating all call sites.
+
+Public methods used by other systems are contracts.
+
+Examples:
+
+- requestChunkData()
+- spawnVillage()
+- generateChunk()
+
+Before modifying, renaming, or removing:
+
+- Verify all callers
+- Update all callers
+- Verify runtime behavior
+
+Breaking a contract requires updating all dependent systems.
+
+-----------------------------------------------------------------
+
+TICK INDEPENDENCE & TIME SCALING RULE
+
+Simulation logic must never depend on render framerate.
+
+All simulation math must:
+
+- Use Delta Time
+OR
+- Use Fixed Simulation Ticks
+
+Simulation must produce identical outcomes at:
+
+- 1x speed
+- Fast forward
+- Background simulation
+
+Rendering speed must never affect simulation correctness.
 
 =================================================================
 SECTION 4: MEMORY, PERFORMANCE, & SAFETY
+=================================================================
+
 THREAD SAFETY & CONCURRENCY RULE
-Worker threads (e.g., TerrainWorkerPool) must NEVER access:
 
-Visual APIs (Renderers, Shaders, Materials)
+Worker threads must NEVER access:
 
-Physics engines
+- Renderers
+- Shaders
+- Materials
+- Physics
+- UI
+- Main-thread-only objects
 
-UI Elements
-Background threads compute pure data. Main threads render pure data.
+Background threads compute data.
+
+Main thread consumes data.
+
+All shared state should be assumed unsafe until validated.
+
+-----------------------------------------------------------------
 
 ASSET DISPOSAL RULE (NO VRAM LEAKS)
-Destroying a game object does not automatically destroy its dynamically created assets.
-If a system generates a procedural mesh, texture, or unique material, it MUST explicitly destroy that asset when the entity is pooled or destroyed.
 
-EVENT SUBSCRIPTION LIFECYCLE (NO EVENT LEAKS)
-If a system subscribes to an event, it MUST cleanly unsubscribe when destroyed or disabled. Every AddListener must have a corresponding RemoveListener.
+Destroying an object does not destroy generated assets.
+
+Procedural assets must be explicitly disposed:
+
+- Meshes
+- Materials
+- Textures
+- Render targets
+
+to prevent VRAM leaks.
+
+-----------------------------------------------------------------
+
+EVENT SUBSCRIPTION LIFECYCLE
+
+Every AddListener requires a matching RemoveListener.
+
+Systems must unsubscribe when:
+
+- Disabled
+- Destroyed
+- Unloaded
+
+-----------------------------------------------------------------
 
 FAIL SAFE & NULL SAFETY
-Before accessing Objects, Entities, Villages, or Chunk references: Verify existence.
-When unexpected conditions occur, prefer graceful degradation. Fall back, log a warning, and keep the system running.
+
+Before accessing:
+
+- Objects
+- Entities
+- Villages
+- Roads
+- Chunks
+- Event payloads
+
+Verify existence.
+
+Unexpected situations should:
+
+- Log
+- Fallback
+- Continue safely
+
+Never silently crash.
 
 =================================================================
-HARDENING CHECKLIST (TO BE COMPLETED BEFORE PR/MERGE)
-[ ] Targeted Fix (One approved objective per commit, no "while I'm here")
+HARDENING CHECKLIST (REQUIRED BEFORE PR/MERGE)
+=================================================================
 
-[ ] Runtime Verified (Tested in-engine, generation pipeline confirmed)
+[ ] Targeted Fix (One approved objective per commit)
+
+[ ] Runtime Verified (Tested in-engine)
 
 [ ] API Contracts Verified (All callers updated)
 
-[ ] Seeded RNG (Fully deterministic, reproducible via Seed/Day/Coord/ID)
+[ ] Evidence Provided (Claims backed by source locations)
 
-[ ] Tick Independent (Math respects Delta Time, decoupled from framerate)
+[ ] Assumptions Labeled (CONFIRMED vs ASSUMPTION)
 
-[ ] Thread Safe (No main-thread APIs called from worker pools)
+[ ] Seeded RNG (Deterministic)
 
-[ ] Save Safe (Backward compatible, built for 100+ in-game days)
+[ ] Tick Independent (Delta Time / Fixed Tick safe)
 
-[ ] VRAM Safe (Procedural meshes/materials explicitly destroyed)
+[ ] Thread Safe
 
-[ ] Null Safe (References verified, events cleanly unsubscribed)
+[ ] Save Safe
 
-[ ] No Silent Failure (Graceful degradation, proper logging)
+[ ] VRAM Safe
 
-[ ] Ownership Defined (Single Authority rule respected)
+[ ] Null Safe
 
-[ ] Observability Available (Debug telemetry exposed)
+[ ] No Silent Failure
 
-[ ] Technical Debt Documented (If temporary, explicitly marked)
+[ ] Ownership Defined
+
+[ ] Observability Available
+
+[ ] Technical Debt Documented
 
 =================================================================
 DARK FOREST ENGINE HARDENING PRINCIPLE
+=================================================================
+
+Build systems as if:
+
+- More careers will be added
+- More villages will be added
+- More factions will be added
+- More businesses will be added
+- More AI will be added
+
 Every system should be designed as though the world will eventually become:
-Larger. Older. Busier. More simulated. More dynamic.
-Build systems as if more careers, villages, factions, businesses, and AI will be added.
+
+Larger.
+Older.
+Busier.
+More simulated.
+More dynamic.
+
 Optimize for future expansion without introducing unnecessary complexity.
