@@ -115,8 +115,13 @@ export class RedwoodGenerator {
                     geo.setAttribute('color', new THREE.BufferAttribute(data.colors, 3)); // Wind/Moss metadata
                     
                                         if (data.indices) {
-                        geo.setIndex(new THREE.BufferAttribute(data.indices, 1));
-                    }
+                                            geo.setIndex(new THREE.BufferAttribute(data.indices, 1));
+                                        }
+                    
+                                        if (data.trunkIndexCount !== undefined && data.foliageIndexCount !== undefined) {
+                                            geo.addGroup(0, data.trunkIndexCount, 0);
+                                            geo.addGroup(data.trunkIndexCount, data.foliageIndexCount, 1);
+                                        }
 
                     geo.computeBoundingBox();
                     geo.computeBoundingSphere();

@@ -120,6 +120,11 @@ self.onmessage = function (e) {
             if (meshData.uvs?.buffer) transferables.push(meshData.uvs.buffer);
             if (meshData.colors?.buffer) transferables.push(meshData.colors.buffer);
             if (meshData.indices?.buffer) transferables.push(meshData.indices.buffer);
+        
+        if (meshData.trunkIndexCount !== undefined) {
+            generatedBuffers[key].trunkIndexCount = meshData.trunkIndexCount;
+            generatedBuffers[key].foliageIndexCount = meshData.foliageIndexCount;
+        }
         });
 
                 self.postMessage({ generatedBuffers }, transferables);
@@ -274,7 +279,7 @@ function buildRedwoodMesh(ageState, seed) {
     const hasBrokenCrown = (ageState === 'ANCIENT' || ageState === 'COLOSSAL_ANCIENT' || ageState === 'DYING') && (prng.next() < 0.12);
     const effectiveHeight = hasBrokenCrown ? height * prng.range(0.72, 0.85) : height;
 
-    const leanAngleX = (prng.range(-0.05, 0.05)) * (ageState.includes('ANCIENT') ? 1.5 : 0.8);
+        const leanAngleX = (prng.range(-0.05, 0.05)) * (ageState.includes('ANCIENT') ? 1.5 : 0.8);
     const leanAngleZ = (prng.range(-0.05, 0.05)) * (ageState.includes('ANCIENT') ? 1.5 : 0.8);
     const trunkTwistRate = prng.range(-0.15, 0.15);
 
@@ -282,7 +287,8 @@ function buildRedwoodMesh(ageState, seed) {
     const normals = [];
     const uvs = [];
     const colors = [];
-    const indices = [];
+    const trunkIndices = [];
+    const foliageIndices = [];
 
     const radialSegs = 32;
     const heightSegs = 64;
@@ -342,13 +348,13 @@ function buildRedwoodMesh(ageState, seed) {
         }
     }
 
-    for (let y = 0; y < heightSegs; y++) {
+        for (let y = 0; y < heightSegs; y++) {
         for (let r = 0; r < radialSegs; r++) {
             const i1 = (y * (radialSegs + 1)) + r;
             const i2 = i1 + radialSegs + 1;
 
-            indices.push(i1, i2, i1 + 1);
-            indices.push(i2, i2 + 1, i1 + 1);
+            trunkIndices.push(i1, i2, i1 + 1);
+            trunkIndices.push(i2, i2 + 1, i1 + 1);
         }
     }
 
@@ -380,12 +386,12 @@ function buildRedwoodMesh(ageState, seed) {
                 }
             }
 
-            for (let s = 0; s < segs; s++) {
+                        for (let s = 0; s < segs; s++) {
                 for (let side = 0; side < sides; side++) {
                     const i1 = vertexOffset + (s * (sides + 1)) + side;
                     const i2 = i1 + sides + 1;
-                    indices.push(i1, i2, i1 + 1);
-                    indices.push(i2, i2 + 1, i1 + 1);
+                    trunkIndices.push(i1, i2, i1 + 1);
+                    trunkIndices.push(i2, i2 + 1, i1 + 1);
                 }
             }
             vertexOffset += (segs + 1) * (sides + 1);
@@ -408,11 +414,11 @@ function buildRedwoodMesh(ageState, seed) {
                 const sway = Math.pow(t, 1.5) * (bV * 0.9);
                 colors.push(sway, 0.0, 0.0);
                 colors.push(sway, 0.0, 0.0);
-                colors.push(sway, 0.0, 0.0);
+                                colors.push(sway, 0.0, 0.0);
                 colors.push(sway, 0.0, 0.0);
 
-                indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2);
-                indices.push(vertexOffset, vertexOffset + 2, vertexOffset + 3);
+                trunkIndices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2);
+                trunkIndices.push(vertexOffset, vertexOffset + 2, vertexOffset + 3);
                 vertexOffset += 4;
             }
         }
@@ -452,11 +458,11 @@ function buildRedwoodMesh(ageState, seed) {
                 const branchSway = bV * 0.85;
                 colors.push(branchSway, 1.0, 0.0);
                 colors.push(branchSway, 1.0, 0.0);
-                colors.push(branchSway, 1.0, 0.0);
+                                colors.push(branchSway, 1.0, 0.0);
                 colors.push(branchSway, 1.0, 0.0);
 
-                indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2);
-                indices.push(vertexOffset, vertexOffset + 2, vertexOffset + 3);
+                foliageIndices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2);
+                foliageIndices.push(vertexOffset, vertexOffset + 2, vertexOffset + 3);
                 vertexOffset += 4;
             }
         }
@@ -538,14 +544,18 @@ function buildRedwoodMesh(ageState, seed) {
 
                 addFoliageClusterGroup(pX, pY, pZ, prng.range(5.5, 9.0), bV, zoneDensityMult);
             }
-        }
+                }
     }
+
+    const indices = trunkIndices.concat(foliageIndices);
 
     return {
         positions: new Float32Array(positions),
         normals: new Float32Array(normals),
         uvs: new Float32Array(uvs),
         colors: new Float32Array(colors),
-        indices: new Uint32Array(indices)
+        indices: new Uint32Array(indices),
+        trunkIndexCount: trunkIndices.length,
+        foliageIndexCount: foliageIndices.length
     };
 }

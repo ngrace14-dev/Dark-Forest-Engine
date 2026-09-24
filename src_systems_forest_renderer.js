@@ -4,6 +4,7 @@
 // ============================================================================
 
 import * as THREE from 'three';
+import { createTrunkMaterial, createCanopyMaterial } from '../src_shaders_forest_materials.js';
 
 class ForestRenderer {
     constructor() {
@@ -28,22 +29,17 @@ class ForestRenderer {
 
         const ageStates = ['COLOSSAL_ANCIENT', 'ANCIENT', 'MATURE', 'YOUNG', 'DYING'];
 
-        for (const ageState of ageStates) {
+                for (const ageState of ageStates) {
             for (let varIdx = 0; varIdx < 4; varIdx++) {
                 const prefabKey = `Redwood_${ageState}_${varIdx}`;
 
-                const mat = new THREE.MeshStandardMaterial({
-                    color: 0x3d2015,
-                    roughness: 0.82,
-                    metalness: 0.03,
-                    side: THREE.DoubleSide,
-                    alphaTest: 0.18,
-                    vertexColors: true
-                });
+                const trunkMat = createTrunkMaterial();
+                const canopyMat = createCanopyMaterial();
 
-                mat.onBeforeCompile = (shader) => {
+                // Phase 6 FIX: Share uniforms on both materials for sway to work correctly
+                trunkMat.onBeforeCompile = (shader) => {
                     Object.assign(shader.uniforms, this.sharedUniforms);
-
+                    // Minimal sway for trunk (taken from previous standard material vertex block)
                     shader.vertexShader = `
                         uniform float uTime;
                         uniform float uWindSpeed;
@@ -63,9 +59,57 @@ class ForestRenderer {
                         #endif
 
                         float branchSway = sin(uTime * 1.2 + vWorldPos.x * 0.04 + vWorldPos.z * 0.04) * color.r * 0.8;
-                        float leafFlutter = sin(uTime * 6.0 + vWorldPos.y * 0.15) * color.g * 0.20;
+                        transformed.x += branchSway * uWindSpeed;
+                        transformed.z += (branchSway * 0.5) * uWindSpeed;
+                        `
+                    );
+                    
+                    shader.fragmentShader = `
+                        uniform vec3 uForestSunDir;
+                        uniform vec3 uForestSunCol;
+                        uniform float uRawDebugMode;
+                        varying vec3 vWorldPos;
+                        varying vec3 vColorAttr;
+                        ${shader.fragmentShader}
+                    `.replace(
+                        `#include <color_fragment>`,
+                        `
+                        #include <color_fragment>
+
+                        vec3 barkBaseColor = vec3(0.16, 0.08, 0.04);
+                        vec3 mossColor = vec3(0.09, 0.22, 0.06);
+
+                        diffuseColor.rgb = mix(barkBaseColor, mossColor, vColorAttr.b);
+                        `
+                    );
+                };
+                
+                canopyMat.onBeforeCompile = (shader) => {
+                    Object.assign(shader.uniforms, this.sharedUniforms);
+                    
+                    shader.vertexShader = `
+                        uniform float uTime;
+                        uniform float uWindSpeed;
+                        varying vec3 vWorldPos;
+                        varying vec3 vColorAttr;
+                        ${shader.vertexShader}
+                    `.replace(
+                        `#include <begin_vertex>`,
+                        `
+                        #include <begin_vertex>
+                        vColorAttr = color;
+
+                        #ifdef USE_INSTANCING
+                            vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
+                        #else
+                            vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+                        #endif
+
+                        float branchSway = sin(uTime * 1.2 + vWorldPos.x * 0.04 + vWorldPos.z * 0.04) * color.r * 0.8;
+                        float leafFlutter = sin(uTime * 6.0 + vWorldPos.y * 0.15) * 0.20; // foliage relies entirely on leaf flutter over base branch sway
 
                         transformed.x += (branchSway + leafFlutter) * uWindSpeed;
+                        transformed.y += leafFlutter * uWindSpeed;
                         transformed.z += (branchSway * 0.5 + leafFlutter) * uWindSpeed;
                         `
                     );
@@ -82,17 +126,10 @@ class ForestRenderer {
                         `
                         #include <color_fragment>
 
-                        vec3 barkBaseColor = vec3(0.16, 0.08, 0.04);
                         vec3 foliageNeedleColor = vec3(0.06, 0.18, 0.08);
-                        vec3 mossColor = vec3(0.09, 0.22, 0.06);
+                        diffuseColor.rgb = foliageNeedleColor;
 
-                        if (vColorAttr.g > 0.5) {
-                            diffuseColor.rgb = foliageNeedleColor;
-                        } else {
-                            diffuseColor.rgb = mix(barkBaseColor, mossColor, vColorAttr.b);
-                        }
-
-                        if (vColorAttr.g > 0.5 && uRawDebugMode < 0.5) {
+                        if (uRawDebugMode < 0.5) {
                             vec3 viewDir = normalize(cameraPosition - vWorldPos);
                             float backLight = max(0.0, dot(-viewDir, uForestSunDir));
                             float sssScatter = pow(backLight, 4.0) * 0.65;
@@ -103,11 +140,7 @@ class ForestRenderer {
                     );
                 };
 
-                if (window.VolumetricFogSystem?.patchMaterial) {
-                    window.VolumetricFogSystem.patchMaterial(mat);
-                }
-
-                this.materials.set(prefabKey, mat);
+                this.materials.set(prefabKey, [trunkMat, canopyMat]);
             }
         }
 
