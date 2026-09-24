@@ -159,6 +159,49 @@ Rethink.
 
 -----------------------------------------------------------------
 
+INVESTIGATION BEFORE IMPLEMENTATION RULE
+
+Before modifying architecture:
+
+1. Identify ownership.
+2. Identify authority.
+3. Identify callers.
+4. Identify dependencies.
+5. Gather evidence.
+
+Implementation should occur only after
+a high-confidence root cause is established.
+
+Avoid implementing fixes based solely on symptoms.
+
+-----------------------------------------------------------------
+
+LOCALHOST / SERVER RULE
+
+Do not start local web servers unless explicitly requested.
+
+Examples:
+
+- npx http-server
+- npm run dev
+- npm run serve
+- live-server
+- python -m http.server
+
+Do not wait on long-running processes.
+
+Do not use localhost state as evidence.
+
+When runtime verification is required:
+
+1. Describe the verification steps.
+2. Wait for user-supplied runtime evidence.
+3. Analyze logs, screenshots, and console output.
+
+Repository evidence takes priority over localhost inspection.
+
+-----------------------------------------------------------------
+
 EVIDENCE RULE
 
 Claims about existing code must be supported by source evidence.
@@ -175,7 +218,7 @@ Examples:
 Every confirmed claim should include:
 
 - File name
-- Location reference
+- Line reference
 
 Architecture claims without evidence should be treated as assumptions.
 
@@ -216,6 +259,41 @@ Every change must define:
 - Failure Symptoms
 
 Visual changes should include screenshot verification whenever practical.
+
+-----------------------------------------------------------------
+
+RUNTIME STATE CLAIM RULE
+
+The AI must never claim:
+
+- Fixed
+- Working
+- Successful
+- Resolved
+- Verified
+
+unless runtime evidence exists.
+
+Allowed status labels:
+
+IMPLEMENTED
+UNVERIFIED
+VERIFIED
+
+Examples:
+
+Correct:
+
+IMPLEMENTED
+Runtime verification pending.
+
+Incorrect:
+
+Fixed.
+Working.
+Resolved.
+
+without runtime evidence.
 
 -----------------------------------------------------------------
 
@@ -289,7 +367,7 @@ Procedural assets must be explicitly disposed:
 - Meshes
 - Materials
 - Textures
-- Render targets
+- Render Targets
 
 to prevent VRAM leaks.
 
@@ -335,6 +413,10 @@ HARDENING CHECKLIST (REQUIRED BEFORE PR/MERGE)
 [ ] Targeted Fix (One approved objective per commit)
 
 [ ] Runtime Verified (Tested in-engine)
+
+[ ] Runtime Evidence Available (Logs, screenshots, console output, or observable behavior)
+
+[ ] Status Correctly Classified (IMPLEMENTED / UNVERIFIED / VERIFIED)
 
 [ ] API Contracts Verified (All callers updated)
 
