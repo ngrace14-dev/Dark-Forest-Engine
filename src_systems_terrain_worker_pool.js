@@ -62,15 +62,16 @@ export class TerrainWorkerPool {
         this.idleWorkers.push(worker);
     }
 
-    // FIX: Renamed back to requestChunkData to match src_engine.js expectations
-    requestChunkData(chunkData, callback) {
+        // FIX: Renamed back to requestChunkData to match src_engine.js expectations
+    requestChunkData(cx, cz, lod, chunkSize, seed, roadPoints, callback) {
         const taskId = ++this.taskIdCounter;
         this.taskCallbacks.set(taskId, callback);
 
         const dispatch = () => {
             if (this.idleWorkers.length > 0) {
                 const worker = this.idleWorkers.pop();
-                worker.postMessage({ id: taskId, ...chunkData });
+                const segments = lod === 'A' ? 30 : (lod === 'B' ? 10 : 2);
+                worker.postMessage({ id: taskId, cx, cz, segments, chunkSize, seed, roadPoints });
             } else {
                 setTimeout(dispatch, 10);
             }
