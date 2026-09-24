@@ -81,7 +81,8 @@ export class TerrainWorkerPool {
 }
 
 if (typeof window !== 'undefined') {
-    window.TerrainWorkerPool = TerrainWorkerPool;
+    // FIX: Initialize the class instead of just assigning the constructor
+    window.TerrainWorkerPool = new TerrainWorkerPool('src_workers_terrain_worker.js');
 }
 
 export default TerrainWorkerPool;
