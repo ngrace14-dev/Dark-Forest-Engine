@@ -316,14 +316,20 @@ function buildRedwoodMesh(ageState, seed) {
             const cosT = Math.cos(theta);
             const sinT = Math.sin(theta);
 
-            let burlDisplacement = 0.0;
+                        let burlDisplacement = 0.0;
+            let n1 = 0.0;
             if (flareIntensity > 0.0) {
-                const n1 = Math.max(0.0, noiseGen.noise(cosT * 2.5, sinT * 2.5, v * 6.0));
+                n1 = Math.max(0.0, noiseGen.noise(cosT * 2.5, sinT * 2.5, v * 6.0));
                 const n2 = Math.sin(theta * 7.0) * 0.45 + Math.cos(theta * 4.0) * 0.3;
                 burlDisplacement = (n1 * 0.7 + n2 * 0.3) * flareIntensity * flareAggression;
             }
 
-            const ridgeNoise = noiseGen.noise(cosT * 9.0, v * 30.0, sinT * 9.0) * 0.28 * (1.0 - v);
+            const phaseShift = v * 8.0 + n1 * 2.0;
+            const waveA = Math.sin(u * Math.PI * 24.0 + phaseShift);
+            const waveB = Math.sin(u * Math.PI * 14.0 - phaseShift * 0.4);
+            const interference = (waveA + waveB) * 0.5;
+            const plateShape = 1.0 - Math.pow(Math.abs(interference), 0.7);
+            const ridgeNoise = (plateShape - 0.5) * (radius * 0.12) * (1.0 - v * 0.8);
 
             const currentRadius = radius + burlDisplacement + ridgeNoise;
             const px = cosT * currentRadius + driftX;
