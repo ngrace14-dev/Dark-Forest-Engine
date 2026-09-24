@@ -59,12 +59,12 @@ export function createForestFloorMaterial(options = {}) {
             varying vec3 vWorldPosFloor;
             varying vec3 vWorldNormalFloor;
             
-            // 1. Shared noise lifecycle
+                        // 1. Shared noise lifecycle
             float getForestBump(vec3 pos) {
                 vec2 duffUV = pos.xz * 0.15;
                 float noiseA = sin(duffUV.x) * cos(duffUV.y);
                 float noiseB = sin(pos.x * 0.8) * cos(pos.z * 0.8) * 0.5 + 0.5;
-                float noiseC = sin(pos.x * 4.0) * cos(pos.z * 4.0);
+                float noiseC = sin(pos.x * 2.2) * cos(pos.z * 2.2);
                 
                 // Micro-relief: Duff is bumpy, moss is smoother
                 float duffBump = noiseA * 0.5 + noiseC * 0.1;
@@ -90,9 +90,9 @@ export function createForestFloorMaterial(options = {}) {
 
             float det = dot(vPdx, rx);
             
-            // 3. Distance-faded bump intensity
+                        // 3. Distance-faded bump intensity
             float dist = length(vViewPosition);
-            float bumpIntensity = smoothstep(80.0, 10.0, dist) * 1.5;
+            float bumpIntensity = smoothstep(60.0, 15.0, dist) * 0.4;
 
             vec3 bumpNormal = (rx * dbdx + ry * dbdy) * sign(det) / max(abs(det), 1e-7);
             normal = normalize(normal - bumpNormal * bumpIntensity);
