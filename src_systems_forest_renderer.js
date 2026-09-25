@@ -120,9 +120,10 @@ class ForestRenderer {
                         
                         float det = dot(vPdx, rx);
                         
-                        // 3. Distance fade to prevent shimmering
+                                                // 3. Distance fade to prevent shimmering
                         float dist = length(vViewPosition);
-                        float bumpIntensity = smoothstep(100.0, 15.0, dist) * 1.5;
+                        // EXTREME STRESS TEST: Multiply intensity by 5x (7.5) and disable long-distance fade
+                        float bumpIntensity = smoothstep(300.0, 15.0, dist) * 7.5;
                         
                         vec3 bumpNormal = (rx * dbdx + ry * dbdy) * sign(det) / max(abs(det), 1e-7);
                         normal = normalize(normal - bumpNormal * bumpIntensity);
@@ -134,6 +135,11 @@ class ForestRenderer {
 
                         vec3 barkBaseColor = vec3(0.16, 0.08, 0.04);
                         vec3 mossColor = vec3(0.09, 0.22, 0.06);
+                        
+                        // EXTREME STRESS TEST: Manually darken deep crevices to force contrast
+                        float barkValDiag = getBarkBump(vTrunkUv, vWorldPos.y);
+                        barkBaseColor *= mix(0.1, 1.5, barkValDiag);
+                        mossColor *= mix(0.1, 1.5, barkValDiag);
 
                         diffuseColor.rgb = mix(barkBaseColor, mossColor, vColorAttr.b);
                         `
