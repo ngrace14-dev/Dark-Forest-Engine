@@ -213,10 +213,17 @@ class ForestRenderer {
         this.instancedMeshes.set(meshKey, imesh);
     }
 
-    clearChunkInstances(chunkKey) {
+        clearChunkInstances(chunkKey) {
         for (const [meshKey, imesh] of this.instancedMeshes.entries()) {
             if (meshKey.startsWith(`${chunkKey}_`)) {
                 this.group.remove(imesh);
+                
+                // ASSET DISPOSAL RULE: Clean up cloned geometry and custom instanced buffers
+                // Shared materials are NOT disposed here as they are reused by other chunks
+                if (imesh.geometry && !imesh.geometry.isShared) {
+                    imesh.geometry.dispose();
+                }
+                
                 this.instancedMeshes.delete(meshKey);
             }
         }
