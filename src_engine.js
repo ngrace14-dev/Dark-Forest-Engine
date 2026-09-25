@@ -1936,23 +1936,57 @@ async function bootEngine() {
         window.GameCore.scene.background = new THREE.Color(0x040608);
         window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 2000000); 
 
-        // INITIALIZE REDWOOD WORKER ARCHETYPES & FOREST SYSTEM
-        if (window.RedwoodGenerator?.init) {
-            try {
-                await window.RedwoodGenerator.init('src_workers_tree_worker.js');
-            } catch (err) {
-                console.warn('[Engine] RedwoodGenerator worker fallback:', err);
-            }
-        }
+                // INITIALIZE REDWOOD WORKER ARCHETYPES & FOREST SYSTEM
+                if (window.RedwoodGenerator?.init) {
+                    try {
+                        // Pre-Flight Synchronization: Await worker generation before initiating the Baker
+                        await window.RedwoodGenerator.init('src_workers_tree_worker.js');
+                        console.log('[Engine] Master Redwood Geometries stored locally.');
+                    } catch (err) {
+                        console.warn('[Engine] RedwoodGenerator worker fallback:', err);
+                    }
+                }
 
-        if (window.ForestRenderer) {
-            await window.ForestRenderer.ensureAssets();
-            window.GameCore.scene.add(window.ForestRenderer.group);
-        }
+                if (window.ForestRenderer) {
+                    await window.ForestRenderer.ensureAssets();
+                    window.GameCore.scene.add(window.ForestRenderer.group);
+                }
 
-        if (window.ForestImpostorSystem) {
-            window.ForestImpostorSystem.init(window.GameCore.scene);
-        }
+                // --- PRE-FLIGHT SYNCHRONIZATION ---
+                // We only proceed to bake and initialize impostors if the Worker successfully returned the geometries.
+                if (window.ImpostorBaker && window.RedwoodGenerator?.isInitialized) {
+                    console.log('[Engine] Initializing LOD Impostor Baker...');
+                    try {
+                        // Initialize Baker isolated scene using the instantiated procedural materials
+                        const baseTrunkMat = window.ForestRenderer.materials.get('Redwood_ANCIENT_0')[0];
+                        const baseCanopyMat = window.ForestRenderer.materials.get('Redwood_ANCIENT_0')[1];
+                
+                        window.ImpostorBaker.initializeBakeSetup(
+                            baseTrunkMat, 
+                            baseCanopyMat, 
+                            window.RenderPipeline?.dirLight?.position?.clone().normalize() || new THREE.Vector3(0.3, 0.6, 0.7),
+                            window.RenderPipeline?.dirLight?.color || new THREE.Color(0xfef3c7)
+                        );
+                
+                        // Fetch Master Geometry built by the Web Worker (Guaranteeing it exists due to the await above)
+                        const masterGeo = window.RedwoodGenerator.getArchetype('ANCIENT', 0);
+                
+                        const bakedAtlas = window.ImpostorBaker.bakeAtlas(masterGeo, masterGeo, 16);
+                
+                        if (window.ForestImpostorSystem) {
+                            window.ForestImpostorSystem.init(window.GameCore.scene, bakedAtlas, 16);
+                        }
+                
+                        window.ImpostorBaker.dispose();
+                        console.log('[Engine] Impostor Baker finished and disposed cleanly.');
+                    } catch (err) {
+                        console.error('[Engine] Impostor Baker crashed:', err);
+                        if (window.ForestImpostorSystem) window.ForestImpostorSystem.init(window.GameCore.scene); // Fallback init
+                    }
+                } else if (window.ForestImpostorSystem) {
+                    // Fallback initialization if Baker failed or Worker crashed
+                    window.ForestImpostorSystem.init(window.GameCore.scene);
+                }
 
         // INITIALIZE NEW SYSTEMS
         if (WetlandsSystem) {
@@ -1970,7 +2004,7 @@ async function bootEngine() {
             window.GameCore.dunesSystem.spawnDuneChunk(window.GameCore.scene, 0, 0);
         }
 
-        initLightPool(window.GameCore.scene);
+                initLightPool(window.GameCore.scene);
 
         renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" }); 
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); 
@@ -1982,6 +2016,10 @@ async function bootEngine() {
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         document.body.appendChild(renderer.domElement);
+        
+        if (window.ImpostorBaker) {
+            window.ImpostorBaker.renderer = renderer; // Bind the constructed renderer to the baker
+        }
 
         if (window.RenderOptimizer?.prewarmShaders) {
             window.RenderOptimizer.prewarmShaders(renderer, window.GameCore.scene, window.GameCore.camera);

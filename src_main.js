@@ -20,6 +20,7 @@ import './src_systems_grass.js';
 import './src_systems_ruins.js';             // Procedural Stone Ruins & Cobblestones
 import './src_generators_redwood.js';        // <-- ADDED: Redwood Generator & Web Worker Orchestrator
 import './src_systems_procedural_trees.js';   // High-Quality Procedural Trees
+import { ImpostorBaker } from './src_systems_impostor_baker.js'; // Single Authority Baker
 import './src_systems_forest_impostors.js';   // 3km Distant Canopy Impostor System
 import { WetlandsSystem } from './src_systems_wetlands.js';
 import { MountainSystem } from './src_systems_mountains.js';
@@ -64,6 +65,11 @@ import './src_systems_vat.js';
 // 5. Initialize UI Engine (Runs after systems are imported)
 if (typeof initializeUIEngine === 'function') {
     initializeUIEngine(window.EventBus);
+}
+
+if (typeof window !== 'undefined' && !window.ImpostorBaker) {
+    // Bind an uninitialized instance to window so the engine can invoke it during boot
+    window.ImpostorBaker = new ImpostorBaker(null, 2048); 
 }
 
 // 6. Main Engine Entry Point
