@@ -121,28 +121,29 @@ class ForestRenderer {
                         float det = dot(vPdx, rx);
                         
                                                 // 3. Distance fade to prevent shimmering
-                        float dist = length(vViewPosition);
-                        // EXTREME STRESS TEST: Multiply intensity by 5x (7.5) and disable long-distance fade
-                        float bumpIntensity = smoothstep(300.0, 15.0, dist) * 7.5;
+                                                float dist = length(vViewPosition);
+                                                float bumpIntensity = smoothstep(100.0, 15.0, dist) * 1.5;
                         
-                        vec3 bumpNormal = (rx * dbdx + ry * dbdy) * sign(det) / max(abs(det), 1e-7);
-                                                // NO NORMAL BEND FOR THIS TEST
-                        // normal = normalize(normal - bumpNormal * bumpIntensity);
-                        `
+                                                vec3 bumpNormal = (rx * dbdx + ry * dbdy) * sign(det) / max(abs(det), 1e-7);
+                                                normal = normalize(normal - bumpNormal * bumpIntensity);
+                                                `
                     ).replace(
-                        `#include <color_fragment>`,
-                        `
-                        #include <color_fragment>
+                                                `#include <color_fragment>`,
+                                                `
+                                                #include <color_fragment>
 
-                        float barkValDiag = getBarkBump(vTrunkUv, vWorldPos.y);
+                                                vec3 barkBaseColor = vec3(0.16, 0.08, 0.04);
+                                                vec3 mossColor = vec3(0.09, 0.22, 0.06);
+
+                                                float barkVal = getBarkBump(vTrunkUv, vWorldPos.y);
                         
-                        // ULTIMATE STRESS TEST: Pure White Plates, Pure Black Crevices
-                        if (barkValDiag > 0.4) {
-                            diffuseColor.rgb = vec3(1.0, 1.0, 1.0); // WHITE PLATES
-                        } else {
-                            diffuseColor.rgb = vec3(0.0, 0.0, 0.0); // BLACK CREVICES
-                        }
-                        `
+                                                // Fake Ambient Occlusion: Darken the deep crevices so they read despite high ambient light
+                                                float creviceAO = mix(0.4, 1.0, barkVal);
+                                                barkBaseColor *= creviceAO;
+                                                mossColor *= creviceAO;
+
+                                                diffuseColor.rgb = mix(barkBaseColor, mossColor, vColorAttr.b);
+                                                `
                     );
                 };
                 
