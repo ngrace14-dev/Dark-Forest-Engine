@@ -353,6 +353,34 @@ export function createTrunkMaterial(options = {}) {
                 vec3 mossColor = mix(richMossColor, dryMossColor, mossNoise) * creviceAO; // Apply AO to moss as well
 
                 diffuseColor.rgb = mix(barkBaseColor, mossColor, finalMossMask);
+                
+                // --- Terrain Integration: Soil Blending & Contact Shadows ---
+                // Isolate the absolute base of the flared roots (0.0 to 1.5 meters)
+                // We use vWorldPos.y assuming terrain is roughly flat at the local tree origin.
+                // In a displaced terrain system, this might need local space Y instead, but world Y works for relatively flat groves.
+                
+                #ifdef USE_INSTANCING
+                    // Get local Y to accurately detect the base regardless of terrain height
+                    float localY = (inverse(modelMatrix * instanceMatrix) * vec4(vWorldPos, 1.0)).y;
+                #else
+                    float localY = (inverse(modelMatrix) * vec4(vWorldPos, 1.0)).y;
+                #endif
+                
+                // Ground proximity factor: 1.0 at ground level (localY = 0), 0.0 at 1.5 meters up
+                float groundProximity = 1.0 - smoothstep(0.0, 1.5, localY);
+                
+                // Soil & Leaf Litter Mesh Blending
+                // Deep, desaturated brown matching the forest floor material
+                vec3 soilColor = vec3(0.12, 0.09, 0.06);
+                
+                // Blend the entire existing diffuse (bark + moss) into the soil color based on proximity
+                diffuseColor.rgb = mix(diffuseColor.rgb, soilColor, groundProximity * 0.9);
+                
+                // SSAO & Contact Shadows
+                // Simulate dense ambient occlusion where roots burrow into the dirt
+                // Clamp the shadow so it doesn't become pitch black (minimum 0.15)
+                float contactShadow = mix(1.0, 0.15, groundProximity);
+                diffuseColor.rgb *= contactShadow;
             `
         });
     };
