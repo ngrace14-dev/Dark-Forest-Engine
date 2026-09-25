@@ -162,11 +162,8 @@ class ForestImpostorSystem {
     generateDistantForest(centerX, centerZ) {
         if (!this.initialized || !this.instancedMesh) return;
 
-        let index = 0;
-        const hash = (x, z) => {
-            let h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
-            return h - Math.floor(h);
-        };
+                let index = 0;
+        const hash = (x, z) => window.ForestManager?.getTreeSeed(x, z) ?? 0;
 
         const getTerrainY = (x, z) => {
             const h = window.WorldGenerator?.getTerrainHeight?.(x, z) ?? 0;

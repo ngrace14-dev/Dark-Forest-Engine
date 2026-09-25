@@ -10,6 +10,11 @@ class ForestManager {
         this.seed = window.EngineParams?.worldSeed || 1337;
     }
 
+    getTreeSeed(x, z) {
+        let h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
+        return h - Math.floor(h);
+    }
+
     getTerrainHeight(x, z) {
         if (typeof window !== 'undefined') {
             if (window.WorldGenerator?.getTerrainHeight) {
@@ -33,11 +38,8 @@ class ForestManager {
         const chunkZ = cz * 60;
         const chunkKey = `chunk_${cx}_${cz}`;
 
-        // Deterministic hash to keep tree/mid-story positions consistent per chunk
-        const hash = (x, z) => {
-            let h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
-            return h - Math.floor(h);
-        };
+                // Deterministic hash to keep tree/mid-story positions consistent per chunk
+        const hash = (x, z) => this.getTreeSeed(x, z);
 
         const addMidStoryPoint = (prefabKey, pt) => {
             if (!midStoryMap.has(prefabKey)) {

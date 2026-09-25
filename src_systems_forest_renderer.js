@@ -108,7 +108,8 @@ class ForestRenderer {
         }
     }
 
-    // Deterministic hash utility for instancing properties
+        // Deterministic hash utility for instancing properties is now centralized in ForestManager.
+    // Preserving the method stub if anything else in the class expected it, but routing to the global.
     _hashString(str) {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
@@ -193,8 +194,9 @@ class ForestRenderer {
 
             imesh.setMatrixAt(i, dummy.matrix);
 
-            // Pack Dense Attributes (aInstanceData: x=seed, y=lean(unused atm), z=scale, w=windPhase)
-            const seed = this._hashString(`${chunkKey}_${i}_${p.x}_${p.z}`);
+                        // Pack Dense Attributes (aInstanceData: x=seed, y=lean(unused atm), z=scale, w=windPhase)
+            // Phase 6 FIX: Route seed generation to the global Single Authority to align with Impostors
+            const seed = window.ForestManager?.getTreeSeed(p.x, p.z) ?? this._hashString(`${chunkKey}_${i}_${p.x}_${p.z}`);
             const windPhase = seed; // Reuse seed for a deterministic 0-1 phase offset
             
             instanceDataArray[i * 4 + 0] = seed;
