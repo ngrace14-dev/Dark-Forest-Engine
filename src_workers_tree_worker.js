@@ -332,8 +332,8 @@ function buildRedwoodMesh(ageState, seed) {
                         // Soften terracing: Restore continuous curvature to prevent faceted polygons
                         const plateShape = 1.0 - Math.pow(Math.abs(interference), 0.7);
             
-                        // Drop displacement magnitude back to structural bounds (0.12)
-                        const ridgeNoise = (plateShape - 0.5) * (radius * 0.12) * (1.0 - v * 0.8);
+                                                // Recover Ancient Character: 0.25 depth allows bark to carve deep, twisting tendons around the burls
+                        const ridgeNoise = (plateShape - 0.5) * (radius * 0.25) * (1.0 - v * 0.8);
 
                         const currentRadius = radius + burlDisplacement + ridgeNoise;
             const px = cosT * currentRadius + driftX;
