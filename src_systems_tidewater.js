@@ -26,7 +26,12 @@ export class TidewaterSystem {
                     new THREE.Vector4(-0.2, 1.0, 0.30, 18.0),  // High-frequency chop
                     new THREE.Vector4(0.8, -0.6, 0.15, 11.0)   // High-frequency interference
                 ]
-            }
+            },
+            uSunDir: { value: new THREE.Vector3(0.3, 0.6, 0.7).normalize() },
+            uSunColor: { value: new THREE.Color(0xfef3c7) },
+            uSkyColor: { value: new THREE.Color(0x5a7b93) },
+            uWaterShallow: { value: new THREE.Color(0x0f5e6a) },
+            uWaterDeep: { value: new THREE.Color(0x02101a) }
         };
     }
 
@@ -129,23 +134,69 @@ export class TidewaterSystem {
                 }
             `,
             fragmentShader: `
+                uniform float uTime;
+                uniform vec3 uSunDir;
+                uniform vec3 uSunColor;
+                uniform vec3 uSkyColor;
+                uniform vec3 uWaterShallow;
+                uniform vec3 uWaterDeep;
+
                 varying vec2 vUv;
                 varying vec3 vWorldPos;
                 varying vec3 vNormal;
                 
+                // Procedural noise for foam breakup
+                float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+                float noise(vec2 p) {
+                    vec2 i = floor(p); vec2 f = fract(p);
+                    vec2 u = f*f*(3.0-2.0*f);
+                    return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), u.x),
+                               mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+                }
+
                 void main() {
                     // Normalize the varying just in case interpolation warped it
                     vec3 n = normalize(vNormal);
+                    vec3 viewDir = normalize(cameraPosition - vWorldPos);
                     
-                    // Basic directional light placeholder to prove the analytical normal is working
-                    vec3 lightDir = normalize(vec3(0.3, 0.6, 0.7));
-                    float ndotl = max(0.0, dot(n, lightDir));
+                    // 1. Depth-Based Color Gradient
+                    // Gerstner waves oscillate vertically around Y=0. Troughs are negative, crests are positive.
+                    float depthBlend = smoothstep(-1.5, 1.5, vWorldPos.y);
+                    vec3 baseColor = mix(uWaterDeep, uWaterShallow, depthBlend);
                     
-                    // Deep ocean blue base color mixed with simple directional diffuse lighting
-                    vec3 oceanBase = vec3(0.05, 0.15, 0.30);
-                    vec3 litColor = oceanBase + (vec3(0.1, 0.2, 0.3) * ndotl);
+                    // 2. Fresnel Reflection
+                    // Glancing angles reflect the sky/environment color
+                    float fresnel = pow(1.0 - max(dot(viewDir, n), 0.0), 3.0);
+                    baseColor = mix(baseColor, uSkyColor, fresnel * 0.7);
                     
-                    gl_FragColor = vec4(litColor, 0.85); 
+                    // 3. Lighting & Specular Sun Glints
+                    vec3 lightDir = normalize(uSunDir);
+                    float diff = max(dot(n, lightDir), 0.0);
+                    
+                    // Blinn-Phong specular highlight calculation
+                    vec3 halfVector = normalize(lightDir + viewDir);
+                    float NdotH = max(0.0, dot(n, halfVector));
+                    float specular = pow(NdotH, 150.0); // Sharp, bright sun glints
+                    vec3 specularColor = uSunColor * specular * 1.5;
+                    
+                    // Apply diffuse light (with a base ambient term of 0.3) and add specular
+                    vec3 litColor = baseColor * (diff * 0.7 + 0.3) + specularColor;
+                    
+                    // 4. Crest Foam
+                    // Isolate sharp peaks: high world Y value AND steep normal (where Y component of normal drops)
+                    float peakHeight = smoothstep(0.8, 2.5, vWorldPos.y);
+                    float steepness = smoothstep(0.7, 0.95, 1.0 - n.y);
+                    float foamMask = peakHeight * steepness;
+                    
+                    // Break up the foam organically with moving noise so it doesn't look like a solid polygon
+                    float fNoise = noise(vWorldPos.xz * 2.0 - uTime * 0.8);
+                    foamMask *= smoothstep(0.3, 0.7, fNoise);
+                    foamMask = clamp(foamMask * 1.5, 0.0, 1.0); // Boost visibility
+                    
+                    vec3 foamColor = vec3(0.95, 0.98, 1.0);
+                    vec3 finalColor = mix(litColor, foamColor, foamMask);
+                    
+                    gl_FragColor = vec4(finalColor, 0.92); 
                 }
             `,
             transparent: true,
