@@ -7,6 +7,106 @@
 import * as THREE from 'three';
 
 /**
+ * Structured Shader Snippet Compiler
+ * Replaces fragile regex injections with deterministic block assignments.
+ */
+function assembleShader(shader, snippets) {
+    // 1. Vertex Declarations (always includes instanced data routing)
+    const vertDecl = `
+        uniform float uTime;
+        uniform float uWindSpeed;
+        
+        #ifdef USE_INSTANCING
+            attribute vec4 aInstanceData; // x: seed, y: lean, z: scale/height, w: windPhase
+            varying vec4 vInstanceData;
+        #endif
+        
+        varying vec3 vWorldPos;
+        varying vec3 vColorAttr;
+        ${snippets.VERTEX_DECLARATIONS || ''}
+    `;
+
+    // 2. Vertex Transform (world position capture and sway math)
+    const vertTransform = `
+        vColorAttr = color;
+        
+        #ifdef USE_INSTANCING
+            vInstanceData = aInstanceData;
+            vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
+        #else
+            vInstanceData = vec4(1.0, 0.0, 1.0, 0.0); // Fallback for non-instanced objects
+            vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+        #endif
+        
+        ${snippets.VERTEX_TRANSFORM || ''}
+    `;
+
+    // 3. Fragment Declarations
+    const fragDecl = `
+        uniform float uFogIntensity;
+        uniform vec3 uForestSunDir;
+        uniform vec3 uForestSunCol;
+        uniform float uRawDebugMode;
+        
+        varying vec3 vWorldPos;
+        varying vec3 vColorAttr;
+        
+        #ifdef USE_INSTANCING
+            varying vec4 vInstanceData;
+        #endif
+        
+        ${snippets.FRAG_DECLARATIONS || ''}
+    `;
+
+    // Patch Vertex Shader
+    shader.vertexShader = vertDecl + '\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\n' + vertTransform
+    );
+
+    // Patch Fragment Shader
+    shader.fragmentShader = fragDecl + '\n' + shader.fragmentShader;
+
+    // FRAG_NORMAL: Inject after normal setup
+    if (snippets.FRAG_NORMAL) {
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <normal_fragment_begin>',
+            '#include <normal_fragment_begin>\n' + snippets.FRAG_NORMAL
+        );
+    }
+
+    // FRAG_COLOR: Inject after diffuse color is calculated but before lighting
+    if (snippets.FRAG_COLOR) {
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <color_fragment>',
+            '#include <color_fragment>\n' + snippets.FRAG_COLOR
+        );
+    }
+
+    // FRAG_LIGHTING: Inject custom SSS/Lighting overrides
+    if (snippets.FRAG_LIGHTING) {
+        // Appending to the end of the standard lighting chunk
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <lights_fragment_end>',
+            '#include <lights_fragment_end>\n' + snippets.FRAG_LIGHTING
+        );
+    }
+
+    // FOG OVERRIDE: Maintain silhouette readability in dense fog
+    shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <fog_fragment>',
+        `
+        #ifdef USE_FOG
+            float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );
+            fogFactor *= uFogIntensity; 
+            gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );
+        #endif
+        `
+    );
+}
+
+/**
  * Phase 6 FIX: Canopy Material Generator
  * Solves the invisible canopy issue by recalibrating alpha clipping thresholds, 
  * adjusting depth-write rules for volumetric fog, and enabling double-sided rendering.
@@ -38,45 +138,43 @@ export function createCanopyMaterial(options = {}) {
         shader.uniforms.uTime = { value: 0 };
         shader.uniforms.uWindSpeed = { value: 1.0 };
         shader.uniforms.uFogIntensity = { value: 1.0 }; // Hook for Dev Tools RAW_RENDER_MODE
+        shader.uniforms.uForestSunDir = { value: new THREE.Vector3(0.3, 0.6, 0.7).normalize() };
+        shader.uniforms.uForestSunCol = { value: new THREE.Color(0xfef3c7) };
+        shader.uniforms.uRawDebugMode = { value: 0.0 };
 
-        shader.vertexShader = `
-            uniform float uTime;
-            uniform float uWindSpeed;
-            varying vec3 vWorldPos;
-            ${shader.vertexShader}
-        `.replace(
-            `#include <begin_vertex>`,
-            `
-            #include <begin_vertex>
-            
-            #ifdef USE_INSTANCING
-                vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
-            #else
-                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-            #endif
+        assembleShader(shader, {
+            VERTEX_TRANSFORM: `
+                // Canopy flutter math utilizing instance windPhase (w) and scaling sway by height (z)
+                float windPhase = vInstanceData.w * 6.28318;
+                float branchSway = sin(uTime * 1.2 + vWorldPos.x * 0.04 + vWorldPos.z * 0.04 + windPhase) * color.r * 0.8 * vInstanceData.z;
+                float leafFlutter = sin(uTime * 6.0 + vWorldPos.y * 0.15 + windPhase) * 0.20; 
 
-            // Canopy flutter math (distinct from trunk sway)
-            float flutter = sin(uTime * 4.0 + vWorldPos.x * 0.5 + vWorldPos.z * 0.5) * 0.1;
-            transformed.y += flutter * uWindSpeed;
-            transformed.x += (flutter * 0.5) * uWindSpeed;
+                transformed.x += (branchSway + leafFlutter) * uWindSpeed;
+                transformed.y += leafFlutter * uWindSpeed;
+                transformed.z += (branchSway * 0.5 + leafFlutter) * uWindSpeed;
+            `,
+            FRAG_COLOR: `
+                // Deterministic color variation using the instance seed
+                float seedNoise = fract(sin(vInstanceData.x * 12.9898) * 43758.5453);
+                
+                vec3 baseNeedleColor = vec3(0.06, 0.18, 0.08);
+                vec3 driedNeedleColor = vec3(0.12, 0.15, 0.05);
+                
+                // Slightly mix in dried needle colors based on seed to break uniformity
+                diffuseColor.rgb = mix(baseNeedleColor, driedNeedleColor, seedNoise * 0.3);
+            `,
+            FRAG_LIGHTING: `
+                if (uRawDebugMode < 0.5) {
+                    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+                    float backLight = max(0.0, dot(-viewDir, uForestSunDir));
+                    float sssScatter = pow(backLight, 4.0) * 0.65;
+                    vec3 sssGlow = uForestSunCol * vec3(0.20, 0.55, 0.10) * sssScatter;
+                    
+                    // Add SSS directly to the final lighting output (gl_FragColor is calculated after this chunk)
+                    outgoingLight += sssGlow * diffuseColor.rgb; 
+                }
             `
-        );
-
-        shader.fragmentShader = `
-            uniform float uFogIntensity;
-            varying vec3 vWorldPos;
-            ${shader.fragmentShader}
-        `.replace(
-            `#include <fog_fragment>`,
-            `
-            // Phase 6 FIX: Protect canopy silhouette readability in heavy fog
-            #ifdef USE_FOG
-                float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );
-                fogFactor *= uFogIntensity; // Allow UI to toggle/scale fog interference
-                gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );
-            #endif
-            `
-        );
+        });
     };
 
     // Auto-patch into the custom volumetric fog system if it exists globally
@@ -98,6 +196,81 @@ export function createTrunkMaterial(options = {}) {
         vertexColors: true, // FIX: Required for injected vColorAttr = color; in ForestRenderer
         ...options
     });
+
+    mat.onBeforeCompile = (shader) => {
+        shader.uniforms.uTime = { value: 0 };
+        shader.uniforms.uWindSpeed = { value: 1.0 };
+        shader.uniforms.uFogIntensity = { value: 1.0 }; 
+        shader.uniforms.uForestSunDir = { value: new THREE.Vector3(0.3, 0.6, 0.7).normalize() };
+        shader.uniforms.uForestSunCol = { value: new THREE.Color(0xfef3c7) };
+        shader.uniforms.uRawDebugMode = { value: 0.0 };
+
+        assembleShader(shader, {
+            VERTEX_DECLARATIONS: `
+                varying vec2 vTrunkUv;
+            `,
+            VERTEX_TRANSFORM: `
+                vTrunkUv = uv;
+                float windPhase = vInstanceData.w * 6.28318;
+                float branchSway = sin(uTime * 1.2 + vWorldPos.x * 0.04 + vWorldPos.z * 0.04 + windPhase) * color.r * 0.8 * vInstanceData.z;
+                transformed.x += branchSway * uWindSpeed;
+                transformed.z += (branchSway * 0.5) * uWindSpeed;
+            `,
+            FRAG_DECLARATIONS: `
+                varying vec2 vTrunkUv;
+                
+                // 1. Procedural Bark Height Generator (Seeded)
+                float getBarkBump(vec2 trunkUV, float worldY, float seed) {
+                    float weave = sin(trunkUV.y * 0.15 + seed * 10.0) * 0.2;
+                    float platesA = sin(trunkUV.x * 24.0 + weave);
+                    float platesB = sin(trunkUV.x * 15.0 - weave);
+                    float interference = (platesA + platesB) * 0.5;
+                    float barkShape = 1.0 - pow(abs(interference), 0.7);
+                    float ageFade = clamp(1.0 - (worldY * 0.015), 0.2, 1.0);
+                    float microFibers = sin(trunkUV.x * 120.0) * cos(trunkUV.y * 40.0) * 0.05;
+                    return (barkShape + microFibers) * ageFade;
+                }
+            `,
+            FRAG_NORMAL: `
+                // 2. Compute screen-space bark derivatives
+                float barkVal = getBarkBump(vTrunkUv, vWorldPos.y, vInstanceData.x);
+                float dbdx = dFdx(barkVal);
+                float dbdy = dFdy(barkVal);
+                
+                vec3 vPdx = dFdx(vViewPosition);
+                vec3 vPdy = dFdy(vViewPosition);
+                
+                vec3 rx = cross(vPdy, normal);
+                vec3 ry = cross(normal, vPdx);
+                
+                float det = dot(vPdx, rx);
+                
+                // 3. Distance fade to prevent shimmering
+                float dist = length(vViewPosition);
+                float bumpIntensity = smoothstep(100.0, 15.0, dist) * 1.5;
+
+                vec3 bumpNormal = (rx * dbdx + ry * dbdy) * sign(det) / max(abs(det), 1e-7);
+                normal = normalize(normal - bumpNormal * bumpIntensity);
+            `,
+            FRAG_COLOR: `
+                // Deterministic variance using seed
+                float seedNoise = fract(sin(vInstanceData.x * 78.233) * 43758.5453);
+                
+                vec3 barkBaseColor = mix(vec3(0.35, 0.16, 0.10), vec3(0.28, 0.14, 0.08), seedNoise * 0.4);
+                vec3 mossColor = vec3(0.12, 0.28, 0.08);
+
+                float barkValSample = getBarkBump(vTrunkUv, vWorldPos.y, vInstanceData.x);
+                
+                // Fake Ambient Occlusion: Darken the deep crevices so they read despite high ambient light
+                float creviceAO = mix(0.55, 1.0, barkValSample);
+                barkBaseColor *= creviceAO;
+                mossColor *= creviceAO;
+
+                // vColorAttr.b acts as a moss map provided by geometry
+                diffuseColor.rgb = mix(barkBaseColor, mossColor, vColorAttr.b);
+            `
+        });
+    };
 
     if (typeof window !== 'undefined' && window.VolumetricFogSystem?.patchMaterial) {
         window.VolumetricFogSystem.patchMaterial(mat);

@@ -37,172 +37,33 @@ class ForestRenderer {
                 const canopyMat = createCanopyMaterial();
 
                 // Phase 6 FIX: Share uniforms on both materials for sway to work correctly
-                                trunkMat.onBeforeCompile = (shader) => {
-                    Object.assign(shader.uniforms, this.sharedUniforms);
-                    // Minimal sway for trunk (taken from previous standard material vertex block)
-                    shader.vertexShader = `
-                        uniform float uTime;
-                        uniform float uWindSpeed;
-                        varying vec3 vWorldPos;
-                        varying vec3 vColorAttr;
-                        varying vec2 vTrunkUv;
-                        ${shader.vertexShader}
-                    `.replace(
-                        `#include <begin_vertex>`,
-                        `
-                        #include <begin_vertex>
-                        vColorAttr = color;
-                        vTrunkUv = uv;
-
-                        #ifdef USE_INSTANCING
-                            vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
-                        #else
-                            vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-                        #endif
-
-                        float branchSway = sin(uTime * 1.2 + vWorldPos.x * 0.04 + vWorldPos.z * 0.04) * color.r * 0.8;
-                        transformed.x += branchSway * uWindSpeed;
-                        transformed.z += (branchSway * 0.5) * uWindSpeed;
-                        `
-                    );
-                    
-                                        shader.fragmentShader = `
-                        uniform vec3 uForestSunDir;
-                        uniform vec3 uForestSunCol;
-                        uniform float uRawDebugMode;
-                        varying vec3 vWorldPos;
-                        varying vec3 vColorAttr;
-                        varying vec2 vTrunkUv;
-                        
-                        // 1. Procedural Bark Height Generator
-                        float getBarkBump(vec2 trunkUV, float worldY) {
-                            // High-frequency anisotropic bark ridges
-                            // U wraps 8 times around the trunk, V is raw height
-                            
-                            // Slow low-frequency wave to cause plates to drift/weave vertically
-                            float weave = sin(trunkUV.y * 0.15) * 0.2;
-                            
-                            // Fast vertical plates
-                            float platesA = sin(trunkUV.x * 24.0 + weave);
-                            float platesB = sin(trunkUV.x * 15.0 - weave);
-                            
-                                                                                                                // Splitting/merging interference pattern
-                            float interference = (platesA + platesB) * 0.5;
-                            
-                            // Soften terracing: Restore continuous normal derivatives across the plate
-                            float barkShape = 1.0 - pow(abs(interference), 0.7);
-                            
-                            // Fade depth based on height (older bark at base is deeper)
-                            float ageFade = clamp(1.0 - (worldY * 0.015), 0.2, 1.0);
-                            
-                            // Add micro-noise for splintered fiber texture
-                            float microFibers = sin(trunkUV.x * 120.0) * cos(trunkUV.y * 40.0) * 0.05;
-                            
-                            return (barkShape + microFibers) * ageFade;
-                        }
-
-                        ${shader.fragmentShader}
-                    `.replace(
-                        `#include <normal_fragment_begin>`,
-                        `
-                        #include <normal_fragment_begin>
-                        
-                        // 2. Compute screen-space bark derivatives
-                        float barkVal = getBarkBump(vTrunkUv, vWorldPos.y);
-                        float dbdx = dFdx(barkVal);
-                        float dbdy = dFdy(barkVal);
-                        
-                        vec3 vPdx = dFdx(vViewPosition);
-                        vec3 vPdy = dFdy(vViewPosition);
-                        
-                        vec3 rx = cross(vPdy, normal);
-                        vec3 ry = cross(normal, vPdx);
-                        
-                        float det = dot(vPdx, rx);
-                        
-                                                // 3. Distance fade to prevent shimmering
-                                                float dist = length(vViewPosition);
-                                                float bumpIntensity = smoothstep(100.0, 15.0, dist) * 1.5;
-                        
-                                                vec3 bumpNormal = (rx * dbdx + ry * dbdy) * sign(det) / max(abs(det), 1e-7);
-                                                normal = normalize(normal - bumpNormal * bumpIntensity);
-                                                `
-                    ).replace(
-                                                `#include <color_fragment>`,
-                                                `
-                                                                                                #include <color_fragment>
-
-                                                // Ancient Redwood Warm Cinnamon Hue
-                                                vec3 barkBaseColor = vec3(0.35, 0.16, 0.10);
-                                                // Saturated Forest Moss
-                                                vec3 mossColor = vec3(0.12, 0.28, 0.08);
-
-                                                float barkVal = getBarkBump(vTrunkUv, vWorldPos.y);
-                        
-                                                // Fake Ambient Occlusion: Darken the deep crevices so they read despite high ambient light
-                                                float creviceAO = mix(0.55, 1.0, barkVal);
-                                                barkBaseColor *= creviceAO;
-                                                mossColor *= creviceAO;
-
-                                                diffuseColor.rgb = mix(barkBaseColor, mossColor, vColorAttr.b);
-                                                `
-                    );
-                };
+                // Note: Shader snippet assembly and injection logic has been moved to src_shaders_forest_materials.js
+                // adhering to the Single Authority Rule.
                 
+                // Keep the shared uniforms continuously updated
+                if (!trunkMat.userData) trunkMat.userData = {};
+                if (!canopyMat.userData) canopyMat.userData = {};
+                
+                // In order to allow shared uniforms to be updated, we hook into the standard
+                // onBeforeCompile created by the snippet compiler to inject our shared object references.
+                const originalTrunkCompile = trunkMat.onBeforeCompile;
+                trunkMat.onBeforeCompile = (shader) => {
+                    originalTrunkCompile(shader);
+                    shader.uniforms.uTime = this.sharedUniforms.uTime;
+                    shader.uniforms.uWindSpeed = this.sharedUniforms.uWindSpeed;
+                    shader.uniforms.uForestSunDir = this.sharedUniforms.uForestSunDir;
+                    shader.uniforms.uForestSunCol = this.sharedUniforms.uForestSunCol;
+                    shader.uniforms.uRawDebugMode = this.sharedUniforms.uRawDebugMode;
+                };
+
+                const originalCanopyCompile = canopyMat.onBeforeCompile;
                 canopyMat.onBeforeCompile = (shader) => {
-                    Object.assign(shader.uniforms, this.sharedUniforms);
-                    
-                    shader.vertexShader = `
-                        uniform float uTime;
-                        uniform float uWindSpeed;
-                        varying vec3 vWorldPos;
-                        varying vec3 vColorAttr;
-                        ${shader.vertexShader}
-                    `.replace(
-                        `#include <begin_vertex>`,
-                        `
-                        #include <begin_vertex>
-                        vColorAttr = color;
-
-                        #ifdef USE_INSTANCING
-                            vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
-                        #else
-                            vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-                        #endif
-
-                        float branchSway = sin(uTime * 1.2 + vWorldPos.x * 0.04 + vWorldPos.z * 0.04) * color.r * 0.8;
-                        float leafFlutter = sin(uTime * 6.0 + vWorldPos.y * 0.15) * 0.20; // foliage relies entirely on leaf flutter over base branch sway
-
-                        transformed.x += (branchSway + leafFlutter) * uWindSpeed;
-                        transformed.y += leafFlutter * uWindSpeed;
-                        transformed.z += (branchSway * 0.5 + leafFlutter) * uWindSpeed;
-                        `
-                    );
-
-                    shader.fragmentShader = `
-                        uniform vec3 uForestSunDir;
-                        uniform vec3 uForestSunCol;
-                        uniform float uRawDebugMode;
-                        varying vec3 vWorldPos;
-                        varying vec3 vColorAttr;
-                        ${shader.fragmentShader}
-                    `.replace(
-                        `#include <color_fragment>`,
-                        `
-                        #include <color_fragment>
-
-                        vec3 foliageNeedleColor = vec3(0.06, 0.18, 0.08);
-                        diffuseColor.rgb = foliageNeedleColor;
-
-                        if (uRawDebugMode < 0.5) {
-                            vec3 viewDir = normalize(cameraPosition - vWorldPos);
-                            float backLight = max(0.0, dot(-viewDir, uForestSunDir));
-                            float sssScatter = pow(backLight, 4.0) * 0.65;
-                            vec3 sssGlow = uForestSunCol * vec3(0.20, 0.55, 0.10) * sssScatter;
-                            diffuseColor.rgb += sssGlow;
-                        }
-                        `
-                    );
+                    originalCanopyCompile(shader);
+                    shader.uniforms.uTime = this.sharedUniforms.uTime;
+                    shader.uniforms.uWindSpeed = this.sharedUniforms.uWindSpeed;
+                    shader.uniforms.uForestSunDir = this.sharedUniforms.uForestSunDir;
+                    shader.uniforms.uForestSunCol = this.sharedUniforms.uForestSunCol;
+                    shader.uniforms.uRawDebugMode = this.sharedUniforms.uRawDebugMode;
                 };
 
                 this.materials.set(prefabKey, [trunkMat, canopyMat]);
@@ -247,6 +108,17 @@ class ForestRenderer {
         }
     }
 
+    // Deterministic hash utility for instancing properties
+    _hashString(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash |= 0; 
+        }
+        return Math.abs(hash) / 2147483647;
+    }
+
     setChunkInstances(chunkKey, prefabKey, points) {
         if (!chunkKey || !prefabKey || !points || points.length === 0) return;
 
@@ -288,13 +160,23 @@ class ForestRenderer {
             geo.isShared = true;
         }
 
+        // Clone the geometry if it's shared so we don't pollute other chunks' instance data buffers.
+        // We only do this if it's not a shared fallback geometry OR if we are explicitly injecting new attributes.
+        // For dense forest instancing, we clone the master archetype geometry here for safety.
+        let instanceGeo = geo;
+        if (geo.isShared || prefabKey.startsWith('Redwood_')) {
+            instanceGeo = geo.clone();
+            instanceGeo.isShared = false;
+        }
+
         const mat = this.materials.get(prefabKey) || new THREE.MeshStandardMaterial({ color: 0x2d3a29 });
-        const imesh = new THREE.InstancedMesh(geo, mat, points.length);
+        const imesh = new THREE.InstancedMesh(instanceGeo, mat, points.length);
 
         imesh.castShadow = true;
         imesh.receiveShadow = true;
 
         const dummy = new THREE.Object3D();
+        const instanceDataArray = new Float32Array(points.length * 4);
 
         points.forEach((p, i) => {
             dummy.position.set(p.x, p.y, p.z);
@@ -310,7 +192,19 @@ class ForestRenderer {
             dummy.updateMatrix();
 
             imesh.setMatrixAt(i, dummy.matrix);
+
+            // Pack Dense Attributes (aInstanceData: x=seed, y=lean(unused atm), z=scale, w=windPhase)
+            const seed = this._hashString(`${chunkKey}_${i}_${p.x}_${p.z}`);
+            const windPhase = seed; // Reuse seed for a deterministic 0-1 phase offset
+            
+            instanceDataArray[i * 4 + 0] = seed;
+            instanceDataArray[i * 4 + 1] = 0; // Reserved for lean magnitude if needed by vertex shader later
+            instanceDataArray[i * 4 + 2] = scale;
+            instanceDataArray[i * 4 + 3] = windPhase;
         });
+
+        // Inject the dense attribute into the instanced geometry
+        instanceGeo.setAttribute('aInstanceData', new THREE.InstancedBufferAttribute(instanceDataArray, 4));
 
         imesh.instanceMatrix.needsUpdate = true;
         this.group.add(imesh);
