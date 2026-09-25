@@ -86,11 +86,11 @@ class ForestRenderer {
                             float platesA = sin(trunkUV.x * 24.0 + weave);
                             float platesB = sin(trunkUV.x * 15.0 - weave);
                             
-                            // Splitting/merging interference pattern
+                                                        // Splitting/merging interference pattern
                             float interference = (platesA + platesB) * 0.5;
                             
-                            // Pinch furrows, flatten crests
-                            float barkShape = 1.0 - pow(abs(interference), 0.6);
+                            // Terracing: Sharpen valleys, flatten peaks into broad slabs
+                            float barkShape = smoothstep(0.05, 0.45, 1.0 - abs(interference));
                             
                             // Fade depth based on height (older bark at base is deeper)
                             float ageFade = clamp(1.0 - (worldY * 0.015), 0.2, 1.0);
