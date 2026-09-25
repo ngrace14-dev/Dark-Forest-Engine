@@ -327,14 +327,15 @@ function buildRedwoodMesh(ageState, seed) {
                         const phaseShift = v * 8.0 + n1 * 2.0;
             const waveA = Math.sin(u * Math.PI * 24.0 + phaseShift);
                         const waveB = Math.sin(u * Math.PI * 14.0 - phaseShift * 0.4);
-            const interference = (waveA + waveB) * 0.5;
+                        const interference = (waveA + waveB) * 0.5;
             
-            // Terracing: Sharpen valleys, flatten peaks into broad slabs
-            const plateShape = smoothstep(0.05, 0.45, 1.0 - Math.abs(interference));
+                        // Soften terracing: Restore continuous curvature to prevent faceted polygons
+                        const plateShape = 1.0 - Math.pow(Math.abs(interference), 0.7);
             
-            const ridgeNoise = (plateShape - 0.5) * (radius * 0.35) * (1.0 - v * 0.6);
+                        // Drop displacement magnitude back to structural bounds (0.12)
+                        const ridgeNoise = (plateShape - 0.5) * (radius * 0.12) * (1.0 - v * 0.8);
 
-            const currentRadius = radius + burlDisplacement + ridgeNoise;
+                        const currentRadius = radius + burlDisplacement + ridgeNoise;
             const px = cosT * currentRadius + driftX;
             const py = currentY;
             const pz = sinT * currentRadius + driftZ;
