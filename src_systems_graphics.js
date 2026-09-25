@@ -37,11 +37,11 @@ class RenderPipeline {
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
 
-        // --- Lighting Setup ---
-        this.ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+                // --- Lighting Setup ---
+        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
         scene.add(this.ambientLight);
 
-        this.dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
+        this.dirLight = new THREE.DirectionalLight(0xffffff, 4.0);
         this.dirLight.position.set(20, 60, 20);
         this.dirLight.castShadow = true;
         this.dirLight.shadow.mapSize.width = 1024;
@@ -160,9 +160,9 @@ class RenderPipeline {
         this.dirLight.position.y = Math.sin(angle) * sunRadius;
         this.dirLight.position.z = Math.cos(angle) * 100;
 
-        const sunHeight = Math.sin(angle);
-        let baseDirIntensity = 2.2;
-        let baseAmbientIntensity = 1.2;
+                const sunHeight = Math.sin(angle);
+        let baseDirIntensity = 4.0;
+        let baseAmbientIntensity = 0.2;
 
         if (sunHeight > 0.3) {
             this.dirLight.color.setHex(0xffffff); this.ambientLight.color.setHex(0xffffff);
