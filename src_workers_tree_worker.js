@@ -554,7 +554,7 @@ function buildRedwoodMesh(ageState, seed) {
             droopAmount = prng.range(-12.0, -6.0); // Extreme vertical growth to form a multi-pronged shattered top
         }
 
-        // Low-frequency noise creates massive asymmetric limbs reaching for sunlight
+                // Low-frequency noise creates massive asymmetric limbs reaching for sunlight
         const asymmetry = noiseGen.noise(bV * 12.0, bAngle * 2.0, 0) * 0.5 + 0.5; // 0.0 to 1.0
         
         // Combine base length, power curve, and asymmetry.
@@ -571,20 +571,47 @@ function buildRedwoodMesh(ageState, seed) {
         const rootX = Math.cos(bAngle) * tRadius;
         const rootZ = Math.sin(bAngle) * tRadius;
 
-                const tipX = rootX + Math.cos(bAngle) * bLength;
-                const tipY = bY - droopAmount + (clusteredProgress * 3.0);
-                const tipZ = rootZ + Math.sin(bAngle) * bLength;
+        // --- Branch Structure Logic ---
+        // Implement 70° to 85° droop angle (Pitch downwards from horizontal)
+        // Droop decreases (angle gets shallower) towards the top of the tree.
+        let droopDegrees = prng.range(70.0, 85.0);
         
-                // Ensure candelabra leaders are thick like secondary trunks
-                let bStartRad = Math.max(0.15, (1.0 - bV) * 0.6);
-                let bEndRad = 0.06;
-                if (isCandelabraLeader) {
-                    bStartRad = prng.range(0.6, 1.2); // Massive base
-                    bEndRad = prng.range(0.2, 0.4);   // Thick tip
-                }
+        // Reduce droop angle exponentially as we move up the tree, simulating crown reaching for light
+        // 0.0 = horizontal, >0 = pointing downwards
+        if (isCandelabraLeader) {
+            // Candelabra leaders point upwards (negative droop)
+            droopDegrees = prng.range(-45.0, -10.0);
+        } else {
+            // Standard branches droop. Shallow out near the top.
+            const droopEasing = Math.pow(1.0 - heightProgress, 1.5);
+            droopDegrees *= droopEasing;
+        }
 
-                const use6SideCylinder = (ageState === 'COLOSSAL_ANCIENT') && (bV < 0.75) || isCandelabraLeader;
-                addBranchTube(rootX, bY, rootZ, tipX, tipY, tipZ, bStartRad, bEndRad, bV, use6SideCylinder);
+        const droopRad = droopDegrees * (Math.PI / 180.0);
+        
+        // Calculate tip coordinates using pitch and yaw
+        const pitchCos = Math.cos(droopRad);
+        const pitchSin = Math.sin(droopRad); // Positive goes down
+
+        const tipX = rootX + Math.cos(bAngle) * (bLength * pitchCos);
+        const tipY = bY - (bLength * pitchSin);
+        const tipZ = rootZ + Math.sin(bAngle) * (bLength * pitchCos);
+        
+        // Exponential Radius Scaling
+        // Ensure candelabra leaders are thick like secondary trunks
+        let bStartRad = Math.max(0.15, (1.0 - bV) * 0.6);
+        let bEndRad = 0.06;
+        if (isCandelabraLeader) {
+            bStartRad = prng.range(0.6, 1.2); // Massive base
+            bEndRad = prng.range(0.2, 0.4);   // Thick tip
+        } else {
+             // Exponential decay: Thick base relative to branch length, tapering sharply
+             bStartRad = (bLength * 0.04) + 0.05; // Base radius scales with length
+             bEndRad = bStartRad * 0.15; // Tip is 15% of the base thickness
+        }
+
+        const use6SideCylinder = (ageState === 'COLOSSAL_ANCIENT') && (bV < 0.75) || isCandelabraLeader;
+        addBranchTube(rootX, bY, rootZ, tipX, tipY, tipZ, bStartRad, bEndRad, bV, use6SideCylinder);
 
                 if (bV > 0.62 && prng.next() < reitProbability) {
             const reitCount = isUpperCrown ? Math.floor(prng.range(2, 4)) : 1;
