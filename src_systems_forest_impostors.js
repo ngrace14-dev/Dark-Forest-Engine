@@ -213,13 +213,45 @@ class ForestImpostorSystem {
             const chunkX = Math.floor(pos.x / 120);
             const chunkZ = Math.floor(pos.z / 120);
 
-            if (chunkX !== this.lastPlayerChunk.x || chunkZ !== this.lastPlayerChunk.z) {
+                        if (chunkX !== this.lastPlayerChunk.x || chunkZ !== this.lastPlayerChunk.z) {
                 this.generateDistantForest(pos.x, pos.z);
                 this.lastPlayerChunk = { x: chunkX, z: chunkZ };
             }
         }
     }
+
+    /**
+     * PILLAR 4 (OBSERVABILITY RULE)
+     * Exposes runtime metrics for active 2D billboards and the state of the texture atlas.
+     */
+    getTelemetry() {
+        const atlasTexture = this.uniforms.uAtlasTexture.value;
+        const atlasStatus = atlasTexture ? 'Loaded' : 'Missing';
+        let atlasResolution = 'N/A';
+        
+        if (atlasTexture && atlasTexture.image) {
+            atlasResolution = `${atlasTexture.image.width}x${atlasTexture.image.height}`;
+        } else if (atlasTexture && atlasTexture.source && atlasTexture.source.data) {
+            atlasResolution = `${atlasTexture.source.data.width}x${atlasTexture.source.data.height}`;
+        }
+
+        return {
+            systemInitialized: this.initialized,
+            active2DImpostors: this.instancedMesh ? this.instancedMesh.count : 0,
+            atlasStatus: atlasStatus,
+            atlasResolution: atlasResolution,
+            atlasGridSize: this.uniforms.uGridSize.value,
+            totalVariations: this.uniforms.uNumVariations.value
+        };
+    }
 }
 
 window.ForestImpostorSystem = new ForestImpostorSystem();
+
+// Global Debug Accessor
+if (typeof window !== 'undefined') {
+    if (!window.ForestDebug) window.ForestDebug = {};
+    window.ForestDebug.getImpostorTelemetry = () => window.ForestImpostorSystem.getTelemetry();
+}
+
 export default ForestImpostorSystem;

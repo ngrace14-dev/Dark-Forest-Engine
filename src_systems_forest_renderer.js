@@ -229,11 +229,42 @@ class ForestRenderer {
         }
     }
 
-    update(delta) {
+        update(delta) {
         const timeSecs = performance.now() / 1000;
         this.sharedUniforms.uTime.value = timeSecs;
+    }
+
+    /**
+     * PILLAR 4 (OBSERVABILITY RULE)
+     * Exposes runtime metrics for active 3D chunks and instanced trees.
+     */
+    getTelemetry() {
+        let totalInstances = 0;
+        for (const imesh of this.instancedMeshes.values()) {
+            totalInstances += imesh.count;
+        }
+
+        const activeChunks = new Set();
+        for (const key of this.instancedMeshes.keys()) {
+            const chunkId = key.split('_')[0];
+            activeChunks.add(chunkId);
+        }
+
+        return {
+            activeChunks: activeChunks.size,
+            instancedMeshCount: this.instancedMeshes.size,
+            total3DTreeInstances: totalInstances,
+            terrainMeshCount: this.terrainMeshes.size
+        };
     }
 }
 
 window.ForestRenderer = new ForestRenderer();
+
+// Global Debug Accessor
+if (typeof window !== 'undefined') {
+    if (!window.ForestDebug) window.ForestDebug = {};
+    window.ForestDebug.getRendererTelemetry = () => window.ForestRenderer.getTelemetry();
+}
+
 export default window.ForestRenderer;
