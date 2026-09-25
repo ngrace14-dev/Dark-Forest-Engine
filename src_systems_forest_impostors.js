@@ -40,26 +40,47 @@ class ForestImpostorSystem {
             depthWrite: true,
             depthTest: true,
 
-            vertexShader: `
+                        vertexShader: `
                 uniform float uTime;
                 uniform float uMinRadius;
                 uniform float uMaxRadius;
+                uniform float uNumVariations;
+                uniform float uGridSize;
                 
                 varying vec2 vUv;
                 varying float vDist;
-                varying vec3 vWorldPos;
+                
+                // Deterministic seed matching the 3D procedural generation
+                float hash(vec2 p) {
+                    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+                }
 
                 void main() {
-                    vUv = uv;
-
                     #ifdef USE_INSTANCING
                         vec3 worldOrigin = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
                     #else
                         vec3 worldOrigin = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
                     #endif
 
-                    vWorldPos = worldOrigin;
                     vDist = length(cameraPosition.xz - worldOrigin.xz);
+
+                    // UV Grid sampling logic mapping the specific variant cell
+                    float seed = hash(worldOrigin.xz);
+                    
+                    // Multiply by a large number and floor to get an integer variant index
+                    // This matches the deterministic mapping philosophy of the 3D trees
+                    float variantIndex = floor(mod(seed * 10000.0, uNumVariations)); 
+                    
+                    float col = mod(variantIndex, uGridSize);
+                    float row = floor(variantIndex / uGridSize);
+
+                    // Scale base UV down to grid cell size and translate to specific row/col
+                    // Note: UV origin is bottom-left
+                    vec2 cellUv = uv * (1.0 / uGridSize);
+                    cellUv.x += col * (1.0 / uGridSize);
+                    cellUv.y += row * (1.0 / uGridSize);
+
+                    vUv = cellUv;
 
                     // Cylindrical Billboarding (Rotates quad on Y axis toward camera position)
                     vec3 look = cameraPosition - worldOrigin;
@@ -87,56 +108,22 @@ class ForestImpostorSystem {
                 uniform float uFogDensity;
                 uniform float uMinRadius;
                 uniform float uMaxRadius;
+                uniform sampler2D uAtlasTexture;
 
                 varying vec2 vUv;
                 varying float vDist;
-                varying vec3 vWorldPos;
-
-                float hash(vec2 p) {
-                    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-                }
 
                 void main() {
                     // Distance clipping bounds
                     if (vDist < uMinRadius || vDist > uMaxRadius) discard;
 
-                    vec2 uv = vUv;
-                    float treeHash = hash(vWorldPos.xz);
+                    // Sample the exact baked variant from the texture atlas
+                    vec4 texColor = texture2D(uAtlasTexture, vUv);
 
-                    // 1. Tapered Redwood Trunk Profile
-                    float trunkWidth = mix(0.10, 0.015, uv.y); 
-                    float trunkMask = smoothstep(trunkWidth, trunkWidth - 0.008, abs(uv.x - 0.5)) * step(uv.y, 0.95);
+                    // HARD DISCARD: Alpha carving for the billboard profile
+                    if (texColor.a < 0.5) discard;
 
-                    // 2. Irregular Redwood Upper Canopy Mask (Upper ~40% only)
-                    float canopyBase = mix(0.58, 0.68, treeHash);
-                    float canopyMask = 0.0;
-                    
-                    if (uv.y > canopyBase) {
-                        float heightNorm = (uv.y - canopyBase) / (1.0 - canopyBase);
-                        float env = sin(heightNorm * 3.1415); 
-                        
-                        // Ragged high-frequency sine waves to break up mechanical silhouette
-                        float raggedEdge = sin(uv.y * 50.0 + treeHash * 20.0) * 0.05 
-                                         + cos(uv.y * 20.0) * 0.07;
-                        
-                        float maxWidth = (0.28 * env) + raggedEdge;
-                        canopyMask = smoothstep(maxWidth, maxWidth - 0.015, abs(uv.x - 0.5));
-                    }
-
-                    float alpha = clamp(trunkMask + canopyMask, 0.0, 1.0);
-                    
-                    // HARD DISCARD: Writes solid pixel to depth buffer for Volumetric Fog depth reconstruction
-                    if (alpha < 0.5) discard;
-
-                    // Deep Redwood Foliage and Bark Albedo Blending
-                    vec3 darkNeedle = vec3(0.03, 0.07, 0.03);
-                    vec3 tipHighlight = vec3(0.12, 0.22, 0.09);
-                    vec3 trunkColor = vec3(0.18, 0.09, 0.05);
-
-                    vec3 finalColor = mix(darkNeedle, tipHighlight, uv.y);
-                    if (trunkMask > 0.5 && canopyMask < 0.2) {
-                        finalColor = trunkColor;
-                    }
+                    vec3 finalColor = texColor.rgb;
 
                     // Atmospheric Scattering & Fog Absorption
                     float fogFactor = 1.0 - exp(-vDist * uFogDensity);
