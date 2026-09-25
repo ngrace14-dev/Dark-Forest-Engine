@@ -37,7 +37,7 @@ class ForestRenderer {
                 const canopyMat = createCanopyMaterial();
 
                 // Phase 6 FIX: Share uniforms on both materials for sway to work correctly
-                trunkMat.onBeforeCompile = (shader) => {
+                                trunkMat.onBeforeCompile = (shader) => {
                     Object.assign(shader.uniforms, this.sharedUniforms);
                     // Minimal sway for trunk (taken from previous standard material vertex block)
                     shader.vertexShader = `
@@ -45,12 +45,14 @@ class ForestRenderer {
                         uniform float uWindSpeed;
                         varying vec3 vWorldPos;
                         varying vec3 vColorAttr;
+                        varying vec2 vTrunkUv;
                         ${shader.vertexShader}
                     `.replace(
                         `#include <begin_vertex>`,
                         `
                         #include <begin_vertex>
                         vColorAttr = color;
+                        vTrunkUv = uv;
 
                         #ifdef USE_INSTANCING
                             vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
@@ -64,14 +66,68 @@ class ForestRenderer {
                         `
                     );
                     
-                    shader.fragmentShader = `
+                                        shader.fragmentShader = `
                         uniform vec3 uForestSunDir;
                         uniform vec3 uForestSunCol;
                         uniform float uRawDebugMode;
                         varying vec3 vWorldPos;
                         varying vec3 vColorAttr;
+                        varying vec2 vTrunkUv;
+                        
+                        // 1. Procedural Bark Height Generator
+                        float getBarkBump(vec2 trunkUV, float worldY) {
+                            // High-frequency anisotropic bark ridges
+                            // U wraps 8 times around the trunk, V is raw height
+                            
+                            // Slow low-frequency wave to cause plates to drift/weave vertically
+                            float weave = sin(trunkUV.y * 0.15) * 0.2;
+                            
+                            // Fast vertical plates
+                            float platesA = sin(trunkUV.x * 24.0 + weave);
+                            float platesB = sin(trunkUV.x * 15.0 - weave);
+                            
+                            // Splitting/merging interference pattern
+                            float interference = (platesA + platesB) * 0.5;
+                            
+                            // Pinch furrows, flatten crests
+                            float barkShape = 1.0 - pow(abs(interference), 0.6);
+                            
+                            // Fade depth based on height (older bark at base is deeper)
+                            float ageFade = clamp(1.0 - (worldY * 0.015), 0.2, 1.0);
+                            
+                            // Add micro-noise for splintered fiber texture
+                            float microFibers = sin(trunkUV.x * 120.0) * cos(trunkUV.y * 40.0) * 0.05;
+                            
+                            return (barkShape + microFibers) * ageFade;
+                        }
+
                         ${shader.fragmentShader}
                     `.replace(
+                        `#include <normal_fragment_begin>`,
+                        `
+                        #include <normal_fragment_begin>
+                        
+                        // 2. Compute screen-space bark derivatives
+                        float barkVal = getBarkBump(vTrunkUv, vWorldPos.y);
+                        float dbdx = dFdx(barkVal);
+                        float dbdy = dFdy(barkVal);
+                        
+                        vec3 vPdx = dFdx(vViewPosition);
+                        vec3 vPdy = dFdy(vViewPosition);
+                        
+                        vec3 rx = cross(vPdy, normal);
+                        vec3 ry = cross(normal, vPdx);
+                        
+                        float det = dot(vPdx, rx);
+                        
+                        // 3. Distance fade to prevent shimmering
+                        float dist = length(vViewPosition);
+                        float bumpIntensity = smoothstep(100.0, 15.0, dist) * 1.5;
+                        
+                        vec3 bumpNormal = (rx * dbdx + ry * dbdy) * sign(det) / max(abs(det), 1e-7);
+                        normal = normalize(normal - bumpNormal * bumpIntensity);
+                        `
+                    ).replace(
                         `#include <color_fragment>`,
                         `
                         #include <color_fragment>
