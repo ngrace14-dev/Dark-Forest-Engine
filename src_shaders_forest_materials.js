@@ -153,7 +153,12 @@ export function createCanopyMaterial(options = {}) {
                 transformed.y += leafFlutter * uWindSpeed;
                 transformed.z += (branchSway * 0.5 + leafFlutter) * uWindSpeed;
             `,
-            FRAG_COLOR: `
+                        FRAG_COLOR: `
+                // Enforce sharp alpha-testing to carve out evergreen needle shapes
+                if (diffuseColor.a < 0.5) {
+                    discard;
+                }
+
                 // Deterministic color variation using the instance seed
                 float seedNoise = fract(sin(vInstanceData.x * 12.9898) * 43758.5453);
                 
@@ -166,9 +171,20 @@ export function createCanopyMaterial(options = {}) {
             FRAG_LIGHTING: `
                 if (uRawDebugMode < 0.5) {
                     vec3 viewDir = normalize(cameraPosition - vWorldPos);
-                    float backLight = max(0.0, dot(-viewDir, uForestSunDir));
-                    float sssScatter = pow(backLight, 4.0) * 0.65;
-                    vec3 sssGlow = uForestSunCol * vec3(0.20, 0.55, 0.10) * sssScatter;
+                    vec3 lightDir = normalize(uForestSunDir);
+                    
+                    // Subsurface Scattering (SSS) approximation
+                    // Distort light vector by normal for structural subsurface thickness simulation
+                    vec3 sssHalf = normalize(lightDir + normal * 0.3); 
+                    
+                    // Transmission occurs when light is behind the surface relative to view
+                    float transmission = pow(max(0.0, dot(-viewDir, sssHalf)), 4.0);
+                    
+                    // Weight by normal to emphasize back-illumination
+                    float backfacing = clamp(1.0 - dot(normal, lightDir), 0.0, 1.0);
+                    
+                    // Warm, scattered light color
+                    vec3 sssGlow = uForestSunCol * vec3(0.25, 0.60, 0.10) * transmission * backfacing * 1.5;
                     
                     // Add SSS directly to the final lighting output (gl_FragColor is calculated after this chunk)
                     outgoingLight += sssGlow * diffuseColor.rgb; 
@@ -274,11 +290,25 @@ export function createTrunkMaterial(options = {}) {
                 vec3 bumpNormal = (rx * dbdx + ry * dbdy) * sign(det) / max(abs(det), 1e-7);
                 normal = normalize(normal - bumpNormal * bumpIntensity);
             `,
-            FRAG_COLOR: `
+                        FRAG_COLOR: `
                 // Deterministic variance using seed
                 float seedNoise = fract(sin(vInstanceData.x * 78.233) * 43758.5453);
                 
-                vec3 barkBaseColor = mix(vec3(0.35, 0.16, 0.10), vec3(0.28, 0.14, 0.08), seedNoise * 0.4);
+                // Procedural height-based color gradient for redwood trunks
+                // Soil Brown -> Cinnamon Red -> Golden/Lighter tips
+                vec3 soilBrown = vec3(0.20, 0.12, 0.07);
+                vec3 cinnamonRed = vec3(0.42, 0.18, 0.10);
+                vec3 goldenTips = vec3(0.55, 0.35, 0.18);
+                
+                float hFactor = clamp(vWorldPos.y / 100.0, 0.0, 1.0);
+                
+                vec3 gradientColor = mix(
+                    mix(soilBrown, cinnamonRed, smoothstep(0.0, 0.4, hFactor)),
+                    goldenTips,
+                    smoothstep(0.4, 1.0, hFactor)
+                );
+                
+                vec3 barkBaseColor = mix(gradientColor, gradientColor * 0.7, seedNoise * 0.4);
                 vec3 mossColor = vec3(0.12, 0.28, 0.08);
 
                 float barkValSample = getBarkBump(vTrunkUv, vWorldPos.y, vInstanceData.x);
