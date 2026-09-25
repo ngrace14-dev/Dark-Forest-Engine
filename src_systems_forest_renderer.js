@@ -130,15 +130,17 @@ class ForestRenderer {
                     ).replace(
                                                 `#include <color_fragment>`,
                                                 `
-                                                #include <color_fragment>
+                                                                                                #include <color_fragment>
 
-                                                vec3 barkBaseColor = vec3(0.16, 0.08, 0.04);
-                                                vec3 mossColor = vec3(0.09, 0.22, 0.06);
+                                                // Ancient Redwood Warm Cinnamon Hue
+                                                vec3 barkBaseColor = vec3(0.35, 0.16, 0.10);
+                                                // Saturated Forest Moss
+                                                vec3 mossColor = vec3(0.12, 0.28, 0.08);
 
                                                 float barkVal = getBarkBump(vTrunkUv, vWorldPos.y);
                         
                                                 // Fake Ambient Occlusion: Darken the deep crevices so they read despite high ambient light
-                                                float creviceAO = mix(0.4, 1.0, barkVal);
+                                                float creviceAO = mix(0.55, 1.0, barkVal);
                                                 barkBaseColor *= creviceAO;
                                                 mossColor *= creviceAO;
 

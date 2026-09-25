@@ -350,9 +350,9 @@ function buildRedwoodMesh(ageState, seed) {
 
             uvs.push(u * 8.0, v * (effectiveHeight / 2.5));
 
-            const northBias = pz < -0.1 ? Math.abs(pz / currentRadius) : 0.0;
-            const baseMoss = flareIntensity * 0.85;
-            const mossWeight = Math.min(1.0, northBias * (1.0 - v * 0.7) + baseMoss);
+                        const northBias = pz < -0.1 ? Math.abs(pz / currentRadius) : 0.0;
+            const baseMoss = flareIntensity * 0.25;
+            const mossWeight = Math.min(1.0, northBias * 0.7 * (1.0 - v * 0.7) + baseMoss);
 
             colors.push(0.0, 0.0, mossWeight);
         }
