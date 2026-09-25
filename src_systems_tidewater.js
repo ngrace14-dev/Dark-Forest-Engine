@@ -210,7 +210,52 @@ export class TidewaterSystem {
         this.scene.add(this.oceanMesh);
 
         this.initialized = true;
-        console.log('[TidewaterSystem] Initialized with placeholder mesh.');
+        console.log('[TidewaterSystem] Initialized successfully.');
+
+        // PILLAR 4 (OBSERVABILITY RULE) - Bind Telemetry to Global Debug Object
+        if (typeof window !== 'undefined') {
+            if (!window.ForestDebug) window.ForestDebug = {};
+            window.ForestDebug.getTidewaterTelemetry = () => this.getTelemetry();
+        }
+    }
+
+    /**
+     * PILLAR 4 (OBSERVABILITY RULE)
+     * Returns key diagnostic metrics for the Tidewater System.
+     */
+    getTelemetry() {
+        const telemetry = {
+            isInitialized: this.initialized,
+            isRendering: false,
+            meshActive: false,
+            vertexCount: 0,
+            faceCount: 0,
+            simulationTime: this.uniforms.uTime.value.toFixed(3),
+            waveCount: this.uniforms.uWaves.value.length
+        };
+
+        if (this.oceanMesh) {
+            telemetry.meshActive = true;
+            // Check if mesh is actually in the active scene graph
+            telemetry.isRendering = this.oceanMesh.parent !== null;
+            
+            if (this.oceanMesh.geometry) {
+                // BufferGeometry vertex count is positions.length / 3
+                const positions = this.oceanMesh.geometry.attributes.position;
+                if (positions) telemetry.vertexCount = positions.count;
+                
+                // Face count (triangles)
+                const indices = this.oceanMesh.geometry.index;
+                if (indices) {
+                    telemetry.faceCount = indices.count / 3;
+                } else if (positions) {
+                    // Non-indexed geometry fallback
+                    telemetry.faceCount = positions.count / 3;
+                }
+            }
+        }
+
+        return telemetry;
     }
 
     /**
