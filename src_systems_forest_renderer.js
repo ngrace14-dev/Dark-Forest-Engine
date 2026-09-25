@@ -126,22 +126,22 @@ class ForestRenderer {
                         float bumpIntensity = smoothstep(300.0, 15.0, dist) * 7.5;
                         
                         vec3 bumpNormal = (rx * dbdx + ry * dbdy) * sign(det) / max(abs(det), 1e-7);
-                        normal = normalize(normal - bumpNormal * bumpIntensity);
+                                                // NO NORMAL BEND FOR THIS TEST
+                        // normal = normalize(normal - bumpNormal * bumpIntensity);
                         `
                     ).replace(
                         `#include <color_fragment>`,
                         `
                         #include <color_fragment>
 
-                        vec3 barkBaseColor = vec3(0.16, 0.08, 0.04);
-                        vec3 mossColor = vec3(0.09, 0.22, 0.06);
-                        
-                        // EXTREME STRESS TEST: Manually darken deep crevices to force contrast
                         float barkValDiag = getBarkBump(vTrunkUv, vWorldPos.y);
-                        barkBaseColor *= mix(0.1, 1.5, barkValDiag);
-                        mossColor *= mix(0.1, 1.5, barkValDiag);
-
-                        diffuseColor.rgb = mix(barkBaseColor, mossColor, vColorAttr.b);
+                        
+                        // ULTIMATE STRESS TEST: Pure White Plates, Pure Black Crevices
+                        if (barkValDiag > 0.4) {
+                            diffuseColor.rgb = vec3(1.0, 1.0, 1.0); // WHITE PLATES
+                        } else {
+                            diffuseColor.rgb = vec3(0.0, 0.0, 0.0); // BLACK CREVICES
+                        }
                         `
                     );
                 };
