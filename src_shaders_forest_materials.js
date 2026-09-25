@@ -254,7 +254,7 @@ export function createTrunkMaterial(options = {}) {
                 transformed.x += branchSway * uWindSpeed;
                 transformed.z += (branchSway * 0.5) * uWindSpeed;
             `,
-            FRAG_DECLARATIONS: `
+                        FRAG_DECLARATIONS: `
                 varying vec2 vTrunkUv;
                 
                 // 1. Procedural Bark Height Generator (Seeded)
@@ -267,6 +267,13 @@ export function createTrunkMaterial(options = {}) {
                     float ageFade = clamp(1.0 - (worldY * 0.015), 0.2, 1.0);
                     float microFibers = sin(trunkUV.x * 120.0) * cos(trunkUV.y * 40.0) * 0.05;
                     return (barkShape + microFibers) * ageFade;
+                }
+                
+                // 2. Procedural Moss Distribution Noise
+                float getMossNoise(vec3 worldPos, float seed) {
+                    float n1 = sin(worldPos.x * 0.8 + seed) * cos(worldPos.y * 0.8) * sin(worldPos.z * 0.8);
+                    float n2 = sin(worldPos.x * 2.5) * cos(worldPos.z * 2.5);
+                    return smoothstep(0.0, 1.0, (n1 * 0.6 + n2 * 0.4) * 0.5 + 0.5);
                 }
             `,
             FRAG_NORMAL: `
@@ -290,7 +297,7 @@ export function createTrunkMaterial(options = {}) {
                 vec3 bumpNormal = (rx * dbdx + ry * dbdy) * sign(det) / max(abs(det), 1e-7);
                 normal = normalize(normal - bumpNormal * bumpIntensity);
             `,
-                        FRAG_COLOR: `
+                                                FRAG_COLOR: `
                 // Deterministic variance using seed
                 float seedNoise = fract(sin(vInstanceData.x * 78.233) * 43758.5453);
                 
@@ -309,17 +316,43 @@ export function createTrunkMaterial(options = {}) {
                 );
                 
                 vec3 barkBaseColor = mix(gradientColor, gradientColor * 0.7, seedNoise * 0.4);
-                vec3 mossColor = vec3(0.12, 0.28, 0.08);
-
-                float barkValSample = getBarkBump(vTrunkUv, vWorldPos.y, vInstanceData.x);
                 
                 // Fake Ambient Occlusion: Darken the deep crevices so they read despite high ambient light
+                float barkValSample = getBarkBump(vTrunkUv, vWorldPos.y, vInstanceData.x);
                 float creviceAO = mix(0.55, 1.0, barkValSample);
                 barkBaseColor *= creviceAO;
-                mossColor *= creviceAO;
 
-                // vColorAttr.b acts as a moss map provided by geometry
-                diffuseColor.rgb = mix(barkBaseColor, mossColor, vColorAttr.b);
+                // --- Procedural Moss Accumulation ---
+                // Weaterhing favors the lower trunk, tapering off as height increases
+                float heightMossMask = 1.0 - smoothstep(5.0, 30.0, vWorldPos.y);
+                
+                // Moss naturally favors the North/North-West sides of the tree in the northern hemisphere
+                // Using world normal mapping assuming Z is North/South and X is East/West
+                // Because 'normal' here is view-space, we reconstruct world normal for directional weathering
+                #ifdef USE_INSTANCING
+                    vec3 worldNormal = normalize(mat3(modelMatrix * instanceMatrix) * objectNormal);
+                #else
+                    vec3 worldNormal = normalize(mat3(modelMatrix) * objectNormal);
+                #endif
+                
+                float directionalMoss = smoothstep(-0.2, 0.8, dot(worldNormal, normalize(vec3(-0.5, 0.2, -1.0))));
+                
+                // Slope bias: moss favors upward facing ledges and burls (Y > 0)
+                float slopeMoss = smoothstep(0.1, 0.9, worldNormal.y);
+                
+                // Combine masks with high-frequency procedural noise
+                float mossNoise = getMossNoise(vWorldPos, vInstanceData.x);
+                float finalMossMask = (directionalMoss + slopeMoss * 0.5) * heightMossMask * mossNoise;
+                
+                // Incorporate the vertex geometry moss map (vColorAttr.b) from the generator
+                finalMossMask = clamp(finalMossMask + (vColorAttr.b * mossNoise), 0.0, 1.0);
+
+                // Blend Moss into Bark
+                vec3 richMossColor = vec3(0.15, 0.28, 0.10);
+                vec3 dryMossColor = vec3(0.20, 0.24, 0.12);
+                vec3 mossColor = mix(richMossColor, dryMossColor, mossNoise) * creviceAO; // Apply AO to moss as well
+
+                diffuseColor.rgb = mix(barkBaseColor, mossColor, finalMossMask);
             `
         });
     };
