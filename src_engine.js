@@ -1958,27 +1958,37 @@ async function bootEngine() {
                     console.log('[Engine] Initializing LOD Impostor Baker...');
                     try {
                         // Initialize Baker isolated scene using the instantiated procedural materials
-                        const baseTrunkMat = window.ForestRenderer.materials.get('Redwood_ANCIENT_0')[0];
-                        const baseCanopyMat = window.ForestRenderer.materials.get('Redwood_ANCIENT_0')[1];
+                        const baseTrunkMat = window.ForestRenderer.materials.get('Redwood_ANCIENT_0')?.[0];
+                        const baseCanopyMat = window.ForestRenderer.materials.get('Redwood_ANCIENT_0')?.[1];
                 
-                        window.ImpostorBaker.initializeBakeSetup(
-                            baseTrunkMat, 
-                            baseCanopyMat, 
-                            window.RenderPipeline?.dirLight?.position?.clone().normalize() || new THREE.Vector3(0.3, 0.6, 0.7),
-                            window.RenderPipeline?.dirLight?.color || new THREE.Color(0xfef3c7)
-                        );
-                
-                        // Fetch Master Geometry built by the Web Worker (Guaranteeing it exists due to the await above)
-                        const masterGeo = window.RedwoodGenerator.getArchetype('ANCIENT', 0);
-                
-                        const bakedAtlas = window.ImpostorBaker.bakeAtlas(masterGeo, masterGeo, 16);
-                
-                        if (window.ForestImpostorSystem) {
-                            window.ForestImpostorSystem.init(window.GameCore.scene, bakedAtlas, 16);
+                        // Ensure materials are set for the procedural trees
+                        if (!baseTrunkMat || !baseCanopyMat) {
+                            console.warn('[Engine] Forest materials not found. Falling back to default impostor system.');
+                            if (window.ForestImpostorSystem) window.ForestImpostorSystem.init(window.GameCore.scene);
+                        } else {
+                            window.ImpostorBaker.initializeBakeSetup(
+                                baseTrunkMat, 
+                                baseCanopyMat, 
+                                window.RenderPipeline?.dirLight?.position?.clone().normalize() || new THREE.Vector3(0.3, 0.6, 0.7),
+                                window.RenderPipeline?.dirLight?.color || new THREE.Color(0xfef3c7)
+                            );
+                    
+                            // Fetch Master Geometry built by the Web Worker (Guaranteeing it exists due to the await above)
+                            const masterGeo = window.RedwoodGenerator.getArchetype('ANCIENT', 0);
+                    
+                            if (!masterGeo) {
+                                throw new Error("Master geometry 'Redwood_ANCIENT_0' not found from generator.");
+                            }
+                    
+                            const bakedAtlas = window.ImpostorBaker.bakeAtlas(masterGeo, masterGeo, 16);
+                    
+                            if (window.ForestImpostorSystem) {
+                                window.ForestImpostorSystem.init(window.GameCore.scene, bakedAtlas, 16);
+                            }
+                    
+                            window.ImpostorBaker.dispose();
+                            console.log('[Engine] Impostor Baker finished and disposed cleanly.');
                         }
-                
-                        window.ImpostorBaker.dispose();
-                        console.log('[Engine] Impostor Baker finished and disposed cleanly.');
                     } catch (err) {
                         console.error('[Engine] Impostor Baker crashed:', err);
                         if (window.ForestImpostorSystem) window.ForestImpostorSystem.init(window.GameCore.scene); // Fallback init

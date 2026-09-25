@@ -134,8 +134,8 @@ class ForestRenderer {
 
         let geo = null;
 
-        if (prefabKey.startsWith('Redwood_')) {
-            geo = window.RedwoodGenerator?.getArchetypeGeometry?.(prefabKey);
+                if (prefabKey.startsWith('Redwood_')) {
+            geo = window.RedwoodGenerator?.archetypes?.get(prefabKey);
         } else if (window.AssetManager?.prefabs[prefabKey]) {
             const customModelName = window.AssetManager.prefabs[prefabKey].customModel;
             if (customModelName && window.AssetManager.models[customModelName]) {
@@ -163,14 +163,22 @@ class ForestRenderer {
 
         // Clone the geometry if it's shared so we don't pollute other chunks' instance data buffers.
         // We only do this if it's not a shared fallback geometry OR if we are explicitly injecting new attributes.
-        // For dense forest instancing, we clone the master archetype geometry here for safety.
+                // For dense forest instancing, we clone the master archetype geometry here for safety.
         let instanceGeo = geo;
         if (geo.isShared || prefabKey.startsWith('Redwood_')) {
             instanceGeo = geo.clone();
             instanceGeo.isShared = false;
         }
 
-        const mat = this.materials.get(prefabKey) || new THREE.MeshStandardMaterial({ color: 0x2d3a29 });
+        const mats = this.materials.get(prefabKey);
+        let mat;
+        if (mats && mats.length === 2) {
+             // If we have procedural dual-materials (Trunk and Canopy), pass the array
+             mat = mats;
+        } else {
+             mat = mats || new THREE.MeshStandardMaterial({ color: 0x2d3a29 });
+        }
+        
         const imesh = new THREE.InstancedMesh(instanceGeo, mat, points.length);
 
         imesh.castShadow = true;
