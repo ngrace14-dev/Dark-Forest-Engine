@@ -209,8 +209,30 @@ export function createTrunkMaterial(options = {}) {
             VERTEX_DECLARATIONS: `
                 varying vec2 vTrunkUv;
             `,
-            VERTEX_TRANSFORM: `
+                        VERTEX_TRANSFORM: `
                 vTrunkUv = uv;
+                
+                // --- Procedural Flared Buttress Base ---
+                float rootAngle = atan(position.z, position.x);
+                float rootSeed = vInstanceData.x;
+                
+                // Irregular fluted lobes based on angle and instance seed
+                float rootNoise = sin(rootAngle * 3.0 + rootSeed * 17.0) * 0.5 + 
+                                  cos(rootAngle * 5.0 - rootSeed * 11.0) * 0.3;
+                
+                // Inverse exponential taper: widest at y=0, sharply decaying upwards
+                float flareDecay = exp(-max(0.0, position.y) * 0.45);
+                float flareAmount = (1.5 + rootNoise) * flareDecay;
+                
+                // Displace vertices outward on the XZ plane
+                float distXZ = length(position.xz);
+                if (distXZ > 0.001) {
+                    vec2 flareDir = position.xz / distXZ;
+                    transformed.x += flareDir.x * flareAmount;
+                    transformed.z += flareDir.y * flareAmount;
+                }
+                
+                // --- Wind Sway ---
                 float windPhase = vInstanceData.w * 6.28318;
                 float branchSway = sin(uTime * 1.2 + vWorldPos.x * 0.04 + vWorldPos.z * 0.04 + windPhase) * color.r * 0.8 * vInstanceData.z;
                 transformed.x += branchSway * uWindSpeed;
