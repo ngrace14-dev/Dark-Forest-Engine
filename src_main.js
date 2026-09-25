@@ -25,6 +25,7 @@ import './src_systems_forest_impostors.js';   // 3km Distant Canopy Impostor Sys
 import { WetlandsSystem } from './src_systems_wetlands.js';
 import { MountainSystem } from './src_systems_mountains.js';
 import { DunesSystem } from './src_systems_dunes.js';
+import { TidewaterSystem } from './src_systems_tidewater.js';
 import './src_systems_input.js';
 import './src_systems_audio.js';
 import './src_systems_vfx.js';

@@ -8,6 +8,7 @@ import alea from 'alea';
 import { WetlandsSystem } from './src_systems_wetlands.js';
 import { MountainSystem } from './src_systems_mountains.js';
 import { DunesSystem } from './src_systems_dunes.js';
+import { TidewaterSystem } from './src_systems_tidewater.js';
 
 // Redwood Ecosystem imports
 import RedwoodGenerator from './src_generators_redwood.js';
@@ -792,7 +793,7 @@ function fixedUpdateLogic(delta) {
         window.GrassSystem.update(delta, activePos);
     }
 
-    // AAA SYSTEM UPDATES
+        // AAA SYSTEM UPDATES
     if (window.GameCore?.wetlandsSystem && window.GameCore.camera) {
         window.GameCore.wetlandsSystem.update(delta, window.GameCore.camera);
     }
@@ -807,6 +808,10 @@ function fixedUpdateLogic(delta) {
             window.GameCore.camera, 
             window.EngineParams?.worldDay || 0
         );
+    }
+    
+    if (window.GameCore?.tidewaterSystem && window.GameCore.camera) {
+        window.GameCore.tidewaterSystem.update(delta, window.GameCore.camera);
     }
 
     // REDWOOD ECOSYSTEM UPDATES
@@ -1998,7 +2003,7 @@ async function bootEngine() {
                     window.ForestImpostorSystem.init(window.GameCore.scene);
                 }
 
-        // INITIALIZE NEW SYSTEMS
+                // INITIALIZE NEW SYSTEMS
         if (WetlandsSystem) {
             window.GameCore.wetlandsSystem = new WetlandsSystem(window.GameCore, 300000);
             window.GameCore.wetlandsSystem.spawnWetlandsChunk(window.GameCore.scene, 0, 0, 0.0);
@@ -2012,6 +2017,11 @@ async function bootEngine() {
         if (DunesSystem) {
             window.GameCore.dunesSystem = new DunesSystem(window.GameCore);
             window.GameCore.dunesSystem.spawnDuneChunk(window.GameCore.scene, 0, 0);
+        }
+        
+        if (TidewaterSystem && renderer) {
+            window.GameCore.tidewaterSystem = new TidewaterSystem();
+            window.GameCore.tidewaterSystem.init(window.GameCore.scene, renderer);
         }
 
                 initLightPool(window.GameCore.scene);
