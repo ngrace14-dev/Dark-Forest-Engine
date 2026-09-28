@@ -2040,9 +2040,9 @@ async function bootEngine() {
             window.GameCore.wetlandsSystem.spawnWetlandsChunk(window.GameCore.scene, 0, 0, 0.0);
         }
         
-        if (MountainSystem) {
+                if (MountainSystem) {
             window.GameCore.mountainSystem = new MountainSystem(window.GameCore, 300000);
-            window.GameCore.mountainSystem.spawnMountainChunk(window.GameCore.scene, 0, 0);
+            // window.GameCore.mountainSystem.spawnMountainChunk(window.GameCore.scene, 0, 0);
         }
 
         if (DunesSystem) {
