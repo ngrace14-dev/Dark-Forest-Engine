@@ -1263,42 +1263,51 @@ function getVisualMesh(def) {
             head.receiveShadow = true;
             meshGroup.add(head);
                 } else {
-            let mesh; 
-            const h = def.height || 2.0;
-            if(def.type === 'structure' || def.type === 'hub') {
-                // --- DARK FOREST SHAPE LANGUAGE: Gothic Placeholder Architecture ---
-                const r = def.radius;
+                    let mesh; 
+                    const h = def.height || 2.0;
+                    const r = def.radius || 0.5;
+
+                    if(def.type === 'structure' || def.type === 'hub') {
+                        // --- DARK FOREST SHAPE LANGUAGE: Gothic Placeholder Architecture ---
+                        // 1. Tapered Frustum Body (Walls)
+                        const bodyH = h * 0.6;
+                        const bodyGeo = new THREE.CylinderGeometry(r * 0.8, r, bodyH, 4);
+                        bodyGeo.rotateY(Math.PI / 4); // Align flat sides with grid
+                        bodyGeo.translate(0, bodyH / 2 - (h / 2), 0); // Center relative to full height
                 
-                // 1. Tapered Frustum Body (Walls)
-                const bodyH = h * 0.6;
-                const bodyGeo = new THREE.CylinderGeometry(r * 0.8, r, bodyH, 4);
-                bodyGeo.rotateY(Math.PI / 4); // Align flat sides with grid
-                bodyGeo.translate(0, bodyH / 2 - (h / 2), 0); // Center relative to full height
+                        // 2. Steep Gothic Wedge (Roof)
+                        const roofH = h * 0.4;
+                        const roofGeo = new THREE.ConeGeometry(r * 1.1, roofH, 4);
+                        roofGeo.rotateY(Math.PI / 4);
+                        roofGeo.translate(0, bodyH + (roofH / 2) - (h / 2), 0);
                 
-                // 2. Steep Gothic Wedge (Roof)
-                const roofH = h * 0.4;
-                const roofGeo = new THREE.ConeGeometry(r * 1.1, roofH, 4);
-                roofGeo.rotateY(Math.PI / 4);
-                roofGeo.translate(0, bodyH + (roofH / 2) - (h / 2), 0);
-                
-                // 3. Merge primitives to maintain 1 draw call
-                const mergedGeo = window.BufferGeometryUtils ? 
-                    window.BufferGeometryUtils.mergeGeometries([bodyGeo, roofGeo]) : 
-                    bodyGeo; // Fallback if Utils not loaded
+                        // 3. Merge primitives to maintain 1 draw call
+                        const mergedGeo = window.BufferGeometryUtils ? 
+                            window.BufferGeometryUtils.mergeGeometries([bodyGeo, roofGeo]) : 
+                            bodyGeo; // Fallback if Utils not loaded
                     
-                mesh = new THREE.Mesh(mergedGeo, new THREE.MeshStandardMaterial({ color: def.color || 0x888888 }));
-                mesh.position.y = h / 2;
-            } else if(def.type === 'mountain') {
-                mesh = new THREE.Mesh(new THREE.ConeGeometry(def.radius, h, 16), new THREE.MeshStandardMaterial({ color: def.color || 0x444444 }));
-                mesh.position.y = h / 2;
-            } else {
-                mesh = new THREE.Mesh(new THREE.CylinderGeometry(def.radius, def.radius, h, 8), new THREE.MeshStandardMaterial({ color: def.color || 0x666666 }));
-                mesh.position.y = h / 2;
-            }
-            mesh.castShadow = true; 
-            mesh.receiveShadow = true; 
-            meshGroup.add(mesh);
-        }
+                        mesh = new THREE.Mesh(mergedGeo, new THREE.MeshStandardMaterial({ color: def.color || 0x888888 }));
+                        mesh.position.y = h / 2;
+                    } else if(def.type === 'mountain') {
+                        mesh = new THREE.Mesh(new THREE.ConeGeometry(def.radius, h, 16), new THREE.MeshStandardMaterial({ color: def.color || 0x444444 }));
+                        mesh.position.y = h / 2;
+                    } else if (def.type === 'prop' || def.type === 'merchantChest') {
+                        mesh = new THREE.Mesh(new THREE.BoxGeometry(r*2, h, r*2), new THREE.MeshStandardMaterial({ color: def.color || 0x5a4230 }));
+                        mesh.position.y = h / 2;
+                    } else if (def.type === 'powerStone' || def.type === 'streetLight') {
+                        mesh = new THREE.Mesh(new THREE.OctahedronGeometry(r), new THREE.MeshStandardMaterial({ color: def.color || 0x334155 }));
+                        mesh.position.y = h / 2;
+                    } else if (def.type === 'firePit') {
+                        mesh = new THREE.Mesh(new THREE.CylinderGeometry(r*0.8, r, h, 6), new THREE.MeshStandardMaterial({ color: def.color || 0x292929 }));
+                        mesh.position.y = h / 2;
+                    } else {
+                        mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 8), new THREE.MeshStandardMaterial({ color: def.color || 0x666666 }));
+                        mesh.position.y = h / 2;
+                    }
+                    mesh.castShadow = true; 
+                    mesh.receiveShadow = true; 
+                    meshGroup.add(mesh);
+                }
     }
     return meshGroup;
 }
