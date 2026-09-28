@@ -2114,23 +2114,24 @@ async function bootEngine() {
                                mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), u.x), u.y);
                 }
 
-                void main() {
-                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-                    vWorldPos = worldPosition.xyz;
+                                void main() {
+                                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                                    vWorldPos = worldPosition.xyz;
                       
-                                        float dist = max(abs(worldPosition.x), abs(worldPosition.z));
-                    float mountainMask = smoothstep(290000.0, 345000.0, dist); 
+                                    float distFromOrigin = max(abs(worldPosition.x), abs(worldPosition.z));
+                                    float mountainMask = smoothstep(290000.0, 345000.0, distFromOrigin); 
                       
-                    vec2 p = worldPosition.xz;
-                    float h = noise(p * 0.000006) * 4500.0;
-                    h += (1.0 - abs(noise(p * 0.000012) * 2.0 - 1.0)) * 2500.0;
-                    h += noise(p * 0.00004) * 800.0;
+                                    vec2 p = worldPosition.xz;
+                                    float h = noise(p * 0.000006) * 4500.0;
+                                    h += (1.0 - abs(noise(p * 0.000012) * 2.0 - 1.0)) * 2500.0;
+                                    h += noise(p * 0.00008) * 800.0;
                       
-                    worldPosition.y += h * mountainMask;
-                    vHeight = h * mountainMask;
+                                    float finalHeight = h * mountainMask;
+                                    worldPosition.y += finalHeight;
+                                    vHeight = finalHeight;
                       
-                    gl_Position = projectionMatrix * viewMatrix * worldPosition;
-                }
+                                    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+                                }
             `,
             fragmentShader: `
                 varying float vHeight;
@@ -2138,7 +2139,7 @@ async function bootEngine() {
                 uniform vec3 sunPos;
                 uniform vec3 fogColor;
 
-                void main() {
+                                void main() {
                     vec3 rockColor = vec3(0.05, 0.07, 0.10);
                     vec3 peakColor = vec3(0.18, 0.22, 0.28);
                     vec3 snowColor = vec3(0.85, 0.90, 0.96);
@@ -2148,10 +2149,10 @@ async function bootEngine() {
                     float snowMask = smoothstep(4200.0, 6500.0, vHeight);
                     color = mix(color, snowColor, snowMask);
 
-                                        float dist = max(abs(vWorldPos.x), abs(vWorldPos.z));
-                    float fogFactor = smoothstep(0.0, 500000.0, dist);
+                    float distToCam = distance(cameraPosition, vWorldPos);
+                    float fogFactor = smoothstep(0.0, 600000.0, distToCam);
                       
-                    gl_FragColor = vec4(mix(color, fogColor, fogFactor * 0.90), 1.0);
+                    gl_FragColor = vec4(mix(color, fogColor, fogFactor * 0.95), 1.0);
                 }
             `
         });
