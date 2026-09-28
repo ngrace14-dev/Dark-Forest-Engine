@@ -2118,13 +2118,13 @@ async function bootEngine() {
                     vec4 worldPosition = modelMatrix * vec4(position, 1.0);
                     vWorldPos = worldPosition.xyz;
                       
-                    float dist = length(worldPosition.xz);
-                    float mountainMask = smoothstep(315000.0, 345000.0, dist); 
+                                        float dist = max(abs(worldPosition.x), abs(worldPosition.z));
+                    float mountainMask = smoothstep(290000.0, 345000.0, dist); 
                       
                     vec2 p = worldPosition.xz;
-                    float h = noise(p * 0.000005) * 8800.0;
-                    h += (1.0 - abs(noise(p * 0.00002) * 2.0 - 1.0)) * 4500.0;
-                    h += noise(p * 0.0001) * 1200.0;
+                    float h = noise(p * 0.000006) * 4500.0;
+                    h += (1.0 - abs(noise(p * 0.000012) * 2.0 - 1.0)) * 2500.0;
+                    h += noise(p * 0.00004) * 800.0;
                       
                     worldPosition.y += h * mountainMask;
                     vHeight = h * mountainMask;
@@ -2148,10 +2148,10 @@ async function bootEngine() {
                     float snowMask = smoothstep(4200.0, 6500.0, vHeight);
                     color = mix(color, snowColor, snowMask);
 
-                    float dist = length(vWorldPos.xz);
-                    float fogFactor = smoothstep(50000.0, 900000.0, dist);
+                                        float dist = max(abs(vWorldPos.x), abs(vWorldPos.z));
+                    float fogFactor = smoothstep(0.0, 500000.0, dist);
                       
-                    gl_FragColor = vec4(mix(color, fogColor, fogFactor * 0.80), 1.0);
+                    gl_FragColor = vec4(mix(color, fogColor, fogFactor * 0.90), 1.0);
                 }
             `
         });
