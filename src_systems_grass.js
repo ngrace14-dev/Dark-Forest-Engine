@@ -68,47 +68,94 @@ export class GrassSystem {
         };
     }
 
-    spawnFloorPatch(chunkKey, cx, cz, biomeKey) {
+        spawnFloorPatch(chunkKey, cx, cz, biomeKey, clusterPoints = []) {
         if (!this.initialized || !this.scene) return;
         if (this.grassChunks.has(chunkKey)) return;
 
-        const density = (biomeKey === 'redwoods' || biomeKey === 'valley') ? 150 : 20;
+        let baseDensity = 20;
+        if (biomeKey === 'redwoods') baseDensity = 1000;
+        else if (biomeKey === 'valley') baseDensity = 500;
+
+        const totalMoss = baseDensity;
+        const totalFern = Math.floor(baseDensity * 0.4);
+        const totalSentinel = Math.floor(baseDensity * 0.2);
         
         const group = new THREE.Group();
-        const mossMesh = new THREE.InstancedMesh(this.mossGeo, this.floorMaterial, density);
-        const fernMesh = new THREE.InstancedMesh(this.fernGeo, this.floorMaterial, Math.floor(density * 0.4));
-        const sentinelMesh = new THREE.InstancedMesh(this.sentinelGeo, this.floorMaterial, Math.floor(density * 0.2));
+        const mossMesh = new THREE.InstancedMesh(this.mossGeo, this.floorMaterial, totalMoss);
+        const fernMesh = new THREE.InstancedMesh(this.fernGeo, this.floorMaterial, totalFern);
+        const sentinelMesh = new THREE.InstancedMesh(this.sentinelGeo, this.floorMaterial, totalSentinel);
 
         const dummy = new THREE.Object3D();
         const getTerrainY = (x, z) => window.WorldGenerator?.getTerrainHeight?.(x, z) ?? 0;
 
-        for (let i = 0; i < density; i++) {
-            const wx = cx * 60 + (Math.random() - 0.5) * 60;
-            const wz = cz * 60 + (Math.random() - 0.5) * 60;
+        let mossIdx = 0;
+        let fernIdx = 0;
+        let sentinelIdx = 0;
+
+        // 1. Clustered Placement (Priority)
+        if (clusterPoints.length > 0) {
+            clusterPoints.forEach(pt => {
+                // Place 8-12 moss blocks and 3-5 ferns per cluster
+                const itemsInCluster = 8 + Math.floor(Math.random() * 5);
+                for (let c = 0; c < itemsInCluster; c++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = 1.5 + Math.random() * 3.5;
+                    const wx = pt.x + Math.cos(angle) * dist;
+                    const wz = pt.z + Math.sin(angle) * dist;
+                    const wy = getTerrainY(wx, wz);
+
+                    if (mossIdx < totalMoss) {
+                        dummy.position.set(wx, wy - 0.05, wz);
+                        dummy.rotation.y = Math.random() * Math.PI;
+                        dummy.scale.setScalar(1.2 + Math.random() * 2.0); // Increased scale
+                        dummy.updateMatrix();
+                        mossMesh.setMatrixAt(mossIdx++, dummy.matrix);
+                    }
+                    
+                    if (c % 3 === 0 && fernIdx < totalFern) {
+                        dummy.position.set(wx, wy, wz);
+                        dummy.scale.setScalar(0.7 + Math.random() * 0.8);
+                        dummy.updateMatrix();
+                        fernMesh.setMatrixAt(fernIdx++, dummy.matrix);
+                    }
+                }
+            });
+        }
+
+        // 2. Random Scatter (Fill remaining)
+        const chunkOriginX = cx * 60;
+        const chunkOriginZ = cz * 60;
+
+        while (mossIdx < totalMoss) {
+            const wx = chunkOriginX + (Math.random() - 0.5) * 60;
+            const wz = chunkOriginZ + (Math.random() - 0.5) * 60;
             const wy = getTerrainY(wx, wz);
 
-            // Moss Block
             dummy.position.set(wx, wy - 0.05, wz);
             dummy.rotation.y = Math.random() * Math.PI;
             dummy.scale.setScalar(0.8 + Math.random() * 1.5);
             dummy.updateMatrix();
-            mossMesh.setMatrixAt(i, dummy.matrix);
+            mossMesh.setMatrixAt(mossIdx++, dummy.matrix);
+        }
 
-            // Fern Wedge (Probability-based)
-            if (i < Math.floor(density * 0.4)) {
-                dummy.position.set(wx + 0.5, wy, wz + 0.5);
-                dummy.scale.setScalar(0.5 + Math.random() * 1.0);
-                dummy.updateMatrix();
-                fernMesh.setMatrixAt(i, dummy.matrix);
-            }
+        while (fernIdx < totalFern) {
+            const wx = chunkOriginX + (Math.random() - 0.5) * 60;
+            const wz = chunkOriginZ + (Math.random() - 0.5) * 60;
+            const wy = getTerrainY(wx, wz);
+            dummy.position.set(wx, wy, wz);
+            dummy.scale.setScalar(0.5 + Math.random() * 1.0);
+            dummy.updateMatrix();
+            fernMesh.setMatrixAt(fernIdx++, dummy.matrix);
+        }
 
-            // Sentinel (Probability-based)
-            if (i < Math.floor(density * 0.2)) {
-                dummy.position.set(wx - 0.5, wy, wz - 0.5);
-                dummy.scale.setScalar(0.5 + Math.random() * 1.2);
-                dummy.updateMatrix();
-                sentinelMesh.setMatrixAt(i, dummy.matrix);
-            }
+        while (sentinelIdx < totalSentinel) {
+            const wx = chunkOriginX + (Math.random() - 0.5) * 60;
+            const wz = chunkOriginZ + (Math.random() - 0.5) * 60;
+            const wy = getTerrainY(wx, wz);
+            dummy.position.set(wx, wy, wz);
+            dummy.scale.setScalar(0.5 + Math.random() * 1.2);
+            dummy.updateMatrix();
+            sentinelMesh.setMatrixAt(sentinelIdx++, dummy.matrix);
         }
 
         [mossMesh, fernMesh, sentinelMesh].forEach(m => {
