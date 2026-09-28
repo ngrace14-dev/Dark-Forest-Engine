@@ -1109,12 +1109,21 @@ const ChunkManager = {
                     }
                 }
 
+                                const biomeKey = window.WorldGenerator?.getBiome?.(chunkX, chunkZ) || 'redwoods';
+                if (window.GrassSystem) {
+                    window.GrassSystem.spawnFloorPatch(key, cx, cz, biomeKey);
+                }
+
                 window.EventBus?.emit('CHUNK_GENERATED');
             }
         );
     },
     unloadChunk: function(key) {
         const chunk = this.activeChunks.get(key); 
+
+        if (window.GrassSystem) {
+            window.GrassSystem.unloadFloorPatch(key);
+        }
 
         if (window.RoadRenderer && window.GameCore?.scene) {
             window.RoadRenderer.removeDecorationsForChunk(key, window.GameCore.scene);

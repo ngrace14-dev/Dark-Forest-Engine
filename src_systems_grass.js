@@ -1,160 +1,145 @@
 import * as THREE from 'three';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
-export class GrassRenderer {
-    constructor(engine, maxInstances = 200000) { // Phase 7 FIX: Reduced global cap to reflect shift to duff/moss
-        this.engine = engine;
-        this.maxInstances = maxInstances;
+export class GrassSystem {
+    constructor() {
         this.time = 0;
+        this.initialized = false;
+        this.scene = null;
+        this.grassChunks = new Map();
         
-        this.maxInteractiveEntities = 16;
-        this.playerPositions = new Array(this.maxInteractiveEntities).fill(null).map(() => new THREE.Vector3(9999, 9999, 9999));
-        this.activePlayerCount = 0;
-
-        this.initMaterials();
         this.initGeometry();
-        this.grassChunks = [];
+        this.initMaterials();
     }
 
-    initMaterials() {
-        this.grassMaterial = new THREE.MeshStandardMaterial({
-            // Phase 7 FIX: Muted color to blend better with dark humus and duff
-            color: 0x3d4f29, 
-            roughness: 0.8,
-            side: THREE.DoubleSide,
-            alphaTest: 0.5, 
-            transparent: false, 
-        });
-
-        this.grassMaterial.onBeforeCompile = (shader) => {
-            shader.uniforms.uTime = { value: 0 };
-            shader.uniforms.uPlayerPositions = { value: this.playerPositions };
-            shader.uniforms.uPlayerCount = { value: 0 };
-            
-            shader.vertexShader = `
-                uniform float uTime;
-                uniform vec3 uPlayerPositions[${this.maxInteractiveEntities}];
-                uniform int uPlayerCount;
-
-                varying float vHeight;
-                varying vec3 vWorldPos;
-                ${shader.vertexShader}
-            `.replace(
-                '#include <begin_vertex>',
-                `
-                #include <begin_vertex>
-                vHeight = uv.y; 
-
-                #ifdef USE_INSTANCING
-                    vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
-                #else
-                    vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-                #endif
-
-                float windWave = sin(vWorldPos.x * 0.5 + uTime) * cos(vWorldPos.z * 0.5 + (uTime * 0.8));
-                float gust = sin(uTime * 2.0 + vWorldPos.x * 0.1) * 0.5 + 0.5;
-                float swayAmount = windWave * (0.2 + gust * 0.3) * pow(vHeight, 2.0);
-                
-                transformed.x += swayAmount;
-                transformed.z += swayAmount;
-
-                vec2 totalTrample = vec2(0.0);
-                for (int i = 0; i < ${this.maxInteractiveEntities}; i++) {
-                    if (i >= uPlayerCount) break;
-                    vec3 playerPos = uPlayerPositions[i];
-                    float dist = distance(vWorldPos.xz, playerPos.xz);
-                    float trampleRadius = 1.5; 
-                    if (dist < trampleRadius) {
-                        vec2 pushDir = normalize(vWorldPos.xz - playerPos.xz + vec2(0.001)); 
-                        float pushFactor = (1.0 - (dist / trampleRadius)) * pow(vHeight, 1.5);
-                        totalTrample += pushDir * pushFactor * 1.2;
-                    }
-                }
-
-                transformed.x += totalTrample.x;
-                transformed.z += totalTrample.y;
-
-                float totalOffset = length(vec2(swayAmount) + totalTrample);
-                transformed.y -= abs(totalOffset) * 0.4 * vHeight; 
-                `
-            );
-
-            shader.fragmentShader = `
-                varying float vHeight;
-                varying vec3 vWorldPos;
-                ${shader.fragmentShader}
-            `.replace(
-                '#include <color_fragment>',
-                `
-                #include <color_fragment>
-                float dist = distance(vWorldPos, cameraPosition);
-                if (dist > 150.0) discard; 
-
-                vec3 rootColor = vec3(0.06, 0.08, 0.02);
-                vec3 tipColor = diffuseColor.rgb;
-                
-                diffuseColor.rgb = mix(rootColor, tipColor, smoothstep(0.0, 0.4, vHeight));
-                `
-            ).replace(
-                '#include <lights_fragment_begin>',
-                `
-                #include <lights_fragment_begin>
-                #if NUM_DIR_LIGHTS > 0
-                    vec3 mainLightDir = directionalLights[0].direction;
-                    float backLight = max(0.0, dot(-normal, mainLightDir));
-                    float sssScatter = pow(backLight, 3.0) * 0.6;
-                    vec3 sssGlow = directionalLights[0].color * vec3(0.6, 0.9, 0.2) * sssScatter * vHeight;
-                    reflectedLight.directDiffuse += sssGlow;
-                #endif
-                `
-            );
-            this.grassShader = shader;
-        };
+    init(scene) {
+        if (this.initialized) return;
+        this.scene = scene;
+        this.initialized = true;
+        console.log('[GrassSystem] Gothic Forest Floor Proto Initialized.');
     }
 
     initGeometry() {
-        this.bladeGeo = new THREE.PlaneGeometry(0.1, 0.6, 1, 3);
-        this.bladeGeo.translate(0, 0.3, 0); 
+        // Archetype 1: Moss Block (Low profile beveled volume)
+        this.mossGeo = new THREE.BoxGeometry(0.4, 0.2, 0.4);
+        this.mossGeo.translate(0, 0.1, 0);
+
+        // Archetype 2: Fern Wedge (Gothic cluster of 3 wedges)
+        const wedgeParts = [];
+        for (let i = 0; i < 3; i++) {
+            const w = new THREE.ConeGeometry(0.15, 0.4, 3);
+            w.rotateX(0.2); // Lean
+            w.rotateY((i / 3) * Math.PI * 2);
+            w.translate(0, 0.2, 0);
+            wedgeParts.push(w);
+        }
+        this.fernGeo = BufferGeometryUtils.mergeGeometries(wedgeParts);
+
+        // Archetype 3: Tall Sentinel (Single vertical gothic wedge)
+        this.sentinelGeo = new THREE.ConeGeometry(0.1, 0.8, 3);
+        this.sentinelGeo.translate(0, 0.4, 0);
     }
 
-    // Phase 7 FIX: Changed default density from 40000 to 12000 per patch
-    // Allocates density budget away from uniform lawn grass to make room for moss/detritus 
-    spawnGrassChunk(scene, startX, startZ, patchSize = 20, density = 12000) {
-        const instancedGrass = new THREE.InstancedMesh(this.bladeGeo, this.grassMaterial, density);
-        instancedGrass.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-        instancedGrass.receiveShadow = true;
+    initMaterials() {
+        // Shared Opaque Standard Material (Zero Transparency, Zero Alpha Cards)
+        this.floorMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a2b1a, 
+            roughness: 0.9,
+            metalness: 0.0,
+            flatShading: true
+        });
+
+        this.floorMaterial.onBeforeCompile = (shader) => {
+            shader.vertexShader = `
+                varying float vY;
+                ${shader.vertexShader}
+            `.replace('#include <begin_vertex>', `
+                #include <begin_vertex>
+                vY = position.y;
+            `);
+            shader.fragmentShader = `
+                varying float vY;
+                ${shader.fragmentShader}
+            `.replace('#include <color_fragment>', `
+                #include <color_fragment>
+                // Subtle gradient for vertical wedges
+                diffuseColor.rgb *= mix(0.6, 1.0, vY);
+            `);
+        };
+    }
+
+    spawnFloorPatch(chunkKey, cx, cz, biomeKey) {
+        if (!this.initialized || !this.scene) return;
+        if (this.grassChunks.has(chunkKey)) return;
+
+        const density = (biomeKey === 'redwoods' || biomeKey === 'valley') ? 150 : 20;
+        
+        const group = new THREE.Group();
+        const mossMesh = new THREE.InstancedMesh(this.mossGeo, this.floorMaterial, density);
+        const fernMesh = new THREE.InstancedMesh(this.fernGeo, this.floorMaterial, Math.floor(density * 0.4));
+        const sentinelMesh = new THREE.InstancedMesh(this.sentinelGeo, this.floorMaterial, Math.floor(density * 0.2));
 
         const dummy = new THREE.Object3D();
         const getTerrainY = (x, z) => window.WorldGenerator?.getTerrainHeight?.(x, z) ?? 0;
 
         for (let i = 0; i < density; i++) {
-            const wx = startX + (Math.random() - 0.5) * patchSize;
-            const wz = startZ + (Math.random() - 0.5) * patchSize;
+            const wx = cx * 60 + (Math.random() - 0.5) * 60;
+            const wz = cz * 60 + (Math.random() - 0.5) * 60;
             const wy = getTerrainY(wx, wz);
 
-            dummy.position.set(wx, wy, wz);
-            dummy.rotation.y = Math.random() * Math.PI * 2;
-            const scale = 0.7 + Math.random() * 0.6;
-            dummy.scale.set(scale, scale, scale);
+            // Moss Block
+            dummy.position.set(wx, wy - 0.05, wz);
+            dummy.rotation.y = Math.random() * Math.PI;
+            dummy.scale.setScalar(0.8 + Math.random() * 1.5);
             dummy.updateMatrix();
-            instancedGrass.setMatrixAt(i, dummy.matrix);
+            mossMesh.setMatrixAt(i, dummy.matrix);
+
+            // Fern Wedge (Probability-based)
+            if (i < Math.floor(density * 0.4)) {
+                dummy.position.set(wx + 0.5, wy, wz + 0.5);
+                dummy.scale.setScalar(0.5 + Math.random() * 1.0);
+                dummy.updateMatrix();
+                fernMesh.setMatrixAt(i, dummy.matrix);
+            }
+
+            // Sentinel (Probability-based)
+            if (i < Math.floor(density * 0.2)) {
+                dummy.position.set(wx - 0.5, wy, wz - 0.5);
+                dummy.scale.setScalar(0.5 + Math.random() * 1.2);
+                dummy.updateMatrix();
+                sentinelMesh.setMatrixAt(i, dummy.matrix);
+            }
         }
 
-        instancedGrass.instanceMatrix.needsUpdate = true;
-        instancedGrass.computeBoundingSphere();
-        scene.add(instancedGrass);
-        this.grassChunks.push(instancedGrass);
-        return instancedGrass;
+        [mossMesh, fernMesh, sentinelMesh].forEach(m => {
+            m.instanceMatrix.needsUpdate = true;
+            m.castShadow = true;
+            m.receiveShadow = true;
+            group.add(m);
+        });
+
+        this.scene.add(group);
+        this.grassChunks.set(chunkKey, group);
+    }
+
+    unloadFloorPatch(chunkKey) {
+        const group = this.grassChunks.get(chunkKey);
+        if (group) {
+            group.children.forEach(m => {
+                m.geometry.dispose();
+                m.material.dispose();
+            });
+            this.scene.remove(group);
+            this.grassChunks.delete(chunkKey);
+        }
     }
 
     update(delta, entityPositions = []) {
         this.time += delta;
-        if (this.grassShader) {
-            this.grassShader.uniforms.uTime.value = this.time;
-            const count = Math.min(entityPositions.length, this.maxInteractiveEntities);
-            this.grassShader.uniforms.uPlayerCount.value = count;
-            for (let i = 0; i < count; i++) {
-                this.playerPositions[i].copy(entityPositions[i]);
-            }
-        }
     }
 }
+
+if (typeof window !== 'undefined') {
+    window.GrassSystem = new GrassSystem();
+}
+
