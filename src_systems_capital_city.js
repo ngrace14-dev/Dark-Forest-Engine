@@ -17,25 +17,31 @@ class CapitalCityManager {
     /**
      * Helper: Creates a house/structure with a rectangular body and triangular roof
      */
-    createBuildingMesh(w, h, d, wallMat, roofMat) {
+        createBuildingMesh(w, h, d, wallMat, roofMat) {
         const group = new THREE.Group();
         const bodyHeight = h * 0.65;
         const roofHeight = h * 0.35;
 
-        // Rectangular Building Body
-        const bodyGeo = new THREE.BoxGeometry(w, bodyHeight, d);
+        // Tapered Frustum Body (Dark Forest Shape Language)
+        // A Box is simulated using a 4-sided cylinder
+        const bodyRadiusBottom = Math.hypot(w, d) / 2;
+        const bodyRadiusTop = bodyRadiusBottom * 0.85; // Slight inward taper
+        
+        const bodyGeo = new THREE.CylinderGeometry(bodyRadiusTop, bodyRadiusBottom, bodyHeight, 4);
+        bodyGeo.rotateY(Math.PI / 4); // Align flat sides with box bounds
+        
         const bodyMesh = new THREE.Mesh(bodyGeo, wallMat);
         bodyMesh.position.y = bodyHeight / 2;
         bodyMesh.castShadow = true;
         bodyMesh.receiveShadow = true;
         group.add(bodyMesh);
 
-        // Triangular / Pyramidal Roof
-        const roofRadius = Math.hypot(w, d) / 2;
+        // Triangular / Pyramidal Roof with Overhang
+        const roofRadius = bodyRadiusBottom * 1.15; // Aggressive Gothic overhang
         const roofGeo = new THREE.ConeGeometry(roofRadius, roofHeight, 4);
         const roofMesh = new THREE.Mesh(roofGeo, roofMat);
         roofMesh.position.y = bodyHeight + (roofHeight / 2);
-        roofMesh.rotation.y = Math.PI / 4; // Align 4-sided cone with rectangle corners
+        roofMesh.rotation.y = Math.PI / 4; // Align 4-sided cone with wall frustum
         roofMesh.castShadow = true;
         roofMesh.receiveShadow = true;
         group.add(roofMesh);
@@ -199,12 +205,17 @@ class CapitalCityManager {
                 continue;
             }
 
-            // Standard Wall Segment with Merlons (Crenellations)
+                        // Standard Wall Segment with Merlons (Crenellations)
             const segmentLength = (2 * Math.PI * radius) / segments;
             const wallGroup = new THREE.Group();
 
-            // Main Rectangular Wall Span
-            const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(thickness, height, segmentLength + 0.2), material);
+            // Main Frustum Wall Span (Tapered)
+            const wallGeo = new THREE.CylinderGeometry(thickness * 0.4, thickness * 0.5, height, 4);
+            wallGeo.rotateY(Math.PI / 4);
+            // Scale the cylinder to match the rectangular span
+            wallGeo.scale(1, 1, segmentLength / thickness); 
+            
+            const wallMesh = new THREE.Mesh(wallGeo, material);
             wallMesh.position.y = height / 2;
             wallMesh.castShadow = true;
             wallMesh.receiveShadow = true;
@@ -213,11 +224,14 @@ class CapitalCityManager {
             // Top Merlons (Castle Wall Teeth)
             const merlonCount = 3;
             const merlonH = 2.0;
-            const merlonW = thickness * 1.1;
+            const merlonW = thickness * 0.8;
             const merlonD = segmentLength / (merlonCount * 2);
 
             for (let m = 0; m < merlonCount; m++) {
-                const merlonMesh = new THREE.Mesh(new THREE.BoxGeometry(merlonW, merlonH, merlonD), material);
+                const merlonGeo = new THREE.CylinderGeometry(merlonW * 0.4, merlonW * 0.5, merlonH, 4);
+                merlonGeo.rotateY(Math.PI / 4);
+                merlonGeo.scale(1, 1, merlonD / merlonW);
+                const merlonMesh = new THREE.Mesh(merlonGeo, material);
                 const mz = -segmentLength / 2 + (m * 2 + 0.5) * merlonD;
                 merlonMesh.position.set(0, height + merlonH / 2, mz);
                 merlonMesh.castShadow = true;
