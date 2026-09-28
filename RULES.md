@@ -1,18 +1,78 @@
-PROJECT RULES AND HARDENING ADDENDUM
-(The Engineering Constitution)
+# DARK FOREST ENGINE CONSTITUTION v3
+## Engineering, Runtime, Visual, and Hardening Rules
 
-HARDENING MODE ADDENDUM
+# PREAMBLE
 
-When modifying, debugging, extending, or correcting systems:
+Dark Forest is:
 
-The objective is not only to make code work.
-The objective is to make code remain stable under future expansion.
+An Ancient Storybook Civilization Simulator populated by Living Gothic Folk Miniatures beneath colossal Ancient Low-Poly Redwoods.
 
-=================================================================
-SECTION 1: THE 5 PILLARS OF DARK FOREST
-=================================================================
+Priority Order:
 
-PILLAR 1: WORLD STATE INTEGRITY & SIMULATION FIRST
+1. Simulation
+2. Readability
+3. Performance
+4. Atmosphere
+5. Detail
+
+Rendering exists to visualize simulation.
+
+Rendering is never the source of simulation truth.
+
+---
+
+# SECTION 0: ACTIVE RUNTIME PATH RULE
+
+Before investigating visuals:
+
+Verify the intended system is actually rendering.
+
+Never investigate:
+
+- Fog
+- Materials
+- Lighting
+- Atmosphere
+- Optimization
+- Shader behavior
+
+until the active runtime path has been identified.
+
+Required:
+
+1. Rendering Owner
+2. Active Geometry Path
+3. Active Material Path
+4. Asset Source
+5. Fallback Path
+
+Example:
+
+BAD
+
+Trees look wrong
+↓
+Investigate fog
+↓
+Investigate shaders
+
+GOOD
+
+Trees look wrong
+↓
+Identify geometry source
+↓
+Identify renderer path
+↓
+Identify fallback path
+↓
+Then investigate visuals
+
+---
+
+# SECTION 1: THE 5 PILLARS OF DARK FOREST
+
+## PILLAR 1: WORLD STATE INTEGRITY & SIMULATION FIRST
 
 Rendering exists to visualize simulation.
 
@@ -26,51 +86,59 @@ The world state must survive and progress independently of:
 - Camera absence
 - UI absence
 
-Example:
+Examples:
 
-Villages must update, trees must grow, and AI must simulate even when not rendered.
+- Villages update while not rendered
+- Roads age while not rendered
+- Trees grow while not rendered
+- AI simulates while not rendered
 
------------------------------------------------------------------
+---
 
-PILLAR 2: DETERMINISTIC SIMULATION
+## PILLAR 2: DETERMINISTIC SIMULATION
 
-Never use uncontrolled randomness (e.g. Math.random()) for:
+Never use uncontrolled randomness for:
 
 - Procedural generation
 - AI decisions
-- Simulation logic
+- Economy logic
+- Simulation
 
-Every simulation bug should be reproducible via:
+Forbidden:
+
+- Math.random()
+
+Required:
 
 - Seed
-- World Day
-- Chunk Coordinate
 - Entity ID
+- Chunk Coordinate
+- World Day
 
------------------------------------------------------------------
+Every bug should be reproducible.
 
-PILLAR 3: LONG-TERM SAVE SAFETY
+---
 
-Any new system should assume:
+## PILLAR 3: LONG-TERM SAVE SAFETY
 
-Worlds may survive for hundreds of in-game days.
+Assume worlds survive hundreds of in-game days.
 
-When modifying save structures:
+When modifying save data:
 
 - Preserve compatibility
-- Provide versioning
+- Implement versioning
 - Provide migration paths
-- Provide fallback values
+- Add fallback values
 
-Older saves must degrade gracefully and never crash.
+Older saves must never crash.
 
------------------------------------------------------------------
+---
 
-PILLAR 4: OBSERVABILITY RULE
+## PILLAR 4: OBSERVABILITY RULE
 
-Every critical system must expose sufficient debug information to verify runtime behavior.
+Critical systems must expose debug information.
 
-Mandatory telemetry for major systems:
+Required telemetry:
 
 - Loaded Count
 - Active Count
@@ -80,153 +148,145 @@ Mandatory telemetry for major systems:
 
 Examples:
 
-- Terrain Chunks
-- Villages
-- Roads
 - Trees
+- Chunks
+- Roads
+- Villages
 - Workers
+- AI
 - Caravans
 
------------------------------------------------------------------
+---
 
-PILLAR 5: SINGLE AUTHORITY & OWNERSHIP
+## PILLAR 5: SINGLE AUTHORITY & OWNERSHIP
 
 Every domain has exactly one owner.
 
-Shared mutable ownership is forbidden.
+Required:
+
+- Creator
+- Updater
+- Consumer
+- Destroyer
 
 Examples:
 
-Terrain -> BlockTerrainSystem
+Terrain -> TerrainSystem
 
 Villages -> VillageManager
 
 Roads -> RoadManager
 
+Forests -> ForestManager
+
 Narrator -> NarratorSystem
 
-Always identify:
+Shared mutable ownership is forbidden.
 
-- Who creates it
-- Who updates it
-- Who consumes it
-- Who destroys it
+---
 
-=================================================================
-SECTION 2: AI ASSISTANCE & SCOPE CONTROL
-=================================================================
+# SECTION 2: AI ASSISTANCE & SCOPE CONTROL
 
-NO "WHILE I'M HERE" FIXES
-
-Never accept unsolicited refactoring of adjacent code.
-
-Unapproved scope creep introduces untested variables and breaks stable architecture.
+## NO "WHILE I'M HERE" FIXES
 
 One approved objective per commit.
 
------------------------------------------------------------------
+No adjacent refactors.
 
-CONTEXT LIMIT DISCIPLINE
+No unsolicited architecture changes.
 
-Keep context narrow and targeted.
+No scope creep.
+
+---
+
+## CONTEXT LIMIT DISCIPLINE
+
+Keep prompts focused.
 
 Do not dump:
 
 - Massive files
-- Entire subsystems
-- Broad architectural requests
+- Entire repositories
+- Multiple systems
 
-into a single AI prompt.
+into a single request.
 
------------------------------------------------------------------
+---
 
-THE "JUST MAKE IT COMPILE" WARNING
+## JUST MAKE IT COMPILE RULE
 
-Do not accept code that merely removes compiler errors.
+Compiling is not success.
 
-Examples:
+Forbidden:
 
-- Empty interfaces
+- Empty methods
 - Fake implementations
-- Type-cast abuse
-- Placeholder logic
+- Temporary stubs
+- Type abuse
 
-If the solution is fighting the architecture:
+If architecture fights the fix:
 
 Stop.
-Re-evaluate.
-Rethink.
 
------------------------------------------------------------------
+Reassess.
 
-INVESTIGATION BEFORE IMPLEMENTATION RULE
+---
+
+## INVESTIGATION BEFORE IMPLEMENTATION
 
 Before modifying architecture:
 
-1. Identify ownership.
-2. Identify authority.
-3. Identify callers.
-4. Identify dependencies.
-5. Gather evidence.
+1. Identify ownership
+2. Identify authority
+3. Identify callers
+4. Identify dependencies
+5. Gather evidence
 
-Implementation should occur only after
-a high-confidence root cause is established.
+Root cause first.
 
-Avoid implementing fixes based solely on symptoms.
+Implementation second.
 
------------------------------------------------------------------
+---
 
-LOCALHOST / SERVER RULE
+## LOCALHOST RULE
 
-Do not start local web servers unless explicitly requested.
+Never use localhost as evidence.
 
-Examples:
+Do not start:
 
-- npx http-server
 - npm run dev
-- npm run serve
 - live-server
 - python -m http.server
+- http-server
 
-Do not wait on long-running processes.
+unless explicitly requested.
 
-Do not use localhost state as evidence.
+Runtime evidence comes from:
 
-When runtime verification is required:
+- Logs
+- Screenshots
+- Console output
+- User validation
 
-1. Describe the verification steps.
-2. Wait for user-supplied runtime evidence.
-3. Analyze logs, screenshots, and console output.
+---
 
-Repository evidence takes priority over localhost inspection.
+## EVIDENCE RULE
 
------------------------------------------------------------------
-
-EVIDENCE RULE
-
-Claims about existing code must be supported by source evidence.
-
-Examples:
-
-- API contracts
-- Ownership
-- Dependencies
-- Method signatures
-- Callers
-- Data flow
+Claims require source evidence.
 
 Every confirmed claim should include:
 
-- File name
-- Line reference
+- File
+- Function
+- Source reference
 
-Architecture claims without evidence should be treated as assumptions.
+Architecture assertions without evidence are assumptions.
 
------------------------------------------------------------------
+---
 
-ASSUMPTION LABELING RULE
+## ASSUMPTION LABELING RULE
 
-All conclusions must be labeled as either:
+Every conclusion must be labeled:
 
 CONFIRMED
 
@@ -234,72 +294,96 @@ or
 
 ASSUMPTION
 
-CONFIRMED:
-Directly supported by source code.
+CONFIRMED
 
-ASSUMPTION:
-Not yet verified by source evidence.
+Supported by source evidence.
 
-Assumptions must never be presented as verified facts.
+ASSUMPTION
 
-=================================================================
-SECTION 3: RUNTIME VERIFICATION & API CONTRACTS
-=================================================================
+Not yet verified.
 
-RUNTIME VERIFICATION RULE
+Assumptions must never be presented as facts.
 
-A fix is not complete because it compiles.
+---
+
+# SECTION 3: RUNTIME VERIFICATION
+
+## RUNTIME VERIFICATION RULE
+
+Compiles != Complete
 
 A fix is complete when verified running.
 
-Every change must define:
+Every implementation must define:
 
 - Expected Runtime Result
 - Verification Steps
 - Failure Symptoms
 
-Visual changes should include screenshot verification whenever practical.
+Visual changes require screenshots whenever practical.
 
------------------------------------------------------------------
+---
 
-RUNTIME STATE CLAIM RULE
+## RUNTIME STATE CLAIM RULE
 
-The AI must never claim:
+Forbidden status:
 
 - Fixed
 - Working
-- Successful
 - Resolved
+- Successful
 - Verified
-
-unless runtime evidence exists.
-
-Allowed status labels:
-
-IMPLEMENTED
-UNVERIFIED
-VERIFIED
-
-Examples:
-
-Correct:
-
-IMPLEMENTED
-Runtime verification pending.
-
-Incorrect:
-
-Fixed.
-Working.
-Resolved.
 
 without runtime evidence.
 
------------------------------------------------------------------
+Allowed statuses:
 
-PUBLIC API CONTRACT RULE
+PLANNED
 
-Public methods used by other systems are contracts.
+IMPLEMENTED
+
+IMPLEMENTED + AWAITING VALIDATION
+
+VALIDATED
+
+---
+
+## VISUAL VALIDATION GATE
+
+Whenever modifying:
+
+### Trees
+
+- Geometry
+- Canopies
+- Materials
+- Roots
+- Atmosphere
+
+### NPCs
+
+- Models
+- Silhouettes
+- Equipment
+- LODs
+
+### Player
+
+- Character
+- Equipment
+- Visuals
+
+Required:
+
+VISUAL VALIDATION REQUIRED
+
+Provide screenshots.
+
+---
+
+## PUBLIC API CONTRACT RULE
+
+Public APIs are contracts.
 
 Examples:
 
@@ -307,75 +391,66 @@ Examples:
 - spawnVillage()
 - generateChunk()
 
-Before modifying, renaming, or removing:
+Before changing:
 
-- Verify all callers
-- Update all callers
-- Verify runtime behavior
+- Verify callers
+- Update callers
+- Validate runtime behavior
 
-Breaking a contract requires updating all dependent systems.
+Breaking contracts requires updating all dependencies.
 
------------------------------------------------------------------
+---
 
-TICK INDEPENDENCE & TIME SCALING RULE
+## TICK INDEPENDENCE RULE
 
-Simulation logic must never depend on render framerate.
+Simulation may not depend on framerate.
 
-All simulation math must:
+Required:
 
-- Use Delta Time
+- Delta Time
 OR
-- Use Fixed Simulation Ticks
+- Fixed Tick
 
-Simulation must produce identical outcomes at:
+Simulation outcomes must remain identical regardless of FPS.
 
-- 1x speed
-- Fast forward
-- Background simulation
+---
 
-Rendering speed must never affect simulation correctness.
+# SECTION 4: MEMORY, PERFORMANCE, & SAFETY
 
-=================================================================
-SECTION 4: MEMORY, PERFORMANCE, & SAFETY
-=================================================================
+## THREAD SAFETY RULE
 
-THREAD SAFETY & CONCURRENCY RULE
-
-Worker threads must NEVER access:
+Workers may never access:
 
 - Renderers
-- Shaders
 - Materials
 - Physics
 - UI
 - Main-thread-only objects
 
-Background threads compute data.
+Workers compute.
 
-Main thread consumes data.
+Main thread consumes.
 
-All shared state should be assumed unsafe until validated.
+---
 
------------------------------------------------------------------
+## VRAM SAFETY RULE
 
-ASSET DISPOSAL RULE (NO VRAM LEAKS)
+Destroying objects does not destroy assets.
 
-Destroying an object does not destroy generated assets.
+Always dispose:
 
-Procedural assets must be explicitly disposed:
-
-- Meshes
+- Geometry
 - Materials
 - Textures
 - Render Targets
 
-to prevent VRAM leaks.
+No VRAM leaks.
 
------------------------------------------------------------------
+---
 
-EVENT SUBSCRIPTION LIFECYCLE
+## EVENT LIFECYCLE RULE
 
-Every AddListener requires a matching RemoveListener.
+Every AddListener requires RemoveListener.
 
 Systems must unsubscribe when:
 
@@ -383,50 +458,291 @@ Systems must unsubscribe when:
 - Destroyed
 - Unloaded
 
------------------------------------------------------------------
+---
 
-FAIL SAFE & NULL SAFETY
+## FAIL SAFE RULE
 
-Before accessing:
+Always verify existence before access.
 
-- Objects
-- Entities
+Examples:
+
 - Villages
 - Roads
+- Entities
 - Chunks
-- Event payloads
-
-Verify existence.
+- Events
 
 Unexpected situations should:
 
 - Log
 - Fallback
-- Continue safely
+- Continue
 
 Never silently crash.
 
-=================================================================
-HARDENING CHECKLIST (REQUIRED BEFORE PR/MERGE)
-=================================================================
+---
 
-[ ] Targeted Fix (One approved objective per commit)
+# SECTION 5: VISUAL CONSTITUTION
 
-[ ] Runtime Verified (Tested in-engine)
+## Art Direction
 
-[ ] Runtime Evidence Available (Logs, screenshots, console output, or observable behavior)
+Dark Forest is:
 
-[ ] Status Correctly Classified (IMPLEMENTED / UNVERIFIED / VERIFIED)
+Ancient Storybook Gothic
 
-[ ] API Contracts Verified (All callers updated)
+---
 
-[ ] Evidence Provided (Claims backed by source locations)
+## CORE SHAPE LANGUAGE
 
-[ ] Assumptions Labeled (CONFIRMED vs ASSUMPTION)
+Primary Shapes:
 
-[ ] Seeded RNG (Deterministic)
+- Box
+- Frustum
+- Wedge
 
-[ ] Tick Independent (Delta Time / Fixed Tick safe)
+Everything else is secondary.
+
+---
+
+# SECTION 6: TREE RULES
+
+## Identity
+
+Ancient Low-Poly Redwoods
+
+Required:
+
+- Root Flare
+- Tapered Trunk
+- Layered Frustum Canopies
+- Flat Shading
+- Strong Silhouettes
+
+Forbidden:
+
+- Leaf Cards
+- Needle Cards
+- Alpha Foliage
+- Transparent Canopies
+- Cross Planes
+
+---
+
+## Tree FailSafe Rule
+
+Forbidden fallback:
+
+CylinderGeometry(0.5, 2.5, 40, 12)
+
+Required fallback:
+
+Ancient Redwood Primitive
+
+Consisting of:
+
+- Root Flare
+- Tapered Trunk
+- 3 Frustum Canopy Shelves
+
+Even failures must follow the visual constitution.
+
+---
+
+## Redwood Terrain Rule
+
+Target:
+
+- Mostly Flat
+- Gentle Rolling Terrain
+- Village Friendly
+- Root Friendly
+
+Avoid:
+
+- Mountain Ridges
+- Sharp Cliffs
+- Noise Spikes
+
+unless biome-specific.
+
+---
+
+# SECTION 7: CHARACTER RULES
+
+## Identity
+
+Living Gothic Folk Miniatures
+
+Required:
+
+- Cube Head
+- Frustum Body
+- Primitive Equipment
+- Silhouette Readability
+
+Visible limbs are optional.
+
+---
+
+## Recognition Priority
+
+Silhouette
+↓
+Equipment
+↓
+Profession
+↓
+Face
+
+---
+
+## Forbidden
+
+- Realistic Humans
+- Detailed Anatomy
+- Fingers
+- Muscles
+- Tiny Accessories
+
+---
+
+# SECTION 8: EQUIPMENT RULES
+
+Built from:
+
+- Box
+- Frustum
+- Wedge
+- Cylinder
+
+Examples:
+
+Lantern
+
+- Outer Cube
+- Recessed Windows
+- Emissive Core
+
+Book
+
+- Two Flattened Boxes
+
+Hammer
+
+- Box + Cylinder
+
+Crown
+
+- Wedges
+
+---
+
+# SECTION 9: BUILDING RULES
+
+## Architecture Style
+
+Ancient Storybook Gothic
+
+Required:
+
+- Tapered Walls
+- Grounded Foundations
+- Heavy Roofs
+- Strong Silhouettes
+
+Forbidden:
+
+- Perfect Cubes
+- Perfect Cylinders
+- Thin Supports
+
+---
+
+## Placeholder Rule
+
+Missing assets must render as:
+
+Gothic Frustum Buildings
+
+Never:
+
+Gray Debug Cubes
+
+---
+
+# SECTION 10: PROP RULES
+
+Required:
+
+Power Stone
+
+- Octahedron
+
+Street Light
+
+- Lantern Primitive
+
+Merchant Chest
+
+- Heavy Box
+
+Bench
+
+- Box + Wedge Supports
+
+Fire Pit
+
+- Frustum Brazier
+
+Props must follow:
+
+Box Rule
+Frustum Rule
+Grounding Rule
+
+---
+
+# SECTION 11: INVESTIGATION BUDGET RULE
+
+Each cycle must be:
+
+One Problem
+↓
+One Root Cause
+↓
+One Fix
+↓
+One Validation
+
+Avoid:
+
+One Problem
+↓
+20 Investigations
+↓
+No Validation
+
+---
+
+# HARDENING CHECKLIST
+
+[ ] One approved objective per commit
+
+[ ] Runtime Verified
+
+[ ] Runtime Evidence Available
+
+[ ] Correct Status Classification
+
+[ ] API Contracts Verified
+
+[ ] Evidence Provided
+
+[ ] Assumptions Labeled
+
+[ ] Deterministic
+
+[ ] Tick Independent
 
 [ ] Thread Safe
 
@@ -436,7 +752,7 @@ HARDENING CHECKLIST (REQUIRED BEFORE PR/MERGE)
 
 [ ] Null Safe
 
-[ ] No Silent Failure
+[ ] No Silent Failures
 
 [ ] Ownership Defined
 
@@ -444,9 +760,9 @@ HARDENING CHECKLIST (REQUIRED BEFORE PR/MERGE)
 
 [ ] Technical Debt Documented
 
-=================================================================
-DARK FOREST ENGINE HARDENING PRINCIPLE
-=================================================================
+---
+
+# DARK FOREST HARDENING PRINCIPLE
 
 Build systems as if:
 
@@ -456,12 +772,12 @@ Build systems as if:
 - More businesses will be added
 - More AI will be added
 
-Every system should be designed as though the world will eventually become:
+Assume the world becomes:
 
 Larger.
 Older.
 Busier.
-More simulated.
-More dynamic.
+More Simulated.
+More Dynamic.
 
-Optimize for future expansion without introducing unnecessary complexity.
+Design for expansion without unnecessary complexity.
