@@ -107,27 +107,18 @@ function assembleShader(shader, snippets) {
 }
 
 /**
- * Phase 6 FIX: Canopy Material Generator
- * Solves the invisible canopy issue by recalibrating alpha clipping thresholds, 
- * adjusting depth-write rules for volumetric fog, and enabling double-sided rendering.
+ * Ancient Low-Poly Redwood Canopy Material Generator
+ * Optimized for solid frustum tiers, ensuring flat shading and volumetric 
+ * depth-write compatibility with volumetric fog.
  */
 export function createCanopyMaterial(options = {}) {
         const mat = new THREE.MeshLambertMaterial({
         color: options.color || 0x1e3622, // Dark Redwood Foliage Green
         
-        // Phase 6 FIX: DoubleSide ensures cards are visible from below (crucial for ground perspective)
-        side: THREE.DoubleSide, 
-        
         // Flat shading for low poly style
         flatShading: true,
         
-        // Phase 6 FIX: Use alphaTest for foliage cards instead of pure transparency.
-        // Pure transparency breaks volumetric fog depth sorting.
         transparent: false, 
-        
-        // Phase 6 FIX: Lowered from default high values to 0.15. 
-        // This ensures thin needle cards arent entirely culled by mipmap alpha erosion at a distance.
-        alphaTest: 0.15, 
         
         depthWrite: true,
         vertexColors: true, // FIX: Required for injected vColorAttr = color; in ForestRenderer
@@ -144,30 +135,25 @@ export function createCanopyMaterial(options = {}) {
         shader.uniforms.uRawDebugMode = { value: 0.0 };
 
         assembleShader(shader, {
-            VERTEX_TRANSFORM: `
+                        VERTEX_TRANSFORM: `
                 // Canopy flutter math utilizing instance windPhase (w) and scaling sway by height (z)
                 float windPhase = vInstanceData.w * 6.28318;
                 float branchSway = sin(uTime * 1.2 + vWorldPos.x * 0.04 + vWorldPos.z * 0.04 + windPhase) * color.r * 0.8 * vInstanceData.z;
-                float leafFlutter = sin(uTime * 6.0 + vWorldPos.y * 0.15 + windPhase) * 0.20; 
+                float tierFlutter = sin(uTime * 6.0 + vWorldPos.y * 0.15 + windPhase) * 0.20; 
 
-                transformed.x += (branchSway + leafFlutter) * uWindSpeed;
-                transformed.y += leafFlutter * uWindSpeed;
-                transformed.z += (branchSway * 0.5 + leafFlutter) * uWindSpeed;
+                transformed.x += (branchSway + tierFlutter) * uWindSpeed;
+                transformed.y += tierFlutter * uWindSpeed;
+                transformed.z += (branchSway * 0.5 + tierFlutter) * uWindSpeed;
             `,
-                        FRAG_COLOR: `
-                // Enforce sharp alpha-testing to carve out evergreen needle shapes
-                if (diffuseColor.a < 0.5) {
-                    discard;
-                }
-
+                                                FRAG_COLOR: `
                 // Deterministic color variation using the instance seed
                 float seedNoise = fract(sin(vInstanceData.x * 12.9898) * 43758.5453);
                 
-                vec3 baseNeedleColor = vec3(0.06, 0.18, 0.08);
-                vec3 driedNeedleColor = vec3(0.12, 0.15, 0.05);
+                vec3 deepCanopyColor = vec3(0.06, 0.18, 0.08);
+                vec3 sunlitCanopyColor = vec3(0.12, 0.15, 0.05);
                 
-                // Slightly mix in dried needle colors based on seed to break uniformity
-                diffuseColor.rgb = mix(baseNeedleColor, driedNeedleColor, seedNoise * 0.3);
+                // Slightly mix in sunlit canopy colors based on seed to break uniformity
+                diffuseColor.rgb = mix(deepCanopyColor, sunlitCanopyColor, seedNoise * 0.3);
             `,
             FRAG_LIGHTING: `
                 if (uRawDebugMode < 0.5) {
