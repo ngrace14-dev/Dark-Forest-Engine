@@ -132,7 +132,27 @@ window.EditorManager = {
             meshGroup.add(customModel);
         } else {
             let mesh;
-            if(def.type === 'structure') mesh = new THREE.Mesh(new THREE.BoxGeometry(def.radius*2, def.height, def.radius*2));
+            const h = def.height || 2.0;
+            const r = def.radius || 1.0;
+
+            if(def.type === 'structure') {
+                // --- DARK FOREST SHAPE LANGUAGE: Gothic Placeholder Ghost ---
+                const bodyH = h * 0.6;
+                const bodyGeo = new THREE.CylinderGeometry(r * 0.8, r, bodyH, 4);
+                bodyGeo.rotateY(Math.PI / 4);
+                bodyGeo.translate(0, bodyH / 2 - (h / 2), 0);
+                
+                const roofH = h * 0.4;
+                const roofGeo = new THREE.ConeGeometry(r * 1.1, roofH, 4);
+                roofGeo.rotateY(Math.PI / 4);
+                roofGeo.translate(0, bodyH + (roofH / 2) - (h / 2), 0);
+                
+                const mergedGeo = window.BufferGeometryUtils ? 
+                    window.BufferGeometryUtils.mergeGeometries([bodyGeo, roofGeo]) : 
+                    bodyGeo;
+                    
+                mesh = new THREE.Mesh(mergedGeo);
+            }
             else if(def.type === 'mountain') mesh = new THREE.Mesh(new THREE.ConeGeometry(def.radius, def.height, 16));
             else mesh = new THREE.Mesh(new THREE.CylinderGeometry(def.radius, def.radius, def.height, 8));
             
