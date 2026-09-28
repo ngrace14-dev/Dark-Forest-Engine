@@ -76,7 +76,7 @@ function assembleShader(shader, snippets) {
         );
     }
 
-    // FRAG_COLOR: \\n                // Enforce sharp alpha-testing to carve out evergreen needle shapes\n                if (diffuseColor.a < 0.5) {\n                    discard;\n                }\n\n                // Deterministic color variation using the instance seed\n                float seedNoise = fract(sin(vInstanceData.x * 12.9898) * 43758.5453);\n                \n                vec3 baseNeedleColor = vec3(0.06, 0.18, 0.08);\n                vec3 driedNeedleColor = vec3(0.12, 0.15, 0.05);\n                \n                // Slightly mix in dried needle colors based on seed to break uniformity\n                diffuseColor.rgb = mix(baseNeedleColor, driedNeedleColor, seedNoise * 0.3);\n            \\n        });              // Enforce sharp alpha-testing to carve out evergreen needle shapes\n                if (diffuseColor.a < 0.5) {\n                    discard;\n                }\n\n                // Deterministic color variation using the instance seed\n                float seedNoise = fract(sin(vInstanceData.x * 12.9898) * 43758.5453);\n                \n                vec3 baseNeedleColor = vec3(0.06, 0.18, 0.08);\n                vec3 driedNeedleColor = vec3(0.12, 0.15, 0.05);\n                \n                // Slightly mix in dried needle colors based on seed to break uniformity\n                diffuseColor.rgb = mix(baseNeedleColor, driedNeedleColor, seedNoise * 0.3);\n            \t after diffuse color is calculated but before lighting
+    // FRAG_COLOR: Inject after diffuse color is calculated but before lighting
     if (snippets.FRAG_COLOR) {
         shader.fragmentShader = shader.fragmentShader.replace(
             '#include <color_fragment>',
@@ -111,7 +111,30 @@ function assembleShader(shader, snippets) {
  * Solves the invisible canopy issue by recalibrating alpha clipping thresholds, 
  * adjusting depth-write rules for volumetric fog, and enabling double-sided rendering.
  */
-export function createCanopyMaterial(options = {}) {\n        const mat = new THREE.MeshLambertMaterial({\n        color: options.color || 0x1e3622, // Dark Redwood Foliage Green\n        \n        // Phase 6 FIX: DoubleSide ensures cards are visible from below (crucial for ground perspective)\n        side: THREE.DoubleSide, \n        \n        // Flat shading for low poly style\n        flatShading: true,\n        \n        // Phase 6 FIX: Use alphaTest for foliage cards instead of pure transparency.\n        // Pure transparency breaks volumetric fog depth sorting.\n        transparent: false, \n        \n        // Phase 6 FIX: Lowered from default high values to 0.15. \n        // This ensures thin needle cards arent entirely culled by mipmap alpha erosion at a distance.\n        alphaTest: 0.15, \n        \n        depthWrite: true,\n        vertexColors: true, // FIX: Required for injected vColorAttr = color; in ForestRenderer\n        ...options\n    });\n\n    mat.onBeforeCompile = (shader) => {
+export function createCanopyMaterial(options = {}) {
+        const mat = new THREE.MeshLambertMaterial({
+        color: options.color || 0x1e3622, // Dark Redwood Foliage Green
+        
+        // Phase 6 FIX: DoubleSide ensures cards are visible from below (crucial for ground perspective)
+        side: THREE.DoubleSide, 
+        
+        // Flat shading for low poly style
+        flatShading: true,
+        
+        // Phase 6 FIX: Use alphaTest for foliage cards instead of pure transparency.
+        // Pure transparency breaks volumetric fog depth sorting.
+        transparent: false, 
+        
+        // Phase 6 FIX: Lowered from default high values to 0.15. 
+        // This ensures thin needle cards arent entirely culled by mipmap alpha erosion at a distance.
+        alphaTest: 0.15, 
+        
+        depthWrite: true,
+        vertexColors: true, // FIX: Required for injected vColorAttr = color; in ForestRenderer
+        ...options
+    });
+
+    mat.onBeforeCompile = (shader) => {
         // Expose time and wind uniforms for vertex sway
         shader.uniforms.uTime = { value: 0 };
         shader.uniforms.uWindSpeed = { value: 1.0 };
