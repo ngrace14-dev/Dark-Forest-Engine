@@ -79,10 +79,25 @@ let currentSeed = null;
 
 function getTerrainHeight(x, z) {
     if (!noiseFn) noiseFn = createSimplexNoise(1337);
-    // FIX: Reduced macro elevation and micro detail to flatten steep trenches
-    const elevation = noiseFn(x * 0.003, z * 0.003) * 8.0;
-    const detail = noiseFn(x * 0.015, z * 0.015) * 2.0;
-    const h = elevation + detail;
+    
+    // Evaluate exact logic from EpochManager physics collider
+    let isRedwood = false;
+    let dist = Math.max(Math.abs(x), Math.abs(z));
+    if (dist <= (575843.2 / 2)) {
+        let val = noiseFn(x * 0.003, z * 0.003);
+        if (val <= 0.45 && val >= -0.3 && !(val > -0.3 && val < 0.1)) {
+            isRedwood = true;
+        }
+    }
+
+    let h = noiseFn(x * 0.005, z * 0.005) * 8.0;
+    h += noiseFn(x * 0.05, z * 0.05) * 1.5;
+
+    if (isRedwood) {
+        h *= 0.25;
+        h += noiseFn(x * 0.01, z * 0.01) * 3.0;
+    }
+    
     return Number.isFinite(h) ? h : 0;
 }
 

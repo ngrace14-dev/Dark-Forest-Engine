@@ -86,9 +86,19 @@ export class EpochManager {
         const mountainWidth = this.config.mountainRingWidthMeters;
         const dist = Math.max(Math.abs(x), Math.abs(z));
 
+        // BIOME SPECIFIC HEIGHT MODIFIERS
+        const biomeKey = this.getBiome(x, z);
+
         // BASE NOISE (Rolling terrain)
         let height = this.noise2D(x * 0.005, z * 0.005) * 8;
         height += this.noise2D(x * 0.05, z * 0.05) * 1.5; // Roughness
+        
+        // --- REDWOOD TERRAIN FLATTENING ---
+        // Ancient Redwoods require relatively flat ground for massive roots and villages
+        if (biomeKey === 'redwoods') {
+            height *= 0.25; // Drastically flatten macro rolling hills
+            height += this.noise2D(x * 0.01, z * 0.01) * 3; // Add very gentle sloping instead
+        }
 
         // 1. THE MOUNTAIN RING (100 MILES THICK)
         if (dist > halfForestSide && dist <= halfForestSide + mountainWidth) {
