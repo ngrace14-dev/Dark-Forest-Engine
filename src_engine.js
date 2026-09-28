@@ -1076,6 +1076,8 @@ const ChunkManager = {
                                 window.ForestRenderer.setChunkInstances(key, archKey, pts);
                             }
                         } else {
+                            // FIX: Dispatch fallback using an explicit archetype key instead of generic "Redwood Tree"
+                            // to trigger the proper generator retrieval or advanced fallback inside ForestRenderer
                             const redwoodPoints = chunkData.tierA.map(point => ({
                                 x: point.x,
                                 y: safeGetTerrainHeight(point.x, point.z),
@@ -1083,7 +1085,7 @@ const ChunkManager = {
                                 scale: 0.8 + Math.random() * 0.4,
                                 rotation: Math.random() * Math.PI * 2
                             }));
-                            window.ForestRenderer.setChunkInstances(key, 'Redwood Tree', redwoodPoints);
+                            window.ForestRenderer.setChunkInstances(key, 'Redwood_ANCIENT_0', redwoodPoints);
                         }
                     }
 
