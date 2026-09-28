@@ -84,7 +84,7 @@ function assembleShader(shader, snippets) {
         );
     }
 
-    // FRAG_LIGHTING: Inject custom SSS/Lighting overrides
+    // ject custom SSS/Lighting overrides
     if (snippets.FRAG_LIGHTING) {
         // Appending to the end of the standard lighting chunk
         shader.fragmentShader = shader.fragmentShader.replace(
@@ -111,29 +111,7 @@ function assembleShader(shader, snippets) {
  * Solves the invisible canopy issue by recalibrating alpha clipping thresholds, 
  * adjusting depth-write rules for volumetric fog, and enabling double-sided rendering.
  */
-export function createCanopyMaterial(options = {}) {
-        const mat = new THREE.MeshStandardMaterial({
-        color: options.color || 0x1e3622, // Dark Redwood Foliage Green
-        roughness: 0.85,
-        metalness: 0.05,
-        
-        // Phase 6 FIX: DoubleSide ensures cards are visible from below (crucial for ground perspective)
-        side: THREE.DoubleSide, 
-        
-        // Phase 6 FIX: Use alphaTest for foliage cards instead of pure transparency.
-        // Pure transparency breaks volumetric fog depth sorting.
-        transparent: false, 
-        
-        // Phase 6 FIX: Lowered from default high values to 0.15. 
-        // This ensures thin needle cards aren't entirely culled by mipmap alpha erosion at a distance.
-        alphaTest: 0.15, 
-        
-        depthWrite: true,
-        vertexColors: true, // FIX: Required for injected vColorAttr = color; in ForestRenderer
-        ...options
-    });
-
-    mat.onBeforeCompile = (shader) => {
+export function createCanopyMaterial(options = {}) {\n        const mat = new THREE.MeshLambertMaterial({\n        color: options.color || 0x1e3622, // Dark Redwood Foliage Green\n        \n        // Phase 6 FIX: DoubleSide ensures cards are visible from below (crucial for ground perspective)\n        side: THREE.DoubleSide, \n        \n        // Flat shading for low poly style\n        flatShading: true,\n        \n        // Phase 6 FIX: Use alphaTest for foliage cards instead of pure transparency.\n        // Pure transparency breaks volumetric fog depth sorting.\n        transparent: false, \n        \n        // Phase 6 FIX: Lowered from default high values to 0.15. \n        // This ensures thin needle cards arent entirely culled by mipmap alpha erosion at a distance.\n        alphaTest: 0.15, \n        \n        depthWrite: true,\n        vertexColors: true, // FIX: Required for injected vColorAttr = color; in ForestRenderer\n        ...options\n    });\n\n    mat.onBeforeCompile = (shader) => {
         // Expose time and wind uniforms for vertex sway
         shader.uniforms.uTime = { value: 0 };
         shader.uniforms.uWindSpeed = { value: 1.0 };

@@ -489,165 +489,138 @@ function buildRedwoodMesh(ageState, seed) {
 
         const effectiveBranchCount = hasBrokenCrown ? Math.floor(branchCount * 0.70) : branchCount;
 
-    // Silhouette Modification: Number of massive branch shelves/clusters based on height
-    const numShelves = Math.floor(effectiveHeight / 12.0); 
+    // --- REWRITE: CHEESE FOLK STYLIZED CANOPY TIERS ---
+    // Instead of generating 120+ procedural branches, we generate 3-5 massive low-poly frustums (tiers)
+    
+    // We determine the number of tiers based on age and height
+    let numTiers = 3;
+    if (ageState === 'COLOSSAL_ANCIENT' || ageState === 'ANCIENT') numTiers = 5;
+    if (ageState === 'MATURE') numTiers = 4;
+    
+    // Calculate the total height available for the canopy
+    const canopyStartHeight = bareTrunkRatio * effectiveHeight;
+    const canopyAvailableHeight = effectiveHeight - canopyStartHeight;
+    
+    // Calculate base parameters for tiers
+    const tierHeightBase = canopyAvailableHeight / numTiers;
+    // We want the bottom tier to be the widest, tapering up
+    let currentTierRadius = baseRadius * 3.5; // Massive overhang
+    
+    if (ageState === 'DYING') {
+        currentTierRadius *= 0.6; // Dying trees are thinner
+    }
 
-    for (let b = 0; b < effectiveBranchCount; b++) {
-        const baseProgress = b / effectiveBranchCount;
+    // Build massive volumetric tiers
+    for (let t = 0; t < numTiers; t++) {
+        const tierProgress = t / numTiers; // 0.0 (bottom) to 1.0 (top)
         
-        // Silhouette Modification 1: Shelf Clustering
-        // Use a sine wave to warp the linear progression, pulling branches into dense layers separated by gaps
-        const shelfBias = Math.sin(baseProgress * Math.PI * 2.0 * numShelves);
-        let clusteredProgress = baseProgress + (shelfBias * 0.04);
+        // Add some variation based on deterministic seed
+        const tierHeightOffset = prng.range(-tierHeightBase * 0.15, tierHeightBase * 0.25);
+        let tierYStart = canopyStartHeight + (t * tierHeightBase) - (tierHeightBase * 0.3) + tierHeightOffset;
         
-        // Clamp to ensure we don't accidentally push branches below the bare trunk line or above the top
-        clusteredProgress = Math.max(0.0, Math.min(1.0, clusteredProgress));
-        
-        const bV = bareTrunkRatio + clusteredProgress * (1.0 - bareTrunkRatio);
-        const bY = bV * effectiveHeight;
-
-        if (prng.next() < 0.25 && bV < 0.82) {
-            const stubAngle = b * 2.39996;
-            const stubLen = prng.range(1.5, 3.5);
-            const tRad = baseRadius * (1.0 - Math.pow(bV, 3.0)) + topRadius;
-            const sX = Math.cos(stubAngle) * tRad;
-            const sZ = Math.sin(stubAngle) * tRad;
-            addBranchTube(sX, bY, sZ, sX + Math.cos(stubAngle) * stubLen, bY - 1.0, sZ + Math.sin(stubAngle) * stubLen, 0.35, 0.1, bV);
-            continue;
+        // Top tier extends to the top of the tree
+        let tierYEnd = tierYStart + tierHeightBase * 1.5;
+        if (t === numTiers - 1 && !hasBrokenCrown) {
+            tierYEnd = effectiveHeight;
         }
 
-                let zoneDensityMult = 1.0;
-        let isUpperCrown = false;
-
-        if (bV >= 0.80) {
-            zoneDensityMult = 1.85;
-            isUpperCrown = true;
-        } else if (bV >= 0.65) {
-            zoneDensityMult = 1.30;
-        } else {
-            zoneDensityMult = 0.70;
-        }
-
-        const bAngle = b * 2.39996 + prng.range(-0.15, 0.15);
+        // Taper the radius as we go up
+        const tierRadiusScale = 1.0 - Math.pow(tierProgress, 1.2); 
+        let tierRadius = currentTierRadius * tierRadiusScale;
         
-                // Silhouette Modification 2: Columnar Envelope & Noise Asymmetry
-        const heightProgress = (bV - bareTrunkRatio) / (1.0 - bareTrunkRatio);
+        // Ensure minimum radius
+        tierRadius = Math.max(tierRadius, baseRadius * 1.5);
         
-        let taperCurve = 1.0 - Math.pow(heightProgress, 4.0);
-        let droopAmount = isUpperCrown ? prng.range(0.5, 1.5) : prng.range(3.0, 6.0); // Less droop at the very top
+        // Add random variation to the tier radius to break perfection
+        tierRadius *= prng.range(0.9, 1.1);
+
+        // Low-Poly Geometry: 8-sided massive chunky frustums
+        const sides = 8;
         
-        // Crown Rewrite: Candelabra Override for Ancient Tops
-        let isCandelabraLeader = false;
-        if (isUpperCrown && ageState.includes('ANCIENT')) {
-            // Force the top 12% of branches into massive vertical leaders
-            if (heightProgress > 0.88) {
-                isCandelabraLeader = true;
-                taperCurve = 1.0; // Override taper completely
-                droopAmount = prng.range(-8.0, -4.0); // Grow steeply UPWARDS (negative droop)
-            }
-        }
+        // Random rotation offset per tier
+        const angleOffset = prng.range(0, Math.PI * 2);
         
-        // Crown Rewrite: Broken Crown Shatter Logic
-        if (hasBrokenCrown && heightProgress > 0.80) {
-            isCandelabraLeader = true;
-            taperCurve = 0.8; // Maintain massive width at the break point
-            droopAmount = prng.range(-12.0, -6.0); // Extreme vertical growth to form a multi-pronged shattered top
-        }
+        // We slope the bottom of the tier inwards towards the trunk
+        const bottomRadius = tierRadius * 0.85; 
+        // The top of the tier tapers sharply
+        const topRadius = tierRadius * 0.25;
 
-                // Low-frequency noise creates massive asymmetric limbs reaching for sunlight
-        const asymmetry = noiseGen.noise(bV * 12.0, bAngle * 2.0, 0) * 0.5 + 0.5; // 0.0 to 1.0
+        // Calculate wind sway modifier based on height (bV equivalent)
+        const bV = tierYStart / effectiveHeight;
+        const sway = bV * 0.85; // Wind sway increases with height
         
-        // Combine base length, power curve, and asymmetry.
-        const baseLength = ageState.includes('ANCIENT') ? 14.0 : 10.0;
-        let maxLen = (taperCurve * baseLength) + (asymmetry * 8.0) + 2.5;
-        
-        if (isCandelabraLeader) {
-            maxLen *= prng.range(0.6, 1.4); // Erratic lengths for leaders
-        }
-        
-        const bLength = maxLen * prng.range(0.85, 1.15);
+        // Build the faceted frustum for this tier
+        for (let side = 0; side < sides; side++) {
+            const angle1 = angleOffset + (side / sides) * Math.PI * 2.0;
+            const angle2 = angleOffset + ((side + 1) / sides) * Math.PI * 2.0;
 
-        const tRadius = baseRadius * (1.0 - Math.pow(bV, 3.0)) + topRadius;
-        const rootX = Math.cos(bAngle) * tRadius;
-        const rootZ = Math.sin(bAngle) * tRadius;
+            // X, Z for the two bottom points
+            const bx1 = Math.cos(angle1) * bottomRadius;
+            const bz1 = Math.sin(angle1) * bottomRadius;
+            const bx2 = Math.cos(angle2) * bottomRadius;
+            const bz2 = Math.sin(angle2) * bottomRadius;
 
-        // --- Branch Structure Logic ---
-        // Implement 70° to 85° droop angle (Pitch downwards from horizontal)
-        // Droop decreases (angle gets shallower) towards the top of the tree.
-        let droopDegrees = prng.range(70.0, 85.0);
-        
-        // Reduce droop angle exponentially as we move up the tree, simulating crown reaching for light
-        // 0.0 = horizontal, >0 = pointing downwards
-        if (isCandelabraLeader) {
-            // Candelabra leaders point upwards (negative droop)
-            droopDegrees = prng.range(-45.0, -10.0);
-        } else {
-            // Standard branches droop. Shallow out near the top.
-            const droopEasing = Math.pow(1.0 - heightProgress, 1.5);
-            droopDegrees *= droopEasing;
-        }
+            // X, Z for the two top points
+            const tx1 = Math.cos(angle1) * topRadius;
+            const tz1 = Math.sin(angle1) * topRadius;
+            const tx2 = Math.cos(angle2) * topRadius;
+            const tz2 = Math.sin(angle2) * topRadius;
 
-        const droopRad = droopDegrees * (Math.PI / 180.0);
-        
-        // Calculate tip coordinates using pitch and yaw
-        const pitchCos = Math.cos(droopRad);
-        const pitchSin = Math.sin(droopRad); // Positive goes down
+            // Introduce some vertex jitter (±5%) for organic asymmetry (Requirement 5)
+            const jitterBottom = prng.range(0.95, 1.05);
+            const jitterTop = prng.range(0.95, 1.05);
+            
+            const jbx1 = bx1 * jitterBottom; const jbz1 = bz1 * jitterBottom;
+            const jbx2 = bx2 * jitterBottom; const jbz2 = bz2 * jitterBottom;
+            const jtx1 = tx1 * jitterTop;    const jtz1 = tz1 * jitterTop;
+            const jtx2 = tx2 * jitterTop;    const jtz2 = tz2 * jitterTop;
 
-        const tipX = rootX + Math.cos(bAngle) * (bLength * pitchCos);
-        const tipY = bY - (bLength * pitchSin);
-        const tipZ = rootZ + Math.sin(bAngle) * (bLength * pitchCos);
-        
-        // Exponential Radius Scaling
-        // Ensure candelabra leaders are thick like secondary trunks
-        let bStartRad = Math.max(0.15, (1.0 - bV) * 0.6);
-        let bEndRad = 0.06;
-        if (isCandelabraLeader) {
-            bStartRad = prng.range(0.6, 1.2); // Massive base
-            bEndRad = prng.range(0.2, 0.4);   // Thick tip
-        } else {
-             // Exponential decay: Thick base relative to branch length, tapering sharply
-             bStartRad = (bLength * 0.04) + 0.05; // Base radius scales with length
-             bEndRad = bStartRad * 0.15; // Tip is 15% of the base thickness
-        }
+            // To enforce FLAT SHADING (Requirement 6), we must not share vertices between faces.
+            // Every quad face needs 4 distinct vertices (2 triangles = 6 indices pointing to 4 vertices).
+            
+            // Push Vertices
+            // V0: Bottom Left
+            positions.push(jbx1, tierYStart, jbz1);
+            // V1: Bottom Right
+            positions.push(jbx2, tierYStart, jbz2);
+            // V2: Top Right
+            positions.push(jtx2, tierYEnd, jtz2);
+            // V3: Top Left
+            positions.push(jtx1, tierYEnd, jtz1);
 
-        const use6SideCylinder = (ageState === 'COLOSSAL_ANCIENT') && (bV < 0.75) || isCandelabraLeader;
-        addBranchTube(rootX, bY, rootZ, tipX, tipY, tipZ, bStartRad, bEndRad, bV, use6SideCylinder);
+            // Calculate Flat Normal for the face
+            // Using cross product of (V1-V0) and (V3-V0)
+            const vec1 = [jbx2 - jbx1, 0, jbz2 - jbz1];
+            const vec2 = [jtx1 - jbx1, tierYEnd - tierYStart, jtz1 - jbz1];
+            const nx = vec1[1]*vec2[2] - vec1[2]*vec2[1];
+            const ny = vec1[2]*vec2[0] - vec1[0]*vec2[2];
+            const nz = vec1[0]*vec2[1] - vec1[1]*vec2[0];
+            const nLen = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1.0;
+            
+            const fnx = nx / nLen;
+            const fny = ny / nLen;
+            const fnz = nz / nLen;
 
-                if (bV > 0.62 && prng.next() < reitProbability) {
-            const reitCount = isUpperCrown ? Math.floor(prng.range(2, 4)) : 1;
+            // Push same normal for all 4 vertices
+            normals.push(fnx, fny, fnz);
+            normals.push(fnx, fny, fnz);
+            normals.push(fnx, fny, fnz);
+            normals.push(fnx, fny, fnz);
 
-            for (let rc = 0; rc < reitCount; rc++) {
-                const reitProgress = 0.3 + (rc * 0.25);
-                const reitHeight = prng.range(15.0, 28.0);
-                const reitRad = prng.range(0.35, 0.7);
+            // UVs
+            uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
 
-                const rStartX = rootX + (tipX - rootX) * reitProgress;
-                const rStartY = bY - droopAmount * reitProgress;
-                const rStartZ = rootZ + (tipZ - rootZ) * reitProgress;
+            // Colors (Red channel is used for wind sway)
+            colors.push(sway, 1.0, 0.0);
+            colors.push(sway, 1.0, 0.0);
+            colors.push(sway, 1.0, 0.0);
+            colors.push(sway, 1.0, 0.0);
 
-                const rEndX = rStartX + prng.range(-2.0, 2.0);
-                const rEndY = rStartY + reitHeight;
-                const rEndZ = rStartZ + prng.range(-2.0, 2.0);
-
-                addBranchTube(rStartX, rStartY, rStartZ, rEndX, rEndY, rEndZ, reitRad, 0.1, bV, use6SideCylinder);
-                
-                // Upper Canopy Mass Expansion: Reiterations generate massive foliage clusters
-                addFoliageClusterGroup(rEndX, rEndY, rEndZ, prng.range(10.0, 16.0), bV, 2.0, true);
-            }
-        }
-
-        if (ageState !== 'DYING' || prng.next() > 0.50) {
-            const steps = isUpperCrown ? 4 : 2; // Upper Canopy Mass Expansion: 4 foliage steps instead of 3
-            for (let st = 1; st <= steps; st++) {
-                const frac = 0.5 + (st / steps) * 0.5;
-                const pX = rootX + (tipX - rootX) * frac;
-                const pY = bY + (tipY - bY) * frac;
-                const pZ = rootZ + (tipZ - rootZ) * frac;
-
-                // Upper Canopy Mass Expansion: Massive radii for upper branches
-                const folRadius = isCandelabraLeader ? prng.range(12.0, 18.0) : prng.range(5.5, 9.0);
-                addFoliageClusterGroup(pX, pY, pZ, folRadius, bV, zoneDensityMult, isCandelabraLeader);
-            }
+            // Push Indices (2 triangles per face)
+            foliageIndices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2); // V0, V1, V2
+            foliageIndices.push(vertexOffset, vertexOffset + 2, vertexOffset + 3); // V0, V2, V3
+            
+            vertexOffset += 4;
         }
     }
 
