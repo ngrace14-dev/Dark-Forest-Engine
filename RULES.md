@@ -1,5 +1,5 @@
-# DARK FOREST ENGINE CONSTITUTION v3
-## Engineering, Runtime, Visual, and Hardening Rules
+# DARK FOREST ENGINE CONSTITUTION v4
+## Engineering, Runtime, Visual, Performance, Investigation, and Hardening Rules
 
 # PREAMBLE
 
@@ -17,7 +17,7 @@ Priority Order:
 
 Rendering exists to visualize simulation.
 
-Rendering is never the source of simulation truth.
+Rendering must never become the source of simulation truth.
 
 ---
 
@@ -33,8 +33,8 @@ Never investigate:
 - Materials
 - Lighting
 - Atmosphere
-- Optimization
-- Shader behavior
+- Performance
+- Shaders
 
 until the active runtime path has been identified.
 
@@ -55,18 +55,123 @@ Trees look wrong
 Investigate fog
 ↓
 Investigate shaders
+↓
+Investigate materials
 
 GOOD
 
 Trees look wrong
 ↓
-Identify geometry source
+Identify rendered geometry
 ↓
 Identify renderer path
 ↓
 Identify fallback path
 ↓
 Then investigate visuals
+
+---
+
+# SECTION 0A: REGRESSION INVESTIGATION RULE
+
+When a bug, visual issue, regression, runtime failure,
+or performance problem is reported:
+
+The latest changes are the highest-probability root cause
+until evidence demonstrates otherwise.
+
+Investigation Order:
+
+1. Current Working Diff
+2. Latest Commit
+3. Recently Modified Files
+4. Direct Dependencies
+5. Broader Architecture
+
+Repository evidence takes priority over theoretical investigation.
+
+---
+
+## LATEST CHANGE FIRST RULE
+
+Before broad investigation:
+
+Provide:
+
+CONFIRMED
+
+- Modified Files
+- Modified Functions
+- Responsible System Owners
+- Direct Runtime Impact
+
+Classify:
+
+- RELATED
+- POSSIBLY RELATED
+- UNRELATED
+
+to the reported issue.
+
+---
+
+## RECENT CHANGES EVIDENCE RULE
+
+Every regression investigation must include:
+
+Current Working Diff
+
+OR
+
+Latest Commit
+
+OR
+
+Recent Modified Files
+
+before expanding scope.
+
+Document:
+
+- What changed
+- Who owns it
+- What it affects
+- Whether it could explain symptoms
+
+---
+
+## INVESTIGATION ESCALATION RULE
+
+Only escalate to broader architecture if:
+
+A)
+
+Recent modifications do not explain the problem.
+
+OR
+
+B)
+
+Source evidence disproves recent modifications.
+
+Repository-wide investigations require justification.
+
+---
+
+## POSTMORTEM RULE
+
+When a root cause is found:
+
+Record:
+
+1. Actual Root Cause
+2. Earliest Evidence Available
+3. Earliest Missed Signal
+4. Prevention Rule
+
+Goal:
+
+Never investigate the same failure mode twice.
 
 ---
 
@@ -78,41 +183,43 @@ Rendering exists to visualize simulation.
 
 Rendering must never be the source of simulation truth.
 
-The world state must survive and progress independently of:
+The world state must survive independently of:
 
 - Chunk unloading
 - Renderer destruction
-- Player absence
 - Camera absence
+- Player absence
 - UI absence
 
 Examples:
 
-- Villages update while not rendered
-- Roads age while not rendered
-- Trees grow while not rendered
-- AI simulates while not rendered
+- Villages simulate while unloaded
+- Roads age while unloaded
+- Trees grow while unloaded
+- AI progresses while unloaded
 
 ---
 
 ## PILLAR 2: DETERMINISTIC SIMULATION
 
-Never use uncontrolled randomness for:
-
-- Procedural generation
-- AI decisions
-- Economy logic
-- Simulation
+Never use uncontrolled randomness.
 
 Forbidden:
 
 - Math.random()
 
+for:
+
+- Procedural generation
+- AI decisions
+- Simulation logic
+- Economy logic
+
 Required:
 
 - Seed
-- Entity ID
 - Chunk Coordinate
+- Entity ID
 - World Day
 
 Every bug should be reproducible.
@@ -123,37 +230,37 @@ Every bug should be reproducible.
 
 Assume worlds survive hundreds of in-game days.
 
-When modifying save data:
+Changes to save structures require:
 
-- Preserve compatibility
-- Implement versioning
-- Provide migration paths
-- Add fallback values
+- Versioning
+- Migration
+- Fallback defaults
+- Compatibility
 
-Older saves must never crash.
+Old saves must never hard crash.
 
 ---
 
 ## PILLAR 4: OBSERVABILITY RULE
 
-Critical systems must expose debug information.
+Critical systems require telemetry.
 
-Required telemetry:
+Minimum:
 
 - Loaded Count
 - Active Count
-- Memory Usage
 - Queue Depth
+- Memory Usage
 - Last Tick
 
 Examples:
 
 - Trees
-- Chunks
 - Roads
 - Villages
 - Workers
-- AI
+- NPCs
+- Chunks
 - Caravans
 
 ---
@@ -162,7 +269,7 @@ Examples:
 
 Every domain has exactly one owner.
 
-Required:
+Document:
 
 - Creator
 - Updater
@@ -173,11 +280,11 @@ Examples:
 
 Terrain -> TerrainSystem
 
+Forests -> ForestManager
+
 Villages -> VillageManager
 
 Roads -> RoadManager
-
-Forests -> ForestManager
 
 Narrator -> NarratorSystem
 
@@ -191,11 +298,12 @@ Shared mutable ownership is forbidden.
 
 One approved objective per commit.
 
-No adjacent refactors.
+Forbidden:
 
-No unsolicited architecture changes.
-
-No scope creep.
+- Adjacent refactors
+- Drive-by improvements
+- Unapproved architecture changes
+- Scope creep
 
 ---
 
@@ -203,13 +311,13 @@ No scope creep.
 
 Keep prompts focused.
 
-Do not dump:
+Avoid:
 
-- Massive files
 - Entire repositories
-- Multiple systems
+- Massive files
+- Multiple unrelated systems
 
-into a single request.
+in a single investigation.
 
 ---
 
@@ -219,16 +327,16 @@ Compiling is not success.
 
 Forbidden:
 
-- Empty methods
-- Fake implementations
-- Temporary stubs
+- Empty implementations
+- Stub methods
+- Fake fixes
 - Type abuse
+- Architecture bypasses
 
 If architecture fights the fix:
 
 Stop.
-
-Reassess.
+Re-evaluate.
 
 ---
 
@@ -236,11 +344,11 @@ Reassess.
 
 Before modifying architecture:
 
-1. Identify ownership
-2. Identify authority
-3. Identify callers
-4. Identify dependencies
-5. Gather evidence
+1. Identify ownership.
+2. Identify authority.
+3. Identify callers.
+4. Identify dependencies.
+5. Gather evidence.
 
 Root cause first.
 
@@ -250,37 +358,38 @@ Implementation second.
 
 ## LOCALHOST RULE
 
-Never use localhost as evidence.
+Never treat localhost as evidence.
 
 Do not start:
 
 - npm run dev
 - live-server
-- python -m http.server
 - http-server
+- python -m http.server
 
 unless explicitly requested.
 
 Runtime evidence comes from:
 
-- Logs
 - Screenshots
-- Console output
+- Console logs
+- Runtime behavior
 - User validation
 
 ---
 
 ## EVIDENCE RULE
 
-Claims require source evidence.
+Claims require evidence.
 
 Every confirmed claim should include:
 
 - File
 - Function
+- Owner
 - Source reference
 
-Architecture assertions without evidence are assumptions.
+Architecture claims without evidence are assumptions.
 
 ---
 
@@ -296,11 +405,11 @@ ASSUMPTION
 
 CONFIRMED
 
-Supported by source evidence.
+Supported by source code.
 
 ASSUMPTION
 
-Not yet verified.
+Not yet supported.
 
 Assumptions must never be presented as facts.
 
@@ -320,21 +429,19 @@ Every implementation must define:
 - Verification Steps
 - Failure Symptoms
 
-Visual changes require screenshots whenever practical.
+Visual work requires screenshots whenever practical.
 
 ---
 
 ## RUNTIME STATE CLAIM RULE
 
-Forbidden status:
+Forbidden without runtime evidence:
 
 - Fixed
 - Working
 - Resolved
 - Successful
 - Verified
-
-without runtime evidence.
 
 Allowed statuses:
 
@@ -356,24 +463,24 @@ Whenever modifying:
 
 - Geometry
 - Canopies
-- Materials
 - Roots
+- Materials
 - Atmosphere
 
 ### NPCs
 
 - Models
-- Silhouettes
 - Equipment
 - LODs
+- Silhouettes
 
 ### Player
 
 - Character
 - Equipment
-- Visuals
+- Appearance
 
-Required:
+Required Status:
 
 VISUAL VALIDATION REQUIRED
 
@@ -383,13 +490,13 @@ Provide screenshots.
 
 ## PUBLIC API CONTRACT RULE
 
-Public APIs are contracts.
+Public methods are contracts.
 
 Examples:
 
+- generateChunk()
 - requestChunkData()
 - spawnVillage()
-- generateChunk()
 
 Before changing:
 
@@ -397,13 +504,13 @@ Before changing:
 - Update callers
 - Validate runtime behavior
 
-Breaking contracts requires updating all dependencies.
+Breaking contracts requires updating dependencies.
 
 ---
 
 ## TICK INDEPENDENCE RULE
 
-Simulation may not depend on framerate.
+Simulation must not depend on framerate.
 
 Required:
 
@@ -411,7 +518,7 @@ Required:
 OR
 - Fixed Tick
 
-Simulation outcomes must remain identical regardless of FPS.
+Simulation outcomes must remain consistent.
 
 ---
 
@@ -429,13 +536,11 @@ Workers may never access:
 
 Workers compute.
 
-Main thread consumes.
+Main Thread consumes.
 
 ---
 
 ## VRAM SAFETY RULE
-
-Destroying objects does not destroy assets.
 
 Always dispose:
 
@@ -444,7 +549,7 @@ Always dispose:
 - Textures
 - Render Targets
 
-No VRAM leaks.
+Destroying objects does not free assets.
 
 ---
 
@@ -462,7 +567,7 @@ Systems must unsubscribe when:
 
 ## FAIL SAFE RULE
 
-Always verify existence before access.
+Verify existence before access.
 
 Examples:
 
@@ -470,7 +575,7 @@ Examples:
 - Roads
 - Entities
 - Chunks
-- Events
+- Payloads
 
 Unexpected situations should:
 
@@ -512,39 +617,39 @@ Ancient Low-Poly Redwoods
 
 Required:
 
-- Root Flare
+- Massive Root Flare
 - Tapered Trunk
-- Layered Frustum Canopies
+- Layered Frustum Shelves
 - Flat Shading
-- Strong Silhouettes
+- Strong Silhouette
 
 Forbidden:
 
 - Leaf Cards
 - Needle Cards
+- Cross Planes
 - Alpha Foliage
 - Transparent Canopies
-- Cross Planes
 
 ---
 
 ## Tree FailSafe Rule
 
-Forbidden fallback:
+Forbidden Fallback:
 
 CylinderGeometry(0.5, 2.5, 40, 12)
 
-Required fallback:
+Required Fallback:
 
 Ancient Redwood Primitive
 
-Consisting of:
+Containing:
 
 - Root Flare
 - Tapered Trunk
-- 3 Frustum Canopy Shelves
+- Frustum Canopies
 
-Even failures must follow the visual constitution.
+Failures must still conform to style.
 
 ---
 
@@ -578,7 +683,7 @@ Required:
 - Cube Head
 - Frustum Body
 - Primitive Equipment
-- Silhouette Readability
+- Silhouette Recognition
 
 Visible limbs are optional.
 
@@ -602,13 +707,15 @@ Face
 - Detailed Anatomy
 - Fingers
 - Muscles
-- Tiny Accessories
+- Tiny Props
 
 ---
 
 # SECTION 8: EQUIPMENT RULES
 
-Built from:
+Primitive Construction Only
+
+Allowed:
 
 - Box
 - Frustum
@@ -646,7 +753,7 @@ Ancient Storybook Gothic
 Required:
 
 - Tapered Walls
-- Grounded Foundations
+- Grounded Bases
 - Heavy Roofs
 - Strong Silhouettes
 
@@ -672,8 +779,6 @@ Gray Debug Cubes
 
 # SECTION 10: PROP RULES
 
-Required:
-
 Power Stone
 
 - Octahedron
@@ -686,25 +791,25 @@ Merchant Chest
 
 - Heavy Box
 
-Bench
-
-- Box + Wedge Supports
-
 Fire Pit
 
 - Frustum Brazier
 
+Bench
+
+- Box + Wedge Supports
+
 Props must follow:
 
-Box Rule
-Frustum Rule
-Grounding Rule
+- Box Rule
+- Frustum Rule
+- Grounding Rule
 
 ---
 
 # SECTION 11: INVESTIGATION BUDGET RULE
 
-Each cycle must be:
+Every issue follows:
 
 One Problem
 ↓
@@ -718,9 +823,67 @@ Avoid:
 
 One Problem
 ↓
-20 Investigations
+Many Theories
+↓
+Many Investigations
 ↓
 No Validation
+
+Validation should happen as early as possible.
+
+---
+
+# SECTION 12: CURRENT PROJECT PRIORITIES
+
+Priority 1
+
+Ancient Redwood Rendering
+
+Status:
+
+IMPLEMENTED + AWAITING VALIDATION
+
+---
+
+Priority 2
+
+Redwood Terrain
+
+Status:
+
+IMPLEMENTED + AWAITING VALIDATION
+
+---
+
+Priority 3
+
+Folk Miniature NPC System
+
+Status:
+
+DESIGN LOCKED
+
+---
+
+Priority 4
+
+Player Character
+
+Status:
+
+NOT IMPLEMENTED
+
+---
+
+Priority 5
+
+Settlements / Props / Composition
+
+Only after:
+
+- Trees validate
+- NPCs validate
+- Player validates
 
 ---
 
@@ -780,4 +943,4 @@ Busier.
 More Simulated.
 More Dynamic.
 
-Design for expansion without unnecessary complexity.
+Design for future expansion without unnecessary complexity.
