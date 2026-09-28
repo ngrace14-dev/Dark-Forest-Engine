@@ -140,8 +140,6 @@ export class EpochManager {
             height = duneNoise + (this.noise2D(x * 0.001, z * 0.001) * 10);
         }
 
-        // BIOME SPECIFIC HEIGHT MODIFIERS
-        const biomeKey = this.getBiome(x, z);
         if (biomeKey === 'alpine') {
             height += Math.max(0, this.noise2D(x * 0.01, z * 0.01) * 20);
         }
