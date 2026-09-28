@@ -76,7 +76,7 @@ function assembleShader(shader, snippets) {
         );
     }
 
-    // FRAG_COLOR: Inject after diffuse color is calculated but before lighting
+    // FRAG_COLOR: \\n                // Enforce sharp alpha-testing to carve out evergreen needle shapes\n                if (diffuseColor.a < 0.5) {\n                    discard;\n                }\n\n                // Deterministic color variation using the instance seed\n                float seedNoise = fract(sin(vInstanceData.x * 12.9898) * 43758.5453);\n                \n                vec3 baseNeedleColor = vec3(0.06, 0.18, 0.08);\n                vec3 driedNeedleColor = vec3(0.12, 0.15, 0.05);\n                \n                // Slightly mix in dried needle colors based on seed to break uniformity\n                diffuseColor.rgb = mix(baseNeedleColor, driedNeedleColor, seedNoise * 0.3);\n            \\n        });              // Enforce sharp alpha-testing to carve out evergreen needle shapes\n                if (diffuseColor.a < 0.5) {\n                    discard;\n                }\n\n                // Deterministic color variation using the instance seed\n                float seedNoise = fract(sin(vInstanceData.x * 12.9898) * 43758.5453);\n                \n                vec3 baseNeedleColor = vec3(0.06, 0.18, 0.08);\n                vec3 driedNeedleColor = vec3(0.12, 0.15, 0.05);\n                \n                // Slightly mix in dried needle colors based on seed to break uniformity\n                diffuseColor.rgb = mix(baseNeedleColor, driedNeedleColor, seedNoise * 0.3);\n            \t after diffuse color is calculated but before lighting
     if (snippets.FRAG_COLOR) {
         shader.fragmentShader = shader.fragmentShader.replace(
             '#include <color_fragment>',
