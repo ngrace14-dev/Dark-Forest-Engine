@@ -2149,10 +2149,11 @@ async function bootEngine() {
                     float snowMask = smoothstep(4200.0, 6500.0, vHeight);
                     color = mix(color, snowColor, snowMask);
 
-                    float distToCam = distance(cameraPosition, vWorldPos);
-                    float fogFactor = smoothstep(0.0, 600000.0, distToCam);
+                                        float distToCam = distance(cameraPosition, vWorldPos);
+                    // Stronger atmospheric perspective: mountains heavily hazed from forest center
+                    float fogFactor = smoothstep(0.0, 450000.0, distToCam);
                       
-                    gl_FragColor = vec4(mix(color, fogColor, fogFactor * 0.95), 1.0);
+                    gl_FragColor = vec4(mix(color, fogColor, fogFactor * 0.97), 1.0);
                 }
             `
         });
