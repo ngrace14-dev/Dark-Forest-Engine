@@ -306,7 +306,8 @@ export function createTrunkMaterial(options = {}) {
                 
                 // Fake Ambient Occlusion: Darken the deep crevices so they read despite high ambient light
                 float barkValSample = getBarkBump(vTrunkUv, vWorldPos.y, vInstanceData.x);
-                float creviceAO = mix(0.55, 1.0, barkValSample);
+                // Phase 9 FIX: Softened crevice AO from 0.55 to 0.7 to preserve trunk readability
+                float creviceAO = mix(0.7, 1.0, barkValSample);
                 barkBaseColor *= creviceAO;
 
                 // --- Procedural Moss Accumulation ---
@@ -363,10 +364,11 @@ export function createTrunkMaterial(options = {}) {
                 // Blend the entire existing diffuse (bark + moss) into the soil color based on proximity
                 diffuseColor.rgb = mix(diffuseColor.rgb, soilColor, groundProximity * 0.9);
                 
-                // SSAO & Contact Shadows
+                                // SSAO & Contact Shadows
                 // Simulate dense ambient occlusion where roots burrow into the dirt
-                // Clamp the shadow so it doesn't become pitch black (minimum 0.15)
-                float contactShadow = mix(1.0, 0.15, groundProximity);
+                // Phase 9 FIX: Lift minimum shadow brightness to ensure silhouette readability 
+                // in dense forest regions per the FOREST READABILITY RULE.
+                float contactShadow = mix(1.0, 0.35, groundProximity);
                 diffuseColor.rgb *= contactShadow;
             `
         });
