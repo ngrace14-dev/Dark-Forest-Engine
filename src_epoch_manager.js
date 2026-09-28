@@ -44,17 +44,26 @@ export class EpochManager {
 
     getBiome(x, z) {
         const halfForestSide = this.config.darkForestSideMeters / 2;
+        const mountainWidth = this.config.mountainRingWidthMeters;
         const furthestAxisDistance = Math.max(Math.abs(x), Math.abs(z));
         
-        // World Borders
-        if (furthestAxisDistance > halfForestSide + this.config.mountainRingWidthMeters) return 'desert';
-        if (furthestAxisDistance > halfForestSide) return 'sierra';
+        // DISC 3: THE ENDLESS DUNES
+        if (furthestAxisDistance > halfForestSide + mountainWidth) return 'desert';
         
-        // Procedural Forest Biomes
+        // DISC 2: THE MOUNTAIN RING
+        if (furthestAxisDistance > halfForestSide) {
+            const val = this.getNoise(x, z);
+            // Mix high-altitude alpine peaks into the sierra wall
+            return val > 0.3 ? 'alpine' : 'sierra';
+        }
+        
+        // DISC 1: THE DARK FOREST
+        // Allowed: redwoods, valley, coastal. Forbidden: alpine.
         const val = this.getNoise(x, z);
-        if (val > 0.45) return 'alpine';
         if (val < -0.3) return 'coastal';
-        if (val > -0.3 && val < 0.1) return 'valley';
+        if (val >= -0.3 && val < 0.1) return 'valley';
+        
+        // Remap all high-noise (previously alpine) to redwoods
         return 'redwoods';
     }
 
