@@ -307,7 +307,7 @@ function buildRedwoodMesh(ageState, seed) {
             radius *= (1.0 + (v - 0.88) * 2.5);
         }
 
-        const flareIntensity = v < 0.24 ? Math.pow(1.0 - (v / 0.24), 2.6) : 0.0;
+                const flareIntensity = v < 0.28 ? Math.pow(1.0 - (v / 0.28), 1.8) : 0.0;
 
         for (let r = 0; r <= radialSegs; r++) {
             const u = r / radialSegs;
@@ -316,12 +316,23 @@ function buildRedwoodMesh(ageState, seed) {
             const cosT = Math.cos(theta);
             const sinT = Math.sin(theta);
 
-                        let burlDisplacement = 0.0;
+                        // --- 1. Bark Fluting (Redwood-style vertical ribs) ---
+            // Large facets to match storybook gothic style
+            const fluteCount = 12.0; 
+            const fluteWave = Math.sin(u * Math.PI * 2.0 * fluteCount + v * 5.0);
+            const fluting = (Math.pow(abs(fluteWave), 0.7) - 0.5) * (radius * 0.15);
+
+                        // --- 2. Enhanced Root Flare ---
+            let burlDisplacement = 0.0;
             let n1 = 0.0;
             if (flareIntensity > 0.0) {
-                n1 = Math.max(0.0, noiseGen.noise(cosT * 2.5, sinT * 2.5, v * 6.0));
-                const n2 = Math.sin(theta * 7.0) * 0.45 + Math.cos(theta * 4.0) * 0.3;
-                burlDisplacement = (n1 * 0.7 + n2 * 0.3) * flareIntensity * flareAggression;
+                // Primary buttress lobes
+                const buttressCount = 6.0;
+                const buttressWave = Math.sin(u * Math.PI * 2.0 * buttressCount + v * 2.0);
+                const buttress = Math.max(0.0, buttressWave) * flareAggression * 1.5;
+                
+                n1 = Math.max(0.0, noiseGen.noise(cosT * 2.0, sinT * 2.0, v * 4.0));
+                burlDisplacement = (buttress + n1 * flareAggression) * flareIntensity;
             }
 
                         const phaseShift = v * 8.0 + n1 * 2.0;
@@ -335,7 +346,8 @@ function buildRedwoodMesh(ageState, seed) {
                                                 // Recover Ancient Character: 0.25 depth allows bark to carve deep, twisting tendons around the burls
                         const ridgeNoise = (plateShape - 0.5) * (radius * 0.25) * (1.0 - v * 0.8);
 
-                        const currentRadius = radius + burlDisplacement + ridgeNoise;
+                        const currentRadius = radius + burlDisplacement + ridgeNoise + fluting;
+
             const px = cosT * currentRadius + driftX;
             const py = currentY;
             const pz = sinT * currentRadius + driftZ;
