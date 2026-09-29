@@ -1109,13 +1109,15 @@ const ChunkManager = {
                     }
                 }
 
-                                                                const biomeKey = window.WorldGenerator?.getBiome?.(chunkX, chunkZ) || 'redwoods';
+                                                                                const biomeKey = window.WorldGenerator?.getBiome?.(chunkX, chunkZ) || 'redwoods';
+                const chunkData = window.ForestManager?.generateChunk?.(cx, cz) || { tierA: [], tierB: [] };
                 
-                                if (window.GrassSystem) {
-                                    window.GrassSystem.spawnFloorPatch(key, cx, cz, biomeKey, chunkData.tierA);
-                                }
+                if (window.GrassSystem) {
+                    window.GrassSystem.spawnFloorPatch(key, cx, cz, biomeKey, chunkData.tierA, localRoadPoints);
+                }
 
-                                window.EventBus?.emit('CHUNK_GENERATED');
+                window.EventBus?.emit('CHUNK_GENERATED');
+
 
 
             }
