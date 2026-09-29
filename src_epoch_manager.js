@@ -99,19 +99,25 @@ export class EpochManager {
         const biomeKey = this.getBiome(x, z);
 
         // 1. THE REDWOOD BASIN (DISC 1)
-        // Almost flat in the center, rising very gradually toward the Sierra Wall
+        // Extremely flat center, rising to a gentle rim, then climbing to the Sierra Wall
         let height = 0;
         if (dist <= halfForestSide) {
-            // Base Basin Incline (Gradual rise from center to edge)
             const basinT = dist / halfForestSide;
-            height = Math.pow(basinT, 3.0) * 120.0; // Very gradual curve, reaching 120m at the very edge
-
-            // Macro-Flattened Noise (Barely perceptible rolling)
-            const baseNoise = this.noise2D(x * 0.002, z * 0.002) * 4.0;
-            const detailNoise = this.noise2D(x * 0.04, z * 0.04) * 0.8;
             
-            // Influence of noise is highest in center, but generally very low
-            height += (baseNoise + detailNoise) * (1.0 - Math.pow(basinT, 2.0));
+            // Basin Base Elevation: Exponential rise pushed to the outer rim
+            height = Math.pow(basinT, 4.0) * 120.0; 
+
+            // Organic Terrain Variation (Normalized to meet target ranges)
+            // Center (T=0): +/- 0.5m (1m total)
+            // Mid (T=0.5): +/- 2.5m (5m total)
+            // Edge (T=1.0): +/- 10m (20m total)
+            const varAmp = 0.5 + (basinT * 9.5);
+            
+            // Large-scale geological swells only. No micro-noise.
+            const swell = this.noise2D(x * 0.0008, z * 0.0008); 
+            const ripple = this.noise2D(x * 0.005, z * 0.005) * 0.15;
+            
+            height += (swell + ripple) * varAmp;
         }
 
         // 2. THE MOUNTAIN RING (100 MILES THICK)

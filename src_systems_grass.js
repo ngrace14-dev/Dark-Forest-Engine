@@ -20,24 +20,15 @@ export class GrassSystem {
     }
 
     initGeometry() {
-        // Archetype 1: Moss Block (Low profile beveled volume)
-        this.mossGeo = new THREE.BoxGeometry(0.4, 0.2, 0.4);
-        this.mossGeo.translate(0, 0.1, 0);
-
-        // Archetype 2: Fern Wedge (Gothic cluster of 3 wedges)
-        const wedgeParts = [];
-        for (let i = 0; i < 3; i++) {
-            const w = new THREE.ConeGeometry(0.15, 0.4, 3);
-            w.rotateX(0.2); // Lean
-            w.rotateY((i / 3) * Math.PI * 2);
-            w.translate(0, 0.2, 0);
-            wedgeParts.push(w);
+        // Overhauled to Cluster-per-Instance
+        const tuftParts = [];
+        for(let i=0; i<5; i++) {
+            const blade = new THREE.ConeGeometry(0.08, 1.5, 3);
+            blade.rotateX((Math.random()-0.5)*0.5);
+            blade.translate((Math.random()-0.5)*0.3, 0.75, (Math.random()-0.5)*0.3);
+            tuftParts.push(blade);
         }
-        this.fernGeo = BufferGeometryUtils.mergeGeometries(wedgeParts);
-
-        // Archetype 3: Tall Sentinel (Single vertical gothic wedge)
-        this.sentinelGeo = new THREE.ConeGeometry(0.1, 0.8, 3);
-        this.sentinelGeo.translate(0, 0.4, 0);
+        this.tuftGeo = BufferGeometryUtils.mergeGeometries(tuftParts);
     }
 
         initMaterials() {
