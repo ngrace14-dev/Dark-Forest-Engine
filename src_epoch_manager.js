@@ -98,19 +98,27 @@ export class EpochManager {
         // BIOME SPECIFIC HEIGHT MODIFIERS
         const biomeKey = this.getBiome(x, z);
 
-        // BASE NOISE (Rolling terrain)
-        let height = this.noise2D(x * 0.005, z * 0.005) * 8;
-        height += this.noise2D(x * 0.05, z * 0.05) * 1.5; // Roughness
-        
-        // --- REDWOOD TERRAIN FLATTENING ---
-        // Ancient Redwoods require relatively flat ground for massive roots and villages
-        if (biomeKey === 'redwoods') {
-            height *= 0.25; // Drastically flatten macro rolling hills
-            height += this.noise2D(x * 0.01, z * 0.01) * 3; // Add very gentle sloping instead
+        // 1. THE REDWOOD BASIN (DISC 1)
+        // Almost flat in the center, rising very gradually toward the Sierra Wall
+        let height = 0;
+        if (dist <= halfForestSide) {
+            // Base Basin Incline (Gradual rise from center to edge)
+            const basinT = dist / halfForestSide;
+            height = Math.pow(basinT, 3.0) * 120.0; // Very gradual curve, reaching 120m at the very edge
+
+            // Macro-Flattened Noise (Barely perceptible rolling)
+            const baseNoise = this.noise2D(x * 0.002, z * 0.002) * 4.0;
+            const detailNoise = this.noise2D(x * 0.04, z * 0.04) * 0.8;
+            
+            // Influence of noise is highest in center, but generally very low
+            height += (baseNoise + detailNoise) * (1.0 - Math.pow(basinT, 2.0));
         }
 
-        // 1. THE MOUNTAIN RING (100 MILES THICK)
+        // 2. THE MOUNTAIN RING (100 MILES THICK)
         if (dist > halfForestSide && dist <= halfForestSide + mountainWidth) {
+            // Basin Edge Transition (Starts from the 120m basin rim)
+            height = 120.0; 
+
             // Distance from the inner forest edge to the mountain peak
             const mountainT = (dist - halfForestSide) / mountainWidth; 
             
@@ -142,15 +150,16 @@ export class EpochManager {
             }
         }
 
-        // 2. THE INFINITE DUNES (PAST THE MOUNTAINS)
+        // 3. THE INFINITE DUNES (PAST THE MOUNTAINS)
         if (dist > halfForestSide + mountainWidth) {
             // High frequency, low amplitude rolling sand dunes
             const duneNoise = Math.sin(x * 0.02) * Math.cos(z * 0.02) * 15;
             height = duneNoise + (this.noise2D(x * 0.001, z * 0.001) * 10);
         }
 
-        if (biomeKey === 'alpine') {
-            height += Math.max(0, this.noise2D(x * 0.01, z * 0.01) * 20);
+        if (biomeKey === 'alpine' && dist <= halfForestSide) {
+            // Fallback for internal alpine biomes if they appear - make them gentle hills
+            height += Math.max(0, this.noise2D(x * 0.01, z * 0.01) * 10.0);
         }
 
         return height;
