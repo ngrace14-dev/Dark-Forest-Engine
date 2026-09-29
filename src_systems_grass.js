@@ -74,7 +74,7 @@ export class GrassSystem {
             };
         }
 
-    spawnFloorPatch(chunkKey, cx, cz, biomeKey, clusterPoints = [], roadPoints = []) {
+        spawnFloorPatch(chunkKey, cx, cz, biomeKey, clusterPoints = [], roadPoints = []) {
         if (!this.initialized || !this.scene) return;
         if (this.grassChunks.has(chunkKey)) return;
 
@@ -83,17 +83,16 @@ export class GrassSystem {
         if (biomeKey === 'redwoods') baseDensity = 4000;
         else if (biomeKey === 'valley') baseDensity = 2000;
 
-        // Budget split across layers
-        const mossCount = Math.floor(baseDensity * 1.0);     // Layer 1
-        const fernCount = Math.floor(baseDensity * 0.4);     // Layer 2
-        const shardCount = Math.floor(baseDensity * 0.3);    // Layer 3
-        const sentinelCount = Math.floor(baseDensity * 0.1); // Layer 4
+        const totalMoss = baseDensity;
+        const totalFern = Math.floor(baseDensity * 0.4);
+        const totalShard = Math.floor(baseDensity * 0.3);
+        const totalSentinel = Math.floor(baseDensity * 0.1);
         
         const group = new THREE.Group();
-        const mossMesh = new THREE.InstancedMesh(this.mossGeo, this.floorMaterial, mossCount);
-        const fernMesh = new THREE.InstancedMesh(this.fernGeo, this.floorMaterial, fernCount);
-        const shardMesh = new THREE.InstancedMesh(this.shardGeo, this.floorMaterial, shardCount);
-        const sentinelMesh = new THREE.InstancedMesh(this.sentinelGeo, this.floorMaterial, sentinelCount);
+        const mossMesh = new THREE.InstancedMesh(this.mossGeo, this.floorMaterial, totalMoss);
+        const fernMesh = new THREE.InstancedMesh(this.fernGeo, this.floorMaterial, totalFern);
+        const shardMesh = new THREE.InstancedMesh(this.shardGeo, this.floorMaterial, totalShard);
+        const sentinelMesh = new THREE.InstancedMesh(this.sentinelGeo, this.floorMaterial, totalSentinel);
 
         // --- DEBUG COLORS ---
         const magenta = new THREE.Color(0xff00ff);
@@ -105,28 +104,27 @@ export class GrassSystem {
         const getTerrainY = (x, z) => window.WorldGenerator?.getTerrainHeight?.(x, z) ?? 0;
 
         let mIdx = 0, fIdx = 0, shIdx = 0, sIdx = 0;
-        const chunkX = cx * 60 + 30; // SYNCED: cx * 60 + 30
-        const chunkZ = cz * 60 + 30; // SYNCED: cz * 60 + 30
+        const chunkX = cx * 60 + 30;
+        const chunkZ = cz * 60 + 30;
 
         // --- 2. ROOT ACCENTS & CLUSTERED PLACEMENT ---
         clusterPoints.forEach(pt => {
-            const clusterSize = 12 + Math.floor(Math.random() * 8);
+            const clusterSize = 16 + Math.floor(Math.random() * 12);
             for (let i = 0; i < clusterSize; i++) {
                 const angle = Math.random() * Math.PI * 2;
-                const dist = 1.0 + Math.random() * 4.0;
+                const dist = 1.0 + Math.random() * 5.0;
                 const wx = pt.x + Math.cos(angle) * dist;
                 const wz = pt.z + Math.sin(angle) * dist;
                 const wy = getTerrainY(wx, wz);
 
-                                // Cluster priority: Skirt the trunks with moss and ferns
-                if (mIdx < mossCount) {
+                if (mIdx < totalMoss) {
                     dummy.position.set(wx, wy + 0.1, wz); 
                     dummy.scale.set(1.2 + Math.random() * 0.8, 0.8 + Math.random(), 1.2 + Math.random() * 0.8);
                     dummy.updateMatrix();
                     mossMesh.setMatrixAt(mIdx++, dummy.matrix);
                     mossMesh.setColorAt(mIdx - 1, magenta);
                 }
-                if (fIdx < fernCount && i % 2 === 0) {
+                if (fIdx < totalFern && i % 2 === 0) {
                     dummy.position.set(wx, wy + 0.1, wz);
                     dummy.scale.setScalar(0.8 + Math.random() * 0.6);
                     dummy.updateMatrix();
@@ -136,67 +134,81 @@ export class GrassSystem {
             }
         });
 
-        // --- 3. LAYERED SCATTER (AMBIENT COVERAGE) ---
-        const remainingMossCount = Math.max(1, mossCount - mIdx);
-        const step = 60.0 / Math.sqrt(remainingMossCount);
-        for (let x = -30.0; x < 30.0; x += step) {
-            for (let z = -30.0; z < 30.0; z += step) {
-                const wx = chunkX + x + (Math.random() - 0.5) * step;
-                const wz = chunkZ + z + (Math.random() - 0.5) * step;
-                
-                // --- ROAD & VILLAGE MASKING ---
-                let coverageMod = 1.0;
-                if (roadPoints && roadPoints.length > 0) {
-                    let minDistSq = 10000.0;
-                    roadPoints.forEach(rp => {
-                        const d2 = Math.pow(wx - rp.x, 2) + Math.pow(wz - rp.z, 2);
-                        if (d2 < minDistSq) minDistSq = d2;
-                    });
-                    if (minDistSq < 16.0) coverageMod = 0.2; 
-                    else if (minDistSq < 64.0) coverageMod = 0.5;
-                }
+        // --- 3. LAYERED SCATTER (PATCHY COVERAGE) ---
+        const getPatchDensity = (x, z) => {
+            const n = Math.sin(x * 0.05) * Math.cos(z * 0.05) + 
+                      Math.sin(x * 0.15) * 0.5 + 
+                      Math.cos(z * 0.12) * 0.5;
+            return (n + 1.0) * 0.5;
+        };
 
-                if (Math.random() > coverageMod) continue;
+        let attempts = 0;
+        const remainingMoss = totalMoss - mIdx;
+        const maxAttempts = remainingMoss * 4;
 
-                const wy = getTerrainY(wx, wz);
+        while (mIdx < totalMoss && attempts < maxAttempts) {
+            attempts++;
+            const wx = chunkX + (Math.random() - 0.5) * 60;
+            const wz = chunkZ + (Math.random() - 0.5) * 60;
+            
+            const patchMask = getPatchDensity(wx, wz);
+            if (Math.random() > patchMask) continue;
 
-                                // Layer 1: Moss Carpet (High coverage)
-                if (mIdx < mossCount) {
-                    dummy.position.set(wx, wy + 0.05, wz); 
-                    dummy.rotation.y = Math.random() * Math.PI;
-                    dummy.scale.set(1.5 + Math.random() * 1.5, 0.5, 1.5 + Math.random() * 1.5);
-                    dummy.updateMatrix();
-                    mossMesh.setMatrixAt(mIdx++, dummy.matrix);
-                    mossMesh.setColorAt(mIdx - 1, magenta);
-                }
+            let coverageMod = 1.0;
+            if (roadPoints && roadPoints.length > 0) {
+                let minDistSq = 10000.0;
+                roadPoints.forEach(rp => {
+                    const d2 = Math.pow(wx - rp.x, 2) + Math.pow(wz - rp.z, 2);
+                    if (d2 < minDistSq) minDistSq = d2;
+                });
+                if (minDistSq < 16.0) coverageMod = 0.1; 
+                else if (minDistSq < 64.0) coverageMod = 0.4;
+            }
+            if (Math.random() > coverageMod) continue;
 
-                // Layer 2: Fern Tiers (Island clusters)
-                if (fIdx < fernCount && Math.random() < 0.25) {
-                    dummy.position.set(wx, wy + 0.1, wz);
-                    dummy.scale.setScalar(0.5 + Math.random() * 1.5);
-                    dummy.updateMatrix();
-                    fernMesh.setMatrixAt(fIdx++, dummy.matrix);
-                    fernMesh.setColorAt(fIdx - 1, cyan);
-                }
+            const wy = getTerrainY(wx, wz);
 
-                // Layer 3: Ground Shards (Details)
-                if (shIdx < shardCount && Math.random() < 0.2) {
-                    dummy.position.set(wx, wy + 0.1, wz);
-                    dummy.rotation.y = Math.random() * Math.PI * 2;
-                    dummy.scale.setScalar(0.4 + Math.random() * 1.2);
-                    dummy.updateMatrix();
-                    shardMesh.setMatrixAt(shIdx++, dummy.matrix);
-                    shardMesh.setColorAt(shIdx - 1, yellow);
-                }
+            // Layer 1: Moss Carpet (High organic variation)
+            const moundRoll = Math.random();
+            dummy.position.set(wx, wy + 0.05, wz);
+            dummy.rotation.y = Math.random() * Math.PI;
+            
+            if (moundRoll < 0.25) { // The Mound
+                dummy.scale.set(1.5 + Math.random(), 1.2 + Math.random() * 2.5, 1.5 + Math.random());
+            } else { // The Slab
+                dummy.scale.set(1.5 + Math.random() * 1.5, 0.4 + Math.random() * 0.4, 1.5 + Math.random() * 1.5);
+            }
+            
+            dummy.updateMatrix();
+            mossMesh.setMatrixAt(mIdx++, dummy.matrix);
+            mossMesh.setColorAt(mIdx - 1, magenta);
 
-                // Layer 4: Sentinels (Accents)
-                if (sIdx < sentinelCount && Math.random() < 0.05) {
-                    dummy.position.set(wx, wy + 0.1, wz);
-                    dummy.scale.setScalar(0.8 + Math.random() * 1.0);
-                    dummy.updateMatrix();
-                    sentinelMesh.setMatrixAt(sIdx++, dummy.matrix);
-                    sentinelMesh.setColorAt(sIdx - 1, red);
-                }
+            // Layer 2: Fern Tiers (Attracted to Moss Patches)
+            if (fIdx < totalFern && Math.random() < 0.35) {
+                dummy.position.set(wx + (Math.random()-0.5), wy + 0.1, wz + (Math.random()-0.5));
+                dummy.scale.setScalar(0.6 + Math.random() * 1.4);
+                dummy.updateMatrix();
+                fernMesh.setMatrixAt(fIdx++, dummy.matrix);
+                fernMesh.setColorAt(fIdx - 1, cyan);
+            }
+
+            // Layer 3: Ground Shards
+            if (shIdx < totalShard && Math.random() < 0.25) {
+                dummy.position.set(wx, wy + 0.1, wz);
+                dummy.rotation.y = Math.random() * Math.PI * 2;
+                dummy.scale.setScalar(0.5 + Math.random() * 1.2);
+                dummy.updateMatrix();
+                shardMesh.setMatrixAt(shIdx++, dummy.matrix);
+                shardMesh.setColorAt(shIdx - 1, yellow);
+            }
+
+            // Layer 4: Sentinels
+            if (sIdx < totalSentinel && Math.random() < 0.06) {
+                dummy.position.set(wx, wy + 0.1, wz);
+                dummy.scale.setScalar(0.8 + Math.random() * 1.2);
+                dummy.updateMatrix();
+                sentinelMesh.setMatrixAt(sIdx++, dummy.matrix);
+                sentinelMesh.setColorAt(sIdx - 1, red);
             }
         }
 
