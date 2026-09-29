@@ -8,24 +8,24 @@ import * as THREE from 'three';
 
 // --- Species Parameter Specifications (Sequoia sempervirens) ---
 export const REDWOOD_SPECIES_CONFIG = {
-    ANCIENT: {
-        heightRange: [85.0, 100.0],       // ~280 - 325 ft
-        baseRadiusRange: [3.8, 5.2],     // ~25 - 34 ft base diameter
-        topRadius: 0.35,
-        flareAggression: 4.2,             // Massive root buttresses
-        bareTrunkRatio: 0.62,             // Bottom 62% bare trunk (self-pruned)
+        ANCIENT: {
+        heightRange: [95.0, 115.0],       // Tall cathedral columns
+        baseRadiusRange: [6.0, 8.5],     // Gigantic base
+        topRadius: 0.65,
+        flareAggression: 6.8,             // Sinuous, massive flares
+        bareTrunkRatio: 0.55,             // 55% bare to see forest floor
         branchCount: 45,
-        canopySpread: 14.0,
+        canopySpread: 24.0,              // Massive overhang to close sky
         foliageDensity: 0.85
     },
     MATURE: {
-        heightRange: [60.0, 80.0],
-        baseRadiusRange: [2.2, 3.5],
-        topRadius: 0.25,
-        flareAggression: 2.8,
-        bareTrunkRatio: 0.48,
+        heightRange: [75.0, 95.0],
+        baseRadiusRange: [4.0, 5.5],
+        topRadius: 0.45,
+        flareAggression: 4.8,
+        bareTrunkRatio: 0.45,
         branchCount: 38,
-        canopySpread: 10.0,
+        canopySpread: 18.0,
         foliageDensity: 0.90
     },
     YOUNG: {

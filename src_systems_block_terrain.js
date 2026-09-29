@@ -391,12 +391,12 @@ export class BlockTerrainSystem {
             }
         });
 
-        const step = 24.0;
+                const step = 32.0; // Increased spacing (from 24.0)
 
         for (let x = startX; x < endX; x += step) {
             for (let z = startZ; z < endZ; z += step) {
-                const wx = x + (this.hash2D(x, z) - 0.5) * (step * 0.75);
-                const wz = z + (this.hash2D(z, x) - 0.5) * (step * 0.75);
+                const wx = x + (this.hash2D(x, z) - 0.5) * (step * 0.85);
+                const wz = z + (this.hash2D(z, x) - 0.5) * (step * 0.85);
 
                 const isSafe = window.RoadManager?.isSafeZone?.({ x: wx, z: wz }) || 
                                window.CapitalCityManager?.isInsideCapital?.(wx, wz);
