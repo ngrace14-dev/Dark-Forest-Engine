@@ -41,38 +41,38 @@ export class GrassSystem {
     }
 
         initMaterials() {
-        // Shared Opaque Standard Material (Zero Transparency, Zero Alpha Cards)
-        this.floorMaterial = new THREE.MeshStandardMaterial({
-            color: 0x1a2b1a, 
-            roughness: 0.9,
-            metalness: 0.0,
-            flatShading: true,
-            vertexColors: true // Enable vertex colors for debug pass
-        });
+            // Shared Opaque Standard Material (Zero Transparency, Zero Alpha Cards)
+            this.floorMaterial = new THREE.MeshStandardMaterial({
+                color: 0x1a2b1a, 
+                roughness: 0.9,
+                metalness: 0.0,
+                flatShading: true,
+                vertexColors: true // Enable vertex colors for debug pass
+            });
 
-        this.floorMaterial.onBeforeCompile = (shader) => {
-            shader.vertexShader = `
-                varying float vY;
-                varying vec3 vColor;
-                ${shader.vertexShader}
-            `.replace('#include <begin_vertex>', `
-                #include <begin_vertex>
-                vY = position.y;
-                vColor = color;
-            `);
-            shader.fragmentShader = `
-                varying float vY;
-                varying vec3 vColor;
-                ${shader.fragmentShader}
-            `.replace('#include <color_fragment>', `
-                #include <color_fragment>
-                // VISIBILITY VALIDATION MODE: Use bright debug colors
-                diffuseColor.rgb = vColor;
-                // Add top-down gradient for volume
-                diffuseColor.rgb *= mix(0.7, 1.0, vY);
-            `);
-        };
-    }
+            this.floorMaterial.onBeforeCompile = (shader) => {
+                shader.vertexShader = `
+                    varying float vY;
+                    varying vec3 vDebugColor;
+                    ${shader.vertexShader}
+                `.replace('#include <begin_vertex>', `
+                    #include <begin_vertex>
+                    vY = position.y;
+                    vDebugColor = color;
+                `);
+                shader.fragmentShader = `
+                    varying float vY;
+                    varying vec3 vDebugColor;
+                    ${shader.fragmentShader}
+                `.replace('#include <color_fragment>', `
+                    #include <color_fragment>
+                    // VISIBILITY VALIDATION MODE: Use bright debug colors
+                    diffuseColor.rgb = vDebugColor;
+                    // Add top-down gradient for volume
+                    diffuseColor.rgb *= mix(0.7, 1.0, vY);
+                `);
+            };
+        }
 
     spawnFloorPatch(chunkKey, cx, cz, biomeKey, clusterPoints = [], roadPoints = []) {
         if (!this.initialized || !this.scene) return;
@@ -118,10 +118,10 @@ export class GrassSystem {
                 const wz = pt.z + Math.sin(angle) * dist;
                 const wy = getTerrainY(wx, wz);
 
-                // Cluster priority: Skirt the trunks with moss and ferns
+                                // Cluster priority: Skirt the trunks with moss and ferns
                 if (mIdx < mossCount) {
-                    dummy.position.set(wx, wy + 0.1, wz); // LIFTED: wy + 0.1
-                    dummy.scale.set(2.0, 0.8 + Math.random(), 2.0);
+                    dummy.position.set(wx, wy + 0.1, wz); 
+                    dummy.scale.set(1.2 + Math.random() * 0.8, 0.8 + Math.random(), 1.2 + Math.random() * 0.8);
                     dummy.updateMatrix();
                     mossMesh.setMatrixAt(mIdx++, dummy.matrix);
                     mossMesh.setColorAt(mIdx - 1, magenta);
@@ -160,11 +160,11 @@ export class GrassSystem {
 
                 const wy = getTerrainY(wx, wz);
 
-                // Layer 1: Moss Carpet (High coverage)
+                                // Layer 1: Moss Carpet (High coverage)
                 if (mIdx < mossCount) {
-                    dummy.position.set(wx, wy + 0.05, wz); // LIFTED: wy + 0.05
+                    dummy.position.set(wx, wy + 0.05, wz); 
                     dummy.rotation.y = Math.random() * Math.PI;
-                    dummy.scale.set(3.0 + Math.random() * 2.0, 0.5, 3.0 + Math.random() * 2.0);
+                    dummy.scale.set(1.5 + Math.random() * 1.5, 0.5, 1.5 + Math.random() * 1.5);
                     dummy.updateMatrix();
                     mossMesh.setMatrixAt(mIdx++, dummy.matrix);
                     mossMesh.setColorAt(mIdx - 1, magenta);

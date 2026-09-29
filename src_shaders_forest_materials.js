@@ -93,14 +93,18 @@ function assembleShader(shader, snippets) {
         );
     }
 
-    // FOG OVERRIDE: Maintain silhouette readability in dense fog
-    shader.fragmentShader = shader.fragmentShader.replace(
+        shader.fragmentShader = shader.fragmentShader.replace(
         '#include <fog_fragment>',
         `
         #ifdef USE_FOG
-            float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );
-            fogFactor *= uFogIntensity; 
-            gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );
+            // FIX: Ensure fog uniforms are accessible if they aren't provided by the main shader chunk
+            #ifndef FOG_PARAMS
+                uniform float fogNear;
+                uniform float fogFar;
+            #endif
+            float fogFactorCustom = smoothstep( fogNear, fogFar, vFogDepth );
+            fogFactorCustom *= uFogIntensity; 
+            gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactorCustom );
         #endif
         `
     );
@@ -317,10 +321,10 @@ export function createTrunkMaterial(options = {}) {
                 // Moss naturally favors the North/North-West sides of the tree in the northern hemisphere
                 // Using world normal mapping assuming Z is North/South and X is East/West
                 // Because 'normal' here is view-space, we reconstruct world normal for directional weathering
-                #ifdef USE_INSTANCING
-                    vec3 worldNormal = normalize(mat3(modelMatrix * instanceMatrix) * objectNormal);
+                                #ifdef USE_INSTANCING
+                    vec3 worldNormal = normalize(mat3(modelMatrix * instanceMatrix) * normal);
                 #else
-                    vec3 worldNormal = normalize(mat3(modelMatrix) * objectNormal);
+                    vec3 worldNormal = normalize(mat3(modelMatrix) * normal);
                 #endif
                 
                 float directionalMoss = smoothstep(-0.2, 0.8, dot(worldNormal, normalize(vec3(-0.5, 0.2, -1.0))));
