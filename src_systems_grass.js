@@ -83,9 +83,9 @@ export class GrassSystem {
         if (biomeKey === 'redwoods') baseDensity = 4000;
         else if (biomeKey === 'valley') baseDensity = 2000;
 
-        const totalMoss = baseDensity;
-        const totalFern = Math.floor(baseDensity * 0.4);
-        const totalShard = Math.floor(baseDensity * 0.3);
+        const totalMoss = Math.floor(baseDensity * 0.4);     // Foundation only
+        const totalFern = Math.floor(baseDensity * 0.8);     // Silhouette lead
+        const totalShard = Math.floor(baseDensity * 0.5);    // Detail lead
         const totalSentinel = Math.floor(baseDensity * 0.1);
         
         const group = new THREE.Group();
@@ -119,6 +119,8 @@ export class GrassSystem {
 
                 if (mIdx < totalMoss) {
                     dummy.position.set(wx, wy + 0.1, wz); 
+                    dummy.rotation.x = (Math.random() - 0.5) * 0.6; // Aggressive organic lean
+                    dummy.rotation.z = (Math.random() - 0.5) * 0.6;
                     dummy.scale.set(1.2 + Math.random() * 0.8, 0.8 + Math.random(), 1.2 + Math.random() * 0.8);
                     dummy.updateMatrix();
                     mossMesh.setMatrixAt(mIdx++, dummy.matrix);
@@ -126,6 +128,8 @@ export class GrassSystem {
                 }
                 if (fIdx < totalFern && i % 2 === 0) {
                     dummy.position.set(wx, wy + 0.1, wz);
+                    dummy.rotation.x = (Math.random() - 0.5) * 0.6; // Aggressive organic lean
+                    dummy.rotation.z = (Math.random() - 0.5) * 0.6;
                     dummy.scale.setScalar(0.8 + Math.random() * 0.6);
                     dummy.updateMatrix();
                     fernMesh.setMatrixAt(fIdx++, dummy.matrix);
@@ -172,6 +176,8 @@ export class GrassSystem {
             const moundRoll = Math.random();
             dummy.position.set(wx, wy + 0.05, wz);
             dummy.rotation.y = Math.random() * Math.PI;
+            dummy.rotation.x = (Math.random() - 0.5) * 0.6; // Aggressive organic lean
+            dummy.rotation.z = (Math.random() - 0.5) * 0.6;
             
             if (moundRoll < 0.25) { // The Mound
                 dummy.scale.set(1.5 + Math.random(), 1.2 + Math.random() * 2.5, 1.5 + Math.random());
@@ -186,6 +192,8 @@ export class GrassSystem {
             // Layer 2: Fern Tiers (Attracted to Moss Patches)
             if (fIdx < totalFern && Math.random() < 0.35) {
                 dummy.position.set(wx + (Math.random()-0.5), wy + 0.1, wz + (Math.random()-0.5));
+                dummy.rotation.x = (Math.random() - 0.5) * 0.6; // Aggressive organic lean
+                dummy.rotation.z = (Math.random() - 0.5) * 0.6;
                 dummy.scale.setScalar(0.6 + Math.random() * 1.4);
                 dummy.updateMatrix();
                 fernMesh.setMatrixAt(fIdx++, dummy.matrix);
@@ -196,6 +204,8 @@ export class GrassSystem {
             if (shIdx < totalShard && Math.random() < 0.25) {
                 dummy.position.set(wx, wy + 0.1, wz);
                 dummy.rotation.y = Math.random() * Math.PI * 2;
+                dummy.rotation.x = (Math.random() - 0.5) * 0.6; // Aggressive organic lean
+                dummy.rotation.z = (Math.random() - 0.5) * 0.6;
                 dummy.scale.setScalar(0.5 + Math.random() * 1.2);
                 dummy.updateMatrix();
                 shardMesh.setMatrixAt(shIdx++, dummy.matrix);
@@ -205,6 +215,8 @@ export class GrassSystem {
             // Layer 4: Sentinels
             if (sIdx < totalSentinel && Math.random() < 0.06) {
                 dummy.position.set(wx, wy + 0.1, wz);
+                dummy.rotation.x = (Math.random() - 0.5) * 0.6; // Aggressive organic lean
+                dummy.rotation.z = (Math.random() - 0.5) * 0.6;
                 dummy.scale.setScalar(0.8 + Math.random() * 1.2);
                 dummy.updateMatrix();
                 sentinelMesh.setMatrixAt(sIdx++, dummy.matrix);
@@ -214,6 +226,7 @@ export class GrassSystem {
 
         // Finalize
         [mossMesh, fernMesh, shardMesh, sentinelMesh].forEach(m => {
+            if(!m) return;
             m.count = (m === mossMesh) ? mIdx : (m === fernMesh) ? fIdx : (m === shardMesh) ? shIdx : sIdx;
             m.instanceMatrix.needsUpdate = true;
             m.castShadow = true;
