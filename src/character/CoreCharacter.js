@@ -24,7 +24,8 @@ export class CoreCharacter {
             halfHeight: config.halfHeight || 0.8, // Total height = 1.6
             walkSpeed: config.walkSpeed || 3.0,
             runSpeed: config.runSpeed || 5.0,
-            sprintSpeed: config.sprintSpeed || 7.0,
+            sprintSpeed: config.sprintSpeed || 8.0,
+            dashSpeed: config.dashSpeed || 15.0,
             jumpVelocity: config.jumpVelocity || 5.0,
             gravity: config.gravity || -20.0,
             stepOffset: config.stepOffset || 0.3,
@@ -38,7 +39,8 @@ export class CoreCharacter {
         this.intent = {
             movement: new THREE.Vector3(), // Normalized desired movement direction
             wantsToJump: false,
-            wantsToSprint: false
+            wantsToSprint: false,
+            wantsToDash: false
         };
 
         // Initialize Physics (Rapier Kinematic Character Controller)
@@ -70,13 +72,14 @@ export class CoreCharacter {
         // this.characterController.setFilterFlags(RAPIER.QueryFilterFlags.EXCLUDE_SENSORS);
     }
 
-    setMovementIntent(x, z, wantsToJump, wantsToSprint) {
+    setMovementIntent(x, z, wantsToJump, wantsToSprint, wantsToDash = false) {
         this.intent.movement.set(x, 0, z);
         if (this.intent.movement.lengthSq() > 1.0) {
             this.intent.movement.normalize();
         }
         this.intent.wantsToJump = wantsToJump;
         this.intent.wantsToSprint = wantsToSprint;
+        this.intent.wantsToDash = wantsToDash;
     }
 
     prePhysicsUpdate(delta) {
@@ -86,7 +89,13 @@ export class CoreCharacter {
         let currentSpeed = 0;
         const movementLengthSq = this.intent.movement.lengthSq();
         if (movementLengthSq > 0.01) {
-            currentSpeed = this.intent.wantsToSprint ? this.config.sprintSpeed : this.config.runSpeed;
+            if (this.intent.wantsToDash) {
+                currentSpeed = this.config.dashSpeed;
+            } else if (this.intent.wantsToSprint) {
+                currentSpeed = this.config.sprintSpeed;
+            } else {
+                currentSpeed = this.config.runSpeed;
+            }
         }
 
         // Apply movement
@@ -136,7 +145,8 @@ export class CoreCharacter {
             if (this.velocity.y > 0) this.state = 'jump';
             else this.state = 'fall';
         } else if (movementLengthSq > 0.01) {
-            if (this.intent.wantsToSprint) this.state = 'run';
+            if (this.intent.wantsToDash) this.state = 'dash';
+            else if (this.intent.wantsToSprint) this.state = 'run'; // Usually run animation for sprint
             else this.state = 'walk';
         } else {
             this.state = 'idle';

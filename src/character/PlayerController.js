@@ -22,6 +22,13 @@ export class PlayerController {
         };
         
         this.active = true;
+
+        // Custom state tracking for Dash/Sprint logic
+        this.spaceHeldTime = 0;
+        this.dashCooldown = 0;
+        this.isSprinting = false;
+        this.isDashing = false;
+        this.wasSpaceHeld = false;
     }
 
     update(delta) {
@@ -36,8 +43,37 @@ export class PlayerController {
         if (this.inputSource.keys?.a) moveX -= 1; // A means go left (-X)
         if (this.inputSource.keys?.d) moveX += 1; // D means go right (+X)
 
-        const wantsToJump = this.inputSource.keys?.[' ']; // Spacebar
-        const wantsToSprint = this.inputSource.keys?.shift;
+        const wantsToJump = false; // Disable space-to-jump, it's now dash/sprint
+        const spacePressedThisFrame = this.inputSource.keys?.[' ']; // Spacebar
+        
+        // Dash / Sprint Logic State Machine
+        if (this.dashCooldown > 0) {
+            this.dashCooldown -= delta;
+        }
+
+        if (spacePressedThisFrame) {
+            this.spaceHeldTime += delta;
+            
+            // Just pressed Spacebar
+            if (!this.wasSpaceHeld && this.dashCooldown <= 0) {
+                this.isDashing = true;
+                this.dashCooldown = 0.8; // Time before you can dash again
+            } else if (this.spaceHeldTime > 0.25) {
+                // Held space for > 0.25s -> transition to sprint
+                this.isDashing = false;
+                this.isSprinting = true;
+            }
+        } else {
+            // Released space
+            this.spaceHeldTime = 0;
+            this.isSprinting = false;
+            this.isDashing = false;
+        }
+        
+        this.wasSpaceHeld = spacePressedThisFrame;
+        
+        const wantsToDash = this.isDashing;
+        const wantsToSprint = this.isSprinting;
 
         // 2. Transform input relative to camera
         if (moveX !== 0 || moveZ !== 0) {
@@ -62,9 +98,9 @@ export class PlayerController {
             const finalDirX = moveX * camRightX + (-moveZ) * camForwardX;
             const finalDirZ = moveX * camRightZ + (-moveZ) * camForwardZ;
 
-            this.character.setMovementIntent(finalDirX, finalDirZ, wantsToJump, wantsToSprint);
+            this.character.setMovementIntent(finalDirX, finalDirZ, wantsToJump, wantsToSprint, wantsToDash);
         } else {
-            this.character.setMovementIntent(0, 0, wantsToJump, wantsToSprint);
+            this.character.setMovementIntent(0, 0, wantsToJump, wantsToSprint, wantsToDash);
         }
     }
 }
