@@ -2150,8 +2150,13 @@ async function bootEngine() {
                 this.lastFrameStartPerf = performance.now();
                 this.playerController.update(delta);
                 originalPrePhysics(delta);
+            
+                // Adapter synchronization for legacy systems
+                if (window.GameCore.playerObj) {
+                    window.GameCore.playerObj.currentAnimState = this.state;
+                }
             };
-        
+
             // Override the postPhysicsUpdate to drive the visual sync
             coreCharacter.postPhysicsUpdate = function(delta) {
                 const startPerf = performance.now();
@@ -2170,6 +2175,22 @@ async function bootEngine() {
 
             window.CharacterManager.registerPlayer(coreCharacter);
             window.GameCore.newPlayerPipeline = coreCharacter; // Track for legacy overrides
+
+            // MOCK ADAPTER FOR LEGACY SYSTEMS (UI Map, AI, Interactions, Combat)
+            // This ensures the rest of the engine doesn't crash while we test the new pipeline
+            window.GameCore.playerObj = {
+                id: 'player_integration_test',
+                name: 'Player',
+                visual: characterVisual.mesh,
+                body: coreCharacter.body,
+                currentAnimState: coreCharacter.state,
+                def: {
+                    type: 'character',
+                    faction: 'player',
+                    height: 1.6,
+                    radius: 0.4
+                }
+            };
 
                     initLightPool(window.GameCore.scene);
 
