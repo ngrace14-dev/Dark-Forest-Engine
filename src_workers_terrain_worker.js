@@ -151,10 +151,11 @@ self.onmessage = function (e) {
                 let bCol = 0.10;
 
 
-                const cNoise = noiseFn(wx * 0.1, wz * 0.1) * 0.04;
-                colors[vertIdx] = Math.min(1.0, Math.max(0.0, rCol + cNoise));
-                colors[vertIdx + 1] = Math.min(1.0, Math.max(0.0, gCol + cNoise));
-                colors[vertIdx + 2] = Math.min(1.0, Math.max(0.0, bCol + cNoise));
+                                // Fix #3: Direct, noise-free vertex colors for maximum stability
+                colors[vertIdx] = rCol;
+                colors[vertIdx + 1] = gCol;
+                colors[vertIdx + 2] = bCol;
+
 
                 const hL = getTerrainHeight(wx - 0.1, wz);
                 const hR = getTerrainHeight(wx + 0.1, wz);
