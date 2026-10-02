@@ -225,7 +225,10 @@ export class GrassSystem {
         }
 
         // Finalize
-        grassMesh.count = gIdx;
+                grassMesh.count = gIdx;
+        // Fix for up-close clipping by disabling frustum culling on instanced mesh 
+        // since individual instances aren't culled correctly if the center is out of view
+        grassMesh.frustumCulled = false;
         grassMesh.instanceMatrix.needsUpdate = true;
         if(grassMesh.instanceColor) grassMesh.instanceColor.needsUpdate = true;
         grassMesh.castShadow = true;
