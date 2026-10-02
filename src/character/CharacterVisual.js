@@ -140,7 +140,7 @@ export class CharacterVisual {
             if (window.WorldGenerator?.getTerrainHeight) {
                 groundH = window.WorldGenerator.getTerrainHeight(this.mesh.position.x, this.mesh.position.z);
             }
-            console.log(`[Diagnostic] Player Visual Height: ${this.mesh.position.y.toFixed(2)} | Physics Floor Expected: ${groundH.toFixed(2)}`);
+
         }
 
         // 2. Animation State Selection based on Character State

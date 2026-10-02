@@ -53,8 +53,8 @@ export class PlayerController {
             const camRightX = -camForwardZ;
             const camRightZ = camForwardX;
 
-            const finalDirX = moveX * camRightX + (-moveZ) * camForwardX;
-            const finalDirZ = moveX * camRightZ + (-moveZ) * camForwardZ;
+            const finalDirX = moveX * camRightX + moveZ * camForwardX;
+            const finalDirZ = moveX * camRightZ + moveZ * camForwardZ;
 
             this.character.setMovementIntent(finalDirX, finalDirZ, wantsToJump, wantsToSprint);
         } else {

@@ -4,7 +4,7 @@ import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders
 window.AssetManager = {
     models: {}, animations: {}, modelMeta: {}, textures: {}, globalAnimations: [],
     prefabs: {
-                'Player': { type: 'character', category: 'characters', radius: 0.5, height: 2, modelScale: 1.0, color: 0xffffff, faction: 'player', customModel: 'Redhead Female Player', animMap: { idle: 'idle', walk: 'walk', run: 'run', jump: 'jump', attack: 'attack', block: 'block', dash: 'dash', hit: 'hit', die: 'die' }, vfx: { aura: 'None', onHit: 'Blood' } },
+        'Player': { type: 'character', category: 'characters', radius: 0.5, height: 2, modelScale: 1.0, color: 0xffffff, faction: 'player', customModel: null, animMap: { idle: 'idle', walk: 'walk', run: 'run', jump: 'jump', attack: 'attack', block: 'block', dash: 'dash', hit: 'hit', die: 'die' }, vfx: { aura: 'None', onHit: 'Blood' } },
 
 
         'Female Warrior': { type: 'character', category: 'characters', radius: 0.5, height: 1.9, modelScale: 1.0, color: 0xffffff, faction: 'player', playerCompatible: true, customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'None', onHit: 'Blood' } },

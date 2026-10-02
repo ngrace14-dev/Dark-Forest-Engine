@@ -976,7 +976,7 @@ const ChunkManager = {
                     }
                 }
                 
-                console.log(`[Diagnostic] Chunk ${key} generated. Verts: ${positions.length / 3}, Indices: ${gridIndices.length}, Height Range: ${minH.toFixed(2)} to ${maxH.toFixed(2)}`);
+
 
                 const geo = new THREE.BufferGeometry();
 
