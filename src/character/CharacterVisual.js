@@ -133,6 +133,16 @@ export class CharacterVisual {
         this.character.getPosition(_v1);
         this.mesh.position.copy(_v1);
 
+        // DIAGNOSTIC LOG (throttled to roughly once per second)
+        if (!this.lastLog || performance.now() - this.lastLog > 1000) {
+            this.lastLog = performance.now();
+            let groundH = 0;
+            if (window.WorldGenerator?.getTerrainHeight) {
+                groundH = window.WorldGenerator.getTerrainHeight(this.mesh.position.x, this.mesh.position.z);
+            }
+            console.log(`[Diagnostic] Player Visual Height: ${this.mesh.position.y.toFixed(2)} | Physics Floor Expected: ${groundH.toFixed(2)}`);
+        }
+
         // 2. Animation State Selection based on Character State
         if (this.mixer) {
             this.playAnim(this.character.state);

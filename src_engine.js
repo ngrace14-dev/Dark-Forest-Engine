@@ -934,12 +934,36 @@ const ChunkManager = {
 
         this.activeChunks.set(key, { mesh: null, body: null, collider: null, lod });
 
-        window.TerrainWorkerPool.requestChunkData(
+                window.TerrainWorkerPool.requestChunkData(
             cx, cz, lod, 60, window.EngineParams?.worldSeed || 1337, localRoadPoints,
             ({ positions, normals, colors, clutter }) => {
                 if (!this.activeChunks.has(key)) return;
 
+                // DIAGNOSTIC CHECK: Fix 4.1 Terrain Validation
+                let minH = Infinity, maxH = -Infinity;
+                for (let i = 1; i < positions.length; i += 3) {
+                    const h = positions[i];
+                    if (h < minH) minH = h;
+                    if (h > maxH) maxH = h;
+                }
+                
                 const segments = lod === 'A' ? 30 : (lod === 'B' ? 10 : 2);
+                
+                const indices = [];
+                const gridX = segments + 1;
+                for (let j = 0; j < segments; j++) {
+                    for (let i = 0; i < segments; i++) {
+                        const a = i + gridX * j;
+                        const b = i + gridX * (j + 1);
+                        const c = (i + 1) + gridX * (j + 1);
+                        const d = (i + 1) + gridX * j;
+                        indices.push(a, b, d);
+                        indices.push(b, c, d);
+                    }
+                }
+                
+                console.log(`[Diagnostic] Chunk ${key} generated. Verts: ${positions.length / 3}, Indices: ${indices.length}, Height Range: ${minH.toFixed(2)} to ${maxH.toFixed(2)}`);
+
                 const geo = new THREE.BufferGeometry();
 
                 geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
