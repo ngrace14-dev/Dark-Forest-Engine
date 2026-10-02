@@ -963,50 +963,8 @@ const ChunkManager = {
 
                 const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
 
-                mat.onBeforeCompile = (shader) => {
-                    shader.vertexShader = shader.vertexShader.replace(
-                        `#include <common>`,
-                        `#include <common>
-                         attribute float clutter;
-                         varying float vClutter;
-                         varying vec3 vWorldPos;`
-                    );
-                    shader.vertexShader = shader.vertexShader.replace(
-                        `#include <begin_vertex>`,
-                        `#include <begin_vertex>
-                         vClutter = clutter;
-                         vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;`
-                    );
-                    shader.fragmentShader = shader.fragmentShader.replace(
-                        `#include <common>`,
-                        `#include <common>
-                         varying float vClutter;
-                         varying vec3 vWorldPos;`
-                    );
-                    shader.fragmentShader = shader.fragmentShader.replace(
-                        `#include <color_fragment>`,
-                        `#include <color_fragment>
-                         vec3 grassColor = vec3(0.08, 0.28, 0.08);
-                         diffuseColor.rgb = mix(diffuseColor.rgb, grassColor, vClutter * 0.4);
-
-                         float puddleNoise = sin(vWorldPos.x * 0.12) * cos(vWorldPos.z * 0.12);
-                         float puddleMask = smoothstep(0.45, 0.65, puddleNoise) * (1.0 - vClutter);
-
-                         if (puddleMask > 0.01) {
-                             vec3 waterBedColor = vec3(0.08, 0.06, 0.04);
-                             diffuseColor.rgb = mix(diffuseColor.rgb, waterBedColor, puddleMask * 0.85);
-                         }`
-                    );
-                    shader.fragmentShader = shader.fragmentShader.replace(
-                        `#include <roughnessmap_fragment>`,
-                        `#include <roughnessmap_fragment>
-                         float puddleNoiseRough = sin(vWorldPos.x * 0.12) * cos(vWorldPos.z * 0.12);
-                         float puddleMaskRough = smoothstep(0.45, 0.65, puddleNoiseRough) * (1.0 - vClutter);
-                         roughnessFactor = mix(roughnessFactor, 0.03, puddleMaskRough);`
-                    );
-                };
-
                 if (window.VolumetricFogSystem) {
+
                     window.VolumetricFogSystem.patchMaterial(mat);
                 }
 
