@@ -111,7 +111,7 @@ class RenderPipeline {
                     this.renderer.shadowMap.enabled = false;
                     this.renderer.setPixelRatio(0.5); // 50% render scale for potato
                 }
-                if (window.EngineParams) window.EngineParams.chunkRadius = 3;
+                if (window.EngineParams) window.EngineParams.chunkRadius = 4;
                 // TODO: Throttle distant impostor updates
             } else if (tier === 'medium') {
                 this.passes.ssao.enabled = true;
@@ -123,7 +123,7 @@ class RenderPipeline {
                     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.0));
                 }
-                if (window.EngineParams) window.EngineParams.chunkRadius = 5;
+                if (window.EngineParams) window.EngineParams.chunkRadius = 6;
             } else if (tier === 'high') {
                 this.passes.ssao.enabled = true;
                 this.passes.bloom.enabled = true;
@@ -134,7 +134,7 @@ class RenderPipeline {
                     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.0));
                 }
-                if (window.EngineParams) window.EngineParams.chunkRadius = 7;
+                if (window.EngineParams) window.EngineParams.chunkRadius = 8;
             }
 
             const msg = `[GRAPHICS] Quality Preset Switched to: ${tier.toUpperCase()}`;
