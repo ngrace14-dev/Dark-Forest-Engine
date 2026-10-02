@@ -19,8 +19,8 @@ export class GrassSystem {
         console.log('[GrassSystem] Gothic Forest Floor Proto Initialized.');
     }
 
-    initGeometry() {
-        // Overhauled to Cluster-per-Instance
+        initGeometry() {
+        // 1 grass mesh
         const tuftParts = [];
         for(let i=0; i<5; i++) {
             const blade = new THREE.ConeGeometry(0.08, 1.5, 3);
@@ -28,21 +28,29 @@ export class GrassSystem {
             blade.translate((Math.random()-0.5)*0.3, 0.75, (Math.random()-0.5)*0.3);
             tuftParts.push(blade);
         }
-        this.tuftGeo = BufferGeometryUtils.mergeGeometries(tuftParts);
+        this.grassGeo = BufferGeometryUtils.mergeGeometries(tuftParts);
     }
 
-        initMaterials() {
-            // Shared Opaque Standard Material (Zero Transparency, Zero Alpha Cards)
-            this.floorMaterial = new THREE.MeshStandardMaterial({
-                color: 0x1a2b1a, 
-                roughness: 0.9,
-                metalness: 0.0,
-                flatShading: true,
-                vertexColors: true // Enable vertex colors for debug pass
-            });
+                initMaterials() {
+                    // Shared Opaque Standard Material (Zero Transparency, Zero Alpha Cards)
+                    this.floorMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x1a2b1a, 
+                        roughness: 0.9,
+                        metalness: 0.0,
+                        flatShading: true,
+                        vertexColors: true 
+                    });
 
             this.floorMaterial.onBeforeCompile = (shader) => {
+                shader.uniforms.uTime = { value: 0 };
+                shader.uniforms.uPlayerPos = { value: new THREE.Vector3() };
+
+                // Store uniform references for updating later
+                this.shaderUniforms = shader.uniforms;
+
                 shader.vertexShader = `
+                    uniform float uTime;
+                    uniform vec3 uPlayerPos;
                     varying float vY;
                     varying vec3 vDebugColor;
                     ${shader.vertexShader}
@@ -50,14 +58,45 @@ export class GrassSystem {
                     #include <begin_vertex>
                     vY = position.y;
                     vDebugColor = color;
+                    
+                    // Wind Sway Shader
+                    // one low-frequency wave, one small detail wave
+                    // wind sway using one cheap wave
+                    // looks alive, not physically accurate
+                    vec4 worldPos = instanceMatrix * vec4(position, 1.0);
+                    
+                    // Root-anchored bending (vY controls how much it bends, 0 at root, 1 at tip)
+                    float heightFactor = vY; 
+                    float sway = sin(worldPos.x * 0.15 + uTime * 0.7) * heightFactor * 0.2;
+                    transformed.x += sway;
+                    
+                                        // Interactive Grass Parting (player position, radius, affect upper third)
+                    float distanceToPlayer = distance(worldPos.xz, uPlayerPos.xz);
+                    float partingRadius = 1.5;
+                    float falloff = smoothstep(partingRadius, 0.0, distanceToPlayer);
+                    
+                    // Only part the upper third of the blade
+                    float partFactor = smoothstep(0.3, 1.0, vY);
+                    
+                    if (falloff > 0.0 && partFactor > 0.0) {
+                        vec2 bendDir = normalize(worldPos.xz - uPlayerPos.xz);
+                        transformed.x += bendDir.x * falloff * partFactor * 0.5;
+                        transformed.z += bendDir.y * falloff * partFactor * 0.5;
+                    }
+                    
+                    // Distance fade for animation
+                    float distToCam = distance(worldPos.xyz, cameraPosition);
+                    float animFade = 1.0 - smoothstep(20.0, 40.0, distToCam);
+                    
+                    transformed.x = mix(position.x, transformed.x, animFade);
+                    transformed.z = mix(position.z, transformed.z, animFade);
                 `);
-                shader.fragmentShader = `
+                                shader.fragmentShader = `
                     varying float vY;
                     varying vec3 vDebugColor;
                     ${shader.fragmentShader}
                 `.replace('#include <color_fragment>', `
                     #include <color_fragment>
-                    // VISIBILITY VALIDATION MODE: Use bright debug colors
                     diffuseColor.rgb = vDebugColor;
                     // Add top-down gradient for volume
                     diffuseColor.rgb *= mix(0.7, 1.0, vY);
@@ -69,32 +108,28 @@ export class GrassSystem {
         if (!this.initialized || !this.scene) return;
         if (this.grassChunks.has(chunkKey)) return;
 
-        // --- 1. DENSITY ALLOCATION ---
+                // --- 1. DENSITY ALLOCATION ---
         let baseDensity = 50;
         if (biomeKey === 'redwoods') baseDensity = 4000;
         else if (biomeKey === 'valley') baseDensity = 2000;
 
-        const totalMoss = Math.floor(baseDensity * 0.4);     // Foundation only
-        const totalFern = Math.floor(baseDensity * 0.8);     // Silhouette lead
-        const totalShard = Math.floor(baseDensity * 0.5);    // Detail lead
-        const totalSentinel = Math.floor(baseDensity * 0.1);
+        const totalGrass = baseDensity;
         
         const group = new THREE.Group();
-        const mossMesh = new THREE.InstancedMesh(this.mossGeo, this.floorMaterial, totalMoss);
-        const fernMesh = new THREE.InstancedMesh(this.fernGeo, this.floorMaterial, totalFern);
-        const shardMesh = new THREE.InstancedMesh(this.shardGeo, this.floorMaterial, totalShard);
-        const sentinelMesh = new THREE.InstancedMesh(this.sentinelGeo, this.floorMaterial, totalSentinel);
+        const grassMesh = new THREE.InstancedMesh(this.grassGeo, this.floorMaterial, totalGrass);
 
-        // --- DEBUG COLORS ---
-        const magenta = new THREE.Color(0xff00ff);
-        const cyan = new THREE.Color(0x00ffff);
-        const yellow = new THREE.Color(0xffff00);
-        const red = new THREE.Color(0xff0000);
+                        // --- DEBUG COLORS ---
+        const colors = [
+            new THREE.Color(0x2d4c1e), // Dark green
+            new THREE.Color(0x3a5a24), // Medium green
+            new THREE.Color(0x4a6b2d), // Lighter green
+            new THREE.Color(0x556b2f)  // Dark olive green
+        ];
 
-        const dummy = new THREE.Object3D();
+                const dummy = new THREE.Object3D();
         const getTerrainY = (x, z) => window.WorldGenerator?.getTerrainHeight?.(x, z) ?? 0;
 
-        let mIdx = 0, fIdx = 0, shIdx = 0, sIdx = 0;
+        let gIdx = 0;
         const chunkX = cx * 60 + 30;
         const chunkZ = cz * 60 + 30;
 
@@ -108,23 +143,21 @@ export class GrassSystem {
                 const wz = pt.z + Math.sin(angle) * dist;
                 const wy = getTerrainY(wx, wz);
 
-                if (mIdx < totalMoss) {
+                if (gIdx < totalGrass) {
                     dummy.position.set(wx, wy + 0.1, wz); 
                     dummy.rotation.x = (Math.random() - 0.5) * 0.6; // Aggressive organic lean
                     dummy.rotation.z = (Math.random() - 0.5) * 0.6;
+                    dummy.rotation.y = Math.random() * Math.PI * 2;
                     dummy.scale.set(1.2 + Math.random() * 0.8, 0.8 + Math.random(), 1.2 + Math.random() * 0.8);
                     dummy.updateMatrix();
-                    mossMesh.setMatrixAt(mIdx++, dummy.matrix);
-                    mossMesh.setColorAt(mIdx - 1, magenta);
-                }
-                if (fIdx < totalFern && i % 2 === 0) {
-                    dummy.position.set(wx, wy + 0.1, wz);
-                    dummy.rotation.x = (Math.random() - 0.5) * 0.6; // Aggressive organic lean
-                    dummy.rotation.z = (Math.random() - 0.5) * 0.6;
-                    dummy.scale.setScalar(0.8 + Math.random() * 0.6);
-                    dummy.updateMatrix();
-                    fernMesh.setMatrixAt(fIdx++, dummy.matrix);
-                    fernMesh.setColorAt(fIdx - 1, cyan);
+                    grassMesh.setMatrixAt(gIdx++, dummy.matrix);
+                    
+                                        // Variation logic
+                    const randColor = Math.random();
+                    if (randColor < 0.4) grassMesh.setColorAt(gIdx - 1, colors[0]);
+                    else if (randColor < 0.8) grassMesh.setColorAt(gIdx - 1, colors[1]);
+                    else if (randColor < 0.9) grassMesh.setColorAt(gIdx - 1, colors[2]);
+                    else grassMesh.setColorAt(gIdx - 1, colors[3]);
                 }
             }
         });
@@ -138,10 +171,10 @@ export class GrassSystem {
         };
 
         let attempts = 0;
-        const remainingMoss = totalMoss - mIdx;
-        const maxAttempts = remainingMoss * 4;
+        const remainingGrass = totalGrass - gIdx;
+        const maxAttempts = remainingGrass * 4;
 
-        while (mIdx < totalMoss && attempts < maxAttempts) {
+        while (gIdx < totalGrass && attempts < maxAttempts) {
             attempts++;
             const wx = chunkX + (Math.random() - 0.5) * 60;
             const wz = chunkZ + (Math.random() - 0.5) * 60;
@@ -163,67 +196,41 @@ export class GrassSystem {
 
             const wy = getTerrainY(wx, wz);
 
-            // Layer 1: Moss Carpet (High organic variation)
-            const moundRoll = Math.random();
             dummy.position.set(wx, wy + 0.05, wz);
             dummy.rotation.y = Math.random() * Math.PI;
             dummy.rotation.x = (Math.random() - 0.5) * 0.6; // Aggressive organic lean
             dummy.rotation.z = (Math.random() - 0.5) * 0.6;
             
-            if (moundRoll < 0.25) { // The Mound
-                dummy.scale.set(1.5 + Math.random(), 1.2 + Math.random() * 2.5, 1.5 + Math.random());
-            } else { // The Slab
-                dummy.scale.set(1.5 + Math.random() * 1.5, 0.4 + Math.random() * 0.4, 1.5 + Math.random() * 1.5);
+            // Randomly scale to simulate different types of plants/moss
+            const scaleRoll = Math.random();
+            if (scaleRoll < 0.4) {
+                 dummy.scale.set(1.5 + Math.random(), 1.2 + Math.random() * 2.5, 1.5 + Math.random());
+            } else if (scaleRoll < 0.8) {
+                 dummy.scale.setScalar(0.8 + Math.random() * 0.6);
+            } else if (scaleRoll < 0.9) {
+                 dummy.scale.setScalar(0.5 + Math.random() * 1.2);
+            } else {
+                 dummy.scale.setScalar(0.8 + Math.random() * 1.2);
             }
-            
+
             dummy.updateMatrix();
-            mossMesh.setMatrixAt(mIdx++, dummy.matrix);
-            mossMesh.setColorAt(mIdx - 1, magenta);
-
-            // Layer 2: Fern Tiers (Attracted to Moss Patches)
-            if (fIdx < totalFern && Math.random() < 0.35) {
-                dummy.position.set(wx + (Math.random()-0.5), wy + 0.1, wz + (Math.random()-0.5));
-                dummy.rotation.x = (Math.random() - 0.5) * 0.6; // Aggressive organic lean
-                dummy.rotation.z = (Math.random() - 0.5) * 0.6;
-                dummy.scale.setScalar(0.6 + Math.random() * 1.4);
-                dummy.updateMatrix();
-                fernMesh.setMatrixAt(fIdx++, dummy.matrix);
-                fernMesh.setColorAt(fIdx - 1, cyan);
-            }
-
-            // Layer 3: Ground Shards
-            if (shIdx < totalShard && Math.random() < 0.25) {
-                dummy.position.set(wx, wy + 0.1, wz);
-                dummy.rotation.y = Math.random() * Math.PI * 2;
-                dummy.rotation.x = (Math.random() - 0.5) * 0.6; // Aggressive organic lean
-                dummy.rotation.z = (Math.random() - 0.5) * 0.6;
-                dummy.scale.setScalar(0.5 + Math.random() * 1.2);
-                dummy.updateMatrix();
-                shardMesh.setMatrixAt(shIdx++, dummy.matrix);
-                shardMesh.setColorAt(shIdx - 1, yellow);
-            }
-
-            // Layer 4: Sentinels
-            if (sIdx < totalSentinel && Math.random() < 0.06) {
-                dummy.position.set(wx, wy + 0.1, wz);
-                dummy.rotation.x = (Math.random() - 0.5) * 0.6; // Aggressive organic lean
-                dummy.rotation.z = (Math.random() - 0.5) * 0.6;
-                dummy.scale.setScalar(0.8 + Math.random() * 1.2);
-                dummy.updateMatrix();
-                sentinelMesh.setMatrixAt(sIdx++, dummy.matrix);
-                sentinelMesh.setColorAt(sIdx - 1, red);
-            }
+            grassMesh.setMatrixAt(gIdx++, dummy.matrix);
+            
+            // Variation logic
+            const randColor = Math.random();
+            if (randColor < 0.4) grassMesh.setColorAt(gIdx - 1, colors[0]);
+            else if (randColor < 0.8) grassMesh.setColorAt(gIdx - 1, colors[1]);
+            else if (randColor < 0.9) grassMesh.setColorAt(gIdx - 1, colors[2]);
+            else grassMesh.setColorAt(gIdx - 1, colors[3]);
         }
 
         // Finalize
-        [mossMesh, fernMesh, shardMesh, sentinelMesh].forEach(m => {
-            if(!m) return;
-            m.count = (m === mossMesh) ? mIdx : (m === fernMesh) ? fIdx : (m === shardMesh) ? shIdx : sIdx;
-            m.instanceMatrix.needsUpdate = true;
-            m.castShadow = true;
-            m.receiveShadow = true;
-            group.add(m);
-        });
+        grassMesh.count = gIdx;
+        grassMesh.instanceMatrix.needsUpdate = true;
+        if(grassMesh.instanceColor) grassMesh.instanceColor.needsUpdate = true;
+        grassMesh.castShadow = true;
+        grassMesh.receiveShadow = true;
+        group.add(grassMesh);
 
         this.scene.add(group);
         this.grassChunks.set(chunkKey, group);
@@ -241,8 +248,15 @@ export class GrassSystem {
         }
     }
 
-    update(delta, entityPositions = []) {
+        update(delta, entityPositions = []) {
         this.time += delta;
+        if (this.shaderUniforms) {
+            this.shaderUniforms.uTime.value = this.time;
+            if (entityPositions.length > 0) {
+                // Update player position for interaction (using the first position, assuming it's the player)
+                this.shaderUniforms.uPlayerPos.value.copy(entityPositions[0]);
+            }
+        }
     }
 }
 
