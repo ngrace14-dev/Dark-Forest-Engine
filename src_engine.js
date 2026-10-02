@@ -1046,12 +1046,9 @@ const ChunkManager = {
                             for (const [archKey, pts] of pointsByArchetype.entries()) {
                                 window.ForestRenderer.setChunkInstances(key, archKey, pts);
                             }
-                        } else {
+                                                } else {
                             // FIX: Dispatch fallback using an explicit archetype key instead of generic "Redwood Tree"
                             // to trigger the proper generator retrieval or advanced fallback inside ForestRenderer
-                                                        const px = point.x;
-                            const pz = point.z;
-                            const py = safeGetTerrainHeight(px, pz);
                             
                             // Scale down trunk size and randomize overall scale
                             const redwoodPoints = chunkData.tierA.map(point => ({
