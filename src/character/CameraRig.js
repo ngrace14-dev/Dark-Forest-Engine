@@ -53,7 +53,7 @@ export class CameraRig {
 
     addOrbit(deltaX, deltaY) {
         this.azimuth -= deltaX * this.config.orbitSpeed;
-        this.pitch -= deltaY * this.config.orbitSpeed;
+        this.pitch += deltaY * this.config.orbitSpeed; // Invert pitch
         
         // Clamp pitch
         this.pitch = Math.max(this.config.minPitch, Math.min(this.config.maxPitch, this.pitch));

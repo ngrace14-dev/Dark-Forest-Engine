@@ -63,12 +63,12 @@ document.addEventListener('mousemove', e => {
         const deltaX = e.clientX - window.Input.lastMouseX;
         const deltaY = e.clientY - window.Input.lastMouseY;
 
-        // Integration Test: Pipe to new camera rig if it exists
+                // Integration Test: Pipe to new camera rig if it exists
         if (window.GameCore?.cameraRig) {
-            window.GameCore.cameraRig.addOrbit(deltaX, deltaY);
+            window.GameCore.cameraRig.addOrbit(deltaX, -deltaY);
         } else {
             // Adjust angle and pitch based on mouse movement (Legacy)
-            window.Input.camAngle -= deltaX * 0.01; 
+            window.Input.camAngle += deltaX * 0.01; 
             window.Input.camPitch += deltaY * 0.01;
             
             // Clamp pitch between ground-level (0.1) and top-down (almost PI/2) to prevent camera from flipping upside down

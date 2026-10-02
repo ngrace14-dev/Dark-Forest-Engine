@@ -31,10 +31,10 @@ export class PlayerController {
         let moveX = 0;
         let moveZ = 0;
         
-        if (this.inputSource.keys?.w) moveZ -= 1;
+        if (this.inputSource.keys?.w) moveZ -= 1; // W means go forward (-Z in local coords)
         if (this.inputSource.keys?.s) moveZ += 1;
-        if (this.inputSource.keys?.a) moveX -= 1;
-        if (this.inputSource.keys?.d) moveX += 1;
+        if (this.inputSource.keys?.a) moveX -= 1; // A means go left (-X)
+        if (this.inputSource.keys?.d) moveX += 1; // D means go right (+X)
 
         const wantsToJump = this.inputSource.keys?.[' ']; // Spacebar
         const wantsToSprint = this.inputSource.keys?.shift;
@@ -49,12 +49,18 @@ export class PlayerController {
             const camForwardX = _v1.x;
             const camForwardZ = _v1.z;
             
-            // Right vector is cross product with UP
-            const camRightX = -camForwardZ;
-            const camRightZ = camForwardX;
+            // Right vector is cross product with UP (0,1,0)
+            // Forward is (x, 0, z)
+            // Up is (0, 1, 0)
+            // Cross product: Right = (z, 0, -x)
+            const camRightX = camForwardZ;
+            const camRightZ = -camForwardX;
 
-            const finalDirX = moveX * camRightX + moveZ * camForwardX;
-            const finalDirZ = moveX * camRightZ + moveZ * camForwardZ;
+            // Using standard W = -Z mapping: 
+            // Forward input (moveZ = -1) needs to push along camForward
+            // Right input (moveX = 1) needs to push along camRight
+            const finalDirX = moveX * camRightX + (-moveZ) * camForwardX;
+            const finalDirZ = moveX * camRightZ + (-moveZ) * camForwardZ;
 
             this.character.setMovementIntent(finalDirX, finalDirZ, wantsToJump, wantsToSprint);
         } else {
