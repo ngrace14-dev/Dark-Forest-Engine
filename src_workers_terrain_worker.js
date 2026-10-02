@@ -128,7 +128,7 @@ self.onmessage = function (e) {
         let vertIdx = 0;
         let clutterIdx = 0;
 
-        for (let j = 0; j <= segments; j++) {
+                for (let j = 0; j <= segments; j++) {
             const zLocal = -halfSize + j * step;
             const wz = zLocal + chunkZ;
 
@@ -142,30 +142,14 @@ self.onmessage = function (e) {
                 positions[vertIdx + 1] = wy;
                 positions[vertIdx + 2] = zLocal;
 
-                let minRoadDistSq = 999999;
-                if (localRoadPoints.length > 0) {
-                    for (let r = 0; r < localRoadPoints.length; r++) {
-                        const pt = localRoadPoints[r];
-                        const dx = wx - pt.x;
-                        const dz = wz - pt.z;
-                        const distSq = dx * dx + dz * dz;
-                        if (distSq < minRoadDistSq) minRoadDistSq = distSq;
-                    }
-                }
+                // Fix #2: Removed Road-Meander distance checks from geometry loop 
+                // to prevent floating-point drift and chunk seams.
+                
+                // Color Logic (Phase 1 Reset)
+                let rCol = 0.12;
+                let gCol = 0.15;
+                let bCol = 0.10;
 
-                const minRoadDist = Math.sqrt(minRoadDistSq);
-
-                // FIX: Dark Redwood Humus Baseline
-                let rCol = 0.10;
-                let gCol = 0.08;
-                let bCol = 0.05;
-
-                if (minRoadDist < ROAD_WIDTH + 2) {
-                    const dirtInfluence = Math.max(0, 1.0 - minRoadDist / (ROAD_WIDTH + 2));
-                    rCol = rCol + (0.29 - rCol) * (dirtInfluence * 0.55);
-                    gCol = gCol + (0.24 - gCol) * (dirtInfluence * 0.55);
-                    bCol = bCol + (0.19 - bCol) * (dirtInfluence * 0.55);
-                }
 
                 const cNoise = noiseFn(wx * 0.1, wz * 0.1) * 0.04;
                 colors[vertIdx] = Math.min(1.0, Math.max(0.0, rCol + cNoise));
