@@ -1078,16 +1078,11 @@ const ChunkManager = {
                         } else {
                             // FIX: Dispatch fallback using an explicit archetype key instead of generic "Redwood Tree"
                             // to trigger the proper generator retrieval or advanced fallback inside ForestRenderer
-                                                        const px = point.x;
-                            const pz = point.z;
-                            const py = safeGetTerrainHeight(px, pz);
-                            
-                            // Scale down trunk size and randomize overall scale
                             const redwoodPoints = chunkData.tierA.map(point => ({
                                 x: point.x,
                                 y: safeGetTerrainHeight(point.x, point.z),
                                 z: point.z,
-                                scale: 0.6 + Math.random() * 0.3,
+                                scale: 0.8 + Math.random() * 0.4,
                                 rotation: Math.random() * Math.PI * 2
                             }));
                             window.ForestRenderer.setChunkInstances(key, 'Redwood_ANCIENT_0', redwoodPoints);
