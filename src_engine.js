@@ -973,12 +973,12 @@ const ChunkManager = {
                 
                 geo.setIndex(gridIndices);
 
-                const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
+                                const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
 
-                if (window.VolumetricFogSystem) {
-
-                    window.VolumetricFogSystem.patchMaterial(mat);
-                }
+                // TEMPORARILY DISABLED FOG PATCH: To isolate geometry rendering issues
+                // if (window.VolumetricFogSystem) {
+                //     window.VolumetricFogSystem.patchMaterial(mat);
+                // }
 
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.position.set(chunkX, 0, chunkZ);
