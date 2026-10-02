@@ -30,6 +30,31 @@ class RoadManager {
         }
     }
 
+    generateRoads(villages) {
+        if (!villages || villages.length < 2) {
+            this.generateWorldRoads();
+            return;
+        }
+
+        this.roadNodes = [];
+        const waypoints = villages.map(v => new THREE.Vector3(v.x, 0, v.z));
+        
+        // Close the loop if there are enough villages
+        if (waypoints.length > 2) {
+            waypoints.push(waypoints[0].clone());
+        }
+
+        const curve = new THREE.CatmullRomCurve3(waypoints, true);
+        const points = curve.getPoints(Math.max(50, villages.length * 20));
+
+        for (let i = 0; i < points.length; i++) {
+            const pt = points[i];
+            if (Number.isFinite(pt.x) && Number.isFinite(pt.z)) {
+                this.roadNodes.push({ x: pt.x, z: pt.z, width: this.roadWidth });
+            }
+        }
+    }
+
     getRoadPointsNear(chunkX, chunkZ, searchRadius = 90) {
         const cx = chunkX * 60 + 30;
         const cz = chunkZ * 60 + 30;
