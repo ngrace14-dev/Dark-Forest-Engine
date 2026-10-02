@@ -98,7 +98,7 @@ class RenderPipeline {
         this.setQuality(next[this.qualityTier] || 'medium');
     }
 
-    setQuality(tier) {
+        setQuality(tier) {
         this.qualityTier = tier;
         if (!this.composer) return;
 
@@ -107,16 +107,30 @@ class RenderPipeline {
             this.passes.bloom.enabled = false;
             this.passes.smaa.enabled = false;
             if (this.dirLight) this.dirLight.castShadow = false;
+            if (this.renderer) {
+                this.renderer.shadowMap.enabled = false;
+                this.renderer.setPixelRatio(0.75); // Lower pixel ratio to improve performance on integrated graphics
+            }
         } else if (tier === 'medium') {
             this.passes.ssao.enabled = true;
             this.passes.bloom.enabled = true;
             this.passes.smaa.enabled = false;
             if (this.dirLight) this.dirLight.castShadow = true;
+            if (this.renderer) {
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.0));
+            }
         } else if (tier === 'high') {
             this.passes.ssao.enabled = true;
             this.passes.bloom.enabled = true;
             this.passes.smaa.enabled = true;
             if (this.dirLight) this.dirLight.castShadow = true;
+            if (this.renderer) {
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.0));
+            }
         }
 
         const msg = `[GRAPHICS] Quality Preset Switched to: ${tier.toUpperCase()}`;
