@@ -84,11 +84,12 @@ export class CoreCharacter {
 
         // Determine target speed
         let currentSpeed = 0;
-        if (this.intent.movement.lengthSq() > 0.01) {
+        const movementLengthSq = this.intent.movement.lengthSq();
+        if (movementLengthSq > 0.01) {
             currentSpeed = this.intent.wantsToSprint ? this.config.sprintSpeed : this.config.runSpeed;
         }
 
-        // Horizontal Velocity (Instant acceleration for potato responsiveness)
+        // Apply movement
         this.velocity.x = this.intent.movement.x * currentSpeed;
         this.velocity.z = this.intent.movement.z * currentSpeed;
 
@@ -97,63 +98,45 @@ export class CoreCharacter {
             if (this.intent.wantsToJump) {
                 this.velocity.y = this.config.jumpVelocity;
                 this.isGrounded = false;
-                this.intent.wantsToJump = false; // Consume jump
+                this.intent.wantsToJump = false; 
             } else {
-                // Keep a small downward force to snap to ground slopes
                 this.velocity.y = -1.0; 
             }
         } else {
-            // Apply gravity
             this.velocity.y += this.config.gravity * delta;
-            // Terminal velocity
             if (this.velocity.y < -30.0) this.velocity.y = -30.0;
         }
 
-        // Prepare movement vector for KCC
         _v1.copy(this.velocity).multiplyScalar(delta);
 
-        // Compute KCC movement
-        this.characterController.computeColliderMovement(
-            this.collider,
-            _v1 // The desired displacement
-        );
+        this.characterController.computeColliderMovement(this.collider, _v1);
 
-        // Get corrected movement and apply
         const correctedMovement = this.characterController.computedMovement();
-        
-        // Read position
         const currentTranslation = this.body.translation();
         
-        // Set new position
         this.body.setNextKinematicTranslation({
             x: currentTranslation.x + correctedMovement.x,
             y: currentTranslation.y + correctedMovement.y,
             z: currentTranslation.z + correctedMovement.z
         });
 
-        // Update grounded state from KCC
         this.isGrounded = this.characterController.computedGrounded();
 
-        // If we hit our head or landed, cancel vertical velocity
         if (this.isGrounded && this.velocity.y < 0) {
-            this.velocity.y = -1.0; // Reset to snap velocity
+            this.velocity.y = -1.0; 
         } else if (this.velocity.y > 0 && Math.abs(correctedMovement.y) < 0.001) {
-            // Hit ceiling
             this.velocity.y = 0;
         }
 
-        this.updateState();
+        this.updateState(movementLengthSq);
     }
 
-    updateState() {
-        const horizSpeedSq = this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z;
-        
+    updateState(movementLengthSq) {
         if (!this.isGrounded) {
             if (this.velocity.y > 0) this.state = 'jump';
             else this.state = 'fall';
-        } else if (horizSpeedSq > 0.1) {
-            if (horizSpeedSq > (this.config.runSpeed + 0.5) ** 2) this.state = 'sprint';
-            else if (horizSpeedSq > (this.config.walkSpeed + 0.5) ** 2) this.state = 'run';
+        } else if (movementLengthSq > 0.01) {
+            if (this.intent.wantsToSprint) this.state = 'run';
             else this.state = 'walk';
         } else {
             this.state = 'idle';

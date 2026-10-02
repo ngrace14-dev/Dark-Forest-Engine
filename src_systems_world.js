@@ -51,7 +51,48 @@ window.WorldGenerator = class {
 // If they are missing from other files, these fallbacks will successfully boot the game.
 
 window.spawnPlayer = function(x, y, z) {
+    // Phase 10 integration: Try the new character pipeline first
+    if (window.CoreCharacter && window.PlayerController && window.CameraRig && window.CharacterVisual && window.GameCore.world && window.GameCore.camera) {
+        console.log("?? [World] Spawning Player via AAA Character Pipeline");
+        
+        const playerDef = window.AssetManager?.prefabs?.['Player'] || {};
+        
+        // 1. Create Core Character (Physics)
+        const core = new window.CoreCharacter(window.GameCore.world, x, y, z, {
+            radius: playerDef.radius || 0.4,
+            halfHeight: (playerDef.height || 2) / 2
+        });
+        core.def = playerDef; // Link prefab def to core
+
+        // 2. Create Visual Representation
+        const visual = new window.CharacterVisual(core, window.GameCore.scene, playerDef);
+        core.visual = visual.mesh; // Sync back for legacy lookups if needed
+        
+        // 3. Create Camera Rig
+        const rig = new window.CameraRig(window.GameCore.camera, window.GameCore.world);
+        rig.setTarget(core);
+        
+        // 4. Create Input Controller
+        const controller = new window.PlayerController(core, rig);
+        
+        // 5. Register with Manager (if it exists)
+        if (window.CharacterManager) {
+            if (!window.GameCore.characterManager) window.GameCore.characterManager = new window.CharacterManager();
+            window.GameCore.characterManager.registerPlayer(core);
+            core.manager = window.GameCore.characterManager;
+        }
+
+        // 6. Global Hooks for Engine Update
+        window.GameCore.playerObj = core;
+        window.GameCore.playerController = controller;
+        window.GameCore.cameraRig = rig;
+        window.GameCore.playerVisual = visual;
+
+        return core;
+    }
+
     if (window.GameCore?.newPlayerPipeline) {
+
          console.log(`[World] Integration Test: New Player Pipeline active, skipping legacy spawnPlayer`);
          // We still need to trigger chunk manager and camera placement logic to boot up the environment
          // Teleport the new pipeline to the spawn point

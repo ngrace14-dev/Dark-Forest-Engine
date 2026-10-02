@@ -4,7 +4,9 @@ import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders
 window.AssetManager = {
     models: {}, animations: {}, modelMeta: {}, textures: {}, globalAnimations: [],
     prefabs: {
-        'Player': { type: 'character', category: 'characters', radius: 0.5, height: 2, modelScale: 1.0, color: 0xffffff, faction: 'player', customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'None', onHit: 'Blood' } },
+                'Player': { type: 'character', category: 'characters', radius: 0.5, height: 2, modelScale: 1.0, color: 0xffffff, faction: 'player', customModel: 'Redhead Female Player', animMap: { idle: 'idle', walk: 'walk', run: 'run', jump: 'jump', attack: 'attack', block: 'block', dash: 'dash', hit: 'hit', die: 'die' }, vfx: { aura: 'None', onHit: 'Blood' } },
+
+
         'Female Warrior': { type: 'character', category: 'characters', radius: 0.5, height: 1.9, modelScale: 1.0, color: 0xffffff, faction: 'player', playerCompatible: true, customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'None', onHit: 'Blood' } },
         'Noble Player Character': { type: 'character', category: 'characters', radius: 0.5, height: 1.9, modelScale: 1.0, color: 0xf1d38a, faction: 'player', playerCompatible: true, role: 'noble', customModel: null, animMap: { idle: 'None', walk: 'None', attack: 'None', block: 'None', dash: 'None', hit: 'None', die: 'None' }, vfx: { aura: 'Holy', onHit: 'Blood' } },
         'Female Dark Steel Waist Armor': { type: 'armor', category: 'characters', radius: 0.5, height: 1, modelScale: 1.0, color: 0x24272d, faction: 'player', playerCompatible: true, armorSlot: 'waist', customModel: null, animMap: {}, vfx: { aura: 'None', onHit: 'Sparks' } },
@@ -661,8 +663,19 @@ function loadModel(url, modelName) {
 
 window.EventBus.on('ENGINE_READY', () => {
     window.EventBus.emit('UI_LOG', '[ASSETS] Heavy Meshy terrain models deferred until explicitly loaded.');
+    
+    // Pre-load Player Model
+    const playerDef = window.AssetManager.prefabs['Player'];
+    if (playerDef && playerDef.customModel) {
+        const modelEntry = bundledModels.find(m => m.name === playerDef.customModel);
+        if (modelEntry) {
+            loadModel(resolveAssetPath(modelEntry.path), modelEntry.name);
+        }
+    }
+
     window.EventBus.emit('WORLD_REGENERATE');
 });
+
 
 document.getElementById('btn-upload-file').addEventListener('click', () => { document.getElementById('asset-file-input').click(); });
 async function importMeshyArchive(file) {

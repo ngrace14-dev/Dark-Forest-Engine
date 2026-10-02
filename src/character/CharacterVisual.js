@@ -13,17 +13,22 @@ const _m1 = new THREE.Matrix4();
  * and smoothly interpolates its rotation to face the movement intent or velocity.
  */
 export class CharacterVisual {
-    constructor(character, scene) {
+    constructor(character, scene, def) {
         this.character = character;
         this.scene = scene;
+        this.def = def || (character.def);
         
         // Configuration
         this.config = {
             turnSpeed: 10.0, // Speed of visual rotation interpolation
         };
 
-        // Create a placeholder capsule mesh
-        this.mesh = this._createPlaceholderMesh();
+        this.mixer = null;
+        this.actions = {};
+        this.currentAction = null;
+
+        // Initialize Mesh
+        this.mesh = this._initMesh();
         if (this.scene) {
             this.scene.add(this.mesh);
         }
@@ -32,8 +37,45 @@ export class CharacterVisual {
         this.targetRotation = new THREE.Quaternion();
     }
 
+    _initMesh() {
+        const modelName = this.def?.customModel;
+        
+        if (modelName && window.AssetManager?.models[modelName]) {
+            const asset = window.AssetManager.models[modelName];
+            // CRITICAL: Use SkeletonUtils for rigged models
+            const clonedModel = window.SkeletonUtils.clone(asset);
+            
+            // Setup Animation
+            const clips = window.AssetManager.animations[modelName] || [];
+            if (clips.length > 0) {
+                this.mixer = new THREE.AnimationMixer(clonedModel);
+                clips.forEach(clip => {
+                    this.actions[clip.name] = this.mixer.clipAction(clip);
+                });
+                
+                // Play initial idle
+                const idleClipName = this.def.animMap?.idle;
+                if (idleClipName && this.actions[idleClipName]) {
+                    this.playAnim('idle');
+                }
+            }
+            
+            clonedModel.traverse(child => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+
+            return clonedModel;
+        }
+
+        return this._createPlaceholderMesh();
+    }
+
     _createPlaceholderMesh() {
         const group = new THREE.Group();
+        group.isPlaceholder = true;
         
         // Capsule body
         const geo = new THREE.CapsuleGeometry(
@@ -44,14 +86,13 @@ export class CharacterVisual {
         const mat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.7 });
         const body = new THREE.Mesh(geo, mat);
         
-        // The KCC position represents the center of the capsule in Rapier by default
         body.position.y = 0; 
         
         // Add a "nose" so we can see which way it's facing
         const noseGeo = new THREE.BoxGeometry(0.2, 0.2, 0.4);
         const noseMat = new THREE.MeshStandardMaterial({ color: 0xfacc15 });
         const nose = new THREE.Mesh(noseGeo, noseMat);
-        nose.position.set(0, 0.4, 0.3); // High up and pointing forward (Z+)
+        nose.position.set(0, 0.4, 0.3); 
         
         body.add(nose);
         
@@ -62,25 +103,50 @@ export class CharacterVisual {
         return group;
     }
 
+    playAnim(state, duration = 0.25) {
+        const clipName = this.def?.animMap?.[state];
+        if (!clipName || !this.actions[clipName]) return;
+
+        const nextAction = this.actions[clipName];
+        if (this.currentAction === nextAction) return;
+
+        if (this.currentAction) {
+            this.currentAction.fadeOut(duration);
+        }
+
+        nextAction.reset().fadeIn(duration).play();
+        this.currentAction = nextAction;
+    }
+
     update(delta) {
         if (!this.character || !this.mesh) return;
 
-        // 1. Sync Position exactly with Physics (KCC translation is capsule center)
+        // Auto-swap placeholder if model becomes available
+        if (this.mesh.isPlaceholder && this.def?.customModel && window.AssetManager?.models[this.def.customModel]) {
+            this.scene.remove(this.mesh);
+            this.mesh = this._initMesh();
+            this.scene.add(this.mesh);
+            this.character.visual = this.mesh; // Sync back
+        }
+
+        // 1. Sync Position
         this.character.getPosition(_v1);
         this.mesh.position.copy(_v1);
 
-        // 2. Determine target rotation
-        // If moving, face movement direction. If attacking/strafing, this would face look direction.
+        // 2. Animation State Selection based on Character State
+        if (this.mixer) {
+            this.playAnim(this.character.state);
+            this.mixer.update(delta);
+        }
+
+        // 3. Determine target rotation
         if (this.character.intent.movement.lengthSq() > 0.01) {
-            // Create a look-at matrix facing the intent vector
             _v1.copy(this.mesh.position).add(this.character.intent.movement);
             _m1.lookAt(this.mesh.position, _v1, this.mesh.up);
-            
-            // Extract target quaternion
             this.targetRotation.setFromRotationMatrix(_m1);
         }
 
-        // 3. Slerp visual rotation
+        // 4. Slerp visual rotation
         this.mesh.quaternion.slerp(this.targetRotation, delta * this.config.turnSpeed);
     }
     
@@ -88,6 +154,8 @@ export class CharacterVisual {
         if (this.mesh && this.scene) {
             this.scene.remove(this.mesh);
         }
-        // Dispose geometries/materials if necessary
+        if (this.mixer) {
+            this.mixer.stopAllAction();
+        }
     }
 }

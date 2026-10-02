@@ -2285,13 +2285,30 @@ window.addEventListener('DOMContentLoaded', () => {
                 if (window.GameCore?.world) window.GameCore.world.step(); 
                 if (window.GameCore?.checkFloatingOrigin) window.GameCore.checkFloatingOrigin();
         
-                fixedUpdateLogic(fixedTimeStep); 
+                                fixedUpdateLogic(fixedTimeStep); 
                 accumulator -= fixedTimeStep; 
             } 
 
-            updateCameraAndShadows(delta);
+            // AAA Character Pipeline Updates
+            if (window.GameCore.playerController) {
+                window.GameCore.playerController.update(delta);
+            }
+            if (window.GameCore.characterManager) {
+                window.GameCore.characterManager.update(delta);
+                // Note: Physical step already happened in fixedUpdateLogic
+                window.GameCore.characterManager.postPhysicsUpdate(delta);
+            }
+            if (window.GameCore.playerVisual) {
+                window.GameCore.playerVisual.update(delta);
+            }
+            if (window.GameCore.cameraRig) {
+                window.GameCore.cameraRig.update(delta);
+            } else {
+                updateCameraAndShadows(delta);
+            }
 
             if (window.RenderPipeline) window.RenderPipeline.render();
+
         }
     
         animate();
