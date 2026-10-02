@@ -10,11 +10,12 @@ export class EpochManager {
         this.noise2D = createNoise2D(this.prng);
         
         // Configuration for the World's scale and biomes
-        this.config = {
-            noiseScale: 0.003,
-            darkForestSideMeters: 575843.2,
-            mountainRingWidthMeters: 160934.4,
+                this.config = {
+            noiseScale: 0.015,
+            darkForestSideMeters: 2000.0,
+            mountainRingWidthMeters: 500.0,
             biomes: {
+
                 'redwoods': { name: 'NorCal Redwoods', color: 0x1a2f21, prefab: 'Oak Tree', density: 12 },
                 'alpine': { name: 'Shasta Alpine', color: 0x363a40, prefab: 'Razor Rock Monolith', density: 6 },
                 'valley': { name: 'Central Valley', color: 0x453f2c, prefab: 'Bramble Bush', density: 10 },
