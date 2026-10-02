@@ -1,6 +1,4 @@
 import * as THREE from 'three';
-
-
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 export class GrassSystem {
