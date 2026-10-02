@@ -104,17 +104,16 @@ export class EpochManager {
         if (dist <= halfForestSide) {
             const basinT = dist / halfForestSide;
             
-            // Basin Base Elevation: Gradual quadratic slope towards the outer rim
+                        // Basin Base Elevation: Gradual quadratic slope towards the outer rim
             height = Math.pow(basinT, 2.0) * 120.0; 
 
             // Smooth Rolling Terrain (Flatter than before)
-            // Center (T=0): +/- 0.5m
-            // Edge (T=1.0): +/- 5m (less elevation changes than before)
-            const varAmp = 0.5 + (basinT * 4.5);
+            // Reduce varAmp dramatically so it's mostly flat
+            const varAmp = 0.1 + (basinT * 1.5);
             
             // Large-scale geological swells for smooth rolling hills.
-            const swell = this.noise2D(x * 0.0004, z * 0.0004); 
-            const ripple = this.noise2D(x * 0.002, z * 0.002) * 0.1; // Reduced ripple scale and weight
+            const swell = this.noise2D(x * 0.0002, z * 0.0002); 
+            const ripple = this.noise2D(x * 0.001, z * 0.001) * 0.05; // Extremely subtle ripple
             
             height += (swell + ripple) * varAmp;
         }
