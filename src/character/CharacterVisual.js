@@ -151,6 +151,8 @@ export class CharacterVisual {
 
         // 3. Determine target rotation
         if (this.character.intent.movement.lengthSq() > 0.01) {
+            // Note: intent.movement holds the real world direction we are pressing towards.
+            // LookAt expects the point in world space we want to face.
             _v1.copy(this.mesh.position).add(this.character.intent.movement);
             _m1.lookAt(this.mesh.position, _v1, this.mesh.up);
             this.targetRotation.setFromRotationMatrix(_m1);

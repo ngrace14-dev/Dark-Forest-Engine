@@ -52,13 +52,13 @@ export class PlayerController {
             // Right vector is cross product with UP (0,1,0)
             // Forward is (x, 0, z)
             // Up is (0, 1, 0)
-            // Cross product: Right = (z, 0, -x)
-            const camRightX = camForwardZ;
-            const camRightZ = -camForwardX;
+            // Cross product: Right = (-z, 0, x) -> this points right relative to camera forward
+            const camRightX = -camForwardZ;
+            const camRightZ = camForwardX;
 
             // Using standard W = -Z mapping: 
-            // Forward input (moveZ = -1) needs to push along camForward
-            // Right input (moveX = 1) needs to push along camRight
+            // Forward input (moveZ = -1) needs to push along camForward (-Z in local is +Forward in global)
+            // Note: Since 'w' subtracts 1 from moveZ, we multiply by (-moveZ) so pressing W results in 1 * camForward
             const finalDirX = moveX * camRightX + (-moveZ) * camForwardX;
             const finalDirZ = moveX * camRightZ + (-moveZ) * camForwardZ;
 
