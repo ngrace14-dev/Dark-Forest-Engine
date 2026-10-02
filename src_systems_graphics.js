@@ -99,44 +99,49 @@ class RenderPipeline {
     }
 
         setQuality(tier) {
-        this.qualityTier = tier;
-        if (!this.composer) return;
+            this.qualityTier = tier;
+            if (!this.composer) return;
 
-        if (tier === 'low') {
-            this.passes.ssao.enabled = false;
-            this.passes.bloom.enabled = false;
-            this.passes.smaa.enabled = false;
-            if (this.dirLight) this.dirLight.castShadow = false;
-            if (this.renderer) {
-                this.renderer.shadowMap.enabled = false;
-                this.renderer.setPixelRatio(0.75); // Lower pixel ratio to improve performance on integrated graphics
+            if (tier === 'low') {
+                this.passes.ssao.enabled = false;
+                this.passes.bloom.enabled = false;
+                this.passes.smaa.enabled = false;
+                if (this.dirLight) this.dirLight.castShadow = false;
+                if (this.renderer) {
+                    this.renderer.shadowMap.enabled = false;
+                    this.renderer.setPixelRatio(0.5); // 50% render scale for potato
+                }
+                if (window.EngineParams) window.EngineParams.chunkRadius = 3;
+                // TODO: Throttle distant impostor updates
+            } else if (tier === 'medium') {
+                this.passes.ssao.enabled = true;
+                this.passes.bloom.enabled = true;
+                this.passes.smaa.enabled = false;
+                if (this.dirLight) this.dirLight.castShadow = true;
+                if (this.renderer) {
+                    this.renderer.shadowMap.enabled = true;
+                    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.0));
+                }
+                if (window.EngineParams) window.EngineParams.chunkRadius = 5;
+            } else if (tier === 'high') {
+                this.passes.ssao.enabled = true;
+                this.passes.bloom.enabled = true;
+                this.passes.smaa.enabled = true;
+                if (this.dirLight) this.dirLight.castShadow = true;
+                if (this.renderer) {
+                    this.renderer.shadowMap.enabled = true;
+                    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.0));
+                }
+                if (window.EngineParams) window.EngineParams.chunkRadius = 7;
             }
-        } else if (tier === 'medium') {
-            this.passes.ssao.enabled = true;
-            this.passes.bloom.enabled = true;
-            this.passes.smaa.enabled = false;
-            if (this.dirLight) this.dirLight.castShadow = true;
-            if (this.renderer) {
-                this.renderer.shadowMap.enabled = true;
-                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.0));
-            }
-        } else if (tier === 'high') {
-            this.passes.ssao.enabled = true;
-            this.passes.bloom.enabled = true;
-            this.passes.smaa.enabled = true;
-            if (this.dirLight) this.dirLight.castShadow = true;
-            if (this.renderer) {
-                this.renderer.shadowMap.enabled = true;
-                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.0));
-            }
+
+            const msg = `[GRAPHICS] Quality Preset Switched to: ${tier.toUpperCase()}`;
+            console.log(msg);
+            window.EventBus?.emit('UI_LOG', msg);
+            if (window.EventBus) window.EventBus.emit('WORLD_REGENERATE'); // reload chunks with new radius
         }
-
-        const msg = `[GRAPHICS] Quality Preset Switched to: ${tier.toUpperCase()}`;
-        console.log(msg);
-        window.EventBus?.emit('UI_LOG', msg);
-    }
 
     resize(width, height) {
         if (this.composer) this.composer.setSize(width, height);

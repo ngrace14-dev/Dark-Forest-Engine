@@ -233,8 +233,6 @@ function updateEntities(delta) {
     const detectionRadiusSq = playerAlive ? Math.pow(window.GameState?.forestBlessing?.dangerSense ? 18 : 15, 2) : 0;
     const nowSecs = performance.now() / 1000;
     const camPos = window.GameCore?.camera ? window.GameCore.camera.position : _v1.set(0,0,0);
-    const raycaster = new THREE.Raycaster();
-    const downVector = new THREE.Vector3(0, -1, 0);
 
     let isHidden = false;
     let hostileNearby = false;
@@ -267,8 +265,24 @@ function updateEntities(delta) {
             processEntityStatusEffects(entity, delta);
         }
 
-        if (entity.def?.type === 'npc' || entity.def?.type === 'character') {
-            alignEntityToGround(entity, delta, raycaster, downVector);
+                if (entity.def?.type === 'npc' || entity.def?.type === 'character') {
+            let shouldUpdatePhysics = true;
+            if (playerAlive) {
+                const distSq = entity.visual.position.distanceToSquared(playerPosition);
+                if (distSq > 400) { // > 20m
+                    const frameCounter = Math.floor(nowSecs * 60) + (entity.memoryIndex || 0);
+                    if (distSq > 6400) { // > 80m
+                        shouldUpdatePhysics = false;
+                    } else if (distSq > 1600) { // > 40m
+                        shouldUpdatePhysics = (frameCounter % 10 === 0);
+                    } else { // 20-40m
+                        shouldUpdatePhysics = (frameCounter % 3 === 0);
+                    }
+                }
+            }
+            if (shouldUpdatePhysics) {
+                alignEntityToGround(entity, delta);
+            }
         }
 
         if (playerAlive && entity.hp > 0) {
@@ -363,26 +377,25 @@ function processEntityStatusEffects(entity, delta) {
     }
 }
 
-function alignEntityToGround(entity, delta, raycaster, downVector) {
+function alignEntityToGround(entity, delta) {
     if (!entity?.visual) return;
     const ePos = entity.visual.position;
-    raycaster.set(_v1.set(ePos.x, ePos.y + 2, ePos.z), downVector);
-    const activeMeshes = [];
     
-    for (const chunk of ChunkManager.activeChunks.values()) {
-        if (chunk.mesh) activeMeshes.push(chunk.mesh);
-    }
+    const step = 0.5;
+    const hL = safeGetTerrainHeight(ePos.x - step, ePos.z);
+    const hR = safeGetTerrainHeight(ePos.x + step, ePos.z);
+    const hD = safeGetTerrainHeight(ePos.x, ePos.z - step);
+    const hU = safeGetTerrainHeight(ePos.x, ePos.z + step);
     
-    const intersects = raycaster.intersectObjects(activeMeshes, false);
-    if (intersects.length > 0) {
-        const hitNormal = intersects[0].face.normal;
-        const targetQuaternion = _q1.setFromUnitVectors(_v2.set(0, 1, 0), hitNormal);
-        const currentYRotation = _e1.setFromQuaternion(entity.visual.quaternion, 'YXZ').y;
-        const yQuat = _q1.setFromAxisAngle(_v2.set(0, 1, 0), currentYRotation);
-        
-        targetQuaternion.multiply(yQuat);
-        entity.visual.quaternion.slerp(targetQuaternion, delta * 5.0);
-    }
+    _v3.set(hL - hR, 2.0 * step, hD - hU).normalize();
+    const hitNormal = _v3;
+    
+    const targetQuaternion = _q1.setFromUnitVectors(_v2.set(0, 1, 0), hitNormal);
+    const currentYRotation = _e1.setFromQuaternion(entity.visual.quaternion, 'YXZ').y;
+    const yQuat = _q1.setFromAxisAngle(_v2.set(0, 1, 0), currentYRotation);
+    
+    targetQuaternion.multiply(yQuat);
+    entity.visual.quaternion.slerp(targetQuaternion, delta * 5.0);
 }
 
 function handleEntityDeath(entity) {
@@ -888,15 +901,16 @@ const ChunkManager = {
         }
     },
     
-    loadChunksAround: function(cx, cz) {
+        loadChunksAround: function(cx, cz) {
         const expectedChunks = new Set();
+        const radius = window.EngineParams?.chunkRadius || 5;
         
-        for (let x = cx - 10; x <= cx + 10; x++) { 
-            for (let z = cz - 10; z <= cz + 10; z++) { 
+        for (let x = cx - radius; x <= cx + radius; x++) { 
+            for (let z = cz - radius; z <= cz + radius; z++) { 
                 const dist = Math.max(Math.abs(x - cx), Math.abs(z - cz));
                 const key = `${x},${z}`; 
                 
-                if (dist <= 10) {
+                if (dist <= radius) {
                     expectedChunks.add(key);
                     
                     let targetLod = 'C';
