@@ -38,10 +38,10 @@ export class PlayerController {
         let moveX = 0;
         let moveZ = 0;
         
-        if (this.inputSource.keys?.w) moveZ -= 1; // W means go forward (-Z in local coords)
-        if (this.inputSource.keys?.s) moveZ += 1;
-        if (this.inputSource.keys?.a) moveX -= 1; // A means go left (-X)
-        if (this.inputSource.keys?.d) moveX += 1; // D means go right (+X)
+        if (this.inputSource.keys?.w) moveZ += 1; // W means go forward (positive intent)
+        if (this.inputSource.keys?.s) moveZ -= 1; // S means go backward
+        if (this.inputSource.keys?.a) moveX -= 1; // A means go left
+        if (this.inputSource.keys?.d) moveX += 1; // D means go right
 
         const wantsToJump = false; // Disable space-to-jump, it's now dash/sprint
         const spacePressedThisFrame = this.inputSource.keys?.[' ']; // Spacebar
@@ -78,6 +78,8 @@ export class PlayerController {
         // 2. Transform input relative to camera
         if (moveX !== 0 || moveZ !== 0) {
             // Get camera forward/right flattened to XZ plane
+            // We want the vector pointing out from the camera, away from the player
+            // Default ThreeJS camera looks down -Z. So pushing +1 on local Z gives us the vector looking INTO the scene
             _v1.set(0, 0, -1).applyQuaternion(this.cameraRig.camera.quaternion);
             _v1.y = 0;
             _v1.normalize();
@@ -89,14 +91,14 @@ export class PlayerController {
             // Forward is (x, 0, z)
             // Up is (0, 1, 0)
             // Cross product: Right = (-z, 0, x) -> this points right relative to camera forward
-            const camRightX = -camForwardZ;
-            const camRightZ = camForwardX;
+            const camRightX = camForwardZ;
+            const camRightZ = -camForwardX;
 
-            // Using standard W = -Z mapping: 
-            // Forward input (moveZ = -1) needs to push along camForward (-Z in local is +Forward in global)
-            // Note: Since 'w' subtracts 1 from moveZ, we multiply by (-moveZ) so pressing W results in 1 * camForward
-            const finalDirX = moveX * camRightX + (-moveZ) * camForwardX;
-            const finalDirZ = moveX * camRightZ + (-moveZ) * camForwardZ;
+            // W maps to positive moveZ internally for math clarity
+            // If W is pressed, moveZ = 1. We want to move ALONG camForward.
+            // If D is pressed, moveX = 1. We want to move ALONG camRight.
+            const finalDirX = moveX * camRightX + moveZ * camForwardX;
+            const finalDirZ = moveX * camRightZ + moveZ * camForwardZ;
 
             this.character.setMovementIntent(finalDirX, finalDirZ, wantsToJump, wantsToSprint, wantsToDash);
         } else {
