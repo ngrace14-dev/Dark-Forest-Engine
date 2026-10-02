@@ -99,23 +99,22 @@ export class EpochManager {
         const biomeKey = this.getBiome(x, z);
 
         // 1. THE REDWOOD BASIN (DISC 1)
-        // Extremely flat center, rising to a gentle rim, then climbing to the Sierra Wall
+        // Slowly sloping upwards towards the mountain ring, with smooth rolling hills.
         let height = 0;
         if (dist <= halfForestSide) {
             const basinT = dist / halfForestSide;
             
-            // Basin Base Elevation: Exponential rise pushed to the outer rim
-            height = Math.pow(basinT, 4.0) * 120.0; 
+            // Basin Base Elevation: Gradual quadratic slope towards the outer rim
+            height = Math.pow(basinT, 2.0) * 120.0; 
 
-            // Organic Terrain Variation (Normalized to meet target ranges)
-            // Center (T=0): +/- 0.5m (1m total)
-            // Mid (T=0.5): +/- 2.5m (5m total)
-            // Edge (T=1.0): +/- 10m (20m total)
-            const varAmp = 0.5 + (basinT * 9.5);
+            // Smooth Rolling Terrain (Flatter than before)
+            // Center (T=0): +/- 0.5m
+            // Edge (T=1.0): +/- 5m (less elevation changes than before)
+            const varAmp = 0.5 + (basinT * 4.5);
             
-            // Large-scale geological swells only. No micro-noise.
-            const swell = this.noise2D(x * 0.0008, z * 0.0008); 
-            const ripple = this.noise2D(x * 0.005, z * 0.005) * 0.15;
+            // Large-scale geological swells for smooth rolling hills.
+            const swell = this.noise2D(x * 0.0004, z * 0.0004); 
+            const ripple = this.noise2D(x * 0.002, z * 0.002) * 0.1; // Reduced ripple scale and weight
             
             height += (swell + ripple) * varAmp;
         }

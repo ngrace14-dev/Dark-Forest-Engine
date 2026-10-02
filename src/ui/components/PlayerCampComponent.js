@@ -1,5 +1,6 @@
 import { UIComponent } from '../core/UIComponent.js';
 
+
 export class PlayerCampComponent extends UIComponent {
     constructor() {
         super('companion-dialogue'); // Reuses dialog
