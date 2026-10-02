@@ -51,6 +51,16 @@ window.WorldGenerator = class {
 // If they are missing from other files, these fallbacks will successfully boot the game.
 
 window.spawnPlayer = function(x, y, z) {
+    if (window.GameCore?.newPlayerPipeline) {
+         console.log(`[World] Integration Test: New Player Pipeline active, skipping legacy spawnPlayer`);
+         // We still need to trigger chunk manager and camera placement logic to boot up the environment
+         // Teleport the new pipeline to the spawn point
+         if (window.GameCore.newPlayerPipeline.body) {
+             window.GameCore.newPlayerPipeline.body.setNextKinematicTranslation({x, y, z});
+         }
+         return;
+    }
+
     if (!window.GameCore || !window.GameCore.instantiatePrefab) {
         console.warn("⚠️ GameCore not ready for player spawn.");
         return;

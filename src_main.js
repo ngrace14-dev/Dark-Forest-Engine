@@ -43,6 +43,9 @@ import './src_systems_warden.js';
 import './src_systems_chronicle.js';
 import './src_systems_navigation_careers.js';
 
+// 1.5 Integration Testing: Character Stack
+import './src/character/init.js';
+
 // 2. Mod Tools, Overlays & Dev Systems
 import './src/animation_tools/MixamoRetargeting.js';
 import './src_firebase.js';

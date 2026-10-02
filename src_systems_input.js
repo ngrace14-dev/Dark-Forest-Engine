@@ -60,12 +60,20 @@ document.addEventListener('mousemove', e => {
     if (window.Input.isDraggingCam) { 
         if (window.EngineParams?.editMode) return; // Mouselook handled by EditorManager
         
-        // Adjust angle and pitch based on mouse movement
-        window.Input.camAngle -= (e.clientX - window.Input.lastMouseX) * 0.01; 
-        window.Input.camPitch += (e.clientY - window.Input.lastMouseY) * 0.01;
-        
-        // Clamp pitch between ground-level (0.1) and top-down (almost PI/2) to prevent camera from flipping upside down
-        window.Input.camPitch = Math.max(0.1, Math.min(Math.PI / 2.1, window.Input.camPitch));
+        const deltaX = e.clientX - window.Input.lastMouseX;
+        const deltaY = e.clientY - window.Input.lastMouseY;
+
+        // Integration Test: Pipe to new camera rig if it exists
+        if (window.GameCore?.cameraRig) {
+            window.GameCore.cameraRig.addOrbit(deltaX, deltaY);
+        } else {
+            // Adjust angle and pitch based on mouse movement (Legacy)
+            window.Input.camAngle -= deltaX * 0.01; 
+            window.Input.camPitch += deltaY * 0.01;
+            
+            // Clamp pitch between ground-level (0.1) and top-down (almost PI/2) to prevent camera from flipping upside down
+            window.Input.camPitch = Math.max(0.1, Math.min(Math.PI / 2.1, window.Input.camPitch));
+        }
         
         window.Input.lastMouseX = e.clientX; 
         window.Input.lastMouseY = e.clientY;
@@ -75,7 +83,11 @@ document.addEventListener('mousemove', e => {
 
 document.addEventListener('wheel', e => { 
     // Scroll to zoom in and out
-    window.Input.camDistance = Math.max(5, Math.min(30, window.Input.camDistance + e.deltaY * 0.01)); 
+    if (window.GameCore?.cameraRig) {
+        window.GameCore.cameraRig.addZoom(e.deltaY * 0.01);
+    } else {
+        window.Input.camDistance = Math.max(5, Math.min(30, window.Input.camDistance + e.deltaY * 0.01)); 
+    }
 });
 
 // Prevent browser context menu on right-click

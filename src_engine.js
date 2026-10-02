@@ -45,6 +45,11 @@ function safeGetTerrainHeight(x, z) {
 }
 
 // ==========================================
+// CHARACTER MANAGER INITIALIZATION (INTEGRATION TEST)
+// ==========================================
+window.CharacterManager = new window.CharacterManager();
+
+// ==========================================
 // LIGHT POOL SYSTEM
 // ==========================================
 const MAX_POOLED_LIGHTS = 8;
@@ -109,6 +114,17 @@ function updateLightPool() {
 // ==========================================
 
 function updateCameraAndShadows(delta) {
+    // If the new Player Pipeline is active, the camera is driven by CameraRig in late update
+    if (window.GameCore?.newPlayerPipeline) {
+        // Still need to update the shadow target
+        const dirLight = window.RenderPipeline?.dirLight;
+        if (dirLight && dirLight.castShadow && window.GameCore.newPlayerPipeline.characterVisual) {
+            dirLight.target.position.copy(window.GameCore.newPlayerPipeline.characterVisual.mesh.position);
+            dirLight.target.updateMatrixWorld();
+        }
+        return;
+    }
+
     if (!window.GameCore?.camera || !window.GameCore?.playerObj?.visual) return;
 
     const playerPos = window.GameCore.playerObj.visual.position;
@@ -433,6 +449,8 @@ function handleEntityDeath(entity) {
 // ==========================================
 
 function updatePlayerMovement(delta) {
+    if (window.GameCore?.newPlayerPipeline) return; // Skip legacy movement if new pipeline is active
+
     if (!window.Input || !window.GameCore?.playerObj?.visual || !window.GameCore.playerObj.body) return;
     
     let p;
@@ -814,9 +832,13 @@ function fixedUpdateLogic(delta) {
         window.GameCore.tidewaterSystem.update(delta, window.GameCore.camera);
     }
 
-    // REDWOOD ECOSYSTEM UPDATES
+        // REDWOOD ECOSYSTEM UPDATES
     if (window.BlockTerrainSystem && window.GameCore?.playerObj?.visual) {
         const pPos = window.GameCore.playerObj.visual.position;
+        window.BlockTerrainSystem.updateStreaming(pPos.x, pPos.z, 6);
+    } else if (window.BlockTerrainSystem && window.GameCore?.newPlayerPipeline?.characterVisual) {
+        // Support new pipeline streaming
+        const pPos = window.GameCore.newPlayerPipeline.characterVisual.mesh.position;
         window.BlockTerrainSystem.updateStreaming(pPos.x, pPos.z, 6);
     }
 
@@ -834,15 +856,28 @@ function fixedUpdateLogic(delta) {
         );
     }
 
-    updatePlayerStats(delta);
+        updatePlayerStats(delta);
     updateEntities(delta);
+
+    // [INTEGRATION TEST] Pre-Physics Update
+    if (window.CharacterManager) {
+        window.CharacterManager.update(delta);
+    }
 
     if (window.RenderOptimizer && window.GameCore?.camera) {
         window.RenderOptimizer.updateEntityLOD(window.GameCore.activeEntities || [], window.GameCore.camera.position);
     }
 
-    updatePlayerMovement(delta);
+        updatePlayerMovement(delta);
     updateCombatHitboxes(delta);
+
+    // [INTEGRATION TEST] Post-Physics Update (Visuals & Camera)
+    if (window.CharacterManager) {
+        window.CharacterManager.postPhysicsUpdate(delta);
+    }
+    if (window.GameCore?.cameraRig) {
+        window.GameCore.cameraRig.update(delta);
+    }
 }
 
 // ==========================================
@@ -2067,9 +2102,76 @@ async function bootEngine() {
         if (TidewaterSystem && renderer) {
             window.GameCore.tidewaterSystem = new TidewaterSystem();
             window.GameCore.tidewaterSystem.init(window.GameCore.scene, renderer);
-        }
+            }
 
-                initLightPool(window.GameCore.scene);
+            // ==========================================
+            // PLAYER CHARACTER INTEGRATION TEST
+            // ==========================================
+            const startY = safeGetTerrainHeight(0, 0); 
+            const safeY = isNaN(startY) ? 1 : startY;
+
+            // 1. Create Core Character (Physics + Intents)
+            const coreCharacter = new window.CoreCharacter(window.GameCore.world, 0, safeY + 3.0, 0, {
+                runSpeed: 6.0,
+                sprintSpeed: 10.0,
+                jumpVelocity: 7.0
+            });
+
+            // Add a quick debug logger to the visual to draw the state over its head
+            const textCanvas = document.createElement('canvas');
+            textCanvas.width = 256; textCanvas.height = 64;
+            const textCtx = textCanvas.getContext('2d');
+            const textTex = new THREE.CanvasTexture(textCanvas);
+            const textMat = new THREE.SpriteMaterial({ map: textTex, color: 0xffffff });
+            const textSprite = new THREE.Sprite(textMat);
+            textSprite.position.set(0, 1.5, 0);
+            textSprite.scale.set(3, 0.75, 1);
+        
+            // 2. Create Camera Rig (Spring Arm + Collision)
+            const cameraRig = new window.CameraRig(window.GameCore.camera, window.GameCore.world);
+            cameraRig.setTarget(coreCharacter);
+            window.GameCore.cameraRig = cameraRig; // Expose for mouse drag
+
+            // 3. Create Player Controller (Input Mapping)
+            const playerController = new window.PlayerController(coreCharacter, cameraRig);
+
+            // 4. Create Visual Mesh (Dummy Capsule)
+            const characterVisual = new window.CharacterVisual(coreCharacter, window.GameCore.scene);
+            characterVisual.mesh.add(textSprite);
+
+            // Bind everything together for the update loop
+            // We attach these references to the coreCharacter so CharacterManager can update them in a bundle
+            coreCharacter.playerController = playerController;
+            coreCharacter.characterVisual = characterVisual;
+        
+            // Override the default prePhysicsUpdate on this specific instance for the test
+            const originalPrePhysics = coreCharacter.prePhysicsUpdate.bind(coreCharacter);
+            coreCharacter.prePhysicsUpdate = function(delta) {
+                this.lastFrameStartPerf = performance.now();
+                this.playerController.update(delta);
+                originalPrePhysics(delta);
+            };
+        
+            // Override the postPhysicsUpdate to drive the visual sync
+            coreCharacter.postPhysicsUpdate = function(delta) {
+                const startPerf = performance.now();
+                this.characterVisual.update(delta);
+            
+                // Debug Text Overlay Update
+                textCtx.clearRect(0, 0, 256, 64);
+                textCtx.fillStyle = 'white';
+                textCtx.font = '24px Arial';
+                textCtx.textAlign = 'center';
+                textCtx.fillText(`State: ${this.state}`, 128, 24);
+                const totalMs = (performance.now() - this.lastFrameStartPerf).toFixed(2);
+                textCtx.fillText(`${totalMs}ms`, 128, 54);
+                textTex.needsUpdate = true;
+            };
+
+            window.CharacterManager.registerPlayer(coreCharacter);
+            window.GameCore.newPlayerPipeline = coreCharacter; // Track for legacy overrides
+
+                    initLightPool(window.GameCore.scene);
 
         renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" }); 
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); 
@@ -2195,104 +2297,4 @@ async function bootEngine() {
 
         window.EventBus?.on('ENV_UPDATE', () => {
             if (window.RenderPipeline && window.EngineParams) {
-                window.RenderPipeline.updateEnvironment(window.GameCore.scene, window.GameCore.scene.fog, window.EngineParams, window.GameCore.horizonMaterial);
-            }
-        });
-
-        window.EventBus?.on('SCENE_SWAP', ({ target, pos }) => {
-            if (window.RenderPipeline) window.RenderPipeline.swapScene(target);
-
-            if (target === 'establishment') {
-                if (window.GameCore.playerObj && window.GameCore.playerObj.body) {
-                    window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setTranslation({ x: 0, y: 3, z: 0 }, true);
-                    if (window.EngineParams) window.EngineParams.suppressChunkLoading = true;
-                }
-            } else if (target === 'world') {
-                if (window.GameCore.playerObj && window.GameCore.playerObj.body && pos) {
-                    ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, 0, pos.z));
-                    const groundY = safeGetTerrainHeight(pos.x, pos.z) + 5.0;
-                    window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: groundY, z: pos.z }, true);
-                    if (window.EngineParams) window.EngineParams.suppressChunkLoading = false;
-                }
-            }
-            window.EventBus?.emit('ENV_UPDATE');
-        });
-
-        window.EventBus?.emit('ENGINE_READY'); 
-        window.EventBus?.emit('ENV_UPDATE');
-    } catch(e) { 
-        console.error("CRITICAL BOOT ERROR", e); 
-    }
-}
-
-window.bootEngine = bootEngine;
-
-// ==========================================
-// RENDER LOOP & INPUT BINDING
-// ==========================================
-
-window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('btn-start')?.addEventListener('click', (e) => {
-        document.getElementById('start-screen').classList.add('hidden');
-        document.getElementById('hud').classList.remove('hidden');
-
-        if(window.GameCore) window.GameCore.engineState = 'running';
-
-        window.EventBus?.emit('UI_UPDATE_HUD');
-        window.EventBus?.emit('GAME_STARTED');
-
-        (async () => {
-            try {
-                if (window.Tone) {
-                    await window.Tone.start();
-                    if (window.Tone.Transport.state !== 'started') {
-                        window.Tone.Transport.start();
-                    }
-                    console.log('🔊 WebAudio Context resumed successfully.');
-                }
-            } catch (err) {
-                console.warn('AudioContext failed to start:', err);
-            }
-        })();
-
-        window.addEventListener('resize', () => { 
-            if(window.GameCore?.camera) {
-                window.GameCore.camera.aspect = window.innerWidth / window.innerHeight; 
-                window.GameCore.camera.updateProjectionMatrix(); 
-            }
-            if(renderer) {
-                renderer.setSize(window.innerWidth, window.innerHeight); 
-                if (window.RenderPipeline) window.RenderPipeline.resize(window.innerWidth, window.innerHeight);
-            }
-        });
-    
-        function animate() { 
-            requestAnimationFrame(animate); 
-            let delta = clock.getDelta(); 
-            if (delta > 0.1) delta = 0.1; 
-            accumulator += delta; 
-        
-            while (accumulator >= fixedTimeStep) { 
-                if (window.GameCore?.world) window.GameCore.world.step(); 
-                if (window.GameCore?.checkFloatingOrigin) window.GameCore.checkFloatingOrigin();
-        
-                fixedUpdateLogic(fixedTimeStep); 
-                accumulator -= fixedTimeStep; 
-            } 
-
-            updateCameraAndShadows(delta);
-
-            if (window.RenderPipeline) window.RenderPipeline.render();
-        }
-    
-        animate();
-    
-        window.EventBus?.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
-    }, { once: true }); 
-});
-
-bootEngine();
+                window.RenderPipeline.updateEnvironment(
