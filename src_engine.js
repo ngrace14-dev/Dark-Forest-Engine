@@ -947,9 +947,9 @@ const ChunkManager = {
                     if (h > maxH) maxH = h;
                 }
                 
-                const segments = lod === 'A' ? 30 : (lod === 'B' ? 10 : 2);
+                                const segments = lod === 'A' ? 30 : (lod === 'B' ? 10 : 2);
                 
-                const indices = [];
+                const gridIndices = [];
                 const gridX = segments + 1;
                 for (let j = 0; j < segments; j++) {
                     for (let i = 0; i < segments; i++) {
@@ -957,12 +957,12 @@ const ChunkManager = {
                         const b = i + gridX * (j + 1);
                         const c = (i + 1) + gridX * (j + 1);
                         const d = (i + 1) + gridX * j;
-                        indices.push(a, b, d);
-                        indices.push(b, c, d);
+                        gridIndices.push(a, b, d);
+                        gridIndices.push(b, c, d);
                     }
                 }
                 
-                console.log(`[Diagnostic] Chunk ${key} generated. Verts: ${positions.length / 3}, Indices: ${indices.length}, Height Range: ${minH.toFixed(2)} to ${maxH.toFixed(2)}`);
+                console.log(`[Diagnostic] Chunk ${key} generated. Verts: ${positions.length / 3}, Indices: ${gridIndices.length}, Height Range: ${minH.toFixed(2)} to ${maxH.toFixed(2)}`);
 
                 const geo = new THREE.BufferGeometry();
 
@@ -970,20 +970,8 @@ const ChunkManager = {
                 geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
                 geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
                 geo.setAttribute('clutter', new THREE.BufferAttribute(clutter, 1));
-
-                const indices = [];
-                const gridX = segments + 1;
-                for (let j = 0; j < segments; j++) {
-                    for (let i = 0; i < segments; i++) {
-                        const a = i + gridX * j;
-                        const b = i + gridX * (j + 1);
-                        const c = (i + 1) + gridX * (j + 1);
-                        const d = (i + 1) + gridX * j;
-                        indices.push(a, b, d);
-                        indices.push(b, c, d);
-                    }
-                }
-                geo.setIndex(indices);
+                
+                geo.setIndex(gridIndices);
 
                 const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
 
@@ -1002,8 +990,9 @@ const ChunkManager = {
                 let groundBody = null;
                 let collider = null;
                 if (window.GameCore?.world) {
-                    const indicesU32 = new Uint32Array(indices);
+                    const indicesU32 = new Uint32Array(gridIndices);
                     groundBody = window.GameCore.world.createRigidBody(
+
                         RAPIER.RigidBodyDesc.fixed().setTranslation(chunkX, 0, chunkZ)
                     );
                     collider = window.GameCore.world.createCollider(
