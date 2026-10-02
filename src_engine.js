@@ -2287,10 +2287,10 @@ async function bootEngine() {
                 window.RenderPipeline.dirLight.shadow.normalBias = 0.03;
             }
             window.RenderPipeline.updateEnvironment(window.GameCore.scene, window.GameCore.scene.fog, window.EngineParams, window.GameCore.horizonMaterial);
-        }
+                }
 
-        const startY = safeGetTerrainHeight(0, 0); 
-        const safeY = isNaN(startY) ? 1 : startY;
+        // The player starts have been overridden by the new Integration test above.
+        // We still need to call the legacy setup functions for chunk managers though.
         window.spawnPlayer?.(0, safeY + 3.0, 0); 
         window.spawnPartyMembers?.(); 
         ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
