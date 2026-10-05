@@ -23,6 +23,7 @@ class UnifiedWorkerPool {
             const worker = new Worker('src_workers_router.js', { type: 'module' });
             
             worker.onmessage = (e) => {
+                console.log(String.fromCharCode(91,77,97,105,110,93,32,82,101,99,101,105,118,101,100,32,101,46,100,97,116,97), e.data);
                 const { taskId, error, result } = e.data;
                 const callback = this.callbacks.get(taskId);
                 

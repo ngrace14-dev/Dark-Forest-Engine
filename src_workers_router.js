@@ -40,6 +40,7 @@ self.onmessage = async (e) => {
         const response = await handlerModule[action](payload);
 
         if (!response || !response.result) throw new Error(domain);
+        console.log(String.fromCharCode(91,82,111,117,116,101,114,93,32,68,105,115,112,97,116,99,104,105,110,103) + taskId);
         self.postMessage({
             taskId,
             result: response.result
