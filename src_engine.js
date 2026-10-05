@@ -954,7 +954,7 @@ const ChunkManager = {
         const isInsideAethelgard = window.CapitalCityManager?.isInsideCapital?.(chunkX, chunkZ) || false;
         const localRoadPoints = window.RoadManager?.getRoadPointsNear?.(cx, cz) || [];
 
-        this.activeChunks.set(key, { mesh: null, body: null, collider: null, lod });
+        this.activeChunks.set(key, { state: window.ChunkState.LOADING, mesh: null, body: null, collider: null, lod });
 
                 window.TerrainWorkerPool.requestChunkData(
             cx, cz, lod, 60, window.EngineParams?.worldSeed || 1337, localRoadPoints,
@@ -1179,7 +1179,8 @@ const ChunkManager = {
                 return true; 
             });
         }
-        this.activeChunks.delete(key);
+        // this.activeChunks.delete(key); // DEPRECATED: Phase 1 Incremental Teardown
+        if (chunk) chunk.state = window.ChunkState.UNLOADING;
         window.EventBus?.emit('CHUNK_UNLOADED');
     }
 };

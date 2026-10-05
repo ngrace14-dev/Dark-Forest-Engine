@@ -4,6 +4,7 @@
 import './src_systems_profiler.js';
 import './src_core_registry.js';
 import './src_core_state.js';
+import './src_core_config.js';
 
 // 1. Core Systems & World Managers
 import './src_epoch_manager.js';

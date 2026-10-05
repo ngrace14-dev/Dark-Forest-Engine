@@ -1,3 +1,7 @@
+// --- LIFECYCLE ENUMS (PHASE 1) ---
+window.EntityState = { ACTIVE: 0, SLEEPING: 1, VIRTUAL: 2 };
+window.ChunkState = { LOADING: 0, ACTIVE: 1, UNLOADING: 2, UNLOADED: 3 };
+
 import * as THREE from 'three';
 
 window.EventBus = {
