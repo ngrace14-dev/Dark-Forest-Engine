@@ -92,7 +92,9 @@ function getTerrainHeight(x, z) {
 export async function generateChunk(payload) {
     const e = { data: payload };
     try {
-        const { id, cx, cz, segments, chunkSize, seed, roadPoints } = e.data;
+        const cx = e.data.cx; const cz = e.data.cz; const lod = e.data.lod; const size = e.data.size; const seed = e.data.seed; const localRoadPoints = e.data.localRoadPoints;
+        const segments = lod === String.fromCharCode(65) ? 30 : (lod === String.fromCharCode(66) ? 10 : 2);
+        const chunkSize = size; const roadPoints = localRoadPoints;
 
         const taskSeed = seed || 1337;
         if (!noiseFn || currentSeed !== taskSeed) {
@@ -113,7 +115,7 @@ export async function generateChunk(payload) {
         const halfSize = chunkSize / 2;
         const step = chunkSize / segments;
 
-        const localRoadPoints = [];
+        // const localRoadPoints = [];
         if (Array.isArray(roadPoints) && roadPoints.length > 0) {
             const margin = halfSize + ROAD_WIDTH + 10;
             for (let r = 0; r < roadPoints.length; r++) {
