@@ -41,7 +41,10 @@ export class GrassSystem {
                         vertexColors: true 
                     });
 
-            this.floorMaterial.onBeforeCompile = (shader) => {\n                if (window.EngineConfig?.quality?.shaderTier === String.fromCharCode(76,79,87)) {\n                    shader.vertexShader = String.fromCharCode(35,100,101,102,105,110,101,32,76,79,87,95,81,85,65,76,73,84,89,10) + shader.vertexShader;\n                }
+            this.floorMaterial.onBeforeCompile = (shader) => {
+                if (window.EngineConfig?.quality?.shaderTier === String.fromCharCode(76,79,87)) {
+                    shader.vertexShader = String.fromCharCode(35,100,101,102,105,110,101,32,76,79,87,95,81,85,65,76,73,84,89,10) + shader.vertexShader;
+                }
                 shader.uniforms.uTime = { value: 0 };
                 shader.uniforms.uPlayerPos = { value: new THREE.Vector3() };
 
