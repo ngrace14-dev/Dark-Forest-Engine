@@ -265,25 +265,22 @@ function updateEntities(delta) {
             processEntityStatusEffects(entity, delta);
         }
 
-                if (entity.def?.type === 'npc' || entity.def?.type === 'character') {
-            let shouldUpdatePhysics = true;
-            if (playerAlive) {
-                const distSq = entity.visual.position.distanceToSquared(playerPosition);
-                if (distSq > 400) { // > 20m
-                    const frameCounter = Math.floor(nowSecs * 60) + (entity.memoryIndex || 0);
-                    if (distSq > 6400) { // > 80m
-                        shouldUpdatePhysics = false;
-                    } else if (distSq > 1600) { // > 40m
-                        shouldUpdatePhysics = (frameCounter % 10 === 0);
-                    } else { // 20-40m
-                        shouldUpdatePhysics = (frameCounter % 3 === 0);
-                    }
-                }
-            }
-            if (shouldUpdatePhysics) {
-                alignEntityToGround(entity, delta);
-            }
-        }
+if (entity.def?.type === String.fromCharCode(110,112,99) || entity.def?.type === String.fromCharCode(99,104,97,114,97,99,116,101,114)) {
+    let isVisible = false; let distSq = 0;
+    if (playerAlive) { distSq = entity.visual.position.distanceToSquared(playerPosition);
+        if (window.GameCore?.camera) {
+            _v3.subVectors(entity.visual.position, camPos).normalize();
+            const camForward = window.GameCore.camera.getWorldDirection(_v2);
+            const dot = camForward.dot(_v3);
+            isVisible = (dot > 0.5 && distSq < 10000); } }
+    entity.userData = entity.userData || {};
+    entity.userData.isVisible = isVisible; entity.userData.distSq = distSq;
+    let shouldUpdateAI = false;
+    if (isVisible && distSq < 400) { shouldUpdateAI = window.Heartbeat?.ticks.t60 ?? true;
+    } else if (isVisible && distSq < 3600) { shouldUpdateAI = window.Heartbeat?.ticks.t20 ?? false;
+    } else if (!isVisible && distSq < 1600) { shouldUpdateAI = window.Heartbeat?.ticks.t5 ?? false;
+    } else { shouldUpdateAI = window.Heartbeat?.ticks.t1 ?? false; }
+    if (shouldUpdateAI) { alignEntityToGround(entity, delta); } }
 
         if (playerAlive && entity.hp > 0) {
             const distSq = entity.visual.position.distanceToSquared(playerPosition);
@@ -755,6 +752,7 @@ function updateCombatHitboxes(delta) {
 // ==========================================
 
 function fixedUpdateLogic(delta) {
+    if (window.Heartbeat) window.Heartbeat.update(delta);
     if (window.Profiler) window.Profiler.begin('Physics');
     if (window.GameCore?.playerObj) {
         ChunkManager.update(window.GameCore.playerObj.visual.position);
@@ -1330,8 +1328,10 @@ function playEntityAnimation(entity, state) {
         return;
     }
     
-    if (!entity.mixer || !entity.actions || !entity.actions[state]) return; 
-    if (entity.currentAnimState === 'die') return;
+    if (!entity.mixer || !entity.actions || !entity.actions[state]) return;
+    if (entity.userData?.isVisible === false && entity.userData?.distSq > 1600) return; // Phase 3: Skip unseen distant animation triggers 
+    if (!entity.mixer || !entity.actions || !entity.actions[state]) return;
+    if (entity.userData?.isVisible === false && entity.userData?.distSq > 1600) return;
     if (entity.currentAnimState === state) return; 
     
     const newAction = entity.actions[state]; 
