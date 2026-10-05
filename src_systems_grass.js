@@ -41,7 +41,7 @@ export class GrassSystem {
                         vertexColors: true 
                     });
 
-            this.floorMaterial.onBeforeCompile = (shader) => {
+            this.floorMaterial.onBeforeCompile = (shader) => {\n                if (window.EngineConfig?.quality?.shaderTier === String.fromCharCode(76,79,87)) {\n                    shader.vertexShader = String.fromCharCode(35,100,101,102,105,110,101,32,76,79,87,95,81,85,65,76,73,84,89,10) + shader.vertexShader;\n                }
                 shader.uniforms.uTime = { value: 0 };
                 shader.uniforms.uPlayerPos = { value: new THREE.Vector3() };
 
@@ -78,11 +78,7 @@ export class GrassSystem {
                     // Only part the upper third of the blade
                     float partFactor = smoothstep(0.3, 1.0, vY);
                     
-                    if (falloff > 0.0 && partFactor > 0.0) {
-                        vec2 bendDir = normalize(worldPos.xz - uPlayerPos.xz);
-                        transformed.x += bendDir.x * falloff * partFactor * 0.5;
-                        transformed.z += bendDir.y * falloff * partFactor * 0.5;
-                    }
+                    #ifndef LOW_QUALITY\n                    if (falloff > 0.0 && partFactor > 0.0) {\n                        vec2 bendDir = normalize(worldPos.xz - uPlayerPos.xz);\n                        transformed.x += bendDir.x * falloff * partFactor * 0.5;\n                        transformed.z += bendDir.y * falloff * partFactor * 0.5;\n                    }\n                    #endif
                     
                     // Distance fade for animation
                     float distToCam = distance(worldPos.xyz, cameraPosition);
@@ -113,7 +109,7 @@ export class GrassSystem {
         if (biomeKey === 'redwoods') baseDensity = 4000;
         else if (biomeKey === 'valley') baseDensity = 2000;
 
-        const totalGrass = baseDensity;
+        const totalGrass = Math.floor(baseDensity * (window.EngineConfig?.quality?.grassDensity || 1.0));
         
         const group = new THREE.Group();
         const grassMesh = new THREE.InstancedMesh(this.grassGeo, this.floorMaterial, totalGrass);

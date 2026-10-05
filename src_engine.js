@@ -1395,6 +1395,20 @@ function setupEntityAnimations(entity, isPlayer = false) {
     playEntityAnimation(entity, 'idle');
 }
 
+function createBlobShadow(radius) {
+    const geo = new THREE.PlaneGeometry(radius * 2, radius * 2);
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({ 
+        color: 0x000000, 
+        transparent: true, 
+        opacity: 0.5, 
+        depthWrite: false 
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y = 0.05; // Slightly above ground
+    mesh.isBlobShadow = true;
+    return mesh;
+}
 function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     const def = window.AssetManager?.prefabs?.[name]; 
     if(!def) return;
@@ -1468,7 +1482,12 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
         activeLightEmitters.push({ mesh, color: 0x9bdcff, intensity: def.active === false ? 0 : 2.5, distance: 18 });
     }
 
-    setupEntityAnimations(entity); 
+    setupEntityAnimations(entity);
+    if (!window.EngineConfig?.quality?.shadowsEnabled) {
+        const blob = createBlobShadow(def.radius || 0.5);
+        mesh.add(blob);
+        entity.blobShadow = blob;
+    } 
     if (window.VFXManager?.applyAura) window.VFXManager.applyAura(entity, def); 
     
     window.GameCore.SpatialGrid?.registerEntity?.(entity);

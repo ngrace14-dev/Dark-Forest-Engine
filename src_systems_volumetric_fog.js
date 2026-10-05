@@ -76,7 +76,7 @@ class VolumetricFogSystem {
                 ${shader.fragmentShader}
             `;
 
-            shader.fragmentShader = shader.fragmentShader.replace(
+            if (window.EngineConfig?.quality?.shaderTier === String.fromCharCode(76,79,87)) {\n                shader.fragmentShader = String.fromCharCode(35,100,101,102,105,110,101,32,76,79,87,95,81,85,65,76,73,84,89,10) + shader.fragmentShader;\n            }\n            shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <fog_fragment>`,
                 `
                 // 1. Ray path and view distance calculation
@@ -86,7 +86,7 @@ class VolumetricFogSystem {
 
                 // 2. Analytical Exponential Height Fog Integral
                 float cameraY = cameraPosition.y;
-                float heightFactor = exp(-(cameraY - uHeightFogFloor) * uHeightFogFalloff);
+                #ifdef LOW_QUALITY\n                float heightFactor = 1.0 - clamp((cameraY - uHeightFogFloor) * uHeightFogFalloff, 0.0, 1.0);\n                #else\n                float heightFactor = exp(-(cameraY - uHeightFogFloor) * uHeightFogFalloff);\n                #endif
                 
                 // Avoid division by zero when ray is parallel to horizon
                 float rayY = abs(rayDir.y) < 0.001 ? 0.001 * sign(rayDir.y + 0.00001) : rayDir.y;
@@ -94,7 +94,7 @@ class VolumetricFogSystem {
 
                 // 3. Combine distance fog density with height integration
                 float effectiveDensity = uFogDensity * clamp(heightFog, 0.15, 4.0);
-                float fogFactor = 1.0 - exp(-viewDistance * effectiveDensity);
+                #ifdef LOW_QUALITY\n                float fogFactor = clamp(viewDistance * effectiveDensity, 0.0, 1.0);\n                #else\n                float fogFactor = 1.0 - exp(-viewDistance * effectiveDensity);\n                #endif
 
                 // 4. Directional Sunlight In-Scattering (Mie phase approximation for Canopy God-Rays)
                 float sunScatter = max(0.0, dot(rayDir, uSunDirection));

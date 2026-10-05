@@ -27,7 +27,7 @@ class RenderPipeline {
         });
     }
 
-    init(renderer, scene, pocketScene, camera) {
+    init(renderer, scene, pocketScene, camera) {\n        if (window.EventBus) window.EventBus.on(String.fromCharCode(81,85,65,76,73,84,89,95,67,72,65,78,71,69,68), () => this.applyQualityPreset());
         this.renderer = renderer;
         this.camera = camera;
 
@@ -173,7 +173,7 @@ class RenderPipeline {
         }
     }
 
-    updateEnvironment(scene, fog, engineParams, horizonMaterial) {
+    applyQualityPreset() {\n        if (!window.EngineConfig) return;\n        const q = window.EngineConfig.quality;\n        if (this.dirLight) this.dirLight.castShadow = q.shadowsEnabled;\n        const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.25) * q.renderScale;\n        this.renderer.setPixelRatio(pixelRatio);\n        // Note: RenderPasses/Composer would also resize here\n    }\n\n    updateEnvironment(scene, fog, engineParams, horizonMaterial) {
         if (!engineParams || !this.dirLight) return;
 
         const hourNormalized = (engineParams.timeOfDay % 24) / 24;
