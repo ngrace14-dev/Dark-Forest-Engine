@@ -2204,6 +2204,23 @@ async function bootEngine() {
                     window.GameCore.playerObj.body.setTranslation({ x: 0, y: 3, z: 0 }, true);
                     if (window.EngineParams) window.EngineParams.suppressChunkLoading = true;
                 }
-            } else if (target === 'world') {
+                                            } else if (target === 'world') {
                 if (window.GameCore.playerObj && window.GameCore.playerObj.body && pos) {
-                    ChunkManager.forceUpdatePosition(new THRE
+                    ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, pos.y, pos.z));
+                    window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                    window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+                    window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: pos.y, z: pos.z }, true);
+                    if (window.EngineParams) window.EngineParams.suppressChunkLoading = false;
+                }
+            }
+        });
+    } catch (e) {
+        console.error("Boot sequence failed:", e);
+    }
+}
+
+window.GameCore.bootEngine = bootEngine;
+
+// EXPORT TO GLOBAL
+window.ChunkManager = ChunkManager;
+export default window.GameCore;
