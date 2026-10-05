@@ -2128,6 +2128,26 @@ async function bootEngine() {
         const roomMesh = new THREE.Mesh(roomGeo, roomMat);
         roomMesh.position.y = 5;
         window.GameCore.pocketScene.add(roomMesh);
+// ==========================================
+// CORE ANIMATION LOOP
+// ==========================================
+renderer.setAnimationLoop(() => {
+    const delta = clock.getDelta();
+    accumulator += delta;
+    while (accumulator >= fixedTimeStep) {
+        fixedUpdateLogic(fixedTimeStep);
+        accumulator -= fixedTimeStep;
+    }
+    updateCameraAndShadows(delta);
+    if (window.RenderPipeline) {
+        window.RenderPipeline.render();
+    } else {
+        if (window.Profiler) window.Profiler.begin(String.fromCharCode(82,101,110,100,101,114,101,114));
+        renderer.render(window.GameCore.scene, window.GameCore.camera);
+        if (window.Profiler) window.Profiler.end(String.fromCharCode(82,101,110,100,101,114,101,114));
+        if (window.Profiler) window.Profiler.update(renderer);
+    }
+});
           
         clock = new THREE.Clock(); 
         window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
