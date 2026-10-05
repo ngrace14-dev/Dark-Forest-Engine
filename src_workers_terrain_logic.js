@@ -177,11 +177,8 @@ export async function generateChunk(payload) {
             }
         }
 
-        self.postMessage(
-            { id, key: `${cx},${cz}`, cx, cz, positions, normals, colors, clutter },
-            [positions.buffer, normals.buffer, colors.buffer, clutter.buffer]
-        );
+        return { result: { cx, cz, lod: e.data.lod, positions, normals, colors, clutter }, transfer: [positions.buffer, normals.buffer, colors.buffer, clutter.buffer] };
     } catch (err) {
-        self.postMessage({ id: e.data?.id, error: err.message || 'Worker Error' });
+        throw err;
     }
 };
