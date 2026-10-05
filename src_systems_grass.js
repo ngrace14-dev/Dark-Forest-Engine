@@ -81,7 +81,8 @@ export class GrassSystem {
                     // Only part the upper third of the blade
                     float partFactor = smoothstep(0.3, 1.0, vY);
                     
-                    #ifndef LOW_QUALITY\n                    if (falloff > 0.0 && partFactor > 0.0) {\n                        vec2 bendDir = normalize(worldPos.xz - uPlayerPos.xz);\n                        transformed.x += bendDir.x * falloff * partFactor * 0.5;\n                        transformed.z += bendDir.y * falloff * partFactor * 0.5;\n                    }\n                    #endif
+                    #ifndef LOW_QUALITY\n                    if (falloff > 0.0 && partFactor > 0.0) {\n                        vec2 bendDir = normalize(worldPos.xz - uPlayerPos.xz);\n                        transformed.x += bendDir.x * falloff * partFactor * 0.5;\n                        transformed.z += bendDir.y * falloff * partFactor * 0.5;
+}\n                    #endif
                     
                     // Distance fade for animation
                     float distToCam = distance(worldPos.xyz, cameraPosition);

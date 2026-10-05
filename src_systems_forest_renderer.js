@@ -66,7 +66,12 @@ class ForestRenderer {
                     shader.uniforms.uRawDebugMode = this.sharedUniforms.uRawDebugMode;
                 };
 
-                this.materials.set(prefabKey, [trunkMat, canopyMat]);\n\n                // Prewarm and compile shaders synchronously during load\n                if (window.AssetBudget) {\n                    window.AssetBudget.queueMaterial({ color: 0x2d3a29 }, () => {});\n                }
+                this.materials.set(prefabKey, [trunkMat, canopyMat]);
+
+                // Prewarm and compile shaders synchronously during load
+                if (window.AssetBudget) {
+                    window.AssetBudget.queueMaterial({ color: 0x2d3a29 }, () => {});
+                }
             }
         }
 
