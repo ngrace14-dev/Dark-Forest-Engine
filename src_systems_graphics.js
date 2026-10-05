@@ -155,7 +155,12 @@ class RenderPipeline {
                 window.BlockTerrainManager.setWeatherRain(window.EngineParams.isRaining ? 1.0 : 0.0);
             }
         }
-        if (this.composer) this.composer.render();
+        if (this.composer) {
+            if (window.Profiler) window.Profiler.begin('Renderer');
+            this.composer.render();
+            if (window.Profiler) window.Profiler.end('Renderer');
+            if (window.Profiler) window.Profiler.update(this.renderer);
+        }
     }
 
     swapScene(target) {

@@ -755,6 +755,7 @@ function updateCombatHitboxes(delta) {
 // ==========================================
 
 function fixedUpdateLogic(delta) {
+    if (window.Profiler) window.Profiler.begin('Physics');
     if (window.GameCore?.playerObj) {
         ChunkManager.update(window.GameCore.playerObj.visual.position);
     }
@@ -790,7 +791,11 @@ function fixedUpdateLogic(delta) {
     window.VATManager?.update?.(delta);
     window.EncounterDirector?.update?.(delta);
     
-    if (window.GameCore?.AnimationSystem) window.GameCore.AnimationSystem.update(delta);
+    if (window.GameCore?.AnimationSystem) {
+        if (window.Profiler) window.Profiler.begin('Animation');
+        window.GameCore.AnimationSystem.update(delta);
+        if (window.Profiler) window.Profiler.end('Animation');
+    }
     if (window.ForestRenderer) window.ForestRenderer.update(delta);
     
     if (window.GrassSystem) {
@@ -848,14 +853,17 @@ function fixedUpdateLogic(delta) {
     }
 
     updatePlayerStats(delta);
+    if (window.Profiler) window.Profiler.begin('AI');
     updateEntities(delta);
+    if (window.Profiler) window.Profiler.end('AI');
 
     if (window.RenderOptimizer && window.GameCore?.camera) {
         window.RenderOptimizer.updateEntityLOD(window.GameCore.activeEntities || [], window.GameCore.camera.position);
     }
 
-    updatePlayerMovement(delta);
+        updatePlayerMovement(delta);
     updateCombatHitboxes(delta);
+    if (window.Profiler) window.Profiler.end('Physics');
 }
 
 // ==========================================
@@ -2198,105 +2206,4 @@ async function bootEngine() {
                 }
             } else if (target === 'world') {
                 if (window.GameCore.playerObj && window.GameCore.playerObj.body && pos) {
-                    ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, 0, pos.z));
-                    const groundY = safeGetTerrainHeight(pos.x, pos.z) + 5.0;
-                    window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: groundY, z: pos.z }, true);
-                    if (window.EngineParams) window.EngineParams.suppressChunkLoading = false;
-                }
-            }
-            window.EventBus?.emit('ENV_UPDATE');
-        });
-
-        window.EventBus?.emit('ENGINE_READY'); 
-        window.EventBus?.emit('ENV_UPDATE');
-    } catch(e) { 
-        console.error("CRITICAL BOOT ERROR", e); 
-    }
-}
-
-window.bootEngine = bootEngine;
-
-// ==========================================
-// RENDER LOOP & INPUT BINDING
-// ==========================================
-
-window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('btn-start')?.addEventListener('click', (e) => {
-        document.getElementById('start-screen').classList.add('hidden');
-        document.getElementById('hud').classList.remove('hidden');
-
-        if(window.GameCore) window.GameCore.engineState = 'running';
-
-        window.EventBus?.emit('UI_UPDATE_HUD');
-        window.EventBus?.emit('GAME_STARTED');
-
-        (async () => {
-            try {
-                if (window.Tone) {
-                    await window.Tone.start();
-                    if (window.Tone.Transport.state !== 'started') {
-                        window.Tone.Transport.start();
-                    }
-                    console.log('≡ƒöè WebAudio Context resumed successfully.');
-                }
-            } catch (err) {
-                console.warn('AudioContext failed to start:', err);
-            }
-        })();
-
-        window.addEventListener('resize', () => { 
-            if(window.GameCore?.camera) {
-                window.GameCore.camera.aspect = window.innerWidth / window.innerHeight; 
-                window.GameCore.camera.updateProjectionMatrix(); 
-            }
-            if(renderer) {
-                renderer.setSize(window.innerWidth, window.innerHeight); 
-                if (window.RenderPipeline) window.RenderPipeline.resize(window.innerWidth, window.innerHeight);
-            }
-        });
-    
-        function animate() { 
-            requestAnimationFrame(animate); 
-            let delta = clock.getDelta(); 
-            if (delta > 0.1) delta = 0.1; 
-            accumulator += delta; 
-        
-            while (accumulator >= fixedTimeStep) { 
-                if (window.GameCore?.world) window.GameCore.world.step(); 
-                if (window.GameCore?.checkFloatingOrigin) window.GameCore.checkFloatingOrigin();
-        
-                                fixedUpdateLogic(fixedTimeStep); 
-                accumulator -= fixedTimeStep; 
-            } 
-
-            // AAA Character Pipeline Updates
-            if (window.GameCore.playerController) {
-                window.GameCore.playerController.update(delta);
-            }
-            if (window.GameCore.characterManager) {
-                window.GameCore.characterManager.update(delta);
-                // Note: Physical step already happened in fixedUpdateLogic
-                window.GameCore.characterManager.postPhysicsUpdate(delta);
-            }
-            if (window.GameCore.playerVisual) {
-                window.GameCore.playerVisual.update(delta);
-            }
-            if (window.GameCore.cameraRig) {
-                window.GameCore.cameraRig.update(delta);
-            } else {
-                updateCameraAndShadows(delta);
-            }
-
-            if (window.RenderPipeline) window.RenderPipeline.render();
-
-        }
-    
-        animate();
-    
-        window.EventBus?.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
-    }, { once: true }); 
-});
-
-bootEngine();
+                    ChunkManager.forceUpdatePosition(new THRE
