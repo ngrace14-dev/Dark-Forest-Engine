@@ -68,7 +68,7 @@ export class RedwoodGenerator {
 
         this.initPromise = new Promise((resolve, reject) => {
             try {
-                this.worker = new Worker(workerPath);
+                // this.worker = new Worker... (Phase 2 Migration)
             } catch (err) {
                 console.error('[RedwoodGenerator] Failed to spawn worker, falling back:', err);
                 reject(err);
@@ -97,7 +97,7 @@ export class RedwoodGenerator {
                 seed: 9999
             });
 
-            this.worker.onmessage = (e) => {
+            this._handleWorkerMessage = (e) => {
                 const { generatedBuffers } = e.data;
                 if (!generatedBuffers) {
                     reject(new Error('[RedwoodGenerator] Received empty buffers from worker.'));
