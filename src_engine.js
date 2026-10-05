@@ -753,6 +753,7 @@ function updateCombatHitboxes(delta) {
 
 function fixedUpdateLogic(delta) {
     if (window.Heartbeat) window.Heartbeat.update(delta);
+    if (window.AssetBudget) window.AssetBudget.update();
     if (window.Profiler) window.Profiler.begin('Physics');
     if (window.GameCore?.playerObj) {
         ChunkManager.update(window.GameCore.playerObj.visual.position);
@@ -1585,10 +1586,19 @@ window.ArenaTestManager = {
             const z = this.center.z + Math.sin(angle) * radius;
             
             const prefab = prefabs[(wave + index) % prefabs.length]; 
-            const entity = instantiatePrefab(prefab, x, safeGetTerrainHeight(x, z), z, 'arena');
-            if (entity) { 
-                entity.arenaEntity = true; 
-                entity.arenaWave = wave; 
+            if (window.AssetBudget) {
+                window.AssetBudget.queueInstantiation(prefab, x, safeGetTerrainHeight(x, z), z, String.fromCharCode(97,114,101,110,97), (entity) => {
+                    if (entity) {
+                        entity.arenaEntity = true;
+                        entity.arenaWave = wave;
+                    }
+                });
+            } else {
+                const entity = instantiatePrefab(prefab, x, safeGetTerrainHeight(x, z), z, String.fromCharCode(97,114,101,110,97));
+                if (entity) {
+                    entity.arenaEntity = true;
+                    entity.arenaWave = wave;
+                }
             }
         }
         window.EventBus?.emit('UI_LOG', `[ARENA] Monster wave ${wave} spawned.`);
@@ -2096,6 +2106,7 @@ async function bootEngine() {
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         document.body.appendChild(renderer.domElement);
+        window.GameCore.renderer = renderer;
         
         if (window.ImpostorBaker) {
             window.ImpostorBaker.renderer = renderer; // Bind the constructed renderer to the baker
