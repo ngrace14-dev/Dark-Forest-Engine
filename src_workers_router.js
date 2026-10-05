@@ -39,6 +39,7 @@ self.onmessage = async (e) => {
         // Execute domain logic. It MUST return an object: { result: any, transfer: [] }
         const response = await handlerModule[action](payload);
 
+        if (!response || !response.result) throw new Error(String.fromCharCode(78,111,32,82,101,115,117,108,116));
         self.postMessage({
             taskId,
             result: response.result

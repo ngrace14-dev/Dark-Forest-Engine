@@ -115,14 +115,14 @@ export async function generateChunk(payload) {
         const halfSize = chunkSize / 2;
         const step = chunkSize / segments;
 
-        // const localRoadPoints = [];
+        const filteredRoads = [];
         if (Array.isArray(roadPoints) && roadPoints.length > 0) {
             const margin = halfSize + ROAD_WIDTH + 10;
             for (let r = 0; r < roadPoints.length; r++) {
                 const pt = roadPoints[r];
                 if (pt && Number.isFinite(pt.x) && Number.isFinite(pt.z)) {
                     if (Math.abs(pt.x - chunkX) <= margin && Math.abs(pt.z - chunkZ) <= margin) {
-                        localRoadPoints.push(pt);
+                        filteredRoads.push(pt);
                     }
                 }
             }
@@ -179,7 +179,7 @@ export async function generateChunk(payload) {
             }
         }
 
-        return { result: { cx, cz, lod: e.data.lod, positions, normals, colors, clutter }, transfer: [positions.buffer, normals.buffer, colors.buffer, clutter.buffer] };
+        return { result: { cx: cx, cz: cz, lod: e.data.lod, positions: positions, normals: normals, colors: colors, clutter: clutter }, transfer: [positions.buffer, normals.buffer, colors.buffer, clutter.buffer] };
     } catch (err) {
         throw err;
     }
