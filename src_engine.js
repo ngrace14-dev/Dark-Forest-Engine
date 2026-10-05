@@ -2220,6 +2220,18 @@ async function bootEngine() {
 }
 
 window.GameCore.bootEngine = bootEngine;
+window.addEventListener(String.fromCharCode(108,111,97,100), function() {
+    const btn = document.getElementById(String.fromCharCode(98,116,110,45,115,116,97,114,116));
+    if (btn) {
+        btn.addEventListener(String.fromCharCode(99,108,105,99,107), function() {
+            document.getElementById(String.fromCharCode(115,116,97,114,116,45,115,99,114,101,101,110)).style.display = String.fromCharCode(110,111,110,101);
+            document.getElementById(String.fromCharCode(104,117,100)).classList.remove(String.fromCharCode(104,105,100,100,101,110));
+            document.getElementById(String.fromCharCode(104,117,100)).classList.add(String.fromCharCode(102,108,101,120));
+            if (window.EventBus) window.EventBus.emit(String.fromCharCode(71,65,77,69,95,83,84,65,82,84,69,68));
+        });
+    }
+    bootEngine();
+});
 
 // EXPORT TO GLOBAL
 window.ChunkManager = ChunkManager;
