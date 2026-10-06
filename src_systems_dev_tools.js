@@ -28,8 +28,11 @@ window.EventBus.on('ENGINE_READY', () => {
             }
                 }
 
-        const gui = new window.lil.GUI({ title: 'God Mode Tools', autoPlace: false });
+                const gui = new window.lil.GUI({ title: 'God Mode Tools', autoPlace: false });
         window.lilGuiInstance = gui;
+        
+        // Ensure the gui is hidden if the asset panel isn't open to devtools
+        gui.domElement.style.display = 'block';
 
         // Helper function to safely attach controllers without throwing on undefined properties
         const safeAdd = (folder, target, prop, ...args) => {

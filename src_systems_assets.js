@@ -214,16 +214,25 @@ window.renderAssetManager = function() {
         content.innerHTML = '<div class="text-orange-400 font-bold mb-4 text-sm uppercase tracking-widest border-b border-gray-700 pb-2">🛠️ Engine Developer Tools</div>' +
         '<div id="lil-gui-container" class="bg-gray-900 rounded border border-gray-800 p-2 min-h-[400px]"></div>';
         
-        setTimeout(() => {
+                setTimeout(() => {
             const container = document.getElementById('lil-gui-container');
             if (window.lilGuiInstance && container) {
+                // If it was previously appended elsewhere, remove it first
+                if (window.lilGuiInstance.domElement.parentElement) {
+                    window.lilGuiInstance.domElement.parentElement.removeChild(window.lilGuiInstance.domElement);
+                }
                 container.appendChild(window.lilGuiInstance.domElement);
                 window.lilGuiInstance.domElement.style.position = 'relative';
                 window.lilGuiInstance.domElement.style.top = '0';
                 window.lilGuiInstance.domElement.style.right = '0';
                 window.lilGuiInstance.domElement.style.width = '100%';
+                
+                // Force open the folders to make it obvious
+                Object.values(window.lilGuiInstance.folders).forEach(f => f.open());
+            } else if (!window.lilGuiInstance) {
+                container.innerHTML = '<div class="text-red-500 p-4">Dev Tools not initialized yet. Please wait for engine boot.</div>';
             }
-        }, 0);
+        }, 100);
         return;
     }
 
