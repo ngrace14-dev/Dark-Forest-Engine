@@ -29,6 +29,30 @@ class CrowsEyeSystem {
         });
     }
 
+    update(dt) {
+        if (!this.isActive || !this.ctx) return;
+        this.render();
+    }
+
+    render() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+
+        // Player Marker (Center)
+        this.ctx.fillStyle = '#fbbf24';
+        this.ctx.beginPath();
+        this.ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Label
+        this.ctx.fillStyle = '#fff';
+        this.ctx.font = '10px monospace';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('PLAYER', centerX, centerY - 10);
+    }
+
     createCanvas() {
         if (this.canvas) return;
         this.canvas = document.createElement('canvas');
