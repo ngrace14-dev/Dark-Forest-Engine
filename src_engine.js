@@ -788,7 +788,11 @@ function fixedUpdateLogic(delta) {
 
     window.ArenaTestManager?.update?.(delta);
     window.VATManager?.update?.(delta);
-    window.EncounterDirector?.update?.(delta);
+        window.EncounterDirector?.update?.(delta);
+    
+    if (window.CrowsEye) {
+        window.CrowsEye.update(delta);
+    }
     
     if (window.GameCore?.AnimationSystem) {
         if (window.Profiler) window.Profiler.begin('Animation');
