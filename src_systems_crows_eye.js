@@ -35,7 +35,7 @@ class CrowsEyeSystem {
         if (this.overlay) return;
         this.overlay = document.createElement('div');
         this.overlay.id = 'crows-eye-status';
-        this.overlay.innerText = "CROW'S EYE ACTIVE";
+        this.overlay.innerText = "CROW'S EYE ACTIVE\nLoaded Chunks: 0";
         this.overlay.style.position = 'fixed';
         this.overlay.style.top = '20px';
         this.overlay.style.left = '20px';
@@ -52,7 +52,9 @@ class CrowsEyeSystem {
     }
 
     update(dt) {
-        // Implementation deferred to Phase 3+
+        if (!this.isActive || !this.overlay) return;
+        const chunkCount = window.ChunkManager?.activeChunks?.size || 0;
+        this.overlay.innerText = `CROW'S EYE ACTIVE\nLoaded Chunks: ${chunkCount}`;
     }
 
     render() {
