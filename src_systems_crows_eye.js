@@ -36,22 +36,22 @@ class CrowsEyeSystem {
         if (this.overlay) return;
         this.overlay = document.createElement('div');
         this.overlay.id = 'crows-eye-status';
-        this.overlay.innerHTML = "CROW'S EYE ACTIVE<br>Waiting for telemetry...";
+        this.overlay.innerHTML = "<div style='display:flex; justify-content:center; align-items:center; height:100%;'>CROW'S EYE ACTIVE<br>Waiting for telemetry...</div>";
         this.overlay.style.position = 'fixed';
-        this.overlay.style.top = '20px';
-        this.overlay.style.left = '20px';
-        this.overlay.style.zIndex = '1000';
+        this.overlay.style.inset = '0';
+        this.overlay.style.zIndex = '10000';
         this.overlay.style.color = '#fbbf24';
         this.overlay.style.fontWeight = 'bold';
         this.overlay.style.fontFamily = 'monospace';
-        this.overlay.style.fontSize = '12px';
+        this.overlay.style.fontSize = '14px';
         this.overlay.style.textShadow = '0 0 5px rgba(0,0,0,0.8)';
         this.overlay.style.pointerEvents = 'auto';
         this.overlay.style.display = this.isActive ? 'block' : 'none';
         this.overlay.style.whiteSpace = 'pre';
-        this.overlay.style.backgroundColor = 'rgba(0,0,0,0.6)';
-        this.overlay.style.padding = '10px';
-        this.overlay.style.borderRadius = '5px';
+        this.overlay.style.backgroundColor = 'rgba(0,0,0,0.95)';
+        this.overlay.style.padding = '40px';
+        this.overlay.style.overflowY = 'auto';
+        this.overlay.style.backdropFilter = 'blur(10px)';
         
         this.overlay.addEventListener('click', (e) => {
             if (e.target.tagName === 'SPAN' && e.target.dataset.id) {
@@ -160,7 +160,23 @@ class CrowsEyeSystem {
             intelHtml += `CORRUPTION: ${stats.falseFacts + stats.distortedRecords} (Fakes: ${stats.fabrications})\n`;
         }
         
-        this.overlay.innerHTML = `CROW'S EYE ACTIVE\nWatcher Target: ${narrator.targetName || 'None'}\nLoaded Chunks: ${chunkCount}\nVillages: ${villageCount}\nAdventurers: ${advCount}\nMonsters: ${monsterCount}\n\n${gridHtml}${inspectedHtml}${timelineHtml}${intelHtml}`;
+        this.overlay.innerHTML = `<div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 400px; gap: 40px;">
+            <div>
+                <div style="font-size: 24px; color: #f59e0b; margin-bottom: 20px; border-bottom: 1px solid #78350f; padding-bottom: 10px;">CROW'S EYE SIGHT</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; color: #d97706; font-size: 12px;">
+                    <div>Watcher Target: ${narrator.targetName || 'None'}</div>
+                    <div>Loaded Chunks: ${chunkCount}</div>
+                    <div>Villages: ${villageCount}</div>
+                    <div>Adventurers: ${advCount}</div>
+                </div>
+                ${gridHtml}
+                ${timelineHtml}
+                ${intelHtml}
+            </div>
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-left: 1px solid #78350f; min-height: 80vh;">
+                ${inspectedHtml || '\n\nSelect an entity from the map to inspect its intent.'}
+            </div>
+        </div>`;
     }
 
     generateAsciiGrid(entities, px, pz) {
@@ -168,18 +184,18 @@ class CrowsEyeSystem {
         const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
         const mountainRadius = forestSide / 2;
         const mountainWidth = window.WorldGenConfig?.mountainRingWidthMeters || 160934.4;
-        
-        // Target an approximate 20x20 grid, but adjust cell span to map the full known simulated world
-        const gridSize = 20; 
-        const worldSpan = (mountainRadius + mountainWidth) * 2; 
-        const cellSpan = worldSpan / gridSize;
         const totalRadius = (mountainRadius + mountainWidth);
+        
+        // Target a larger grid for full-screen mode
+        const gridSize = 40; 
+        const worldSpan = totalRadius * 2; 
+        const cellSpan = worldSpan / gridSize;
         
         // Initialize empty grid tracking the top priority entity in each cell
         const cellEntities = Array(gridSize).fill().map(() => Array(gridSize).fill(null));
-        const grid = Array(gridSize).fill().map(() => Array(gridSize).fill('.'));
+        const grid = Array(gridSize).fill().map(() => Array(gridSize).fill(' ')); // Default to empty space for circular mask
         
-        const typePriority = { 'P': 6, 'T': 5, 'V': 4, 'A': 3, 'M': 2, '#': 1, 'R': 0.5, '.': 0 };
+        const typePriority = { 'P': 6, 'T': 5, 'V': 4, 'A': 3, 'M': 2, '#': 1, 'R': 0.5, '.': 0.1, ' ': 0 };
         
         // Map absolute world coordinate to an absolute grid coordinate
         const mapToGrid = (x, z) => {
@@ -190,16 +206,20 @@ class CrowsEyeSystem {
             return { gx, gz };
         };
 
-        // Render Mountain Wall Perimeter
+        // Render Circular Map Mask and Mountain Wall
         for (let gz = 0; gz < gridSize; gz++) {
             for (let gx = 0; gx < gridSize; gx++) {
                 // Calculate world center of this cell
                 const wx = (gx * cellSpan) - totalRadius + (cellSpan / 2);
                 const wz = (gz * cellSpan) - totalRadius + (cellSpan / 2);
-                const dist = Math.max(Math.abs(wx), Math.abs(wz));
+                const dist = Math.sqrt(wx*wx + wz*wz); // Use true radial distance
                 
-                if (dist > mountainRadius && dist <= totalRadius) {
-                    grid[gz][gx] = 'R';
+                if (dist <= totalRadius) {
+                    if (dist > mountainRadius) {
+                        grid[gz][gx] = 'R';
+                    } else {
+                        grid[gz][gx] = '.';
+                    }
                 }
             }
         }
@@ -218,19 +238,22 @@ class CrowsEyeSystem {
         
         let gridHtml = `REGIONS:\n[P] PLAYER   [T] CROW'S TARGET   [R] MOUNTAIN\n\n`;
         
+        gridHtml += `<div style="line-height: 1.1; font-size: 14px; letter-spacing: 2px;">`;
         for (let gz = 0; gz < gridSize; gz++) {
             for (let gx = 0; gx < gridSize; gx++) {
                 const en = cellEntities[gz][gx];
                 const char = grid[gz][gx];
                 const isSelected = en && this.selectedEntityId === en.id;
                 
-                const style = isSelected ? 'background-color: #fbbf24; color: #000;' : '';
+                const style = isSelected ? 'background-color: #fbbf24; color: #000; font-weight: bold;' : '';
+                const color = char === 'R' ? '#4b5563' : char === 'V' ? '#10b981' : char === 'P' ? '#3b82f6' : char === 'T' ? '#f59e0b' : '#94a3b8';
                 const dataId = en && en.id ? `data-id="${en.id}"` : '';
                 
-                gridHtml += `<span style="cursor:pointer;${style}" ${dataId}>${char}</span>`;
+                gridHtml += `<span style="cursor:pointer; ${style} color: ${color};" ${dataId}>${char}</span>`;
             }
             gridHtml += '\n';
         }
+        gridHtml += `</div>`;
 
         let inspectedHtml = '';
         if (this.selectedEntityId) {
