@@ -44,25 +44,48 @@ class CrowsEyeSystem {
         // Villages
         if (window.VillageManager?.villages) {
             window.VillageManager.villages.forEach(v => {
-                // Calculate relative position to player (center)
-                // Note: In Crow's Eye, north is -Z
                 const relX = v.x * scale;
                 const relZ = v.z * scale;
-                
                 const canvasX = centerX + relX;
                 const canvasY = centerY + relZ;
-
-                // Only render if inside canvas bounds (circular)
                 const distFromCenter = Math.hypot(relX, relZ);
                 if (distFromCenter < 140) {
                     this.ctx.fillStyle = v.capital ? '#6366f1' : '#4ade80';
                     this.ctx.beginPath();
                     this.ctx.arc(canvasX, canvasY, 3, 0, Math.PI * 2);
                     this.ctx.fill();
-                    
                     this.ctx.fillStyle = '#fff';
                     this.ctx.font = '8px monospace';
                     this.ctx.fillText(v.name.toUpperCase(), canvasX, canvasY - 6);
+                }
+            });
+        }
+
+        // Adventurers (High-Importance Entities)
+        if (window.AdventurerManager?.records) {
+            window.AdventurerManager.records.forEach(adv => {
+                if (!adv.alive || !adv.position) return;
+                
+                const relX = adv.position.x * scale;
+                const relZ = adv.position.z * scale;
+                const canvasX = centerX + relX;
+                const canvasY = centerY + relZ;
+                const distFromCenter = Math.hypot(relX, relZ);
+
+                if (distFromCenter < 140) {
+                    const isTarget = window.GameState?.narrator?.targetId === adv.id;
+                    this.ctx.fillStyle = isTarget ? '#f87171' : '#60a5fa'; // Red if Crow Target, else Blue
+                    this.ctx.beginPath();
+                    this.ctx.arc(canvasX, canvasY, 2.5, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    if (isTarget) {
+                        this.ctx.strokeStyle = '#f87171';
+                        this.ctx.lineWidth = 1;
+                        this.ctx.beginPath();
+                        this.ctx.arc(canvasX, canvasY, 5, 0, Math.PI * 2);
+                        this.ctx.stroke();
+                    }
                 }
             });
         }
