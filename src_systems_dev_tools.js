@@ -18,7 +18,8 @@ window.EventBus.on('ENGINE_READY', () => {
             
             // Phase 8 FIX: Rendering Isolation Defaults
             rawRenderMode: false,
-            renderLayer: 'Full Scene'
+                        renderLayer: 'Full Scene',
+            crowsEyeMode: window.EngineConfig.crowsEyeMode || false
         };
 
         for (const [key, val] of Object.entries(defaults)) {
@@ -145,6 +146,10 @@ window.EventBus.on('ENGINE_READY', () => {
         arenaFolder.add({ exit: () => window.EventBus.emit('EXIT_ARENA_TEST') }, 'exit').name('🚪 Exit Arena Test');
 
         const narratorFolder = gui.addFolder('🐦 Crow Interest Tests');
+        narratorFolder.add(window.EngineParams, 'crowsEyeMode').name('👁️ ENABLE CROW\'S EYE').onChange(v => {
+            window.EngineConfig.crowsEyeMode = v;
+            window.EventBus.emit('UI_LOG', `Crow's Eye Mode: ${v ? 'ENABLED' : 'DISABLED'}`);
+        });
         narratorFolder.add({ gain: () => window.GameState?.recordFeat?.({ impact: 10, label: 'Developer-forced feat' }) }, 'gain').name('⬆️ Gain Interest');
         narratorFolder.add({ lose: () => window.GameState?.loseCrowInterest?.(10, 'Developer-forced loss.') }, 'lose').name('⬇️ Lose Interest');
         narratorFolder.add({ resolve: () => { if(window.GameState?.narrator) { window.GameState.narrator.targetHeat = 0; window.GameState.evaluateCrowInterest(); } } }, 'resolve').name('🔀 Force Target Handoff');

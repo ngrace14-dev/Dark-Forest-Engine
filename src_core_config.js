@@ -1,6 +1,7 @@
 window.EngineConfig = {
     quality: { shadowsEnabled: true, renderScale: 1.0, grassDensity: 1.0, volumetricFog: true, shaderTier: String.fromCharCode(72,73,71,72) },
     world: { chunkRadius: 5, dayLengthSeconds: 1200 },
+    crowsEyeMode: false,
     performance: { lodThresholdSq: 900, maxEntities: 1000 },
     applyQualityPreset: function(preset) {
         if (preset === String.fromCharCode(76,79,87)) {
