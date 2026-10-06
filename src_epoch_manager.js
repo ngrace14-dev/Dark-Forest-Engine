@@ -9,13 +9,13 @@ export class EpochManager {
         this.prng = alea(this.currentSeed);
         this.noise2D = createNoise2D(this.prng);
         
-        // Configuration for the World's scale and biomes
-                this.config = {
+                // Configuration for the World's scale and biomes
+        // STABILITY: Prefer global config if defined, otherwise use internal defaults
+        this.config = window.WorldGenConfig || {
             noiseScale: 0.015,
             darkForestSideMeters: 2000.0,
             mountainRingWidthMeters: 500.0,
             biomes: {
-
                 'redwoods': { name: 'NorCal Redwoods', color: 0x1a2f21, prefab: 'Oak Tree', density: 12 },
                 'alpine': { name: 'Shasta Alpine', color: 0x363a40, prefab: 'Razor Rock Monolith', density: 6 },
                 'valley': { name: 'Central Valley', color: 0x453f2c, prefab: 'Bramble Bush', density: 10 },
@@ -24,6 +24,7 @@ export class EpochManager {
                 'desert': { name: 'Deep Desert', color: 0xc2b280, prefab: 'Stone Path', density: 5 }
             }
         };
+
     }
 
     _generateEpochSeed() {
