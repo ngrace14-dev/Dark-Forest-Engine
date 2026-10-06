@@ -87,6 +87,7 @@ class IntelManagerSystem {
 
         this.registry.set(id, record);
         this.ownershipRegistry.set(id, new Set());
+        window.EventBus.emit('INTEL_REGISTERED', record);
         return id;
     }
 
@@ -406,6 +407,7 @@ window.IntelEconomy = {
         // The world still believes the rumor until this new FACT propagates.
         
         window.EventBus.emit('UI_LOG', `[VERIFIED] Information updated: ${newIntel.payload.title} is ${truthConditionMet ? 'True' : 'False'}.`);
+        window.EventBus.emit('INTEL_VERIFIED', newIntel);
         return verified_intel_id;
     },
 

@@ -150,8 +150,17 @@ class CrowsEyeSystem {
                 timelineHtml += `- ${e.detail || e.type || 'Unknown Event'}\n`;
             });
         }
+
+        let intelHtml = `\n--- INTEL FIDELITY ---\n`;
+        if (window.IntelTracker?.stats) {
+            const stats = window.IntelTracker.stats;
+            const fidelity = (stats.globalFidelity * 100).toFixed(1);
+            intelHtml += `GLOBAL TRUTH: ${fidelity}%\n`;
+            intelHtml += `FACTS: ${stats.trueFacts} | RUMORS: ${stats.activeRumors}\n`;
+            intelHtml += `CORRUPTION: ${stats.falseFacts + stats.distortedRecords} (Fakes: ${stats.fabrications})\n`;
+        }
         
-        this.overlay.innerHTML = `CROW'S EYE ACTIVE\nWatcher Target: ${narrator.targetName || 'None'}\nLoaded Chunks: ${chunkCount}\nVillages: ${villageCount}\nAdventurers: ${advCount}\nMonsters: ${monsterCount}\n\n${gridHtml}${inspectedHtml}${timelineHtml}`;
+        this.overlay.innerHTML = `CROW'S EYE ACTIVE\nWatcher Target: ${narrator.targetName || 'None'}\nLoaded Chunks: ${chunkCount}\nVillages: ${villageCount}\nAdventurers: ${advCount}\nMonsters: ${monsterCount}\n\n${gridHtml}${inspectedHtml}${timelineHtml}${intelHtml}`;
     }
 
     generateAsciiGrid(entities, px, pz) {
