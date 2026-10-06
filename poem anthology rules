@@ -1,0 +1,132 @@
+You are analyzing a poem from the Dark Forest Folk Anthology.
+
+Do NOT simply explain the poem.
+
+Analyze the poem as an information artifact within the Dark Forest simulation.
+
+Determine:
+
+- Surface Meaning
+- Actual Meaning
+- Truth Economy Classification
+- Associated Forces
+- Story Strength (0-1000)
+- Truth Score (0-1000)
+- Historical Weight (0-1000)
+- Distortion Level
+- Information Economy Effect
+- Chronicle Relevance
+- Notes
+
+Definitions:
+
+Story Strength:
+How culturally influential or memorable the poem is.
+
+Truth Score:
+How accurately the poem reflects objective reality.
+
+Historical Weight:
+How important the underlying events are to world history.
+
+Distortion Level:
+How much the poem differs from objective truth.
+
+Classifications:
+
+- Observational Truth
+- Institutional Truth
+- Mythic Truth
+- Misunderstood Truth
+- Contested History
+- Historical Revision
+- Propaganda
+- Legendary Narrative
+
+Associated Forces may include:
+
+- Forest
+- Crow
+- Crown
+- Houses
+- Huntsman
+- Wendigo
+- Tree
+- Truth
+
+Output Format:
+
+## [Poem Name]
+
+Classification:
+[Classification]
+
+Associated Forces:
+- Force
+- Force
+
+Story Strength:
+[number]
+
+Truth Score:
+[number]
+
+Historical Weight:
+[number]
+
+Distortion Level:
+Low / Moderate / High / Extreme
+
+Surface Meaning:
+[What a villager believes the poem means.]
+
+Actual Meaning:
+[What the poem is actually conveying.]
+
+Information Economy Effect:
+[How the poem influences public understanding, memory, rumors, or belief.]
+
+Chronicle Relevance:
+[What kind of event this poem would originate from if viewed through the Chronicle system.]
+
+Notes:
+[Any hidden implications, historical revisions, propaganda elements, forgotten truths, or disputed meanings.]
+
+Example:
+
+## Forest
+
+Classification:
+Observational Truth
+
+Associated Forces:
+- Forest
+
+Story Strength:
+400
+
+Truth Score:
+950
+
+Historical Weight:
+850
+
+Distortion Level:
+Low
+
+Surface Meaning:
+The forest shifts every 14 days and 14 nights.
+
+Actual Meaning:
+The poem accurately describes a cyclical property of the Forest that villagers have observed for generations.
+
+Information Economy Effect:
+Provides practical survival knowledge that spreads because it consistently produces successful outcomes.
+
+Chronicle Relevance:
+Would originate from generations of repeated observations rather than a singular historical event.
+
+Notes:
+One of the most accurate poems in the anthology.
+The observations are correct even if the underlying mechanism remains misunderstood.
+``
