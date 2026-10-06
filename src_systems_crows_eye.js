@@ -184,10 +184,25 @@ class CrowsEyeSystem {
                     inspectedHtml += `Pop: ${ref.population?.current || 0}/${ref.population?.capacity || 0}\n`;
                     inspectedHtml += `Res: F:${ref.stats?.food||0} W:${ref.stats?.wood||0} S:${ref.stats?.stone||0}\n`;
                     inspectedHtml += `AP: ${ref.stats?.ap || 0}\n`;
+                    
+                    const quests = window.GameState?.questBoard?.filter(q => q.issuer === ref.id) || [];
+                    inspectedHtml += `Quests: ${quests.length > 0 ? quests.length + ' Active' : 'None Recorded'}\n`;
+                    
+                    const event = window.GameState?.worldEvents?.reverse().find(e => e.actorId === ref.id || e.detail?.includes(ref.name));
+                    inspectedHtml += `History: ${event ? event.detail : 'None Recorded'}\n`;
+                    
                 } else if (type === 'A') {
                     const record = window.AdventurerManager?.records?.find(r => r.id === ref.adventurerRecordId || r.id === ref.id);
                     inspectedHtml += `Career: ${record?.quest?.type || 'Wanderer'}\n`;
                     inspectedHtml += `Renown: ${record?.storyHeat || 0}\n`;
+                    inspectedHtml += `Goal: ${record?.quest?.progress !== undefined ? record.quest.progress + '/' + record.quest.goal : 'None Recorded'}\n`;
+                    
+                    const feat = record?.feats?.slice(-1)[0];
+                    inspectedHtml += `History: ${feat ? feat.label : 'None Recorded'}\n`;
+                    
+                } else if (type === 'M') {
+                    inspectedHtml += `Threat: ${ref.hp || 'Unknown'} HP\n`;
+                    inspectedHtml += `Target: ${ref.targetVillageId ? 'Village ' + ref.targetVillageId : (ref.targetId === 'player' ? 'Player' : 'None Recorded')}\n`;
                 }
             } else {
                 inspectedHtml += `\n--- INSPECTION ---\nEntity lost or out of range.`;
