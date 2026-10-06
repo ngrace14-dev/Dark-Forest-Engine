@@ -39,6 +39,33 @@ class CrowsEyeSystem {
         
         const centerX = this.canvas.width / 2;
         const centerY = this.canvas.height / 2;
+        const scale = 0.001; // 1 unit = 1000m (1km)
+
+        // Villages
+        if (window.VillageManager?.villages) {
+            window.VillageManager.villages.forEach(v => {
+                // Calculate relative position to player (center)
+                // Note: In Crow's Eye, north is -Z
+                const relX = v.x * scale;
+                const relZ = v.z * scale;
+                
+                const canvasX = centerX + relX;
+                const canvasY = centerY + relZ;
+
+                // Only render if inside canvas bounds (circular)
+                const distFromCenter = Math.hypot(relX, relZ);
+                if (distFromCenter < 140) {
+                    this.ctx.fillStyle = v.capital ? '#6366f1' : '#4ade80';
+                    this.ctx.beginPath();
+                    this.ctx.arc(canvasX, canvasY, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = '8px monospace';
+                    this.ctx.fillText(v.name.toUpperCase(), canvasX, canvasY - 6);
+                }
+            });
+        }
 
         // Player Marker (Center)
         this.ctx.fillStyle = '#fbbf24';
@@ -47,7 +74,7 @@ class CrowsEyeSystem {
         this.ctx.fill();
         
         // Label
-        this.ctx.fillStyle = '#fff';
+        this.ctx.fillStyle = '#fbbf24';
         this.ctx.font = '10px monospace';
         this.ctx.textAlign = 'center';
         this.ctx.fillText('PLAYER', centerX, centerY - 10);
