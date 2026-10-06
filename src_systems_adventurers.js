@@ -18,8 +18,8 @@ window.AdventurerManager = {
         }));
         window.EventBus.emit('UI_LOG', `[ADVENTURERS] ${this.records.length} potential protagonists entered the woods.`);
     },
-    recordEvent: function(record, type, detail, significance = 10) {
-        const event = { actorId: record.id, actor: record.name, type, detail, significance };
+    recordEvent: function(record, type, detail, significance = 1, historicalWeight = 0.1) {
+        const event = { actorId: record.id, actor: record.name, type, detail, significance, historicalWeight };
         window.ChronicleManager.recordEvent(event);
         record.feats.push({ day: window.EngineParams.worldDay, label: detail });
     },
@@ -156,6 +156,14 @@ window.AdventurerManager = {
         record.alive = false;
         record.activeEntityId = null;
         record.storyHeat = 0;
+        window.ChronicleManager.recordEvent({
+            actorId: record.id,
+            type: 'death',
+            detail: `${record.name} has perished in the woods.`,
+            significance: 150,
+            historicalWeight: 50
+        });
+
         if (window.GameState.narrator.targetId === record.id) {
             window.GameState.loseCrowInterest(100, `${record.name}'s story ends here.`);
             window.GameState.evaluateCrowInterest();

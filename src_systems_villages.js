@@ -198,7 +198,16 @@ window.VillageManager = {
             village.barrierIntegrity = Math.min(100, village.barrierIntegrity + 8);
         } else if (village.barrierIntegrity === 0) {
             this.postVillageNeed(village, 'essence', essenceCost, 'fueling the rune barrier');
-            if (Math.random() < 0.15) window.EventBus.emit('UI_LOG', `[BARRIER] ${village.name}'s ward is failing. Hunters must enter the woods.`);
+            if (Math.random() < 0.15) {
+                window.EventBus.emit('UI_LOG', `[BARRIER] ${village.name}'s ward is failing. Hunters must enter the woods.`);
+                window.ChronicleManager.recordEvent({
+                    actorId: village.id,
+                    type: 'barrier_failure',
+                    detail: `${village.name}'s protective barrier flickered and failed.`,
+                    significance: 40,
+                    historicalWeight: 5
+                });
+            }
         }
         village.provisionStock[village.provision.itemId] = (village.provisionStock[village.provision.itemId] || 0) + Math.max(1, Math.floor(production / 2));
         village.stats.food = Math.max(0, (village.stats.food || 0) - Math.ceil(village.population.current / 24));
@@ -233,14 +242,22 @@ window.VillageManager = {
 
         village.territory.control = Math.max(0, Math.min(100, village.territory.control + (village.territory.underRaid ? -localRaiders.length * 2 : 1)));
         if (village.territory.underRaid) window.EventBus.emit('UI_LOG', `[RAID] ${village.name} is under attack by ${localRaiders.length} hostile creature${localRaiders.length === 1 ? '' : 's'}.`);
-        const activeExpedition = village.expeditions.some(expedition => expedition.status === 'raiding');
-        if (!village.territory.underRaid && !activeExpedition && Math.random() < (village.industry?.mountainGatekeeper ? 0.03 : 0.01)) this.launchHostileExpedition(village);
+        
         if (village.territory.control === 0 && village.territory.faction === 'kingdom') {
             village.territory.faction = 'forest';
             village.territory.reclamation = { wood: 0, stone: 0, requiredWood: 50, requiredStone: 30 };
             village.stats.prosperity = Math.max(0, village.stats.prosperity - 25);
             this.postVillageNeed(village, 'wood', 50, 'reclaiming occupied territory');
             this.postVillageNeed(village, 'stone', 30, 'reclaiming occupied territory');
+            
+            window.ChronicleManager.recordEvent({
+                actorId: village.id,
+                type: 'occupation',
+                detail: `${village.name} was overrun by the corrupted forest.`,
+                significance: 250,
+                historicalWeight: 100
+            });
+
             window.EventBus.emit('UI_LOG', `[OCCUPIED] ${village.name} has fallen under forest control.`);
         }
 
@@ -258,6 +275,18 @@ window.VillageManager = {
             const growth = Math.min(village.population.capacity - village.population.current, Math.max(1, Math.floor(village.population.current * village.stats.prosperity / 10000)));
             village.population.current += growth;
             village.lastGrowthDay = window.EngineParams.worldDay;
+            
+            if (village.population.current > 10000 && !village.recordedMajorMilestone) {
+                village.recordedMajorMilestone = true;
+                window.ChronicleManager.recordEvent({
+                    actorId: village.id,
+                    type: 'growth_milestone',
+                    detail: `${village.name} has grown into a significant regional hub.`,
+                    significance: 100,
+                    historicalWeight: 50
+                });
+            }
+
             window.EventBus.emit('UI_LOG', `[GROWTH] ${village.name} gained ${growth} residents from prosperity.`);
         }
 
@@ -321,11 +350,20 @@ window.VillageManager = {
                 for (let i = village.terminusRecruits.length - 1; i >= 0; i--) {
                     const batch = village.terminusRecruits[i];
                     batch.xp += 5 + (village.stats.prosperity / 20); // Prosperous villages train faster
-                    if (batch.xp >= 100) {
-                        village.terminusEliteGuard = Math.min(300, village.terminusEliteGuard + batch.count);
-                        village.terminusRecruits.splice(i, 1);
-                        window.EventBus.emit('UI_LOG', `[TERMINUS] A batch of ${batch.count} elite guards have finished training and joined the 300.`);
-                    }
+            if (batch.xp >= 100) {
+                village.terminusEliteGuard = Math.min(300, village.terminusEliteGuard + batch.count);
+                village.terminusRecruits.splice(i, 1);
+                
+                window.ChronicleManager.recordEvent({
+                    actorId: village.id,
+                    type: 'elite_training',
+                    detail: `The Elite 300 of Terminus has been bolstered by ${batch.count} new guards.`,
+                    significance: 50,
+                    historicalWeight: 20
+                });
+
+                window.EventBus.emit('UI_LOG', `[TERMINUS] A batch of ${batch.count} elite guards have finished training and joined the 300.`);
+            }
                 }
             }
         }

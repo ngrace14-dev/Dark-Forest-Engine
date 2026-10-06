@@ -19,7 +19,7 @@ window.ChronicleManager = {
 
     /**
      * Records a significant event into the world's memory.
-     * @param {Object} event - { actorId, type, detail, significance }
+     * @param {Object} event - { actorId, type, detail, significance, historicalWeight }
      */
     recordEvent: function(event) {
         const timestamp = {
@@ -29,8 +29,13 @@ window.ChronicleManager = {
             realTime: Date.now()
         };
 
+        const significance = event.significance || 1;
+        const historicalWeight = event.historicalWeight || (significance * 0.1);
+
         const entry = {
             ...event,
+            significance,
+            historicalWeight,
             timestamp,
             id: 'evt_' + Math.random().toString(36).substr(2, 9)
         };
@@ -50,15 +55,16 @@ window.ChronicleManager = {
         }
 
         // 3. Career XP Hooks
-        if (entry.significance > 50) {
-            window.CareerManager.addXP('archivist', Math.floor(entry.significance / 10));
+        if (entry.significance > 50 || entry.historicalWeight > 10) {
+            const xp = Math.floor(entry.significance / 10) + Math.floor(entry.historicalWeight);
+            window.CareerManager.addXP('archivist', xp);
         }
         
         // 4. Update GameState for persistence
         window.GameState.worldEvents = this.worldLedger;
 
         // 5. Narrative Echo (Optional: UI Log for major events)
-        if (entry.significance > 80) {
+        if (entry.significance > 80 || entry.historicalWeight > 100) {
             window.EventBus.emit('UI_LOG', `[HISTORY] ${entry.detail}`);
         }
     },

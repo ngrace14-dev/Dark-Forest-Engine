@@ -13,6 +13,13 @@ class CrowsEyeSystem {
     init() {
         this.isActive = window.EngineConfig?.crowsEyeMode || false;
         this.createOverlay();
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isActive) {
+                window.EngineConfig.applyQualityPreset('crows_eye');
+                window.EventBus.emit('ENV_UPDATE');
+            }
+        });
         
         window.EventBus.on('ENV_UPDATE', () => {
             const currentMode = window.EngineConfig?.crowsEyeMode || false;
@@ -39,7 +46,7 @@ class CrowsEyeSystem {
         this.overlay.innerHTML = "<div style='display:flex; justify-content:center; align-items:center; height:100%;'>CROW'S EYE ACTIVE<br>Waiting for telemetry...</div>";
         this.overlay.style.position = 'fixed';
         this.overlay.style.inset = '0';
-        this.overlay.style.zIndex = '10000';
+        this.overlay.style.zIndex = '100'; // Lowered from 10000 to allow UI panels in front
         this.overlay.style.color = '#fbbf24';
         this.overlay.style.fontWeight = 'bold';
         this.overlay.style.fontFamily = 'monospace';
@@ -278,24 +285,8 @@ class CrowsEyeSystem {
                     const conns = ref.connections || [];
                     inspectedHtml += `Roads: ${conns.length > 0 ? conns.join(', ') : 'Unknown'}\n`;
                     
-                    const caravans = ref.caravans?.filter(c => c.status !== 'complete') || [];
-                    inspectedHtml += `Caravans: ${caravans.length > 0 ? caravans.length + ' Active' : 'Unknown'}\n`;
-                    
-                    const quests = window.GameState?.questBoard?.filter(q => q.issuer === ref.id) || [];
-                    inspectedHtml += `Quests: ${quests.length > 0 ? quests.length + ' Active' : 'Unknown'}\n`;
-                    
-                    let nearbyAdvs = 0;
-                    if (window.AdventurerManager?.records) {
-                        window.AdventurerManager.records.forEach(a => {
-                            if (a.position && Math.hypot(a.position.x - ref.x, a.position.z - ref.z) < 5000) {
-                                nearbyAdvs++;
-                            }
-                        });
-                    }
-                    inspectedHtml += `Nearby Adv: ${nearbyAdvs > 0 ? nearbyAdvs : 'Unknown'}\n`;
-                    
                     const history = window.ChronicleManager?.getHistoryFor(ref.id).slice(-3).reverse() || [];
-                    const historyText = history.length > 0 ? history.map(e => `[Day ${e.timestamp.day}] ${e.detail}`).join('\n') : 'No History Recorded';
+                    const historyText = history.length > 0 ? history.map(e => `[Day ${e.timestamp.day}] ${e.detail} (Sig: ${e.significance})`).join('\n') : 'No History Recorded';
                     inspectedHtml += `History:\n${historyText}\n`;
                     
                 } else if (type === 'A' || type === 'T') {
@@ -317,7 +308,7 @@ class CrowsEyeSystem {
                     inspectedHtml += `Stamina: ${record?.hp || 0}\n`;
                     
                     const history = window.ChronicleManager?.getHistoryFor(record?.id).slice(-3).reverse() || [];
-                    const historyText = history.length > 0 ? history.map(e => `[Day ${e.timestamp.day}] ${e.detail}`).join('\n') : 'No History Recorded';
+                    const historyText = history.length > 0 ? history.map(e => `[Day ${e.timestamp.day}] ${e.detail} (Sig: ${e.significance})`).join('\n') : 'No History Recorded';
                     inspectedHtml += `History:\n${historyText}\n`;
                     
                     if (type === 'T') inspectedHtml += `\nSTATUS: CURRENT CROW FOCUS\n`;

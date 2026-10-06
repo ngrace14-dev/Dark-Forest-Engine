@@ -862,7 +862,12 @@ window.addEventListener('keydown', (e) => {
         if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
         window.EventBus.emit('TOGGLE_INTEL_BAG');
     }
+    if (e.key === 'u' || e.key === 'U') {
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+        window.EventBus.emit('TOGGLE_SQUAD_MANAGER');
+    }
 });
+
 
 // ==========================================
 // INITIALIZATION BOOTSTRAP
