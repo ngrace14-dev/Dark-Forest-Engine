@@ -113,7 +113,27 @@ class CrowsEyeSystem {
         
         const { gridHtml, inspectedHtml } = this.generateAsciiGrid(entities, px, pz);
         
-        this.overlay.innerHTML = `CROW'S EYE ACTIVE\nLoaded Chunks: ${chunkCount}\nVillages: ${villageCount}\nAdventurers: ${advCount}\nMonsters: ${monsterCount}\n\n${gridHtml}${inspectedHtml}`;
+        let timelineHtml = `\n--- SIMULATION TIMELINE ---\n`;
+        const worldDay = window.EngineParams?.worldDay || 0;
+        const year = Math.floor(worldDay / 120) + 1; // Assuming 120 days/year for example
+        const dayOfYear = worldDay % 120;
+        const seasons = ['Spring', 'Summer', 'Autumn', 'Winter'];
+        const season = seasons[Math.floor(dayOfYear / 30)] || 'Unknown';
+        
+        timelineHtml += `YEAR: ${year} | SEASON: ${season} | DAY: ${worldDay}\n\n`;
+        
+        const events = window.GameState?.worldEvents || [];
+        if (events.length === 0) {
+            timelineHtml += `No Recorded History\n`;
+        } else {
+            const recentEvents = events.slice(-5);
+            timelineHtml += `[Year ${year} Day ${worldDay}]\n`;
+            recentEvents.forEach(e => {
+                timelineHtml += `- ${e.detail || e.type || 'Unknown Event'}\n`;
+            });
+        }
+        
+        this.overlay.innerHTML = `CROW'S EYE ACTIVE\nLoaded Chunks: ${chunkCount}\nVillages: ${villageCount}\nAdventurers: ${advCount}\nMonsters: ${monsterCount}\n\n${gridHtml}${inspectedHtml}${timelineHtml}`;
     }
 
     generateAsciiGrid(entities, px, pz) {
