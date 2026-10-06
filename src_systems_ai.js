@@ -598,7 +598,13 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         }
 
                 if (target) {
-            let dir = new window.THREE.Vector3().subVectors(target, en.visual.position);
+                    en.currentTask = 'Hunting';
+                    en.taskTarget = 'Player/Target';
+                    en.taskReason = 'Observed movement.';
+                    en.taskTimestamp = now;
+
+                    let dir = new window.THREE.Vector3().subVectors(target, en.visual.position);
+
             const dist = dir.length();
             if (dir.lengthSq() > 0.001) dir.normalize(); else dir.set(0, 0, 1);
 

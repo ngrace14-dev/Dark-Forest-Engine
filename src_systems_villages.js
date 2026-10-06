@@ -82,7 +82,9 @@ window.VillageManager = {
                 expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [],
                 relations: {}, 
                 diplomaticState: {}, 
-                tensions: 0
+                tensions: 0,
+                // Action Ledger Requirement
+                currentTask: 'Establishing', taskTarget: 'Local Region', taskReason: 'Settlement routine.', taskTimestamp: Date.now()
             });
         }
         
@@ -172,6 +174,9 @@ window.VillageManager = {
     },
 
     simulateVillage: function(village) {
+        village.currentTask = 'Simulating';
+        village.taskReason = 'Economic cycle processing.';
+        village.taskTimestamp = Date.now();
         village.stats = { ap: 0, food: 0, wood: 0, stone: 0, gold: 0, essence: 0, ...village.stats };
         village.barrierIntegrity ??= 100;
         village.population ??= { current: 8, capacity: 12 };
@@ -210,6 +215,9 @@ window.VillageManager = {
 
         // --- DIPLOMATIC IMPACT OF RAIDS (Shared Defense) ---
         if (village.territory.underRaid) {
+            village.currentTask = 'Defending';
+            village.taskTarget = 'City Walls';
+            village.taskReason = 'Repelling forest incursions.';
             // Impact is scaled: Only a "Walking Calamity" (Renown > 500) has Monarch-level impact
             const playerImpactScale = (window.GameState.renown.score > 500) ? 5.0 : 1.0;
 
@@ -328,6 +336,10 @@ window.VillageManager = {
             const destination = this.villages.find(candidate => village.connections.includes(candidate.id) && candidate.industry && candidate.industry.imports.includes(village.industry.produces));
             const targetVillage = destination || this.villages.find(candidate => village.connections.includes(candidate.id));
             
+            village.currentTask = 'Trading';
+            village.taskTarget = targetVillage?.name || 'Unknown';
+            village.taskReason = 'Dispatching wealth for prosperity.';
+
             // --- DIPLOMATIC IMPACT OF TRADE ---
             if (targetVillage) {
                 village.relations[targetVillage.id] = Math.min(100, (village.relations[targetVillage.id] || 0) + 2);

@@ -45,6 +45,12 @@ window.EncounterDirector = {
 
         nearby.forEach(en => {
             if (en.hp > 0 && (en.def.faction === 'monster' || en.def.faction === 'forest') && en.name !== 'Huntsman') {
+                // Initialize Task Data for Monsters
+                en.currentTask ??= 'Prowling';
+                en.taskTarget ??= 'None';
+                en.taskReason ??= 'Following primal instinct.';
+                en.taskTimestamp ??= Date.now();
+
                 // Power formula: HP + (Damage * 5)
                 const power = (en.hp || 50) + ((en.def.attackDamage || 15) * 5);
                 hostilePower += power;

@@ -12,7 +12,9 @@ window.AdventurerManager = {
             alive: true, position: { x: (Math.random() - 0.5) * 120, z: (Math.random() - 0.5) * 120 },
             hp: 100, maxHp: 100, morale: 70, supplies: 8, quest: { type: 'hunt', progress: 0, goal: 3 + Math.floor(Math.random() * 5) },
             party: [{ id: `${name.toLowerCase()}-guardian`, prefab: 'Female Guard', name: `${name}'s companion`, role: 'guardian', level: 1, hp: 90, maxHp: 90 }, { id: `${name.toLowerCase()}-scout`, prefab: 'Adventurer', name: `${name}'s scout`, role: 'scout', level: 1, hp: 80, maxHp: 80 }],
-            feats: [], lastUpdateDay: window.EngineParams.worldDay, activeEntityId: null
+            feats: [], lastUpdateDay: window.EngineParams.worldDay, activeEntityId: null,
+            // Action Ledger Requirement
+            currentTask: 'Idle', taskTarget: 'None', taskReason: 'Waiting for story.', taskTimestamp: Date.now()
         }));
         window.EventBus.emit('UI_LOG', `[ADVENTURERS] ${this.records.length} potential protagonists entered the woods.`);
     },
@@ -53,12 +55,23 @@ window.AdventurerManager = {
             const distance = Math.hypot(directionX, directionZ);
 
             if (distance > 6) {
+                // Action Ledger: Travel
+                record.currentTask = 'Traveling';
+                record.taskTarget = destination?.name || 'Destination';
+                record.taskReason = `Pursuing ${record.quest.type} quest.`;
+                record.taskTimestamp = Date.now();
+
                 // Heroes move at ~5m/s physically. 
                 // Abstract speed = 50m/s (10x)
                 const moveAmount = 50 * 60; // 60 seconds of abstract time per tick
                 const t = Math.min(1.0, moveAmount / distance);
                 record.position.x += directionX * t;
                 record.position.z += directionZ * t;
+            } else {
+                record.currentTask = 'Questing';
+                record.taskTarget = destination?.name || 'Local Area';
+                record.taskReason = `Performing deeds for ${record.quest.type} quest.`;
+                record.taskTimestamp = Date.now();
             }
             
             record.destination = { x: targetX, z: targetZ };

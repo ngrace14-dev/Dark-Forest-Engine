@@ -244,6 +244,9 @@ class CrowsEyeSystem {
                 inspectedHtml += `Pos: [${Math.round(selectedEn.x)}, ${Math.round(selectedEn.z)}]\n`;
                 
                 if (type === 'V') {
+                    inspectedHtml += `Task: ${ref.currentTask || 'Idle'}\n`;
+                    inspectedHtml += `Goal: ${ref.taskTarget || 'None'}\n`;
+                    inspectedHtml += `Why: ${ref.taskReason || 'N/A'}\n`;
                     // ... existing village logic ...
                 } else if (type === 'A' || type === 'T') {
                     const record = window.AdventurerManager?.records?.find(r => r.id === ref.adventurerRecordId || r.id === ref.id || r.id === selectedEn.id);
