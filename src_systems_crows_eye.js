@@ -35,7 +35,7 @@ class CrowsEyeSystem {
         if (this.overlay) return;
         this.overlay = document.createElement('div');
         this.overlay.id = 'crows-eye-status';
-        this.overlay.innerText = "CROW'S EYE ACTIVE\nLoaded Chunks: 0";
+        this.overlay.innerText = "CROW'S EYE ACTIVE\nLoaded Chunks: 0\nVillages: 0\nAdventurers: 0\nMonsters: 0";
         this.overlay.style.position = 'fixed';
         this.overlay.style.top = '20px';
         this.overlay.style.left = '20px';
@@ -53,8 +53,21 @@ class CrowsEyeSystem {
 
     update(dt) {
         if (!this.isActive || !this.overlay) return;
+        
         const chunkCount = window.ChunkManager?.activeChunks?.size || 0;
-        this.overlay.innerText = `CROW'S EYE ACTIVE\nLoaded Chunks: ${chunkCount}`;
+        const villageCount = window.VillageManager?.villages?.length || 0;
+        
+        let advCount = 0;
+        let monsterCount = 0;
+        
+        if (window.GameCore?.activeEntities) {
+            window.GameCore.activeEntities.forEach(en => {
+                if (en.def?.faction === 'adventurer') advCount++;
+                if (en.def?.faction === 'monster' || en.def?.faction === 'forest') monsterCount++;
+            });
+        }
+        
+        this.overlay.innerText = `CROW'S EYE ACTIVE\nLoaded Chunks: ${chunkCount}\nVillages: ${villageCount}\nAdventurers: ${advCount}\nMonsters: ${monsterCount}`;
     }
 
     render() {
