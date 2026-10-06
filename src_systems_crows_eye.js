@@ -63,12 +63,15 @@ class CrowsEyeSystem {
                     this.ctx.beginPath();
                     this.ctx.arc(canvasX, canvasY, 3, 0, Math.PI * 2);
                     this.ctx.fill();
+                    
+                    const actualDistKm = (Math.hypot(v.x, v.z) / 1000).toFixed(1);
                     this.ctx.fillStyle = '#fff';
                     this.ctx.font = '8px monospace';
-                    this.ctx.fillText(v.name.toUpperCase(), canvasX, canvasY - 6);
+                    this.ctx.fillText(`${v.name.toUpperCase()} (${actualDistKm}km)`, canvasX, canvasY - 6);
                 } else {
                     // Render off-canvas indicator
-                    this.drawIndicator(relX, relZ, v.capital ? '#6366f1' : '#4ade80', radius);
+                    const actualDistKm = (Math.hypot(v.x, v.z) / 1000).toFixed(1);
+                    this.drawIndicator(relX, relZ, v.capital ? '#6366f1' : '#4ade80', radius, false, actualDistKm);
                 }
             });
         }
@@ -101,7 +104,8 @@ class CrowsEyeSystem {
                     }
                 } else if (isTarget) {
                     // Only draw off-canvas indicators for the target adventurer
-                    this.drawIndicator(relX, relZ, color, radius, true);
+                    const actualDistKm = (Math.hypot(adv.position.x, adv.position.z) / 1000).toFixed(1);
+                    this.drawIndicator(relX, relZ, color, radius, true, actualDistKm);
                 }
             });
         }
@@ -118,7 +122,7 @@ class CrowsEyeSystem {
         this.ctx.fillText('PLAYER', centerX, centerY - 10);
     }
 
-    drawIndicator(relX, relZ, color, radius, isPulse = false) {
+    drawIndicator(relX, relZ, color, radius, isPulse = false, distLabel = null) {
         const angle = Math.atan2(relZ, relX);
         const centerX = this.canvas.width / 2;
         const centerY = this.canvas.height / 2;
@@ -132,7 +136,16 @@ class CrowsEyeSystem {
         // Triangle pointing towards entity
         this.ctx.save();
         this.ctx.translate(edgeX, edgeY);
+        
+        if (distLabel) {
+            this.ctx.fillStyle = '#fff';
+            this.ctx.font = '7px monospace';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(`${distLabel}km`, 0, 12);
+        }
+
         this.ctx.rotate(angle);
+        this.ctx.fillStyle = color;
         this.ctx.moveTo(5, 0);
         this.ctx.lineTo(-3, -3);
         this.ctx.lineTo(-3, 3);
