@@ -39,17 +39,26 @@ class CrowsEyeSystem {
         
         const centerX = this.canvas.width / 2;
         const centerY = this.canvas.height / 2;
+        const radius = 140;
         const scale = 0.001; // 1 unit = 1000m (1km)
+
+        // Draw compass ring
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        this.ctx.lineWidth = 1;
+        this.ctx.beginPath();
+        this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        this.ctx.stroke();
 
         // Villages
         if (window.VillageManager?.villages) {
             window.VillageManager.villages.forEach(v => {
                 const relX = v.x * scale;
                 const relZ = v.z * scale;
-                const canvasX = centerX + relX;
-                const canvasY = centerY + relZ;
                 const distFromCenter = Math.hypot(relX, relZ);
-                if (distFromCenter < 140) {
+
+                if (distFromCenter < radius) {
+                    const canvasX = centerX + relX;
+                    const canvasY = centerY + relZ;
                     this.ctx.fillStyle = v.capital ? '#6366f1' : '#4ade80';
                     this.ctx.beginPath();
                     this.ctx.arc(canvasX, canvasY, 3, 0, Math.PI * 2);
@@ -57,6 +66,9 @@ class CrowsEyeSystem {
                     this.ctx.fillStyle = '#fff';
                     this.ctx.font = '8px monospace';
                     this.ctx.fillText(v.name.toUpperCase(), canvasX, canvasY - 6);
+                } else {
+                    // Render off-canvas indicator
+                    this.drawIndicator(relX, relZ, v.capital ? '#6366f1' : '#4ade80', radius);
                 }
             });
         }
@@ -68,24 +80,28 @@ class CrowsEyeSystem {
                 
                 const relX = adv.position.x * scale;
                 const relZ = adv.position.z * scale;
-                const canvasX = centerX + relX;
-                const canvasY = centerY + relZ;
                 const distFromCenter = Math.hypot(relX, relZ);
+                const isTarget = window.GameState?.narrator?.targetId === adv.id;
+                const color = isTarget ? '#f87171' : '#60a5fa';
 
-                if (distFromCenter < 140) {
-                    const isTarget = window.GameState?.narrator?.targetId === adv.id;
-                    this.ctx.fillStyle = isTarget ? '#f87171' : '#60a5fa'; // Red if Crow Target, else Blue
+                if (distFromCenter < radius) {
+                    const canvasX = centerX + relX;
+                    const canvasY = centerY + relZ;
+                    this.ctx.fillStyle = color;
                     this.ctx.beginPath();
                     this.ctx.arc(canvasX, canvasY, 2.5, 0, Math.PI * 2);
                     this.ctx.fill();
 
                     if (isTarget) {
-                        this.ctx.strokeStyle = '#f87171';
+                        this.ctx.strokeStyle = color;
                         this.ctx.lineWidth = 1;
                         this.ctx.beginPath();
                         this.ctx.arc(canvasX, canvasY, 5, 0, Math.PI * 2);
                         this.ctx.stroke();
                     }
+                } else if (isTarget) {
+                    // Only draw off-canvas indicators for the target adventurer
+                    this.drawIndicator(relX, relZ, color, radius, true);
                 }
             });
         }
@@ -96,11 +112,43 @@ class CrowsEyeSystem {
         this.ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
         this.ctx.fill();
         
-        // Label
         this.ctx.fillStyle = '#fbbf24';
         this.ctx.font = '10px monospace';
         this.ctx.textAlign = 'center';
         this.ctx.fillText('PLAYER', centerX, centerY - 10);
+    }
+
+    drawIndicator(relX, relZ, color, radius, isPulse = false) {
+        const angle = Math.atan2(relZ, relX);
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        
+        const edgeX = centerX + Math.cos(angle) * (radius - 5);
+        const edgeY = centerY + Math.sin(angle) * (radius - 5);
+
+        this.ctx.fillStyle = color;
+        this.ctx.beginPath();
+        
+        // Triangle pointing towards entity
+        this.ctx.save();
+        this.ctx.translate(edgeX, edgeY);
+        this.ctx.rotate(angle);
+        this.ctx.moveTo(5, 0);
+        this.ctx.lineTo(-3, -3);
+        this.ctx.lineTo(-3, 3);
+        this.ctx.closePath();
+        this.ctx.fill();
+        
+        if (isPulse) {
+            this.ctx.strokeStyle = color;
+            this.ctx.lineWidth = 1;
+            const s = 1 + Math.sin(Date.now() * 0.01) * 0.5;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, 8 * s, 0, Math.PI * 2);
+            this.ctx.stroke();
+        }
+        
+        this.ctx.restore();
     }
 
     createCanvas() {
