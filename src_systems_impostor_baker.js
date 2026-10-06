@@ -191,7 +191,8 @@ export class ImpostorBaker {
      */
     dispose() {
         if (this.renderTarget) {
-            this.renderTarget.dispose();
+            // CRITICAL FIX: Do NOT dispose the render target if we are passing its texture to another system.
+            // this.renderTarget.dispose(); // This destroys the .texture in VRAM!
             this.renderTarget = null;
         }
 

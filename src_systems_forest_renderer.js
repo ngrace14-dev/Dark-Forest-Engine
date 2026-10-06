@@ -7,13 +7,38 @@ import * as THREE from 'three';
 import { createTrunkMaterial, createCanopyMaterial } from './src_shaders_forest_materials.js';
 
 class ForestRenderer {
-    constructor() {
+        constructor() {
         this.group = new THREE.Group();
         this.materials = new Map();
         this.instancedMeshes = new Map();
         this.terrainMeshes = new Map(); 
         this.forestFloorMaterial = null; 
         this.initialized = false;
+        
+        // Singletons for fallback geometries to prevent VRAM leaks
+        this.fallbackBoxGeo = new THREE.BoxGeometry(1.8, 0.8, 1.8);
+        this.fallbackBoxGeo.translate(0, 0.4, 0);
+        this.fallbackBoxGeo.isShared = true;
+        
+        const trunkHeight = 45.0;
+        const trunkGeo = new THREE.CylinderGeometry(0.8, 3.5, trunkHeight, 6);
+        trunkGeo.translate(0, trunkHeight / 2, 0);
+
+        const tier1 = new THREE.CylinderGeometry(1.0, 9.0, 12, 6);
+        tier1.translate(0, trunkHeight * 0.45, 0);
+
+        const tier2 = new THREE.CylinderGeometry(0.8, 7.0, 10, 6);
+        tier2.translate(0, trunkHeight * 0.65, 0);
+
+        const tier3 = new THREE.CylinderGeometry(0.2, 5.0, 9, 6);
+        tier3.translate(0, trunkHeight * 0.85, 0);
+
+        this.fallbackTreeGeo = window.BufferGeometryUtils ? 
+            window.BufferGeometryUtils.mergeGeometries([trunkGeo, tier1, tier2, tier3]) : 
+            trunkGeo;
+        this.fallbackTreeGeo.isShared = true;
+
+        this.fallbackMaterial = new THREE.MeshStandardMaterial({ color: 0x2d3a29 });
 
         this.sharedUniforms = {
             uTime: { value: 0 },
@@ -151,38 +176,16 @@ class ForestRenderer {
             }
         }
 
-        if (!geo) {
+                if (!geo) {
             // FIX: Suppress logs for missing procedural trees, only warn for missing 3D models
-                        if (!prefabKey.startsWith('Redwood_')) {
+            if (!prefabKey.startsWith('Redwood_')) {
                 console.warn(`[ForestRenderer] Missing geometry for "${prefabKey}". Deploying low-profile fallback.`);
             }
             if (prefabKey.includes('Fern') || prefabKey.includes('Shrub') || prefabKey.includes('Moss')) {
-                geo = new THREE.CylinderGeometry(0.2, 1.8, 1.5, 4);
-                geo.rotateY(Math.PI / 4);
-                geo.translate(0, 0.75, 0);
+                geo = this.fallbackBoxGeo;
             } else {
-                // --- TREE EMERGENCY FIX: Gothic Redwood Fallback Geometry ---
-                // Prevents the "black spikes" issue by building a chunky, multi-tier frustum
-                // conforming to the Dark Forest Visual Constitution.
-                
-                const trunkHeight = 45.0;
-                const trunkGeo = new THREE.CylinderGeometry(0.8, 3.5, trunkHeight, 6);
-                trunkGeo.translate(0, trunkHeight / 2, 0);
-
-                const tier1 = new THREE.CylinderGeometry(1.0, 9.0, 12, 6);
-                tier1.translate(0, trunkHeight * 0.45, 0);
-
-                const tier2 = new THREE.CylinderGeometry(0.8, 7.0, 10, 6);
-                tier2.translate(0, trunkHeight * 0.65, 0);
-
-                const tier3 = new THREE.CylinderGeometry(0.2, 5.0, 9, 6);
-                tier3.translate(0, trunkHeight * 0.85, 0);
-
-                geo = window.BufferGeometryUtils ? 
-                    window.BufferGeometryUtils.mergeGeometries([trunkGeo, tier1, tier2, tier3]) : 
-                    trunkGeo;
+                geo = this.fallbackTreeGeo;
             }
-            geo.isShared = true;
         }
 
         // Clone the geometry if it's shared so we don't pollute other chunks' instance data buffers.
@@ -194,13 +197,13 @@ class ForestRenderer {
             instanceGeo.isShared = false;
         }
 
-        const mats = this.materials.get(prefabKey);
+                const mats = this.materials.get(prefabKey);
         let mat;
         if (mats && mats.length === 2) {
              // If we have procedural dual-materials (Trunk and Canopy), pass the array
              mat = mats;
         } else {
-             mat = mats || new THREE.MeshStandardMaterial({ color: 0x2d3a29 });
+             mat = mats || this.fallbackMaterial;
         }
         
         const imesh = new THREE.InstancedMesh(instanceGeo, mat, points.length);

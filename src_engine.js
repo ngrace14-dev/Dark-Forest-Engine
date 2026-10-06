@@ -207,16 +207,21 @@ function updatePlayerStats(delta) {
             effect.remaining -= delta;
             effect.tickTimer -= delta;
             
-            if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
+                        if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
                 effect.tickTimer = 1;
                 const resistance = window.GameCore?.getResistance?.(effect.type) || 0;
                 const tickDamage = Math.max(1, effect.tickDamage - resistance);
                 window.GameState.pStats.hp = Math.max(0, window.GameState.pStats.hp - tickDamage);
-                window.EventBus?.emit('ENTITY_DAMAGED', { 
-                    damage: tickDamage, 
-                    position: window.GameCore.playerObj.visual.position, 
-                    isPlayer: true 
-                });
+                
+                // Only spawn floating text and VFX periodically for DoT to prevent DOM spam
+                if (!effect.lastVisualTick || performance.now() - effect.lastVisualTick > 1000) {
+                    window.EventBus?.emit('ENTITY_DAMAGED', { 
+                        damage: tickDamage, 
+                        position: window.GameCore.playerObj.visual.position, 
+                        isPlayer: true 
+                    });
+                    effect.lastVisualTick = performance.now();
+                }
             }
             return effect.remaining > 0;
         });
@@ -346,21 +351,25 @@ function processEntityStatusEffects(entity, delta) {
         effect.remaining -= delta; 
         effect.tickTimer -= delta;
         
-        if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
+                if (effect.tickDamage > 0 && effect.tickTimer <= 0) {
             effect.tickTimer = 1;
             const resistance = window.GameCore?.getResistance?.(effect.type) || 0;
             const tickDamage = Math.max(1, effect.tickDamage - resistance);
             entity.hp = Math.max(0, entity.hp - tickDamage);
             
-            window.EventBus?.emit('ENTITY_DAMAGED', { 
-                damage: tickDamage, 
-                position: entity.visual.position, 
-                isPlayer: false 
-            });
-            window.EventBus?.emit('SPAWN_HIT_VFX', { 
-                type: effect.type === 'burning' ? 'Fire' : 'Void', 
-                pos: entity.visual.position 
-            });
+            // Only spawn floating text and VFX periodically for DoT to prevent DOM/Particle spam
+            if (!effect.lastVisualTick || performance.now() - effect.lastVisualTick > 1000) {
+                window.EventBus?.emit('ENTITY_DAMAGED', { 
+                    damage: tickDamage, 
+                    position: entity.visual.position, 
+                    isPlayer: false 
+                });
+                window.EventBus?.emit('SPAWN_HIT_VFX', { 
+                    type: effect.type === 'burning' ? 'Fire' : 'Void', 
+                    pos: entity.visual.position 
+                });
+                effect.lastVisualTick = performance.now();
+            }
             
             if (entity.hp <= 0) {
                 handleEntityDeath(entity);
@@ -1335,9 +1344,13 @@ function playEntityAnimation(entity, state) {
     
     if (!entity.mixer || !entity.actions || !entity.actions[state]) return;
     if (entity.userData?.isVisible === false && entity.userData?.distSq > 1600) return; // Phase 3: Skip unseen distant animation triggers 
-    if (!entity.mixer || !entity.actions || !entity.actions[state]) return;
-    if (entity.userData?.isVisible === false && entity.userData?.distSq > 1600) return;
     if (entity.currentAnimState === state) return; 
+    
+    // FIX: Remove orphan listener before switching states
+    if (entity._activeAnimListener) {
+        entity.mixer.removeEventListener('finished', entity._activeAnimListener);
+        entity._activeAnimListener = null;
+    }
     
     const newAction = entity.actions[state]; 
     const oldAction = entity.currentAnimState ? entity.actions[entity.currentAnimState] : null;
@@ -1349,9 +1362,10 @@ function playEntityAnimation(entity, state) {
     entity.currentAnimState = state;
     
     if (state === 'attack' || state === 'dash' || state === 'hit') { 
-        entity.mixer.addEventListener('finished', function restoreIdle(e) { 
+        entity._activeAnimListener = function restoreIdle(e) { 
             if (e.action === newAction) { 
-                entity.mixer.removeEventListener('finished', restoreIdle); 
+                entity.mixer.removeEventListener('finished', entity._activeAnimListener); 
+                entity._activeAnimListener = null;
                 if(entity.hp > 0) {
                     if (window.Input?.isBlocking && entity.def?.faction === 'player') {
                         playEntityAnimation(entity, 'block');
@@ -1360,7 +1374,8 @@ function playEntityAnimation(entity, state) {
                     }
                 }
             } 
-        }); 
+        };
+        entity.mixer.addEventListener('finished', entity._activeAnimListener); 
     }
 }
 window.GameCore.playEntityAnimation = playEntityAnimation;
@@ -2197,13 +2212,13 @@ renderer.setAnimationLoop(() => {
                                     gl_Position = projectionMatrix * viewMatrix * worldPosition;
                                 }
             `,
-            fragmentShader: `
+                        fragmentShader: `
                 varying float vHeight;
                 varying vec3 vWorldPos;
                 uniform vec3 sunPos;
                 uniform vec3 fogColor;
 
-                                void main() {
+                void main() {
                     vec3 rockColor = vec3(0.05, 0.07, 0.10);
                     vec3 peakColor = vec3(0.18, 0.22, 0.28);
                     vec3 snowColor = vec3(0.85, 0.90, 0.96);
@@ -2213,11 +2228,10 @@ renderer.setAnimationLoop(() => {
                     float snowMask = smoothstep(4200.0, 6500.0, vHeight);
                     color = mix(color, snowColor, snowMask);
 
-                                        float distToCam = distance(cameraPosition, vWorldPos);
-                    // Stronger atmospheric perspective: mountains heavily hazed from forest center
-                    float fogFactor = smoothstep(0.0, 450000.0, distToCam);
+                    float dist = length(vWorldPos.xz);
+                    float fogFactor = smoothstep(50000.0, 900000.0, dist);
                       
-                    gl_FragColor = vec4(mix(color, fogColor, fogFactor * 0.97), 1.0);
+                    gl_FragColor = vec4(mix(color, fogColor, fogFactor * 0.80), 1.0);
                 }
             `
         });
@@ -2259,35 +2273,90 @@ renderer.setAnimationLoop(() => {
                     window.GameCore.playerObj.body.setTranslation({ x: 0, y: 3, z: 0 }, true);
                     if (window.EngineParams) window.EngineParams.suppressChunkLoading = true;
                 }
-                                            } else if (target === 'world') {
+            } else if (target === 'world') {
                 if (window.GameCore.playerObj && window.GameCore.playerObj.body && pos) {
-                    ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, pos.y, pos.z));
+                    ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, 0, pos.z));
+                    const groundY = safeGetTerrainHeight(pos.x, pos.z) + 5.0;
                     window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
                     window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: pos.y, z: pos.z }, true);
+                    window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: groundY, z: pos.z }, true);
                     if (window.EngineParams) window.EngineParams.suppressChunkLoading = false;
                 }
             }
+            window.EventBus?.emit('ENV_UPDATE');
         });
-    } catch (e) {
-        console.error("Boot sequence failed:", e);
+
+        window.EventBus?.emit('ENGINE_READY'); 
+        window.EventBus?.emit('ENV_UPDATE');
+    } catch(e) { 
+        console.error("CRITICAL BOOT ERROR", e); 
     }
 }
 
-window.GameCore.bootEngine = bootEngine;
-window.addEventListener(String.fromCharCode(108,111,97,100), function() {
-    const btn = document.getElementById(String.fromCharCode(98,116,110,45,115,116,97,114,116));
-    if (btn) {
-        btn.addEventListener(String.fromCharCode(99,108,105,99,107), function() {
-            document.getElementById(String.fromCharCode(115,116,97,114,116,45,115,99,114,101,101,110)).style.display = String.fromCharCode(110,111,110,101);
-            document.getElementById(String.fromCharCode(104,117,100)).classList.remove(String.fromCharCode(104,105,100,100,101,110));
-            document.getElementById(String.fromCharCode(104,117,100)).classList.add(String.fromCharCode(102,108,101,120));
-            if (window.EventBus) window.EventBus.emit(String.fromCharCode(71,65,77,69,95,83,84,65,82,84,69,68));
+window.bootEngine = bootEngine;
+
+// ==========================================
+// RENDER LOOP & INPUT BINDING
+// ==========================================
+
+window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('btn-start')?.addEventListener('click', (e) => {
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+
+        if(window.GameCore) window.GameCore.engineState = 'running';
+
+        window.EventBus?.emit('UI_UPDATE_HUD');
+        window.EventBus?.emit('GAME_STARTED');
+
+        (async () => {
+            try {
+                if (window.Tone) {
+                    await window.Tone.start();
+                    if (window.Tone.Transport.state !== 'started') {
+                        window.Tone.Transport.start();
+                    }
+                    console.log('🔊 WebAudio Context resumed successfully.');
+                }
+            } catch (err) {
+                console.warn('AudioContext failed to start:', err);
+            }
+        })();
+
+        window.addEventListener('resize', () => { 
+            if(window.GameCore?.camera) {
+                window.GameCore.camera.aspect = window.innerWidth / window.innerHeight; 
+                window.GameCore.camera.updateProjectionMatrix(); 
+            }
+            if(renderer) {
+                renderer.setSize(window.innerWidth, window.innerHeight); 
+                if (window.RenderPipeline) window.RenderPipeline.resize(window.innerWidth, window.innerHeight);
+            }
         });
-    }
-    bootEngine();
+    
+        function animate() { 
+            requestAnimationFrame(animate); 
+            let delta = clock.getDelta(); 
+            if (delta > 0.1) delta = 0.1; 
+            accumulator += delta; 
+        
+            while (accumulator >= fixedTimeStep) { 
+                if (window.GameCore?.world) window.GameCore.world.step(); 
+                if (window.GameCore?.checkFloatingOrigin) window.GameCore.checkFloatingOrigin();
+        
+                fixedUpdateLogic(fixedTimeStep); 
+                accumulator -= fixedTimeStep; 
+            } 
+
+            updateCameraAndShadows(delta);
+
+            if (window.RenderPipeline) window.RenderPipeline.render();
+        }
+    
+        animate();
+    
+        window.EventBus?.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
+    }, { once: true }); 
 });
 
-// EXPORT TO GLOBAL
-window.ChunkManager = ChunkManager;
-export default window.GameCore;
+bootEngine(); 
