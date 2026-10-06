@@ -18,12 +18,10 @@ window.AdventurerManager = {
         }));
         window.EventBus.emit('UI_LOG', `[ADVENTURERS] ${this.records.length} potential protagonists entered the woods.`);
     },
-    recordEvent: function(record, type, detail) {
-        const event = { day: window.EngineParams.worldDay, actorId: record.id, actor: record.name, type, detail };
-        window.GameState.worldEvents ??= [];
-        window.GameState.worldEvents.push(event);
-        if (window.GameState.worldEvents.length > 250) window.GameState.worldEvents.shift();
-        record.feats.push({ day: event.day, label: detail });
+    recordEvent: function(record, type, detail, significance = 10) {
+        const event = { actorId: record.id, actor: record.name, type, detail, significance };
+        window.ChronicleManager.recordEvent(event);
+        record.feats.push({ day: window.EngineParams.worldDay, label: detail });
     },
     partyPower: function(record) {
         return record.level * 2 + record.party.reduce((total, member) => total + member.level, 0) + (record.morale || 0) / 25;

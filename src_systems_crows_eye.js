@@ -270,10 +270,41 @@ class CrowsEyeSystem {
                     inspectedHtml += `Task: ${ref.currentTask || 'Idle'}\n`;
                     inspectedHtml += `Goal: ${ref.taskTarget || 'None'}\n`;
                     inspectedHtml += `Why: ${ref.taskReason || 'N/A'}\n`;
-                    // ... existing village logic ...
+                    
+                    inspectedHtml += `Pop: ${ref.population?.current || 0}/${ref.population?.capacity || 0}\n`;
+                    inspectedHtml += `Res: F:${ref.stats?.food||0} W:${ref.stats?.wood||0} S:${ref.stats?.stone||0}\n`;
+                    inspectedHtml += `AP: ${ref.stats?.ap || 0}\n`;
+                    
+                    const conns = ref.connections || [];
+                    inspectedHtml += `Roads: ${conns.length > 0 ? conns.join(', ') : 'Unknown'}\n`;
+                    
+                    const caravans = ref.caravans?.filter(c => c.status !== 'complete') || [];
+                    inspectedHtml += `Caravans: ${caravans.length > 0 ? caravans.length + ' Active' : 'Unknown'}\n`;
+                    
+                    const quests = window.GameState?.questBoard?.filter(q => q.issuer === ref.id) || [];
+                    inspectedHtml += `Quests: ${quests.length > 0 ? quests.length + ' Active' : 'Unknown'}\n`;
+                    
+                    let nearbyAdvs = 0;
+                    if (window.AdventurerManager?.records) {
+                        window.AdventurerManager.records.forEach(a => {
+                            if (a.position && Math.hypot(a.position.x - ref.x, a.position.z - ref.z) < 5000) {
+                                nearbyAdvs++;
+                            }
+                        });
+                    }
+                    inspectedHtml += `Nearby Adv: ${nearbyAdvs > 0 ? nearbyAdvs : 'Unknown'}\n`;
+                    
+                    const history = window.ChronicleManager?.getHistoryFor(ref.id).slice(-3).reverse() || [];
+                    const historyText = history.length > 0 ? history.map(e => `[Day ${e.timestamp.day}] ${e.detail}`).join('\n') : 'No History Recorded';
+                    inspectedHtml += `History:\n${historyText}\n`;
+                    
                 } else if (type === 'A' || type === 'T') {
                     const record = window.AdventurerManager?.records?.find(r => r.id === ref.adventurerRecordId || r.id === ref.id || r.id === selectedEn.id);
                     
+                    inspectedHtml += `Task: ${record?.currentTask || 'Idle'}\n`;
+                    inspectedHtml += `Goal: ${record?.taskTarget || 'None'}\n`;
+                    inspectedHtml += `Why: ${record?.taskReason || 'N/A'}\n`;
+
                     let destName = 'Unknown';
                     if (record?.destination && window.VillageManager?.villages) {
                         const targetVillage = window.VillageManager.villages.find(v => v.x === record.destination.x && v.z === record.destination.z);
@@ -284,15 +315,17 @@ class CrowsEyeSystem {
                     inspectedHtml += `Career: ${record?.quest?.type || 'Unknown'}\n`;
                     inspectedHtml += `Renown: ${record?.storyHeat || 0}\n`;
                     inspectedHtml += `Stamina: ${record?.hp || 0}\n`;
-                    inspectedHtml += `Goal: ${record?.quest?.progress !== undefined ? record.quest.progress + '/' + record.quest.goal : 'Unknown'}\n`;
-                    inspectedHtml += `Home: ${record?.homeVillageId || 'Unknown'}\n`;
                     
-                    const feat = record?.feats?.slice(-1)[0];
-                    inspectedHtml += `History: ${feat ? feat.label : 'None Recorded'}\n`;
+                    const history = window.ChronicleManager?.getHistoryFor(record?.id).slice(-3).reverse() || [];
+                    const historyText = history.length > 0 ? history.map(e => `[Day ${e.timestamp.day}] ${e.detail}`).join('\n') : 'No History Recorded';
+                    inspectedHtml += `History:\n${historyText}\n`;
                     
-                    if (type === 'T') inspectedHtml += `STATUS: CURRENT CROW FOCUS\n`;
+                    if (type === 'T') inspectedHtml += `\nSTATUS: CURRENT CROW FOCUS\n`;
                     
                 } else if (type === 'M') {
+                    inspectedHtml += `Task: ${ref.currentTask || 'Prowling'}\n`;
+                    inspectedHtml += `Goal: ${ref.taskTarget || 'Unknown'}\n`;
+                    inspectedHtml += `Why: ${ref.taskReason || 'N/A'}\n`;
                     inspectedHtml += `Threat: ${ref.hp || 'Unknown'} HP\n`;
                     
                     let targetName = 'Unknown';
