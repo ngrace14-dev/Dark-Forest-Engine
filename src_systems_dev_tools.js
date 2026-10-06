@@ -28,10 +28,18 @@ window.EventBus.on('ENGINE_READY', () => {
             }
                 }
 
-                const gui = new window.lil.GUI({ title: 'God Mode Tools', autoPlace: false });
+                                const gui = new window.lil.GUI({ title: 'God Mode Tools', autoPlace: false });
         window.lilGuiInstance = gui;
         
+        // Ensure the dev menu is always in front (Phase 2 Crow's Eye Fix)
+        gui.domElement.style.position = 'fixed';
+        gui.domElement.style.top = '0';
+        gui.domElement.style.right = '0';
+        gui.domElement.style.zIndex = '10001'; 
+        document.body.appendChild(gui.domElement);
+        
         // Ensure the gui is hidden if the asset panel isn't open to devtools
+
         gui.domElement.style.display = 'block';
 
         // Helper function to safely attach controllers without throwing on undefined properties
