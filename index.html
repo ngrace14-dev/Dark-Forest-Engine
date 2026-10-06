@@ -167,8 +167,8 @@
             <!-- GRAPHICS PRESET QUICK BUTTONS -->
             <div class="flex items-center gap-1 bg-gray-900 border border-gray-800 p-1.5 rounded-lg">
                 <span class="text-[10px] text-gray-400 font-mono uppercase mr-1">Quality:</span>
-                <button onclick="window.RenderPipeline?.setQuality('low')" class="px-2 py-1 bg-red-950/80 hover:bg-red-900 text-red-400 text-[10px] rounded border border-red-800 font-bold transition-all">LOW</button>
-                                <button onclick="window.EngineConfig.applyQualityPreset('medium')" class="px-2 py-1 bg-yellow-950/80 hover:bg-yellow-900 text-yellow-400 text-[10px] rounded border border-yellow-800 font-bold transition-all">MED</button>
+                                <button onclick="window.EngineConfig.applyQualityPreset('low')" class="px-2 py-1 bg-red-950/80 hover:bg-red-900 text-red-400 text-[10px] rounded border border-red-800 font-bold transition-all">LOW</button>
+                <button onclick="window.EngineConfig.applyQualityPreset('medium')" class="px-2 py-1 bg-yellow-950/80 hover:bg-yellow-900 text-yellow-400 text-[10px] rounded border border-yellow-800 font-bold transition-all">MED</button>
                 <button onclick="window.EngineConfig.applyQualityPreset('high')" class="px-2 py-1 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-400 text-[10px] rounded border border-emerald-800 font-bold transition-all">HIGH</button>
                 <button onclick="window.EngineConfig.applyQualityPreset('crows_eye'); window.EventBus.emit('ENV_UPDATE');" class="px-2 py-1 bg-blue-950/80 hover:bg-blue-900 text-blue-400 text-[10px] rounded border border-blue-800 font-bold transition-all ml-2">CROW'S EYE</button>
             </div>
