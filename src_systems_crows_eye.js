@@ -117,8 +117,12 @@ class CrowsEyeSystem {
         this.ctx.fill();
         
         this.ctx.fillStyle = '#fbbf24';
-        this.ctx.font = '10px monospace';
+        this.ctx.font = 'bold 10px monospace';
         this.ctx.textAlign = 'center';
+        this.ctx.fillText('CROW\'S EYE', centerX, 25);
+
+        this.ctx.fillStyle = '#fbbf24';
+        this.ctx.font = '10px monospace';
         this.ctx.fillText('PLAYER', centerX, centerY - 10);
     }
 
@@ -171,14 +175,16 @@ class CrowsEyeSystem {
         this.canvas.width = 300;
         this.canvas.height = 300;
         this.canvas.style.position = 'fixed';
-        this.canvas.style.top = '20px';
-        this.canvas.style.right = '20px';
+        this.canvas.style.top = '24px';
+        this.canvas.style.right = '24px';
         this.canvas.style.zIndex = '1000';
-        this.canvas.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-        this.canvas.style.border = '2px solid #334155';
+        this.canvas.style.backgroundColor = 'rgba(2, 6, 23, 0.75)';
+        this.canvas.style.border = '2px solid rgba(251, 191, 36, 0.4)';
+        this.canvas.style.boxShadow = '0 0 20px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(251, 191, 36, 0.1)';
         this.canvas.style.borderRadius = '50%';
         this.canvas.style.display = this.isActive ? 'block' : 'none';
         this.canvas.style.pointerEvents = 'none';
+        this.canvas.style.backdropFilter = 'blur(4px)';
         
         document.body.appendChild(this.canvas);
         this.ctx = this.canvas.getContext('2d');
