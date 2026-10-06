@@ -694,7 +694,10 @@ window.EventBus.on('ENGINE_READY', () => {
 });
 
 
-document.getElementById('btn-upload-file').addEventListener('click', () => { document.getElementById('asset-file-input').click(); });
+const uploadFileBtn = document.getElementById('btn-upload-file');
+if (uploadFileBtn) {
+    uploadFileBtn.addEventListener('click', () => { document.getElementById('asset-file-input').click(); });
+}
 async function importMeshyArchive(file) {
     if (!window.JSZip) {
         window.EventBus.emit('UI_LOG', 'ZIP importer unavailable. Check the JSZip CDN connection.');
@@ -720,14 +723,17 @@ async function importMeshyArchive(file) {
     }
 }
 
-document.getElementById('asset-file-input').addEventListener('change', (e) => {
-    for (const file of e.target.files) {
-        const lowerName = file.name.toLowerCase();
-        if (lowerName.endsWith('.zip')) importMeshyArchive(file);
-        else if (lowerName.endsWith('.glb') || lowerName.endsWith('.gltf')) loadModel(URL.createObjectURL(file), file.name);
-    }
-    e.target.value = '';
-});
+const assetFileInput = document.getElementById('asset-file-input');
+if (assetFileInput) {
+    assetFileInput.addEventListener('change', (e) => {
+        for (const file of e.target.files) {
+            const lowerName = file.name.toLowerCase();
+            if (lowerName.endsWith('.zip')) importMeshyArchive(file);
+            else if (lowerName.endsWith('.glb') || lowerName.endsWith('.gltf')) loadModel(URL.createObjectURL(file), file.name);
+        }
+        e.target.value = '';
+    });
+}
 
 document.querySelectorAll('.asset-tab').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -740,6 +746,8 @@ document.querySelectorAll('.asset-tab').forEach(btn => {
 document.querySelectorAll('.asset-tab').forEach(b => { if (b.dataset.tab === 'devtools') b.classList.add('text-orange-400'); });
 
 const overlay = document.getElementById('dnd-overlay');
-window.addEventListener('dragover', (e) => { e.preventDefault(); overlay.classList.remove('hidden'); });
-window.addEventListener('dragleave', (e) => { e.preventDefault(); if (e.relatedTarget === null) overlay.classList.add('hidden'); });
-window.addEventListener('drop', (e) => { e.preventDefault(); overlay.classList.add('hidden'); document.getElementById('asset-file-input').files = e.dataTransfer.files; document.getElementById('asset-file-input').dispatchEvent(new Event('change')); });
+if (overlay) {
+    window.addEventListener('dragover', (e) => { e.preventDefault(); overlay.classList.remove('hidden'); });
+    window.addEventListener('dragleave', (e) => { e.preventDefault(); if (e.relatedTarget === null) overlay.classList.add('hidden'); });
+    window.addEventListener('drop', (e) => { e.preventDefault(); overlay.classList.add('hidden'); document.getElementById('asset-file-input').files = e.dataTransfer.files; document.getElementById('asset-file-input').dispatchEvent(new Event('change')); });
+}
