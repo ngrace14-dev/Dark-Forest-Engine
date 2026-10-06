@@ -13,7 +13,7 @@ class IntelBagUI {
         this.bindEvents();
     }
 
-    bindEvents() {
+        bindEvents() {
         window.EventBus.on('TOGGLE_INTEL_BAG', () => this.toggle());
         window.EventBus.on('RENDER_INTEL_BAG', () => this.render());
 
@@ -21,13 +21,22 @@ class IntelBagUI {
             const btn = e.target.closest('[data-action]');
             if (btn && btn.getAttribute('data-action') === 'close') this.toggle();
         });
+
+        this.panel.addEventListener('change', (e) => {
+            if (e.target.id === 'toggle-crows-eye') {
+                window.EngineConfig.crowsEyeMode = e.target.checked;
+                if (window.EngineParams) window.EngineParams.crowsEyeMode = e.target.checked;
+                window.EventBus.emit('ENV_UPDATE');
+                window.EventBus.emit('UI_LOG', `Crow's Eye Mode: ${e.target.checked ? 'ENABLED' : 'DISABLED'}`);
+            }
+        });
     }
 
     toggle() {
         if (window.UIEngineInstance) window.UIEngineInstance.components.get('intel-bag').toggle();
     }
 
-    render() {
+        render() {
         if (!this.panel || !window.IntelManager) return;
         const playerIntel = window.IntelManager.getIntelForNode('player_node');
         
@@ -35,6 +44,10 @@ class IntelBagUI {
             <div class="flex justify-between items-center mb-4 border-b border-blue-700 pb-2">
                 <h2 class="text-blue-400 font-bold tracking-widest text-sm uppercase">📜 Personal Ledger</h2>
                 <div class="text-[10px] text-gray-400">Total Records: ${playerIntel.length}</div>
+            </div>
+            <div class="flex items-center gap-2 mb-4 p-2 bg-blue-900/20 border border-blue-800/50 rounded">
+                <input type="checkbox" id="toggle-crows-eye" ${window.EngineConfig.crowsEyeMode ? 'checked' : ''} class="accent-blue-500">
+                <label for="toggle-crows-eye" class="text-[10px] text-blue-200 uppercase font-bold cursor-pointer">Enable Crow's Eye View</label>
             </div>
             <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-2">
         `;

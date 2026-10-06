@@ -26,9 +26,10 @@ window.EventBus.on('ENGINE_READY', () => {
             if (window.EngineParams[key] === undefined) {
                 window.EngineParams[key] = val;
             }
-        }
+                }
 
-        const gui = new window.lil.GUI({ title: 'God Mode Tools' });
+        const gui = new window.lil.GUI({ title: 'God Mode Tools', autoPlace: false });
+        window.lilGuiInstance = gui;
 
         // Helper function to safely attach controllers without throwing on undefined properties
         const safeAdd = (folder, target, prop, ...args) => {

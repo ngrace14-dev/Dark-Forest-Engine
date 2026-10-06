@@ -210,6 +210,23 @@ window.removeLayoutItem = function(vid, itemId) { const v = window.VillageManage
 window.renderAssetManager = function() {
     const content = document.getElementById('asset-content'); content.innerHTML = '';
     
+    if (window.EngineState.currentAssetTab === 'devtools') {
+        content.innerHTML = '<div class="text-orange-400 font-bold mb-4 text-sm uppercase tracking-widest border-b border-gray-700 pb-2">🛠️ Engine Developer Tools</div>' +
+        '<div id="lil-gui-container" class="bg-gray-900 rounded border border-gray-800 p-2 min-h-[400px]"></div>';
+        
+        setTimeout(() => {
+            const container = document.getElementById('lil-gui-container');
+            if (window.lilGuiInstance && container) {
+                container.appendChild(window.lilGuiInstance.domElement);
+                window.lilGuiInstance.domElement.style.position = 'relative';
+                window.lilGuiInstance.domElement.style.top = '0';
+                window.lilGuiInstance.domElement.style.right = '0';
+                window.lilGuiInstance.domElement.style.width = '100%';
+            }
+        }, 0);
+        return;
+    }
+
     if (window.EngineState.currentAssetTab === 'mods') {
         content.innerHTML = '<div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2"><div class="text-pink-400 font-bold text-sm uppercase tracking-widest">🧩 Engine Extensions & Mods</div></div>' +
         '<div class="bg-gray-800 p-4 rounded border border-gray-700 shadow-lg mb-4">' +
@@ -715,10 +732,12 @@ document.getElementById('asset-file-input').addEventListener('change', (e) => {
 document.querySelectorAll('.asset-tab').forEach(btn => {
     btn.addEventListener('click', (e) => {
         document.querySelectorAll('.asset-tab').forEach(b => { b.classList.remove('active', 'bg-indigo-600', 'text-white'); b.classList.add('bg-gray-800'); if (b.dataset.tab === 'villages') b.classList.add('text-yellow-400'); else if (b.dataset.tab === 'factions') b.classList.add('text-purple-400'); else if (b.dataset.tab === 'biomes') b.classList.add('text-blue-400'); else if (b.dataset.tab === 'vfx') b.classList.add('text-red-400'); else if (b.dataset.tab === 'world') b.classList.add('text-green-400'); else if (b.dataset.tab === 'mods') b.classList.add('text-pink-400'); else if (b.dataset.tab === 'models') b.classList.add('text-cyan-400'); else b.classList.add('text-gray-300'); });
-        e.target.className = `asset-tab active bg-indigo-600 text-white px-4 py-1.5 rounded text-xs font-bold transition-colors ${e.target.classList.contains('border') ? 'border border-indigo-900/50' : ''}`;
+                e.target.className = `asset-tab active bg-indigo-600 text-white px-4 py-1.5 rounded text-xs font-bold transition-colors ${e.target.classList.contains('border') ? 'border border-indigo-900/50' : ''}`;
         window.EngineState.currentAssetTab = e.target.getAttribute('data-tab'); window.EngineState.editingVillageId = null; window.EventBus.emit('RENDER_ASSETS');
     });
 });
+
+document.querySelectorAll('.asset-tab').forEach(b => { if (b.dataset.tab === 'devtools') b.classList.add('text-orange-400'); });
 
 const overlay = document.getElementById('dnd-overlay');
 window.addEventListener('dragover', (e) => { e.preventDefault(); overlay.classList.remove('hidden'); });

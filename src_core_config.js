@@ -8,6 +8,9 @@ window.EngineConfig = {
             this.quality.shadowsEnabled = false; this.quality.renderScale = 0.5; this.quality.grassDensity = 0.1; this.quality.volumetricFog = false; this.quality.shaderTier = String.fromCharCode(76,79,87); this.world.chunkRadius = 3;
         } else if (preset === String.fromCharCode(77,69,68)) {
             this.quality.shadowsEnabled = true; this.quality.renderScale = 0.75; this.quality.grassDensity = 0.5; this.quality.volumetricFog = false; this.quality.shaderTier = String.fromCharCode(77,69,68); this.world.chunkRadius = 4;
+        } else if (preset === 'crows_eye') {
+             this.crowsEyeMode = !this.crowsEyeMode;
+             if (window.EngineParams) window.EngineParams.crowsEyeMode = this.crowsEyeMode;
         } else {
             this.quality.shadowsEnabled = true; this.quality.renderScale = 1.0; this.quality.grassDensity = 1.0; this.quality.volumetricFog = true; this.quality.shaderTier = String.fromCharCode(72,73,71,72); this.world.chunkRadius = 5;
         }
