@@ -205,24 +205,67 @@ class CrowsEyeSystem {
                     inspectedHtml += `Res: F:${ref.stats?.food||0} W:${ref.stats?.wood||0} S:${ref.stats?.stone||0}\n`;
                     inspectedHtml += `AP: ${ref.stats?.ap || 0}\n`;
                     
+                    const conns = ref.connections || [];
+                    inspectedHtml += `Roads: ${conns.length > 0 ? conns.join(', ') : 'Unknown'}\n`;
+                    
+                    const caravans = ref.caravans?.filter(c => c.status !== 'complete') || [];
+                    inspectedHtml += `Caravans: ${caravans.length > 0 ? caravans.length + ' Active' : 'Unknown'}\n`;
+                    
                     const quests = window.GameState?.questBoard?.filter(q => q.issuer === ref.id) || [];
-                    inspectedHtml += `Quests: ${quests.length > 0 ? quests.length + ' Active' : 'None Recorded'}\n`;
+                    inspectedHtml += `Quests: ${quests.length > 0 ? quests.length + ' Active' : 'Unknown'}\n`;
+                    
+                    let nearbyAdvs = 0;
+                    if (window.AdventurerManager?.records) {
+                        window.AdventurerManager.records.forEach(a => {
+                            if (a.position && Math.hypot(a.position.x - ref.x, a.position.z - ref.z) < 5000) {
+                                nearbyAdvs++;
+                            }
+                        });
+                    }
+                    inspectedHtml += `Nearby Adv: ${nearbyAdvs > 0 ? nearbyAdvs : 'Unknown'}\n`;
                     
                     const event = window.GameState?.worldEvents?.reverse().find(e => e.actorId === ref.id || e.detail?.includes(ref.name));
                     inspectedHtml += `History: ${event ? event.detail : 'None Recorded'}\n`;
                     
                 } else if (type === 'A') {
                     const record = window.AdventurerManager?.records?.find(r => r.id === ref.adventurerRecordId || r.id === ref.id);
-                    inspectedHtml += `Career: ${record?.quest?.type || 'Wanderer'}\n`;
+                    
+                    let destName = 'Unknown';
+                    if (record?.destination && window.VillageManager?.villages) {
+                        const targetVillage = window.VillageManager.villages.find(v => v.x === record.destination.x && v.z === record.destination.z);
+                        if (targetVillage) destName = targetVillage.name;
+                    }
+                    
+                    inspectedHtml += `Dest: ${destName}\n`;
+                    inspectedHtml += `Career: ${record?.quest?.type || 'Unknown'}\n`;
                     inspectedHtml += `Renown: ${record?.storyHeat || 0}\n`;
-                    inspectedHtml += `Goal: ${record?.quest?.progress !== undefined ? record.quest.progress + '/' + record.quest.goal : 'None Recorded'}\n`;
+                    inspectedHtml += `Goal: ${record?.quest?.progress !== undefined ? record.quest.progress + '/' + record.quest.goal : 'Unknown'}\n`;
+                    inspectedHtml += `Home: ${record?.homeVillageId || 'Unknown'}\n`;
                     
                     const feat = record?.feats?.slice(-1)[0];
                     inspectedHtml += `History: ${feat ? feat.label : 'None Recorded'}\n`;
                     
                 } else if (type === 'M') {
                     inspectedHtml += `Threat: ${ref.hp || 'Unknown'} HP\n`;
-                    inspectedHtml += `Target: ${ref.targetVillageId ? 'Village ' + ref.targetVillageId : (ref.targetId === 'player' ? 'Player' : 'None Recorded')}\n`;
+                    
+                    let targetName = 'Unknown';
+                    let distToTarget = 'Unknown';
+                    
+                    if (ref.targetVillageId) {
+                        targetName = `Village ${ref.targetVillageId}`;
+                        const targetV = window.VillageManager?.villages?.find(v => v.id === ref.targetVillageId);
+                        if (targetV && ref.visual?.position) {
+                            distToTarget = Math.round(Math.hypot(targetV.x - ref.visual.position.x, targetV.z - ref.visual.position.z)) + 'm';
+                        }
+                    } else if (ref.targetId === 'player' && window.GameCore?.playerObj?.visual) {
+                        targetName = 'Player';
+                        if (ref.visual?.position) {
+                            distToTarget = Math.round(Math.hypot(window.GameCore.playerObj.visual.position.x - ref.visual.position.x, window.GameCore.playerObj.visual.position.z - ref.visual.position.z)) + 'm';
+                        }
+                    }
+                    
+                    inspectedHtml += `Target: ${targetName}\n`;
+                    inspectedHtml += `Dist: ${distToTarget}\n`;
                 }
             } else {
                 inspectedHtml += `\n--- INSPECTION ---\nEntity lost or out of range.`;
