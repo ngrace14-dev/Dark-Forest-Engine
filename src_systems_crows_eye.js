@@ -11,7 +11,8 @@ class CrowsEyeSystem {
         this.zoom = 1.0;
         this.pan = { x: 0, z: 0 };
         this.isDragging = false;
-        this.lastMouse = { x: 0, y: 0 };
+        this.lastStats = null;
+        this.trends = {};
         window.EventBus.on('ENGINE_READY', () => this.init());
     }
 
@@ -106,17 +107,80 @@ class CrowsEyeSystem {
         document.body.appendChild(this.overlay);
     }
 
-    update(dt) {
+    renderCalibrationView() {
+        if (!window.CalibrationFramework) return "No Calibration Data";
+        const settings = window.CalibrationFramework.settings;
+        let html = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px;">`;
+        
+        const renderSlider = (path, min, max, step) => {
+            const parts = path.split('.');
+            let val = settings;
+            parts.forEach(p => val = val[p]);
+            return `
+                <div style="margin-bottom:15px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <span style="color:#fbbf24; font-size:12px;">${path.toUpperCase()}</span>
+                        <span style="color:#f59e0b;">${val.toFixed(2)}</span>
+                    </div>
+                    <input type="range" min="${min}" max="${max}" step="${step}" value="${val}" 
+                        style="width:100%; accent-color:#fbbf24;" 
+                        oninput="window.CalibrationFramework.settings.${parts[0]}.${parts[1]} = parseFloat(this.value); window.CalibrationFramework.save();">
+                </div>
+            `;
+        };
+
+        html += `<div>
+            <div style="font-weight:bold; color:#fbbf24; border-bottom:1px solid #78350f; margin-bottom:15px; padding-bottom:5px;">WORLD KINETICS</div>
+            ${renderSlider('world.growthRate', 0, 5, 0.1)}
+            ${renderSlider('world.spawnRate', 0, 5, 0.1)}
+            ${renderSlider('world.travelRate', 0, 5, 0.1)}
+            ${renderSlider('chronicle.expansionPressure', 0, 5, 0.1)}
+            <div style="font-weight:bold; color:#fbbf24; border-bottom:1px solid #78350f; margin-top:20px; margin-bottom:15px; padding-bottom:5px;">ECONOMY & CONSUMPTION</div>
+            ${renderSlider('economy.consumption', 0, 5, 0.1)}
+            ${renderSlider('economy.scarcity', 0, 5, 0.1)}
+            ${renderSlider('economy.tradeEfficiency', 0, 5, 0.1)}
+        </div>`;
+
+        html += `<div>
+            <div style="font-weight:bold; color:#fbbf24; border-bottom:1px solid #78350f; margin-bottom:15px; padding-bottom:5px;">TRUTH & RUMORS</div>
+            ${renderSlider('rumors.spreadRate', 0, 5, 0.1)}
+            ${renderSlider('rumors.verificationRate', 0, 5, 0.1)}
+            ${renderSlider('intel.distortionRate', 0, 1, 0.01)}
+            ${renderSlider('chronicle.decayRate', 0, 1, 0.01)}
+            <div style="font-weight:bold; color:#fbbf24; border-bottom:1px solid #78350f; margin-top:20px; margin-bottom:15px; padding-bottom:5px;">FORCES & MONSTERS</div>
+            ${renderSlider('forces.influence', 0, 5, 0.1)}
+            ${renderSlider('monsters.spawnFrequency', 0, 5, 0.1)}
+            ${renderSlider('monsters.strengthScale', 0, 5, 0.1)}
+        </div>`;
+
+        html += `</div>`;
+
+        // Presets
+        html += `<div style="grid-column: span 2; margin-top:20px; border-top: 1px solid #78350f; padding-top:20px;">
+            <div style="font-weight:bold; color:#fbbf24; margin-bottom:10px;">EXPERIMENT PRESETS</div>
+            <div style="display:flex; gap:10px;">
+                ${['AGE_OF_TRUTH', 'GOLDEN_AGE', 'DARK_AGE', 'COLLAPSE'].map(p => `
+                    <button style="background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px 15px; cursor:pointer;"
+                        onclick="window.CalibrationFramework.applyPreset('${p}'); window.CrowsEye.updateTimer=1.0;">${p.replace(/_/g, ' ')}</button>
+                `).join('')}
+            </div>
+        </div>`;
+
+        return html;
+    }
         if (!this.isActive || !this.overlay) return;
         
         this.updateTimer += dt;
         if (this.updateTimer < 0.1) return; // Faster update for UI responsiveness
         this.updateTimer = 0;
 
+        // Calculate Trends (Delta Analysis)
+        this.updateTrends();
+
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'LEGENDS', 'FORCES'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'LEGENDS', 'FORCES', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -157,6 +221,9 @@ class CrowsEyeSystem {
             case 'FORCES':
                 contentHtml = this.renderForcesView();
                 break;
+            case 'CALIBRATION':
+                contentHtml = this.renderCalibrationView();
+                break;
         }
 
         this.overlay.innerHTML = `
@@ -179,7 +246,17 @@ class CrowsEyeSystem {
         const entities = this.gatherEntities();
         const px = window.GameCore?.playerObj?.visual?.position?.x || 0;
         const pz = window.GameCore?.playerObj?.visual?.position?.z || 0;
-        return this.generateAsciiGrid(entities, px, pz);
+        
+        // World Health Dashboard
+        let healthHtml = `<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:20px; font-size:10px; background:rgba(0,0,0,0.5); padding:10px; border:1px solid #78350f;">
+            <div>POPULATION: ${this.lastStats?.population > 10000 ? 'STABLE' : 'CRITICAL'}</div>
+            <div>ECONOMY: ${this.lastStats?.prosperity > 50 ? 'THRIVING' : 'STAGNANT'}</div>
+            <div>TRUTH: ${window.IntelTracker?.stats.globalFidelity > 0.7 ? 'PURE' : 'DISTORTED'}</div>
+            <div>SECURITY: ${window.ForceManager?.forces['Forest'].strength < 600 ? 'SECURE' : 'THREATENED'}</div>
+        </div>`;
+
+        const gridData = this.generateAsciiGrid(entities, px, pz);
+        return { gridHtml: healthHtml + gridData.gridHtml, inspectedHtml: gridData.inspectedHtml };
     }
 
     gatherEntities() {
@@ -245,9 +322,43 @@ class CrowsEyeSystem {
         return html;
     }
 
+    updateTrends() {
+        if (!window.VillageManager) return;
+        
+        const currentStats = {
+            population: window.VillageManager.villages.reduce((sum, v) => sum + v.population.current, 0),
+            food: window.VillageManager.villages.reduce((sum, v) => sum + v.stats.food, 0),
+            gold: window.VillageManager.villages.reduce((sum, v) => sum + v.stats.gold, 0),
+            prosperity: window.VillageManager.villages.reduce((sum, v) => sum + v.stats.prosperity, 0) / (window.VillageManager.villages.length || 1),
+            truth: window.IntelTracker?.stats.trueFacts || 0,
+            distortion: (window.IntelTracker?.stats.falseFacts || 0) + (window.IntelTracker?.stats.distortedRecords || 0)
+        };
+
+        if (this.lastStats) {
+            for (let key in currentStats) {
+                const delta = currentStats[key] - this.lastStats[key];
+                this.trends[key] = delta;
+            }
+        }
+        this.lastStats = currentStats;
+    }
+
+    renderTrend(key, unit = "") {
+        const delta = this.trends[key] || 0;
+        const color = delta > 0 ? '#10b981' : delta < 0 ? '#ef4444' : '#94a3b8';
+        const sign = delta > 0 ? '+' : '';
+        return `<span style="color:${color}; font-size:10px; margin-left:10px;">${sign}${delta.toFixed(1)}${unit}</span>`;
+    }
+
     renderEconomyView() {
         if (!window.VillageManager) return "No Economy Data";
-        let html = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">`;
+        let html = `<div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:10px; margin-bottom:20px; background:rgba(0,0,0,0.4); padding:15px; border:1px solid #78350f;">
+            <div>POPULATION: ${this.lastStats?.population} ${this.renderTrend('population')}</div>
+            <div>FOOD: ${this.lastStats?.food.toFixed(0)} ${this.renderTrend('food')}</div>
+            <div>PROSPERITY: ${this.lastStats?.prosperity.toFixed(1)}% ${this.renderTrend('prosperity')}</div>
+            <div>GOLD: ${this.lastStats?.gold.toFixed(0)} ${this.renderTrend('gold')}</div>
+        </div>`;
+        html += `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">`;
         window.VillageManager.villages.forEach(v => {
             const crisis = v.crises?.length > 0 ? `<span style="color:#ef4444;"> [CRISIS: ${v.crises.join(',')}]</span>` : '';
             const monopoly = v.hasMonopoly ? `<span style="color:#fbbf24;"> [MONOPOLY]</span>` : '';
@@ -297,13 +408,13 @@ class CrowsEyeSystem {
         const fidelity = (stats.true / (registry.length || 1)) * 100;
 
         let html = `<div style="margin-bottom:20px;">
-            <div style="font-size:18px; color:#fbbf24;">GLOBAL FIDELITY: ${fidelity.toFixed(1)}%</div>
+            <div style="font-size:18px; color:#fbbf24;">GLOBAL FIDELITY: ${fidelity.toFixed(1)}% ${this.renderTrend('truth')}</div>
             <div style="height:10px; background:#451a03; width:100%; margin-top:5px;">
                 <div style="height:100%; background:#10b981; width:${fidelity}%"></div>
             </div>
             <div style="display:flex; gap:20px; margin-top:10px; font-size:12px;">
-                <div style="color:#10b981;">VERIFIED REALITY: ${stats.true}</div>
-                <div style="color:#ef4444;">FABRICATIONS/DISTORTIONS: ${stats.false}</div>
+                <div style="color:#10b981;">VERIFIED REALITY: ${stats.true} ${this.renderTrend('truth')}</div>
+                <div style="color:#ef4444;">FABRICATIONS/DISTORTIONS: ${stats.false} ${this.renderTrend('distortion')}</div>
                 <div style="color:#94a3b8;">UNVERIFIED RUMORS: ${stats.unknown}</div>
             </div>
         </div>`;
@@ -321,7 +432,16 @@ class CrowsEyeSystem {
     renderChronicleView() {
         if (!window.ChronicleManager) return "No Chronicle Data";
         const events = window.ChronicleManager.worldLedger.slice().reverse();
-        let html = `<div style="display:flex; flex-direction:column; gap:5px;">`;
+        const snapshots = Array.from(window.ChronicleManager.snapshots.keys()).sort((a, b) => a - b);
+        
+        let html = `<div style="margin-bottom:20px; background:rgba(0,0,0,0.4); padding:15px; border:1px solid #78350f;">
+            <div style="font-weight:bold; color:#fbbf24; margin-bottom:10px;">HISTORICAL PLAYBACK</div>
+            <input type="range" min="${snapshots[0] || 0}" max="${snapshots[snapshots.length-1] || 0}" step="10" 
+                style="width:100%; accent-color:#fbbf24;" id="history-slider">
+            <div id="history-preview" style="margin-top:10px; font-size:12px; color:#92400e;">Drag to rewind time.</div>
+        </div>`;
+
+        html += `<div style="display:flex; flex-direction:column; gap:5px;">`;
         events.forEach(e => {
             html += `<div style="font-size:12px; padding:5px; border-bottom:1px solid rgba(120,53,15,0.2);">
                 <span style="color:#78350f;">[Day ${e.timestamp.day}]</span> 
@@ -330,21 +450,52 @@ class CrowsEyeSystem {
             </div>`;
         });
         html += `</div>`;
+        
+        // Add listener for history slider in createOverlay or similar
+        setTimeout(() => {
+            const slider = document.getElementById('history-slider');
+            const preview = document.getElementById('history-preview');
+            if (slider) {
+                slider.oninput = (e) => {
+                    const day = parseInt(e.target.value);
+                    const snap = window.ChronicleManager.snapshots.get(day);
+                    if (snap) {
+                        preview.innerHTML = `DAY ${day}: Population: ${snap.villages.reduce((s, v) => s + v.pop, 0)} | Truth: ${(snap.truth * 100).toFixed(1)}%`;
+                    }
+                };
+            }
+        }, 100);
+
         return html;
     }
 
     renderHousesView() {
         if (!window.VillageManager) return "No House Data";
-        let html = `<table style="width:100%; text-align:left; border-collapse:collapse;">
+        
+        // Calculate House Metrics
+        const villages = window.VillageManager.villages;
+        const mostProsperous = [...villages].sort((a, b) => b.stats.prosperity - a.stats.prosperity)[0];
+        const monopolyKing = [...villages].sort((a, b) => (b.hasMonopoly ? 1 : 0) - (a.hasMonopoly ? 1 : 0))[0];
+        const mostThreatened = [...villages].sort((a, b) => a.barrierIntegrity - b.barrierIntegrity)[0];
+
+        let html = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:20px; font-size:10px; background:rgba(0,0,0,0.5); padding:10px; border:1px solid #78350f;">
+            <div style="color:#fbbf24;">MOST POWERFUL: ${mostProsperous?.nobleHouse}</div>
+            <div style="color:#f59e0b;">MONOPOLY LEAD: ${monopolyKing?.nobleHouse}</div>
+            <div style="color:#ef4444;">NEAR COLLAPSE: ${mostThreatened?.nobleHouse}</div>
+        </div>`;
+
+        html += `<table style="width:100%; text-align:left; border-collapse:collapse;">
             <tr style="color:#fbbf24; border-bottom: 1px solid #78350f;">
-                <th>HOUSE</th><th>LEADER</th><th>MONOPOLY</th><th>PROSPERITY</th>
+                <th>HOUSE</th><th>LEADER</th><th>MONOPOLY</th><th>PROSPERITY</th><th>WARD</th>
             </tr>`;
-        window.VillageManager.villages.forEach(v => {
+        villages.forEach(v => {
+            const wardColor = v.barrierIntegrity < 30 ? '#ef4444' : v.barrierIntegrity < 70 ? '#f59e0b' : '#10b981';
             html += `<tr style="border-bottom: 1px solid rgba(120,53,15,0.3);">
                 <td style="padding:10px 0;">${v.nobleHouse}</td>
                 <td>${v.nobleLeader}</td>
-                <td>${v.hasMonopoly ? v.industry.produces : 'None'}</td>
-                <td>${v.stats.prosperity}%</td>
+                <td style="color:${v.hasMonopoly ? '#fbbf24' : '#92400e'}">${v.hasMonopoly ? v.industry.produces : 'None'}</td>
+                <td>${v.stats.prosperity.toFixed(1)}%</td>
+                <td style="color:${wardColor}">${v.barrierIntegrity}%</td>
             </tr>`;
         });
         html += `</table>`;
@@ -368,9 +519,48 @@ class CrowsEyeSystem {
 
     renderForcesView() {
         if (!window.ForceManager) return "No Force Data";
-        let html = `<div style="display:flex; flex-direction:column; gap:20px;">`;
+        
+        // Story Density Metrics
+        const day = window.EngineParams?.worldDay || 1;
+        const totalEvents = window.ChronicleManager?.worldLedger.length || 0;
+        const eventsPerDay = (totalEvents / day).toFixed(2);
+        const legendsCount = window.GameState?.legends?.length || 0;
+        const poemsCount = window.GameState?.anthology?.length || 0;
+        
+        let densityHtml = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:20px; font-size:10px; background:rgba(0,0,0,0.5); padding:15px; border:1px solid #d97706;">
+            <div>EVENTS/DAY: ${eventsPerDay}</div>
+            <div>LEGENDS/TOTAL: ${legendsCount}</div>
+            <div>FOLKLORE ITEMS: ${poemsCount}</div>
+        </div>`;
+
+        let html = densityHtml + `<div style="display:flex; flex-direction:column; gap:20px;">`;
         Object.entries(window.ForceManager.forces).forEach(([name, data]) => {
             const percent = (data.strength / 1000) * 100;
+            
+            // Influence mapping
+            let influenceHtml = '';
+            if (name === 'Truth') {
+                const tracker = window.IntelTracker?.stats;
+                if (tracker) {
+                    influenceHtml = `<div style="font-size:10px; color:#10b981; margin-top:5px;">
+                        + ${tracker.trueFacts} Verified Facts<br>
+                        - ${tracker.falseFacts + tracker.distortedRecords} Distortions
+                    </div>`;
+                }
+            } else if (name === 'Houses') {
+                const monopolies = window.VillageManager?.villages.filter(v => v.hasMonopoly).length || 0;
+                influenceHtml = `<div style="font-size:10px; color:#fbbf24; margin-top:5px;">
+                    + ${monopolies} Resource Monopolies<br>
+                    Avg Prosperity: ${this.lastStats?.prosperity.toFixed(1)}%
+                </div>`;
+            } else if (name === 'Crow') {
+                const legends = window.GameState?.legends?.length || 0;
+                influenceHtml = `<div style="font-size:10px; color:#d97706; margin-top:5px;">
+                    + ${legends} Recorded Legends<br>
+                    + ${window.GameState?.anthology?.length || 0} Folktales Written
+                </div>`;
+            }
+
             html += `<div>
                 <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
                     <span style="font-weight:bold; color:#fbbf24;">${name}</span>
@@ -381,6 +571,7 @@ class CrowsEyeSystem {
                     <div style="height:100%; background:#f59e0b; width:${percent}%"></div>
                 </div>
                 <div style="font-size:10px; margin-top:5px; color:#92400e;">Current ${data.metric}: ${data.value}</div>
+                ${influenceHtml}
             </div>`;
         });
         html += `</div>`;

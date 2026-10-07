@@ -7,6 +7,9 @@ window.ChronicleManager = {
     // The Master Chronology (Global Events)
     worldLedger: [],
     
+    // Playback snapshots
+    snapshots: new Map(), // day -> snapshot
+
     // Per-Entity History (Scoped to ID)
     entityRecords: new Map(),
 
@@ -22,51 +25,35 @@ window.ChronicleManager = {
      * @param {Object} event - { actorId, type, detail, significance, historicalWeight }
      */
     recordEvent: function(event) {
-        const timestamp = {
-            day: window.EngineParams?.worldDay || 0,
-            year: Math.floor((window.EngineParams?.worldDay || 0) / 120) + 1,
-            epoch: window.EngineParams?.worldEpoch || 0,
-            realTime: Date.now()
-        };
-
-        const significance = event.significance || 1;
-        const historicalWeight = event.historicalWeight || (significance * 0.1);
-
-        const entry = {
-            ...event,
-            significance,
-            historicalWeight,
-            timestamp,
-            id: 'evt_' + Math.random().toString(36).substr(2, 9)
-        };
-
-        // 1. Add to Global Ledger
-        this.worldLedger.push(entry);
-        if (this.worldLedger.length > 500) this.worldLedger.shift(); // Hard limit
-
-        // 2. Add to Entity Scoped History
-        if (entry.actorId) {
-            if (!this.entityRecords.has(entry.actorId)) {
-                this.entityRecords.set(entry.actorId, []);
-            }
-            const records = this.entityRecords.get(entry.actorId);
-            records.push(entry);
-            if (records.length > 50) records.shift(); // Per-entity limit
-        }
-
-        // 3. Career XP Hooks
-        if (entry.significance > 50 || entry.historicalWeight > 10) {
-            const xp = Math.floor(entry.significance / 10) + Math.floor(entry.historicalWeight);
-            window.CareerManager.addXP('archivist', xp);
-        }
-        
-        // 4. Update GameState for persistence
-        window.GameState.worldEvents = this.worldLedger;
-
+        // ... existing code ...
         // 5. Narrative Echo (Optional: UI Log for major events)
         if (entry.significance > 80 || entry.historicalWeight > 100) {
             window.EventBus.emit('UI_LOG', `[HISTORY] ${entry.detail}`);
         }
+
+        // 6. Snapshot periodic state for playback
+        this.captureSnapshot();
+    },
+
+    captureSnapshot: function() {
+        const day = window.EngineParams?.worldDay || 0;
+        if (day % 10 !== 0 || this.snapshots.has(day)) return;
+
+        const snapshot = {
+            day: day,
+            villages: window.VillageManager.villages.map(v => ({
+                id: v.id,
+                pop: v.population.current,
+                pros: v.stats.prosperity,
+                food: v.stats.food,
+                gold: v.stats.gold,
+                x: v.x,
+                z: v.z
+            })),
+            forces: JSON.parse(JSON.stringify(window.ForceManager?.forces || {})),
+            truth: window.IntelTracker?.stats.globalFidelity || 1.0
+        };
+        this.snapshots.set(day, snapshot);
     },
 
     getHistoryFor: function(actorId) {

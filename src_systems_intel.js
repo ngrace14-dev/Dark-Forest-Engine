@@ -209,7 +209,10 @@ window.IntelPropagation = {
         // STEP B: Information Fidelity (Distortion Check)
         let resulting_intel_id = intel_id;
         
-        if (Math.random() > vectorFidelity) {
+        const cal = window.CalibrationFramework?.settings?.intel || { distortionRate: 0.1 };
+        const distortionChance = (1.0 - vectorFidelity) * cal.distortionRate * 10; // Scaling for effect
+        
+        if (Math.random() < distortionChance) {
             // FAILED FIDELITY: Information Distorts!
             const newCertainty = Math.max(0.1, intel.certainty * 0.5);
             
@@ -400,6 +403,9 @@ window.IntelEconomy = {
     verifyIntel: function(intel_id, verifierNode, truthConditionMet) {
         const intel = window.IntelManager.lookup(intel_id);
         if (!intel || intel.certainty >= 1.0) return false; // Already verified or doesn't exist
+
+        const cal = window.CalibrationFramework?.settings?.rumors || { verificationRate: 1.0 };
+        if (Math.random() > cal.verificationRate) return false; // Throttled by calibration
 
         // The Verification Outcome
         const newTruthState = truthConditionMet ? window.IntelEnums.TRUTH_STATE.TRUE : window.IntelEnums.TRUTH_STATE.FALSE;

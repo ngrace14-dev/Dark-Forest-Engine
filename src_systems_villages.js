@@ -207,6 +207,10 @@ window.VillageManager = {
     },
 
     simulateVillage: function(village) {
+        const cal = window.CalibrationFramework?.settings || {};
+        const econCal = cal.economy || { consumption: 1.0, scarcity: 1.0, tradeEfficiency: 1.0 };
+        const worldCal = cal.world || { growthRate: 1.0, spawnRate: 1.0 };
+
         village.currentTask = 'Simulating';
         village.taskReason = 'Economic cycle processing.';
         village.taskTimestamp = Date.now();
@@ -222,8 +226,10 @@ window.VillageManager = {
         village.provisionStock ??= { [village.provision.itemId]: 0 };
         village.territory ??= { faction: 'kingdom', radius: village.capital ? 140 : 90, control: 100, underRaid: false };
         village.stats.ap = Math.min(200, (village.stats.ap || 0) + 10);
-        const production = Math.max(1, Math.floor(village.population.current / 1500));
+        
+        const production = Math.max(1, Math.floor((village.population.current / 1500) * worldCal.growthRate));
         village.stats[village.industry.produces] += production;
+        
         const essenceCost = Math.max(1, Math.ceil(village.population.current / 5000));
         village.barrierIntegrity = Math.max(0, (village.barrierIntegrity ?? 100) - essenceCost);
         if ((village.stats.essence || 0) >= essenceCost) {
@@ -231,7 +237,7 @@ window.VillageManager = {
             village.barrierIntegrity = Math.min(100, village.barrierIntegrity + 8);
         } else if (village.barrierIntegrity === 0) {
             this.postVillageNeed(village, 'essence', essenceCost, 'fueling the rune barrier');
-            if (Math.random() < 0.15) {
+            if (Math.random() < 0.15 * (cal.monsters?.spawnFrequency || 1.0)) {
                 window.EventBus.emit('UI_LOG', `[BARRIER] ${village.name}'s ward is failing. Hunters must enter the woods.`);
                 window.ChronicleManager.recordEvent({
                     actorId: village.id,
@@ -243,7 +249,9 @@ window.VillageManager = {
             }
         }
         village.provisionStock[village.provision.itemId] = (village.provisionStock[village.provision.itemId] || 0) + Math.max(1, Math.floor(production / 2));
-        village.stats.food = Math.max(0, (village.stats.food || 0) - Math.ceil(village.population.current / 24));
+        
+        const consumptionBase = Math.ceil(village.population.current / 24);
+        village.stats.food = Math.max(0, (village.stats.food || 0) - Math.ceil(consumptionBase * econCal.consumption));
         this.processVillageCaravans(village);
 
         // --- PHASE 3: DISTANT WAR RESOLUTION ---
@@ -288,7 +296,7 @@ window.VillageManager = {
         village.stats.prosperity = Math.max(0, Math.min(100, 20 + foodSecurity + suppliedImports.length * 15 + (connectedTrade ? 25 : 0) - tradeDisruption));
 
         if (village.lastGrowthDay !== window.EngineParams.worldDay && village.population.current < village.population.capacity && village.stats.prosperity >= 70 && village.stats.food >= village.population.current * 8) {
-            const growth = Math.min(village.population.capacity - village.population.current, Math.max(1, Math.floor(village.population.current * village.stats.prosperity / 10000)));
+            const growth = Math.min(village.population.capacity - village.population.current, Math.max(1, Math.floor((village.population.current * village.stats.prosperity / 10000) * worldCal.growthRate)));
             village.population.current += growth;
             village.lastGrowthDay = window.EngineParams.worldDay;
             
