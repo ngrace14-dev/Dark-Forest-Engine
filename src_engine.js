@@ -2148,47 +2148,25 @@ async function bootEngine() {
         roomMesh.position.y = 5;
         window.GameCore.pocketScene.add(roomMesh);
 // ==========================================
-// ==========================================
 // CORE ANIMATION LOOP
 // ==========================================
 renderer.setAnimationLoop(() => {
-    if (window.GameCore?.engineState !== 'running') return;
-
-    let delta = clock.getDelta();
-    if (delta > 0.1) delta = 0.1; // Authority: Prevents spiral of death
-    
+    const delta = clock.getDelta();
     accumulator += delta;
     while (accumulator >= fixedTimeStep) {
-        // Authority: Physics Step
-        if (window.GameCore?.world) {
-            window.GameCore.world.step();
-        }
-        
-        if (window.GameCore?.checkFloatingOrigin) window.GameCore.checkFloatingOrigin();
-
         fixedUpdateLogic(fixedTimeStep);
         accumulator -= fixedTimeStep;
     }
-
-    // Crow's Eye Optimization: Rest the rendering system if full-screen overlay is active
-    if (window.EngineConfig?.crowsEyeMode) {
-        // We still run updateCamera (for spatial audio/proximity) but skip heavy rendering
-        updateCameraAndShadows(delta);
-        return; 
-    }
-
     updateCameraAndShadows(delta);
-
     if (window.RenderPipeline) {
         window.RenderPipeline.render();
     } else {
-        if (window.Profiler) window.Profiler.begin('Renderer');
+        if (window.Profiler) window.Profiler.begin(String.fromCharCode(82,101,110,100,101,114,101,114));
         renderer.render(window.GameCore.scene, window.GameCore.camera);
-        if (window.Profiler) window.Profiler.end('Renderer');
+        if (window.Profiler) window.Profiler.end(String.fromCharCode(82,101,110,100,101,114,101,114));
         if (window.Profiler) window.Profiler.update(renderer);
     }
 });
-
           
         clock = new THREE.Clock(); 
         window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
@@ -2223,4 +2201,162 @@ renderer.setAnimationLoop(() => {
                                     float mountainMask = smoothstep(290000.0, 345000.0, distFromOrigin); 
                       
                                     vec2 p = worldPosition.xz;
-                             
+                                    float h = noise(p * 0.000006) * 4500.0;
+                                    h += (1.0 - abs(noise(p * 0.000012) * 2.0 - 1.0)) * 2500.0;
+                                    h += noise(p * 0.00008) * 800.0;
+                      
+                                    float finalHeight = h * mountainMask;
+                                    worldPosition.y += finalHeight;
+                                    vHeight = finalHeight;
+                      
+                                    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+                                }
+            `,
+                        fragmentShader: `
+                varying float vHeight;
+                varying vec3 vWorldPos;
+                uniform vec3 sunPos;
+                uniform vec3 fogColor;
+
+                void main() {
+                    vec3 rockColor = vec3(0.05, 0.07, 0.10);
+                    vec3 peakColor = vec3(0.18, 0.22, 0.28);
+                    vec3 snowColor = vec3(0.85, 0.90, 0.96);
+
+                    vec3 color = mix(rockColor, peakColor, clamp(vHeight / 4000.0, 0.0, 1.0));
+                    
+                    float snowMask = smoothstep(4200.0, 6500.0, vHeight);
+                    color = mix(color, snowColor, snowMask);
+
+                    float dist = length(vWorldPos.xz);
+                    float fogFactor = smoothstep(50000.0, 900000.0, dist);
+                      
+                    gl_FragColor = vec4(mix(color, fogColor, fogFactor * 0.80), 1.0);
+                }
+            `
+        });
+          
+        const horizonMesh = new THREE.Mesh(horizonGeo, horizonMat);
+        horizonMesh.position.y = -5; 
+        window.GameCore.scene.add(horizonMesh);
+        window.GameCore.horizonMaterial = horizonMat;
+
+        if (window.RenderPipeline) {
+            window.RenderPipeline.init(renderer, window.GameCore.scene, window.GameCore.pocketScene, window.GameCore.camera);
+            if (window.RenderPipeline.dirLight) {
+                window.RenderPipeline.dirLight.castShadow = true;
+                window.RenderPipeline.dirLight.shadow.bias = -0.0005;
+                window.RenderPipeline.dirLight.shadow.normalBias = 0.03;
+            }
+            window.RenderPipeline.updateEnvironment(window.GameCore.scene, window.GameCore.scene.fog, window.EngineParams, window.GameCore.horizonMaterial);
+        }
+
+        const startY = safeGetTerrainHeight(0, 0); 
+        const safeY = isNaN(startY) ? 1 : startY;
+        window.spawnPlayer?.(0, safeY + 3.0, 0); 
+        window.spawnPartyMembers?.(); 
+        ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
+
+        window.EventBus?.on('ENV_UPDATE', () => {
+            if (window.RenderPipeline && window.EngineParams) {
+                window.RenderPipeline.updateEnvironment(window.GameCore.scene, window.GameCore.scene.fog, window.EngineParams, window.GameCore.horizonMaterial);
+            }
+        });
+
+        window.EventBus?.on('SCENE_SWAP', ({ target, pos }) => {
+            if (window.RenderPipeline) window.RenderPipeline.swapScene(target);
+
+            if (target === 'establishment') {
+                if (window.GameCore.playerObj && window.GameCore.playerObj.body) {
+                    window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                    window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+                    window.GameCore.playerObj.body.setTranslation({ x: 0, y: 3, z: 0 }, true);
+                    if (window.EngineParams) window.EngineParams.suppressChunkLoading = true;
+                }
+            } else if (target === 'world') {
+                if (window.GameCore.playerObj && window.GameCore.playerObj.body && pos) {
+                    ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, 0, pos.z));
+                    const groundY = safeGetTerrainHeight(pos.x, pos.z) + 5.0;
+                    window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                    window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+                    window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: groundY, z: pos.z }, true);
+                    if (window.EngineParams) window.EngineParams.suppressChunkLoading = false;
+                }
+            }
+            window.EventBus?.emit('ENV_UPDATE');
+        });
+
+        window.EventBus?.emit('ENGINE_READY'); 
+        window.EventBus?.emit('ENV_UPDATE');
+    } catch(e) { 
+        console.error("CRITICAL BOOT ERROR", e); 
+    }
+}
+
+window.bootEngine = bootEngine;
+
+// ==========================================
+// RENDER LOOP & INPUT BINDING
+// ==========================================
+
+window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('btn-start')?.addEventListener('click', (e) => {
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+
+        if(window.GameCore) window.GameCore.engineState = 'running';
+
+        window.EventBus?.emit('UI_UPDATE_HUD');
+        window.EventBus?.emit('GAME_STARTED');
+
+        (async () => {
+            try {
+                if (window.Tone) {
+                    await window.Tone.start();
+                    if (window.Tone.Transport.state !== 'started') {
+                        window.Tone.Transport.start();
+                    }
+                    console.log('???? WebAudio Context resumed successfully.');
+                }
+            } catch (err) {
+                console.warn('AudioContext failed to start:', err);
+            }
+        })();
+
+        window.addEventListener('resize', () => { 
+            if(window.GameCore?.camera) {
+                window.GameCore.camera.aspect = window.innerWidth / window.innerHeight; 
+                window.GameCore.camera.updateProjectionMatrix(); 
+            }
+            if(renderer) {
+                renderer.setSize(window.innerWidth, window.innerHeight); 
+                if (window.RenderPipeline) window.RenderPipeline.resize(window.innerWidth, window.innerHeight);
+            }
+        });
+    
+        function animate() { 
+            requestAnimationFrame(animate); 
+            let delta = clock.getDelta(); 
+            if (delta > 0.1) delta = 0.1; 
+            accumulator += delta; 
+        
+            while (accumulator >= fixedTimeStep) { 
+                if (window.GameCore?.world) window.GameCore.world.step(); 
+                if (window.GameCore?.checkFloatingOrigin) window.GameCore.checkFloatingOrigin();
+        
+                fixedUpdateLogic(fixedTimeStep); 
+                accumulator -= fixedTimeStep; 
+            } 
+
+            updateCameraAndShadows(delta);
+
+            if (window.RenderPipeline) window.RenderPipeline.render();
+        }
+    
+        animate();
+    
+        window.EventBus?.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
+    }, { once: true }); 
+});
+
+bootEngine(); 
