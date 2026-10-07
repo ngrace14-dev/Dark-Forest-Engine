@@ -7,6 +7,11 @@ class CrowsEyeSystem {
         this.overlay = null;
         this.updateTimer = 0;
         this.selectedEntityId = null;
+        this.currentView = 'MAP'; // Default view
+        this.zoom = 1.0;
+        this.pan = { x: 0, z: 0 };
+        this.isDragging = false;
+        this.lastMouse = { x: 0, y: 0 };
         window.EventBus.on('ENGINE_READY', () => this.init());
     }
 
@@ -65,7 +70,38 @@ class CrowsEyeSystem {
                 this.selectedEntityId = e.target.dataset.id;
                 this.updateTimer = 1.0; // Force immediate update
             }
+            if (e.target.dataset.view) {
+                this.currentView = e.target.dataset.view;
+                this.updateTimer = 1.0;
+            }
         });
+
+        // Dragging & Zooming Logic
+        this.overlay.addEventListener('mousedown', (e) => {
+            if (this.currentView === 'MAP') {
+                this.isDragging = true;
+                this.lastMouse = { x: e.clientX, y: e.clientY };
+            }
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (this.isDragging && this.isActive) {
+                const dx = (e.clientX - this.lastMouse.x) * (2.0 / this.zoom);
+                const dy = (e.clientY - this.lastMouse.y) * (2.0 / this.zoom);
+                this.pan.x -= dx * 100; // Scaled for world units
+                this.pan.z -= dy * 100;
+                this.lastMouse = { x: e.clientX, y: e.clientY };
+                this.updateTimer = 1.0;
+            }
+        });
+        window.addEventListener('mouseup', () => this.isDragging = false);
+        this.overlay.addEventListener('wheel', (e) => {
+            if (this.currentView === 'MAP') {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                this.zoom = Math.max(0.1, Math.min(5.0, this.zoom * delta));
+                this.updateTimer = 1.0;
+            }
+        }, { passive: false });
         
         document.body.appendChild(this.overlay);
     }
@@ -74,206 +110,319 @@ class CrowsEyeSystem {
         if (!this.isActive || !this.overlay) return;
         
         this.updateTimer += dt;
-        if (this.updateTimer < 1.0) return; // Update once per second
+        if (this.updateTimer < 0.1) return; // Faster update for UI responsiveness
         this.updateTimer = 0;
 
-        // --- PHASE 4: NARRATIVE TICK ---
-        if (window.ChronicleManager?.evolveNarrative) {
-            window.ChronicleManager.evolveNarrative();
-        }
-        
-        const chunkCount = window.ChunkManager?.activeChunks?.size || 0;
-        const villageCount = window.VillageManager?.villages?.length || 0;
         const narrator = window.GameState?.narrator || {};
+        const worldDay = window.EngineParams?.worldDay || 0;
         
-        let advCount = 0;
-        let monsterCount = 0;
-        
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'LEGENDS', 'FORCES'];
+        let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
+        views.forEach(v => {
+            const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
+            navHtml += `<div data-view="${v}" style="cursor:pointer; padding:5px 10px; font-weight:bold; ${activeStyle}">${v}</div>`;
+        });
+        navHtml += `</div>`;
+
+        let contentHtml = '';
+        let inspectedHtml = '';
+
+        switch (this.currentView) {
+            case 'MAP':
+                const mapData = this.renderMapView();
+                contentHtml = mapData.gridHtml;
+                inspectedHtml = mapData.inspectedHtml;
+                break;
+            case 'ACTIONS':
+                contentHtml = this.renderActionsView();
+                break;
+            case 'ECONOMY':
+                contentHtml = this.renderEconomyView();
+                break;
+            case 'INTEL':
+                contentHtml = this.renderIntelView();
+                break;
+            case 'TRUTH':
+                contentHtml = this.renderTruthView();
+                break;
+            case 'CHRONICLE':
+                contentHtml = this.renderChronicleView();
+                break;
+            case 'HOUSES':
+                contentHtml = this.renderHousesView();
+                break;
+            case 'LEGENDS':
+                contentHtml = this.renderLegendsView();
+                break;
+            case 'FORCES':
+                contentHtml = this.renderForcesView();
+                break;
+        }
+
+        this.overlay.innerHTML = `
+        <div style="max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 1fr 400px; gap: 40px; height: 90vh;">
+            <div style="display: flex; flex-direction: column;">
+                <div style="font-size: 24px; color: #f59e0b; margin-bottom: 10px;">CROW'S EYE - ${this.currentView}</div>
+                ${navHtml}
+                <div style="flex-grow: 1; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 20px; border: 1px solid #451a03;">
+                    ${contentHtml}
+                </div>
+            </div>
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-left: 1px solid #78350f; overflow-y: auto;">
+                <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px;">INSPECTION</div>
+                ${inspectedHtml || 'Select an entity to view deep telemetry.'}
+            </div>
+        </div>`;
+    }
+
+    renderMapView() {
+        const entities = this.gatherEntities();
+        const px = window.GameCore?.playerObj?.visual?.position?.x || 0;
+        const pz = window.GameCore?.playerObj?.visual?.position?.z || 0;
+        return this.generateAsciiGrid(entities, px, pz);
+    }
+
+    gatherEntities() {
+        const narrator = window.GameState?.narrator || {};
         const entities = [];
         
-        // 1. Player
-        let px = 0, pz = 0;
         if (window.GameCore?.playerObj?.visual) {
-            px = window.GameCore.playerObj.visual.position.x;
-            pz = window.GameCore.playerObj.visual.position.z;
-            entities.push({ type: 'P', x: px, z: pz, id: 'player', ref: window.GameCore.playerObj });
+            entities.push({ type: 'P', x: window.GameCore.playerObj.visual.position.x, z: window.GameCore.playerObj.visual.position.z, id: 'player', ref: window.GameCore.playerObj });
         }
         
-        // 2. Active Entities (Monsters/Nearby Adv)
         if (window.GameCore?.activeEntities) {
             window.GameCore.activeEntities.forEach(en => {
                 if (en.def?.faction === 'monster' || en.def?.faction === 'forest') {
-                    monsterCount++;
                     if (en.visual) entities.push({ type: 'M', x: en.visual.position.x, z: en.visual.position.z, id: en.id, ref: en });
                 }
             });
         }
         
-        // 3. All Adventurers (Including Background/Unloaded)
         if (window.AdventurerManager?.records) {
             window.AdventurerManager.records.forEach(rec => {
-                advCount++;
                 if (rec.position) {
-                    // Check if they are the narrator's target
                     const isTarget = narrator.targetId === rec.id;
-                    entities.push({ 
-                        type: isTarget ? 'T' : 'A', 
-                        x: rec.position.x, 
-                        z: rec.position.z, 
-                        id: rec.id, 
-                        ref: rec 
-                    });
+                    entities.push({ type: isTarget ? 'T' : 'A', x: rec.position.x, z: rec.position.z, id: rec.id, ref: rec });
                 }
             });
         }
         
-        // 4. Villages
         if (window.VillageManager?.villages) {
             window.VillageManager.villages.forEach(v => {
                 entities.push({ type: 'V', x: v.x, z: v.z, id: `village_${v.id}`, ref: v });
             });
         }
 
-        // Add Road Nodes to Entities list
         if (window.RoadManager?.pathNodes) {
              window.RoadManager.pathNodes.forEach((node, idx) => {
                  entities.push({ type: '#', x: node.x, z: node.z, id: `road_${idx}`, ref: { name: 'Road Node' } });
              });
         }
-        
-        const { gridHtml, inspectedHtml } = this.generateAsciiGrid(entities, px, pz);
-        
-        let timelineHtml = `\n--- SIMULATION TIMELINE ---\n`;
-        const worldDay = window.EngineParams?.worldDay || 0;
-        const year = Math.floor(worldDay / 120) + 1; // Assuming 120 days/year for example
-        const dayOfYear = worldDay % 120;
-        const seasons = ['Spring', 'Summer', 'Autumn', 'Winter'];
-        const season = seasons[Math.floor(dayOfYear / 30)] || 'Unknown';
-        
-        timelineHtml += `YEAR: ${year} | SEASON: ${season} | DAY: ${worldDay}\n\n`;
-        
-        const events = window.GameState?.worldEvents || [];
-        if (events.length === 0) {
-            timelineHtml += `No Recorded History\n`;
-        } else {
-            const recentEvents = events.slice(-5);
-            timelineHtml += `[Year ${year} Day ${worldDay}]\n`;
-            recentEvents.forEach(e => {
-                timelineHtml += `- ${e.detail || e.type || 'Unknown Event'}\n`;
-            });
-        }
+        return entities;
+    }
 
-        let intelHtml = `\n--- INTEL FIDELITY ---\n`;
-        if (window.IntelManager) {
-            const activeCount = window.IntelManager.registry.size;
-            const archiveCount = window.IntelManager.archive.size;
-            intelHtml += `ACTIVE RECORDS: ${activeCount} | ARCHIVE: ${archiveCount}\n`;
-        }
-
-        let legendsHtml = `\n--- ACTIVE LEGENDS ---\n`;
-        const legends = window.GameState?.legends || [];
-        if (legends.length === 0) {
-            legendsHtml += `No Legends Born Yet\n`;
-        } else {
-            legends.forEach(l => {
-                legendsHtml += `[${l.title}] - ${l.narrative.substring(0, 50)}...\n`;
-            });
-        }
-
-        let forcesHtml = `\n--- GLOBAL FORCES ---\n`;
-        if (window.ForceManager) {
-            Object.entries(window.ForceManager.forces).forEach(([name, data]) => {
-                const bar = '='.repeat(Math.floor(data.strength / 100)) + '-'.repeat(10 - Math.floor(data.strength / 100));
-                forcesHtml += `${name.padEnd(10)} [${bar}] ${data.strength} (${data.metric}: ${data.value})\n`;
-            });
-        }
-
-        let poemsHtml = `\n--- DARK FOREST FOLK ANTHOLOGY ---\n`;
-        const poems = window.GameState?.anthology || [];
-        if (poems.length === 0) {
-            poemsHtml += `No Songs Sung Yet\n`;
-        } else {
-            poems.forEach(p => {
-                poemsHtml += `## ${p.title}\nClassification: ${p.classification}\n${p.text}\n\n`;
-            });
-        }
-
-        let calibrationHtml = `\n--- SIMULATION CALIBRATION ---\n`;
-        if (window.CalibrationFramework) {
-            calibrationHtml += `INTEL SPREAD: ${window.CalibrationFramework.settings.intel.spreadRate}x\n`;
-            calibrationHtml += `DISTORTION: ${window.CalibrationFramework.settings.intel.distortionRate * 100}%\n`;
-            calibrationHtml += `TRADE EFF: ${window.CalibrationFramework.settings.economy.tradeEfficiency}x\n`;
-        }
+    renderActionsView() {
+        const entities = this.gatherEntities().filter(e => e.ref && (e.ref.currentTask || e.type === 'V' || e.type === 'A' || e.type === 'T'));
+        let html = `<table style="width:100%; text-align:left; border-collapse:collapse;">
+            <tr style="color:#fbbf24; border-bottom: 1px solid #78350f;">
+                <th>ENTITY</th><th>TASK</th><th>GOAL</th><th>REASON</th><th>POS</th>
+            </tr>`;
         
-        this.overlay.innerHTML = `<div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 400px; gap: 40px;">
-            <div>
-                <div style="font-size: 24px; color: #f59e0b; margin-bottom: 20px; border-bottom: 1px solid #78350f; padding-bottom: 10px;">CROW'S EYE SIGHT</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; color: #d97706; font-size: 12px;">
-                    <div>Watcher Target: ${narrator.targetName || 'None'}</div>
-                    <div>Loaded Chunks: ${chunkCount}</div>
-                    <div>Villages: ${villageCount}</div>
-                    <div>Adventurers: ${advCount}</div>
+        entities.forEach(e => {
+            const ref = e.ref;
+            const task = ref.currentTask || (e.type === 'V' ? 'Establishing' : 'Idle');
+            const goal = ref.taskTarget || 'None';
+            const reason = ref.taskReason || 'Unknown';
+            html += `<tr style="border-bottom: 1px solid rgba(120,53,15,0.3);">
+                <td style="color:#f59e0b; cursor:pointer;" data-id="${e.id}">${ref.name || 'Unnamed'}</td>
+                <td>${task}</td>
+                <td>${goal}</td>
+                <td>${reason}</td>
+                <td style="font-size:10px;">${Math.round(e.x)},${Math.round(e.z)}</td>
+            </tr>`;
+        });
+        html += `</table>`;
+        return html;
+    }
+
+    renderEconomyView() {
+        if (!window.VillageManager) return "No Economy Data";
+        let html = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">`;
+        window.VillageManager.villages.forEach(v => {
+            const crisis = v.crises?.length > 0 ? `<span style="color:#ef4444;"> [CRISIS: ${v.crises.join(',')}]</span>` : '';
+            const monopoly = v.hasMonopoly ? `<span style="color:#fbbf24;"> [MONOPOLY]</span>` : '';
+            html += `<div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.2);">
+                <div style="font-weight:bold; color:#fbbf24; margin-bottom:5px;">${v.name}${monopoly}${crisis}</div>
+                <div style="font-size:12px; margin-bottom:10px;">Industry: ${v.industry.industry} (${v.industry.produces})</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:11px;">
+                    <div>FOOD: ${Math.floor(v.stats.food)}</div>
+                    <div>GOLD: ${Math.floor(v.stats.gold)}</div>
+                    <div>WOOD: ${Math.floor(v.stats.wood)}</div>
+                    <div>STONE: ${Math.floor(v.stats.stone)}</div>
+                    <div>POP: ${v.population.current}/${v.population.capacity}</div>
+                    <div>PROSPERITY: ${v.stats.prosperity}%</div>
                 </div>
-                ${gridHtml}
-                ${timelineHtml}
-                ${intelHtml}
-                ${legendsHtml}
-                ${forcesHtml}
-                ${poemsHtml}
-                ${calibrationHtml}
+            </div>`;
+        });
+        html += `</div>`;
+        return html;
+    }
+
+    renderIntelView() {
+        if (!window.IntelManager) return "No Intel Data";
+        const registry = Array.from(window.IntelManager.registry.values());
+        let html = `<div style="display:flex; flex-direction:column; gap:10px;">`;
+        registry.forEach(i => {
+            const color = i.type === 'FACT' ? '#10b981' : i.type === 'WARNING' ? '#f59e0b' : '#94a3b8';
+            html += `<div style="border-left: 4px solid ${color}; padding:10px; background:rgba(255,255,255,0.05);">
+                <div style="font-weight:bold; color:${color}">${i.payload.title} [${i.type}]</div>
+                <div style="font-size:12px;">${i.payload.description}</div>
+                <div style="font-size:10px; color:#78350f; margin-top:5px;">
+                    Certainty: ${(i.certainty * 100).toFixed(0)}% | Rarity: ${i.rarity} | Gen: ${i.spread_generation}
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+        return html;
+    }
+
+    renderTruthView() {
+        if (!window.IntelManager) return "No Truth Data";
+        const registry = Array.from(window.IntelManager.registry.values());
+        const stats = {
+            true: registry.filter(i => i.truth_state === 'TRUE').length,
+            false: registry.filter(i => i.truth_state === 'FALSE').length,
+            unknown: registry.filter(i => i.truth_state === 'UNKNOWN').length
+        };
+        const fidelity = (stats.true / (registry.length || 1)) * 100;
+
+        let html = `<div style="margin-bottom:20px;">
+            <div style="font-size:18px; color:#fbbf24;">GLOBAL FIDELITY: ${fidelity.toFixed(1)}%</div>
+            <div style="height:10px; background:#451a03; width:100%; margin-top:5px;">
+                <div style="height:100%; background:#10b981; width:${fidelity}%"></div>
             </div>
-            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-left: 1px solid #78350f; min-height: 80vh;">
-                ${inspectedHtml || '\n\nSelect an entity from the map to inspect its intent.'}
+            <div style="display:flex; gap:20px; margin-top:10px; font-size:12px;">
+                <div style="color:#10b981;">VERIFIED REALITY: ${stats.true}</div>
+                <div style="color:#ef4444;">FABRICATIONS/DISTORTIONS: ${stats.false}</div>
+                <div style="color:#94a3b8;">UNVERIFIED RUMORS: ${stats.unknown}</div>
             </div>
         </div>`;
+
+        html += `<div style="font-weight:bold; color:#fbbf24; margin-bottom:10px;">MOST DISTORTED EVENTS</div>`;
+        const distorted = registry.filter(i => i.truth_state === 'FALSE').sort((a, b) => b.spread_generation - a.spread_generation);
+        distorted.forEach(i => {
+            html += `<div style="padding:10px; border:1px solid #ef4444; margin-bottom:5px; font-size:12px;">
+                ${i.payload.title} - Spread over ${i.spread_generation} generations.
+            </div>`;
+        });
+        return html;
+    }
+
+    renderChronicleView() {
+        if (!window.ChronicleManager) return "No Chronicle Data";
+        const events = window.ChronicleManager.worldLedger.slice().reverse();
+        let html = `<div style="display:flex; flex-direction:column; gap:5px;">`;
+        events.forEach(e => {
+            html += `<div style="font-size:12px; padding:5px; border-bottom:1px solid rgba(120,53,15,0.2);">
+                <span style="color:#78350f;">[Day ${e.timestamp.day}]</span> 
+                <span style="color:#fbbf24;">${e.type}</span>: ${e.detail} 
+                <span style="color:#d97706; font-size:10px;">(Sig: ${e.significance})</span>
+            </div>`;
+        });
+        html += `</div>`;
+        return html;
+    }
+
+    renderHousesView() {
+        if (!window.VillageManager) return "No House Data";
+        let html = `<table style="width:100%; text-align:left; border-collapse:collapse;">
+            <tr style="color:#fbbf24; border-bottom: 1px solid #78350f;">
+                <th>HOUSE</th><th>LEADER</th><th>MONOPOLY</th><th>PROSPERITY</th>
+            </tr>`;
+        window.VillageManager.villages.forEach(v => {
+            html += `<tr style="border-bottom: 1px solid rgba(120,53,15,0.3);">
+                <td style="padding:10px 0;">${v.nobleHouse}</td>
+                <td>${v.nobleLeader}</td>
+                <td>${v.hasMonopoly ? v.industry.produces : 'None'}</td>
+                <td>${v.stats.prosperity}%</td>
+            </tr>`;
+        });
+        html += `</table>`;
+        return html;
+    }
+
+    renderLegendsView() {
+        const legends = window.GameState?.legends || [];
+        if (legends.length === 0) return "No legends have been recorded yet.";
+        let html = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
+        legends.forEach(l => {
+            html += `<div style="border:1px solid #fbbf24; padding:15px; background:rgba(251,191,36,0.05);">
+                <div style="font-size:18px; color:#fbbf24; font-weight:bold; margin-bottom:10px;">${l.title}</div>
+                <div style="font-style:italic; font-size:13px; line-height:1.4;">"${l.narrative}"</div>
+                <div style="margin-top:10px; font-size:11px; color:#78350f;">Historical Power: ${Math.floor(l.power)}</div>
+            </div>`;
+        });
+        html += `</div>`;
+        return html;
+    }
+
+    renderForcesView() {
+        if (!window.ForceManager) return "No Force Data";
+        let html = `<div style="display:flex; flex-direction:column; gap:20px;">`;
+        Object.entries(window.ForceManager.forces).forEach(([name, data]) => {
+            const percent = (data.strength / 1000) * 100;
+            html += `<div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                    <span style="font-weight:bold; color:#fbbf24;">${name}</span>
+                    <span style="color:#78350f;">${data.strength} / 1000</span>
+                </div>
+                <div style="font-size:11px; margin-bottom:5px;">${data.description}</div>
+                <div style="height:8px; background:#451a03; width:100%;">
+                    <div style="height:100%; background:#f59e0b; width:${percent}%"></div>
+                </div>
+                <div style="font-size:10px; margin-top:5px; color:#92400e;">Current ${data.metric}: ${data.value}</div>
+            </div>`;
+        });
+        html += `</div>`;
+        return html;
     }
 
     generateAsciiGrid(entities, px, pz) {
-        // Automatically determine map dimensions based on the new Epoch Manager settings
         const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
         const mountainRadius = forestSide / 2;
         const mountainWidth = window.WorldGenConfig?.mountainRingWidthMeters || 160934.4;
         const totalRadius = (mountainRadius + mountainWidth);
         
-        // Target a larger grid for full-screen mode
         const gridSize = 40; 
-        const worldSpan = totalRadius * 2; 
+        const worldSpan = (totalRadius * 2) / this.zoom; 
         const cellSpan = worldSpan / gridSize;
         
-        // Initialize empty grid tracking the top priority entity in each cell
         const cellEntities = Array(gridSize).fill().map(() => Array(gridSize).fill(null));
-        const grid = Array(gridSize).fill().map(() => Array(gridSize).fill(' ')); // Default to empty space for circular mask
+        const grid = Array(gridSize).fill().map(() => Array(gridSize).fill(' ')); 
         
         const typePriority = { 'P': 6, 'T': 5, 'V': 4, 'A': 3, 'M': 2, '#': 1, 'R': 0.5, '.': 0.1, ' ': 0 };
         
-        // Map absolute world coordinate to an absolute grid coordinate
         const mapToGrid = (x, z) => {
-            const shiftedX = x + totalRadius;
-            const shiftedZ = z + totalRadius;
-            const gx = Math.floor(shiftedX / cellSpan);
-            const gz = Math.floor(shiftedZ / cellSpan);
+            const relativeX = x - this.pan.x + (worldSpan / 2);
+            const relativeZ = z - this.pan.z + (worldSpan / 2);
+            const gx = Math.floor(relativeX / cellSpan);
+            const gz = Math.floor(relativeZ / cellSpan);
             return { gx, gz };
         };
 
-        // Render Circular Map Mask and Mountain Wall
         for (let gz = 0; gz < gridSize; gz++) {
             for (let gx = 0; gx < gridSize; gx++) {
-                // Calculate world center of this cell
-                const wx = (gx * cellSpan) - totalRadius + (cellSpan / 2);
-                const wz = (gz * cellSpan) - totalRadius + (cellSpan / 2);
-                const dist = Math.sqrt(wx*wx + wz*wz); // Use true radial distance
+                const wx = (gx * cellSpan) - (worldSpan / 2) + this.pan.x;
+                const wz = (gz * cellSpan) - (worldSpan / 2) + this.pan.z;
+                const dist = Math.sqrt(wx*wx + wz*wz); 
                 
                 if (dist <= totalRadius) {
-                    if (dist > mountainRadius) {
-                        grid[gz][gx] = 'R';
-                    } else {
-                        grid[gz][gx] = '.';
-                    }
+                    if (dist > mountainRadius) grid[gz][gx] = 'R';
+                    else grid[gz][gx] = '.';
                 }
             }
         }
 
-        // Plot entities
         entities.forEach(en => {
             const { gx, gz } = mapToGrid(en.x, en.z);
             if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
@@ -285,9 +434,12 @@ class CrowsEyeSystem {
             }
         });
         
-        let gridHtml = `REGIONS:\n[P] PLAYER   [T] CROW'S TARGET   [R] MOUNTAIN\n\n`;
+        let gridHtml = `<div style="display:flex; justify-content:space-between; font-size:12px; color:#78350f; margin-bottom:10px;">
+            <div>Zoom: ${this.zoom.toFixed(1)}x</div>
+            <div>Pan: ${Math.round(this.pan.x)}, ${Math.round(this.pan.z)}</div>
+        </div>`;
         
-        gridHtml += `<div style="line-height: 1.1; font-size: 14px; letter-spacing: 2px;">`;
+        gridHtml += `<div style="line-height: 1.1; font-size: 16px; letter-spacing: 2px; font-family: monospace; cursor: move; user-select: none;">`;
         for (let gz = 0; gz < gridSize; gz++) {
             for (let gx = 0; gx < gridSize; gx++) {
                 const en = cellEntities[gz][gx];
@@ -298,7 +450,7 @@ class CrowsEyeSystem {
                 const color = char === 'R' ? '#4b5563' : char === 'V' ? '#10b981' : char === 'P' ? '#3b82f6' : char === 'T' ? '#f59e0b' : '#94a3b8';
                 const dataId = en && en.id ? `data-id="${en.id}"` : '';
                 
-                gridHtml += `<span style="cursor:pointer; ${style} color: ${color};" ${dataId}>${char}</span>`;
+                gridHtml += `<span style="${style} color: ${color};" ${dataId}>${char}</span>`;
             }
             gridHtml += '\n';
         }
@@ -310,78 +462,48 @@ class CrowsEyeSystem {
             if (selectedEn && selectedEn.ref) {
                 const ref = selectedEn.ref;
                 const type = selectedEn.type;
-                inspectedHtml += `\n--- INSPECTION ---\n`;
-                inspectedHtml += `Name: ${ref.name || 'Unknown'}\n`;
-                inspectedHtml += `Type: ${type === 'P' ? 'Player' : (type === 'A' || type === 'T') ? 'Adventurer' : type === 'V' ? 'Village' : type === 'M' ? 'Monster' : 'Road'}\n`;
-                inspectedHtml += `Pos: [${Math.round(selectedEn.x)}, ${Math.round(selectedEn.z)}]\n`;
                 
-                if (type === 'V') {
-                    inspectedHtml += `Task: ${ref.currentTask || 'Idle'}\n`;
-                    inspectedHtml += `Goal: ${ref.taskTarget || 'None'}\n`;
-                    inspectedHtml += `Why: ${ref.taskReason || 'N/A'}\n`;
-                    
-                    inspectedHtml += `Pop: ${ref.population?.current || 0}/${ref.population?.capacity || 0}\n`;
-                    inspectedHtml += `Res: F:${ref.stats?.food||0} W:${ref.stats?.wood||0} S:${ref.stats?.stone||0}\n`;
-                    inspectedHtml += `AP: ${ref.stats?.ap || 0}\n`;
-                    
-                    const conns = ref.connections || [];
-                    inspectedHtml += `Roads: ${conns.length > 0 ? conns.join(', ') : 'Unknown'}\n`;
-                    
-                    const history = window.ChronicleManager?.getHistoryFor(ref.id).slice(-3).reverse() || [];
-                    const historyText = history.length > 0 ? history.map(e => `[Day ${e.timestamp.day}] ${e.detail} (Sig: ${e.significance})`).join('\n') : 'No History Recorded';
-                    inspectedHtml += `History:\n${historyText}\n`;
-                    
-                } else if (type === 'A' || type === 'T') {
-                    const record = window.AdventurerManager?.records?.find(r => r.id === ref.adventurerRecordId || r.id === ref.id || r.id === selectedEn.id);
-                    
-                    inspectedHtml += `Task: ${record?.currentTask || 'Idle'}\n`;
-                    inspectedHtml += `Goal: ${record?.taskTarget || 'None'}\n`;
-                    inspectedHtml += `Why: ${record?.taskReason || 'N/A'}\n`;
+                // --- PROGRESSIVE DISCLOSURE PANEL ---
+                inspectedHtml += `<div style="display:flex; flex-direction:column; gap:15px; font-size:13px;">
+                    <div><span style="color:#78350f;">NAME:</span> <span style="color:#fbbf24; font-size:16px;">${ref.name || 'Unknown'}</span></div>
+                    <div><span style="color:#78350f;">TYPE:</span> ${type === 'P' ? 'Player' : (type === 'A' || type === 'T') ? 'Adventurer' : type === 'V' ? 'Village' : 'Other'}</div>
+                    <div><span style="color:#78350f;">LOC:</span> [${Math.round(selectedEn.x)}, ${Math.round(selectedEn.z)}]</div>
+                    <div style="border-top:1px solid #451a03; padding-top:10px;">
+                        <span style="color:#fbbf24;">INTENT</span><br>
+                        Task: ${ref.currentTask || 'Idle'}<br>
+                        Goal: ${ref.taskTarget || 'None'}<br>
+                        Reason: ${ref.taskReason || 'N/A'}
+                    </div>`;
 
-                    let destName = 'Unknown';
-                    if (record?.destination && window.VillageManager?.villages) {
-                        const targetVillage = window.VillageManager.villages.find(v => v.x === record.destination.x && v.z === record.destination.z);
-                        if (targetVillage) destName = targetVillage.name;
-                    }
-                    
-                    inspectedHtml += `Dest: ${destName}\n`;
-                    inspectedHtml += `Career: ${record?.quest?.type || 'Unknown'}\n`;
-                    inspectedHtml += `Renown: ${record?.storyHeat || 0}\n`;
-                    inspectedHtml += `Stamina: ${record?.hp || 0}\n`;
-                    
-                    const history = window.ChronicleManager?.getHistoryFor(record?.id).slice(-3).reverse() || [];
-                    const historyText = history.length > 0 ? history.map(e => `[Day ${e.timestamp.day}] ${e.detail} (Sig: ${e.significance})`).join('\n') : 'No History Recorded';
-                    inspectedHtml += `History:\n${historyText}\n`;
-                    
-                    if (type === 'T') inspectedHtml += `\nSTATUS: CURRENT CROW FOCUS\n`;
-                    
-                } else if (type === 'M') {
-                    inspectedHtml += `Task: ${ref.currentTask || 'Prowling'}\n`;
-                    inspectedHtml += `Goal: ${ref.taskTarget || 'Unknown'}\n`;
-                    inspectedHtml += `Why: ${ref.taskReason || 'N/A'}\n`;
-                    inspectedHtml += `Threat: ${ref.hp || 'Unknown'} HP\n`;
-                    
-                    let targetName = 'Unknown';
-                    let distToTarget = 'Unknown';
-                    
-                    if (ref.targetVillageId) {
-                        targetName = `Village ${ref.targetVillageId}`;
-                        const targetV = window.VillageManager?.villages?.find(v => v.id === ref.targetVillageId);
-                        if (targetV && ref.visual?.position) {
-                            distToTarget = Math.round(Math.hypot(targetV.x - ref.visual.position.x, targetV.z - ref.visual.position.z)) + 'm';
-                        }
-                    } else if (ref.targetId === 'player' && window.GameCore?.playerObj?.visual) {
-                        targetName = 'Player';
-                        if (ref.visual?.position) {
-                            distToTarget = Math.round(Math.hypot(window.GameCore.playerObj.visual.position.x - ref.visual.position.x, window.GameCore.playerObj.visual.position.z - ref.visual.position.z)) + 'm';
-                        }
-                    }
-                    
-                    inspectedHtml += `Target: ${targetName}\n`;
-                    inspectedHtml += `Dist: ${distToTarget}\n`;
+                if (type === 'V') {
+                    inspectedHtml += `<div style="border-top:1px solid #451a03; padding-top:10px;">
+                        <span style="color:#fbbf24;">CIVILIZATION</span><br>
+                        Noble House: ${ref.nobleHouse}<br>
+                        Population: ${ref.population.current}<br>
+                        Prosperity: ${ref.stats.prosperity}%<br>
+                        Trade Disruption: ${ref.tradeDisruptionUntil > window.EngineParams.worldDay ? 'ACTIVE' : 'NONE'}
+                    </div>`;
                 }
-            } else {
-                inspectedHtml += `\n--- INSPECTION ---\nEntity lost or out of range.`;
+
+                if (window.IntelManager) {
+                    const knownIntel = window.IntelManager.getIntelForNode(this.selectedEntityId);
+                    if (knownIntel.length > 0) {
+                        inspectedHtml += `<div style="border-top:1px solid #451a03; padding-top:10px;">
+                            <span style="color:#fbbf24;">KNOWN INTEL (${knownIntel.length})</span><br>
+                            ${knownIntel.slice(0, 3).map(i => `- ${i.payload.title}`).join('<br>')}
+                        </div>`;
+                    }
+                }
+
+                const history = window.ChronicleManager?.getHistoryFor(this.selectedEntityId).slice(-5).reverse() || [];
+                if (history.length > 0) {
+                    inspectedHtml += `<div style="border-top:1px solid #451a03; padding-top:10px;">
+                        <span style="color:#fbbf24;">RECENT HISTORY</span><br>
+                        ${history.map(e => `<span style="color:#78350f;">[Day ${e.timestamp.day}]</span> ${e.detail}`).join('<br>')}
+                    </div>`;
+                }
+                
+                inspectedHtml += `</div>`;
             }
         }
         
