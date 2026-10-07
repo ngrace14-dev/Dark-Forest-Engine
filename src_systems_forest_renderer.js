@@ -177,16 +177,12 @@ class ForestRenderer {
         }
 
                 if (!geo) {
-            // FIX: Suppress logs for missing procedural trees, only warn for missing 3D models
-            if (!prefabKey.startsWith('Redwood_')) {
-                console.warn(`[ForestRenderer] Missing geometry for "${prefabKey}". Deploying low-profile fallback.`);
-            }
-            if (prefabKey.includes('Fern') || prefabKey.includes('Shrub') || prefabKey.includes('Moss')) {
-                geo = this.fallbackBoxGeo;
-            } else {
-                geo = this.fallbackTreeGeo;
-            }
-        }
+                    if (prefabKey.includes('Fern') || prefabKey.includes('Shrub') || prefabKey.includes('Moss') || prefabKey.includes('Bramble Bush')) {
+                        geo = this.fallbackBoxGeo;
+                    } else {
+                        geo = this.fallbackTreeGeo;
+                    }
+                }
 
         // Clone the geometry if it's shared so we don't pollute other chunks' instance data buffers.
         // We only do this if it's not a shared fallback geometry OR if we are explicitly injecting new attributes.

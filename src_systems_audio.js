@@ -1,7 +1,8 @@
 class ProceduralAudioEngine {
-    constructor() {
+        constructor() {
         this.isInitialized = false;
         this.synths = {};
+        this.lastHitTime = 0;
     }
 
     init() {
@@ -34,10 +35,14 @@ class ProceduralAudioEngine {
         console.log("🔊 [AudioEngine] Procedural WebAudio Synthesizers Initialized.");
     }
 
-    playHitSound(type = 'impact') {
+            playHitSound(type = 'impact') {
         if (!this.isInitialized || !window.Tone) return;
         const Tone = window.Tone;
         
+        const now = performance.now();
+        if (now - this.lastHitTime < 50) return;
+        this.lastHitTime = now;
+
         if (type === 'heavy') {
             this.synths.thud.triggerAttackRelease('C1', '8n');
             this.synths.impact.triggerAttackRelease('16n');
