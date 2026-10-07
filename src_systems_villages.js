@@ -168,9 +168,42 @@ window.VillageManager = {
         if (village) {
             // Re-imported logic from src_engine.js
             window.VillageManager.simulateVillage(village);
+            
+            // --- PHASE 2: VILLAGE INTEL EXCHANGE ---
+            this.processVillageIntelExchange(village);
         }
         
         this.simulationIndex = (this.simulationIndex + 1) % this.villages.length;
+    },
+
+    processVillageIntelExchange: function(village) {
+        if (!window.IntelPropagation) return;
+
+        // 1. Internal Spread (Gossip)
+        // Residents exchange intel with the village hub
+        village.residents.forEach(r => {
+            const rIntel = window.IntelManager.getIntelForNode(r.id || `res_${village.id}_${r.ox}_${r.oz}`);
+            rIntel.forEach(intel => {
+                window.IntelPropagation.sync(
+                    { id: r.id || 'res', faction: village.territory.faction },
+                    { id: `village_${village.id}`, memory_limit: 50, faction: village.territory.faction },
+                    intel.intel_id,
+                    window.IntelEnums.VECTORS.GOSSIP
+                );
+            });
+        });
+
+        // 2. Hub to Outbound (Caravans/Couriers)
+        // When a caravan is launched, it "loads" current village intel
+        village.caravans.forEach(caravan => {
+            if (caravan.status === 'traveling' && !caravan.intelLoaded) {
+                const hubIntel = window.IntelManager.getIntelForNode(`village_${village.id}`);
+                hubIntel.forEach(intel => {
+                    window.IntelManager.grantOwnership(intel.intel_id, caravan.id);
+                });
+                caravan.intelLoaded = true;
+            }
+        });
     },
 
     simulateVillage: function(village) {
@@ -241,25 +274,8 @@ window.VillageManager = {
         }
 
         village.territory.control = Math.max(0, Math.min(100, village.territory.control + (village.territory.underRaid ? -localRaiders.length * 2 : 1)));
-        if (village.territory.underRaid) window.EventBus.emit('UI_LOG', `[RAID] ${village.name} is under attack by ${localRaiders.length} hostile creature${localRaiders.length === 1 ? '' : 's'}.`);
-        
-        if (village.territory.control === 0 && village.territory.faction === 'kingdom') {
-            village.territory.faction = 'forest';
-            village.territory.reclamation = { wood: 0, stone: 0, requiredWood: 50, requiredStone: 30 };
-            village.stats.prosperity = Math.max(0, village.stats.prosperity - 25);
-            this.postVillageNeed(village, 'wood', 50, 'reclaiming occupied territory');
-            this.postVillageNeed(village, 'stone', 30, 'reclaiming occupied territory');
-            
-            window.ChronicleManager.recordEvent({
-                actorId: village.id,
-                type: 'occupation',
-                detail: `${village.name} was overrun by the corrupted forest.`,
-                significance: 250,
-                historicalWeight: 100
-            });
-
-            window.EventBus.emit('UI_LOG', `[OCCUPIED] ${village.name} has fallen under forest control.`);
-        }
+        // --- PHASE 6: ECONOMIC CRISES ---
+        this.processEconomicCrises(village);
 
         const importGoal = Math.ceil(village.population.current * 0.5);
         const suppliedImports = village.industry.imports.filter(resource => (village.stats[resource] || 0) >= importGoal);
@@ -391,6 +407,41 @@ window.VillageManager = {
             window.EventBus.emit('UI_LOG', `[TRADE] ${village.name} dispatched a merchant caravan.`);
         }
     },
+
+    processEconomicCrises: function(village) {
+        village.crises ??= [];
+        
+        // 1. Famine Check
+        if (village.stats.food < village.population.current * 2) {
+            if (!village.crises.includes('Famine')) {
+                village.crises.push('Famine');
+                window.EventBus.emit('UI_LOG', `[ECONOMY] ${village.name} is suffering from FAMINE.`);
+                window.ChronicleManager.recordEvent({
+                    actorId: village.id,
+                    type: 'famine_start',
+                    detail: `${village.name} has run out of food reserves.`,
+                    significance: 70,
+                    historicalWeight: 20
+                });
+            }
+            village.stats.prosperity = Math.max(0, village.stats.prosperity - 2);
+            village.population.current = Math.max(10, village.population.current - Math.ceil(village.population.current * 0.01));
+        } else {
+            village.crises = village.crises.filter(c => c !== 'Famine');
+        }
+
+        // 2. Resource Monopoly Bonus/Malus
+        // If a village produces a resource that everyone wants but no one else has
+        const industry = village.industry.produces;
+        const competitors = this.villages.filter(v => v.id !== village.id && v.industry.produces === industry).length;
+        if (competitors === 0) {
+            village.stats.gold += 50; // Monopoly premium
+            village.hasMonopoly = true;
+        } else {
+            village.hasMonopoly = false;
+        }
+    },
+
     postVillageNeed: function(village, resource, amount, purpose) {
         const existing = window.GameState.questBoard.find(quest => quest.issuer === village.id && quest.resource === resource && quest.purpose === purpose);
         if (existing) return;
@@ -447,6 +498,16 @@ window.VillageManager = {
             const cargo = caravan.cargo || village.industry.produces;
             const amount = (caravan.amount || 1) * 10; 
             
+            // --- PHASE 2: CARAVAN INTEL DELIVERY ---
+            if (window.IntelPropagation) {
+                const caravanIntel = window.IntelManager.getIntelForNode(caravan.id);
+                window.IntelPropagation.bulkSyncToVillage(
+                    { id: caravan.id, faction: village.territory.faction },
+                    { id: `village_${destination.id}`, memory_limit: 50, faction: destination.territory.faction },
+                    caravanIntel.map(i => i.intel_id)
+                );
+            }
+
             if ((village.stats[cargo] || 0) < amount) return;
             village.stats[cargo] -= amount;
             destination.stats[cargo] += amount;

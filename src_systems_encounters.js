@@ -21,6 +21,9 @@ window.EncounterDirector = {
             }
         }
 
+        // --- PHASE 1: COLLISION SYSTEM ---
+        this.processTaskCollisions();
+
         if (window.EngineParams.worldDay < 3) return; // Give player some breathing room
         if (this.interventionCooldown > 0) return;
         
@@ -28,6 +31,118 @@ window.EncounterDirector = {
         if (window.GameState.pStats.hp > 0 && window.GameState.pStats.hp < (window.GameState.pStats.maxHp * 0.4)) {
             this.evaluateDanger();
         }
+    },
+
+    // --- PHASE 1: COLLISION SYSTEM ---
+    processTaskCollisions: function() {
+        if (!window.GameCore?.activeEntities) return;
+        
+        // We throttle this to prevent frame drops
+        const now = performance.now();
+        if (this.lastCollisionCheck && now - this.lastCollisionCheck < 500) return;
+        this.lastCollisionCheck = now;
+
+        const entities = window.GameCore.activeEntities;
+        
+        for (let i = 0; i < entities.length; i++) {
+            const a = entities[i];
+            if (!a.currentTask || a.hp <= 0) continue;
+
+            for (let j = i + 1; j < entities.length; j++) {
+                const b = entities[j];
+                if (!b.currentTask || b.hp <= 0) continue;
+
+                // Check distance
+                const distSq = a.visual.position.distanceToSquared(b.visual.position);
+                if (distSq < 225) { // 15 meters
+                    this.evaluateIntersection(a, b);
+                }
+            }
+        }
+    },
+
+    evaluateIntersection: function(a, b) {
+        const intersectionKey = [a.currentTask, b.currentTask].sort().join('+');
+        
+        // Avoid spamming the same intersection
+        a.intersections ??= new Map();
+        if (a.intersections.has(b.id) && Date.now() - a.intersections.get(b.id) < 60000) return;
+        a.intersections.set(b.id, Date.now());
+
+        let eventType = null;
+        let significance = 10;
+        let detail = "";
+
+        // Interaction Matrix
+        switch (intersectionKey) {
+            case 'Prowling+Trading': // Monster meets Caravan
+                eventType = 'ROBBERY_EVENT';
+                significance = 60;
+                detail = `A ${a.name} intercepted a merchant caravan near ${b.taskTarget || 'the road'}.`;
+                break;
+            case 'Hunting+Stalking': // Hunter meets Wendigo/Stalker
+                eventType = 'ENCOUNTER_EVENT';
+                significance = 80;
+                detail = `A hunt turned into a deadly encounter between a ${a.name} and a ${b.name}.`;
+                break;
+            case 'Defense Event+Monster Presence':
+            case 'Patrolling+Prowling':
+                eventType = 'DEFENSE_EVENT';
+                significance = 40;
+                detail = `Guard patrol engaged hostile forces.`;
+                break;
+            case 'Trading+Trading':
+                eventType = 'COMMERCE_EVENT';
+                significance = 20;
+                detail = `Caravans crossed paths, exchanging news of the road.`;
+                break;
+        }
+
+        if (eventType) {
+            this.generateChronicleAndIntel(eventType, detail, significance, [a, b]);
+        }
+    },
+
+    generateChronicleAndIntel: function(type, detail, significance, actors) {
+        // 1. Record in Chronicle
+        if (window.ChronicleManager) {
+            window.ChronicleManager.recordEvent({
+                actorId: actors[0].id,
+                type: type,
+                detail: detail,
+                significance: significance,
+                historicalWeight: significance * 0.5
+            });
+        }
+
+        // 2. Generate Intel (Phase 2)
+        // Find witnesses (other nearby entities)
+        const p1 = actors[0].visual.position;
+        const nearby = window.GameCore.SpatialGrid.getNearbyEntities(p1.x, p1.z, 30);
+        const witnesses = nearby.filter(en => !actors.includes(en) && en.hp > 0);
+
+        const intelId = window.IntelManager.register({
+            type: window.IntelEnums.TYPES.RUMOR,
+            payload: {
+                title: type.replace('_', ' '),
+                description: detail,
+                tags: [type.toLowerCase(), 'event'],
+                target_coord: { x: p1.x, z: p1.z }
+            },
+            certainty: 0.7,
+            truth_state: window.IntelEnums.TRUTH_STATE.TRUE,
+            significance: { survival: significance, crow: significance * 0.2 },
+            rarity: significance > 70 ? window.IntelEnums.RARITY.UNCOMMON : window.IntelEnums.RARITY.COMMON,
+            provenance: [{ node_id: 'world_director', timestamp: window.EngineParams?.worldDay || 0 }]
+        });
+
+        // Witnesses "hear" or "see" it and now carry the intel
+        witnesses.forEach(w => {
+            window.IntelManager.grantOwnership(intelId, w.id);
+            // If the witness is a courier or caravan, they'll spread it at the next stop
+        });
+
+        window.EventBus.emit('UI_LOG_DEBUG', `[COLLISION] Generated ${type} with ${witnesses.length} witnesses.`);
     },
 
     evaluateDanger: function() {

@@ -48,7 +48,11 @@ import './src_systems_establishment.js';
 import './src_systems_relationships.js';
 import './src_systems_warden.js';
 import './src_systems_chronicle.js';
+import './src_systems_forces.js';
+import './src_systems_calibration.js';
 import './src_systems_navigation_careers.js';
+
+
 
 // 1.5 Integration Testing: Character Stack
 import './src/character/init.js';

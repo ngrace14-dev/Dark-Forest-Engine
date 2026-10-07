@@ -76,6 +76,11 @@ class CrowsEyeSystem {
         this.updateTimer += dt;
         if (this.updateTimer < 1.0) return; // Update once per second
         this.updateTimer = 0;
+
+        // --- PHASE 4: NARRATIVE TICK ---
+        if (window.ChronicleManager?.evolveNarrative) {
+            window.ChronicleManager.evolveNarrative();
+        }
         
         const chunkCount = window.ChunkManager?.activeChunks?.size || 0;
         const villageCount = window.VillageManager?.villages?.length || 0;
@@ -159,12 +164,45 @@ class CrowsEyeSystem {
         }
 
         let intelHtml = `\n--- INTEL FIDELITY ---\n`;
-        if (window.IntelTracker?.stats) {
-            const stats = window.IntelTracker.stats;
-            const fidelity = (stats.globalFidelity * 100).toFixed(1);
-            intelHtml += `GLOBAL TRUTH: ${fidelity}%\n`;
-            intelHtml += `FACTS: ${stats.trueFacts} | RUMORS: ${stats.activeRumors}\n`;
-            intelHtml += `CORRUPTION: ${stats.falseFacts + stats.distortedRecords} (Fakes: ${stats.fabrications})\n`;
+        if (window.IntelManager) {
+            const activeCount = window.IntelManager.registry.size;
+            const archiveCount = window.IntelManager.archive.size;
+            intelHtml += `ACTIVE RECORDS: ${activeCount} | ARCHIVE: ${archiveCount}\n`;
+        }
+
+        let legendsHtml = `\n--- ACTIVE LEGENDS ---\n`;
+        const legends = window.GameState?.legends || [];
+        if (legends.length === 0) {
+            legendsHtml += `No Legends Born Yet\n`;
+        } else {
+            legends.forEach(l => {
+                legendsHtml += `[${l.title}] - ${l.narrative.substring(0, 50)}...\n`;
+            });
+        }
+
+        let forcesHtml = `\n--- GLOBAL FORCES ---\n`;
+        if (window.ForceManager) {
+            Object.entries(window.ForceManager.forces).forEach(([name, data]) => {
+                const bar = '='.repeat(Math.floor(data.strength / 100)) + '-'.repeat(10 - Math.floor(data.strength / 100));
+                forcesHtml += `${name.padEnd(10)} [${bar}] ${data.strength} (${data.metric}: ${data.value})\n`;
+            });
+        }
+
+        let poemsHtml = `\n--- DARK FOREST FOLK ANTHOLOGY ---\n`;
+        const poems = window.GameState?.anthology || [];
+        if (poems.length === 0) {
+            poemsHtml += `No Songs Sung Yet\n`;
+        } else {
+            poems.forEach(p => {
+                poemsHtml += `## ${p.title}\nClassification: ${p.classification}\n${p.text}\n\n`;
+            });
+        }
+
+        let calibrationHtml = `\n--- SIMULATION CALIBRATION ---\n`;
+        if (window.CalibrationFramework) {
+            calibrationHtml += `INTEL SPREAD: ${window.CalibrationFramework.settings.intel.spreadRate}x\n`;
+            calibrationHtml += `DISTORTION: ${window.CalibrationFramework.settings.intel.distortionRate * 100}%\n`;
+            calibrationHtml += `TRADE EFF: ${window.CalibrationFramework.settings.economy.tradeEfficiency}x\n`;
         }
         
         this.overlay.innerHTML = `<div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 400px; gap: 40px;">
@@ -179,6 +217,10 @@ class CrowsEyeSystem {
                 ${gridHtml}
                 ${timelineHtml}
                 ${intelHtml}
+                ${legendsHtml}
+                ${forcesHtml}
+                ${poemsHtml}
+                ${calibrationHtml}
             </div>
             <div style="background: rgba(255,255,255,0.05); padding: 20px; border-left: 1px solid #78350f; min-height: 80vh;">
                 ${inspectedHtml || '\n\nSelect an entity from the map to inspect its intent.'}

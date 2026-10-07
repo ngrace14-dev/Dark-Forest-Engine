@@ -79,6 +79,9 @@ class IntelManagerSystem {
                 political: data.significance?.political || 0,
                 crow: data.significance?.crow || 0
             },
+
+            // --- PHASE 5: FORCE ALIGNMENT ---
+            associatedForces: data.associatedForces || [],
             
             suppression_level: data.suppression_level || 0,
             epoch_created: data.epoch_created || window.EngineParams?.worldEpoch || 0,
@@ -316,6 +319,33 @@ window.IntelPropagation = {
 // ==========================================
 // PHASE 6.3: VERIFICATION & MARKETIZATION (THE ECONOMY)
 // ==========================================
+window.TruthSystem = {
+    // Verified Reality Store
+    facts: new Map(), // Map<coord_hash, { type, value, timestamp }>
+
+    update: function() {
+        // Periodically verify standing rumors if player/NPC is present at the location
+        const pPos = window.GameCore?.playerObj?.visual?.position;
+        if (pPos) {
+            this.checkVerificationProximity(pPos, 'player');
+        }
+    },
+
+    checkVerificationProximity: function(pos, verifierId) {
+        const intelList = Array.from(window.IntelManager.registry.values());
+        intelList.forEach(intel => {
+            if (intel.type === window.IntelEnums.TYPES.RUMOR && intel.payload.target_coord) {
+                const dist = Math.hypot(intel.payload.target_coord.x - pos.x, intel.payload.target_coord.z - pos.z);
+                if (dist < 10) {
+                    // Automatically verify if the verifier is at the location
+                    // For now, we assume if you're there, you see the truth (simple model)
+                    window.IntelEconomy.verifyIntel(intel.intel_id, { id: verifierId, faction: 'neutral' }, true);
+                }
+            }
+        });
+    }
+};
+
 window.IntelEconomy = {
     /**
      * Calculates the market value of an Intel_ID in Gold.

@@ -180,11 +180,17 @@ function attackNpc(attacker, target) {
 
 const AISystem = {
     update: function(delta) {
-        // AI Update logic will be migrated here in future steps
+                // --- PHASE 3: TRUTH SYSTEM UPDATE ---
+                if (window.TruthSystem) window.TruthSystem.update();
+
+                // --- PHASE 5: FORCE ECOLOGY UPDATE ---
+                if (window.ForceManager) window.ForceManager.update(delta);
     }
 };
 
+
 window.SystemRegistry.register('AISystem', AISystem);
+
 
 window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
 
