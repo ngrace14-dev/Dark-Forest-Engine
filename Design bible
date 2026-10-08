@@ -1,0 +1,2992 @@
+# DARK FOREST
+# MASTER DEVELOPMENT PLAN
+
+---
+
+# TABLE OF CONTENTS
+
+1. Core Philosophy
+2. Design Constraints
+3. Player Role
+4. World Structure
+5. Reality Mechanics
+6. The Chain Theory
+7. The Capital
+8. House Terminus
+9. The Three Hundred Guardians
+10. Barrier Theory
+11. The Endless Dunes
+12. The Mountain Ring
+13. Information Economy
+14. Truth Economy
+15. Chronicle System
+16. Historian System
+17. Folklore System
+18. Force Ecology
+19. Stellaris Economy
+20. Divine Patron System
+21. Dream System
+22. Career Ambition System
+23. Dream Corruption
+24. Forest Will
+25. Relative Dimensional Anchors
+26. Crow's Eye
+27. Living Atlas
+28. Follow System
+29. Observer's Ledger
+30. Mystery System
+31. Expeditions
+32. Calibration Observatory
+33. Discovery Ladder
+34. Architectural Constraints
+35. Future Expansion Hooks
+
+---
+
+# 1. CORE PHILOSOPHY
+
+Dark Forest is a simulation about:
+
+- Truth
+- Memory
+- Civilization
+- Loss
+- Mythology
+- Discovery
+
+The simulation is the primary storyteller.
+
+The player influences.
+
+The player does not control.
+
+The goal is not to conquer the world.
+
+The goal is to understand it.
+
+Questions are more important than answers.
+
+Every major discovery should reveal a deeper mystery.
+
+---
+
+# 2. DESIGN CONSTRAINTS
+
+Dark Forest is NOT:
+
+- An RTS
+- A God Simulator
+- A City Builder
+- A Unit Command Game
+- A Direct-Control Colony Simulator
+
+The simulation owns civilization.
+
+NPCs remain autonomous.
+
+The player influences probability.
+
+The simulation chooses outcomes.
+
+---
+
+# 3. PLAYER ROLE
+
+The player is a Minor Divine Patron.
+
+The player exists as influence rather than physical presence.
+
+The player interacts through:
+
+- Observation
+- Investigation
+- Dreams
+- Ambitions
+- Truth Seeking
+
+The player does not interact through:
+
+- Direct movement
+- Direct NPC control
+- Direct combat
+- Physical traversal
+
+Core Loop:
+
+Observe
+↓
+Notice Anomaly
+↓
+Investigate
+↓
+Influence Through Dreams
+↓
+Observe Consequences
+↓
+Discover Truth
+
+---
+
+# 4. WORLD STRUCTURE
+
+The world consists of three major regions.
+
+## Dark Forest
+
+Living Memory
+
+## Mountain Ring
+
+Recorded Memory
+
+## Endless Dunes
+
+Lost Memory
+
+Each region represents a different relationship with reality and history.
+
+---
+
+# 5. REALITY MECHANICS
+
+The world does not behave uniformly.
+
+Different regions obey different rules.
+
+Most civilizations lack the perspective necessary to recognize this.
+
+---
+
+## Dark Forest
+
+Every 14 days:
+
+Forest
+↓
+White Void
+↓
+Reconstruction
+↓
+Stabilization
+
+Villages relocate.
+
+Roads change.
+
+Reality reconfigures.
+
+---
+
+## Mountain Ring
+
+The Mountains do not shift.
+
+The Mountains rotate around a fixed axis.
+
+Structures persist.
+
+Roads remain.
+
+Archives survive.
+
+The rotation is too gradual to be perceived without generations of observation.
+
+---
+
+## Endless Dunes
+
+The Dunes remain stable while occupied.
+
+When abandoned:
+
+The Dunes regenerate.
+
+Previous routes become unreliable.
+
+Most discoveries are permanently lost.
+
+---
+
+# 6. THE CHAIN THEORY
+
+Public Belief:
+
+The Capital anchors a chain of villages.
+
+Every shift:
+
+The Forest lifts the chain and drops it elsewhere.
+
+This explanation is almost entirely correct.
+
+---
+
+Hidden Truth:
+
+The true structure of reality remains unknown.
+
+Multiple theories describe different observable effects.
+
+No known civilization currently possesses a complete understanding.
+
+---
+
+# 7. THE CAPITAL
+
+The Capital is anchored to the Core of the Forest.
+
+Properties:
+
+- Fixed
+- Publicly Known
+- Permanent
+
+Represents:
+
+Political Stability
+
+Every civilization understands the Capital never moves.
+
+---
+
+# 8. HOUSE TERMINUS
+
+Terminus exists where the Forest bleeds into the Mountain Ring.
+
+The House possesses centuries of observations unavailable elsewhere.
+
+The family preserves forbidden measurements and records.
+
+---
+
+Known only to Terminus:
+
+Reality behaves differently around the village.
+
+The implications of this remain one of the world's greatest secrets.
+
+---
+
+# 9. THE THREE HUNDRED GUARDIANS
+
+Ancient institution.
+
+Purpose:
+
+- Protect Terminus
+- Preserve Measurements
+- Maintain Historical Continuity
+- Guard Forbidden Knowledge
+
+They are custodians of observation.
+
+Not rulers.
+
+---
+
+# 10. BARRIER THEORY
+
+Public Understanding:
+
+Barriers protect villages.
+
+This is true.
+
+---
+
+Hidden Truth:
+
+Barriers also maintain a village's attachment to civilization.
+
+Without a functioning barrier:
+
+Village
+↓
+Disconnects
+↓
+Becomes Lost
+
+Lost does not mean destroyed.
+
+Lost means disconnected from the chain.
+
+---
+
+# 11. THE ENDLESS DUNES
+
+The Dunes are not known to living civilization.
+
+No villager possesses practical knowledge of them.
+
+Knowledge survives only through:
+
+- Lost Poems
+- Ancient Records
+- Recovered Artifacts
+- Contradictions
+
+---
+
+The Dunes contain:
+
+- Lost Cities
+- Ancient Archives
+- Original Histories
+- Forgotten Civilizations
+- Epoch Records
+
+Purpose:
+
+Preserve what civilization forgot.
+
+---
+
+# 12. THE MOUNTAIN RING
+
+Represents:
+
+Recorded Memory
+
+Contains:
+
+- Terminus
+- Archives
+- Strongholds
+- Ancient Roads
+
+The Mountain Ring preserves continuity.
+
+Most important historical discoveries originate here before eventually leading toward the Dunes.
+
+---
+
+# 13. INFORMATION ECONOMY
+
+Information is a resource.
+
+Information possesses:
+
+- Value
+- Age
+- Reliability
+- Source
+- Scarcity
+
+---
+
+Information Lifecycle:
+
+Event
+↓
+Witness
+↓
+Intel
+↓
+Rumor
+↓
+Verification
+↓
+Truth
+↓
+History
+↓
+Folklore
+
+---
+
+Types:
+
+- Common Intel
+- Market Intel
+- Locational Intel
+- Historical Intel
+- Anchored Intel
+- Legendary Intel
+
+---
+
+Locational Information
+
+Expires with shifts.
+
+Value decreases as a cycle approaches completion.
+
+---
+
+Market Information
+
+Increases in value with distance.
+
+Knowledge creates opportunity.
+
+---
+
+NPC Manipulation
+
+NPCs may:
+
+- Lie
+- Conceal
+- Exaggerate
+- Manipulate
+
+Risk depends on personality.
+
+---
+
+# 14. TRUTH ECONOMY
+
+Truth exists independently of belief.
+
+Truth measures reality.
+
+Not consensus.
+
+Tracked:
+
+- Facts
+- Distortions
+- Fabrications
+- Rumors
+- Verification
+
+Global Fidelity measures the overall health of reality.
+
+---
+
+# 15. CHRONICLE SYSTEM
+
+Purpose:
+
+Record events.
+
+Stores:
+
+- Event
+- Date
+- Significance
+- Historical Weight
+- Witnesses
+- Participants
+
+The Chronicle remembers.
+
+It does not interpret.
+
+---
+
+# 16. HISTORIAN SYSTEM
+
+Career Path:
+
+Scribe
+↓
+Recorder
+↓
+Historian
+↓
+Royal Historian
+↓
+Grand Historian
+
+Purpose:
+
+Transform Truth into Official History.
+
+---
+
+Historical Layers:
+
+Chronicle
+↓
+Truth
+↓
+Official History
+↓
+Folklore
+
+Historians create understanding.
+
+Not truth.
+
+---
+
+# 17. FOLKLORE SYSTEM
+
+Poems act as cultural memory.
+
+The original anthology becomes the DNA for procedural folklore.
+
+---
+
+Poem Classes:
+
+- Observational Truth
+- Institutional Truth
+- Mythic Truth
+- Historical Revision
+- Contested History
+- Misunderstood Truth
+
+---
+
+Discovery Tiers
+
+Common
+
+Historical
+
+Legendary
+
+Mythic
+
+The most important poems should be hidden within the Mountains and Dunes.
+
+---
+
+# 18. FORCE ECOLOGY
+
+Forces:
+
+- Forest
+- Crow
+- Tree
+- Crown
+- Houses
+- Huntsman
+- Wendigo
+- Truth
+
+Each force gains and loses strength.
+
+Each force affects civilization differently.
+
+---
+
+# 19. STELLARIS ECONOMY
+
+Resources:
+
+- Food
+- Wood
+- Stone
+- Metal
+- Gold
+- Influence
+
+Supports:
+
+- Trade
+- Monopolies
+- Prosperity
+- Scarcity
+- Crises
+
+---
+
+# 20. DIVINE PATRON SYSTEM
+
+Player role inside Crow's Eye.
+
+The player never gives orders.
+
+The player amplifies ambitions.
+
+Core Loop:
+
+Observe
+↓
+Find Potential
+↓
+Send Dream
+↓
+Interpretation
+↓
+Action
+↓
+History
+
+---
+
+# 21. DREAM SYSTEM
+
+Dreams are symbolic.
+
+Not instructions.
+
+Examples:
+
+- Fire
+- Truth
+- Roots
+- Crowns
+- Iron
+- Shadows
+
+Dreams modify motivation.
+
+Never behavior directly.
+
+---
+
+# 22. CAREER AMBITION SYSTEM
+
+Every profession contains:
+
+- Drives
+- Affinities
+- Resistances
+- Risk Tolerance
+- Corruption Risks
+
+Dreams act as force multipliers against these values.
+
+---
+
+# 23. DREAM CORRUPTION
+
+Excessive influence creates:
+
+- Obsession
+- Fanaticism
+- Burnout
+- Isolation
+- Paranoia
+
+These outcomes create stories.
+
+Not punishment.
+
+---
+
+# 24. FOREST WILL
+
+Independent force.
+
+Not Good.
+
+Not Evil.
+
+Not Goal Driven.
+
+The Forest introduces possibility.
+
+---
+
+Forest Whispers:
+
+- Wander
+- Follow
+- Build
+- Dig
+- Leave
+- Listen
+
+Purpose:
+
+Create unpredictability.
+
+---
+
+# 25. RELATIVE DIMENSIONAL ANCHORS
+
+Consumable.
+
+Single Shift duration.
+
+Purpose:
+
+Preserve relative relationship through one shift.
+
+Anchors do not stop change.
+
+Anchors allow navigation of change.
+
+---
+
+Anchors also create:
+
+Anchored Information
+
+which retains value beyond a normal cycle.
+
+---
+
+# 26. CROW'S EYE
+
+Crow's Eye is:
+
+- Observatory
+- Living Atlas
+- Investigation Tool
+- Historical Archive
+
+Crow's Eye is NOT:
+
+- A scouting game
+- A flying game
+- A movement game
+
+Primary mechanic:
+
+Curiosity.
+
+---
+
+# 27. LIVING ATLAS
+
+Supports:
+
+- Zoom
+- Scroll
+- Follow
+- Investigation
+- Historical Playback
+
+Players should feel the world is larger than their understanding of it.
+
+---
+
+# 28. FOLLOW SYSTEM
+
+Players may follow:
+
+- People
+- Settlements
+- Houses
+- Legends
+- Mysteries
+
+Following grants observation.
+
+Never control.
+
+---
+
+# 29. OBSERVER'S LEDGER
+
+Player Notebook.
+
+Tracks:
+
+- People
+- Places
+- Clues
+- Poems
+- Contradictions
+- Theories
+
+---
+
+# 30. MYSTERY SYSTEM
+
+Major mysteries drive progression.
+
+Examples:
+
+- Terminus Anomaly
+- Barrier Theory
+- Mountain Rotation
+- Missing Histories
+- Ancient Poems
+
+Players advance through understanding.
+
+---
+
+# 31. EXPEDITIONS
+
+Early:
+
+- Trade Surveys
+- Archive Recovery
+- Barrier Research
+
+Middle:
+
+- Mountain Surveys
+- Terminus Investigations
+
+Late:
+
+- Mountain Crossings
+
+Endgame:
+
+- Dune Expeditions
+
+---
+
+# 32. CALIBRATION OBSERVATORY
+
+Simulation Laboratory.
+
+Controls:
+
+- Growth Rate
+- Resource Consumption
+- Trade Efficiency
+- Rumor Spread
+- Distortion
+
+Purpose:
+
+Experimentation.
+
+Not difficulty.
+
+---
+
+# 33. DISCOVERY LADDER
+
+Tier 1
+Rumors
+
+Tier 2
+House Secrets
+
+Tier 3
+Contradictions
+
+Tier 4
+Terminus Anomalies
+
+Tier 5
+Barrier Questions
+
+Tier 6
+Mountain Truths
+
+Tier 7
+Lost Histories
+
+Tier 8
+Endless Dunes
+
+Tier 9
+Epoch Truths
+
+---
+
+# 34. ARCHITECTURAL CONSTRAINTS
+
+The simulation owns civilization.
+
+NPCs remain autonomous.
+
+The Crow remains independent.
+
+The player influences.
+
+The player never commands.
+
+---
+
+# 35. FUTURE EXPANSION HOOKS
+
+- Archaeology
+- Cartography
+- Academic Institutions
+- Religious Orders
+- Dune Civilizations
+- Lost Epoch Histories
+- Advanced Truth Systems
+- Longitudinal Measurement Systems
+- World Reinterpretation Events
+
+---
+
+# FINAL DESIGN PRINCIPLE
+
+The simulation writes history.
+
+The player learns how to read it.
+
+Every answer should reveal a deeper question.
+
+The world should always be older, stranger, and larger than civilization understands.
+
+# ADDENDUM A
+# LAWS OF DISCOVERY
+
+Dark Forest is not structured around access to locations.
+
+Dark Forest is structured around access to understanding.
+
+Progression should occur through:
+
+Observation
+↓
+Contradiction
+↓
+Investigation
+↓
+Evidence
+↓
+New Understanding
+
+The player unlocks mysteries rather than regions.
+
+Regions become explorable because civilization first learns they exist.
+
+---
+
+# ADDENDUM B
+# LAYERS OF TRUTH
+
+Major discoveries should rarely follow:
+
+Wrong
+↓
+Right
+
+Instead they should follow:
+
+Simplified Truth
+↓
+Better Truth
+↓
+Deeper Truth
+↓
+Actual Reality
+
+Every major mystery should have multiple valid layers of understanding.
+
+Older generations should not appear foolish.
+
+They should appear incomplete.
+
+---
+
+# ADDENDUM C
+# GREAT MYSTERY SYSTEM
+
+Crow's Eye should eventually maintain active Mysteries.
+
+Mysteries are first-class gameplay objects.
+
+Examples:
+
+- Terminus Anomaly
+- Barrier Theory
+- Mountain Rotation
+- Missing Epochs
+- Original Poems
+- Ancient Contradictions
+
+Mysteries contain:
+
+- Evidence
+- Related Poems
+- Related Histories
+- Contradictions
+- Associated People
+- Associated Houses
+
+Purpose:
+
+Convert understanding into gameplay.
+
+---
+
+# ADDENDUM D
+# OBSERVER PROGRESSION
+
+The player does not gain power primarily through levels.
+
+The player progresses through:
+
+- Knowledge
+- Relationships
+- Dream Fidelity
+- Influence
+- Evidence
+
+Primary progression metric:
+
+Understanding
+
+not
+
+Numerical Strength.
+
+---
+
+# ADDENDUM E
+# FOLLOWER BONDS
+
+Followers are not units.
+
+Followers are relationships.
+
+Each follower possesses:
+
+- Bond Strength
+- Trust
+- Dream Accuracy
+- Historical Significance
+- Personal History
+
+The player should become attached to followers as people.
+
+Not assets.
+
+---
+
+# ADDENDUM F
+# DREAM INTERPRETATION
+
+Dreams never directly generate actions.
+
+Dreams modify internal motivation.
+
+Resulting pipeline:
+
+Dream
+↓
+Career Affinity
+↓
+Personality
+↓
+Current Circumstances
+↓
+Interpretation
+↓
+Goal
+↓
+Action
+
+The simulation remains responsible for decisions.
+
+---
+
+# ADDENDUM G
+# CAREER ARCHETYPES
+
+Every profession requires:
+
+Core Drives
+
+Dream Affinities
+
+Dream Resistances
+
+Risk Tolerance
+
+Corruption Risks
+
+Examples:
+
+Scholar
+
+Hunter
+
+Merchant
+
+Historian
+
+Archivist
+
+Guard
+
+House Retainer
+
+Noble
+
+Career identity should matter more than dream intent.
+
+---
+
+# ADDENDUM H
+# HISTORY AS AN INSTITUTION
+
+Official History is not Truth.
+
+Official History is civilization's interpretation of Truth.
+
+The Crown may influence:
+
+- Emphasis
+- Focus
+- Educational Priorities
+
+without directly rewriting reality.
+
+This distinction is critical.
+
+---
+
+# ADDENDUM I
+# THE HISTORICAL OFFICE
+
+The Historical Office becomes a permanent institution.
+
+Responsibilities:
+
+- Preserve records
+- Produce educational histories
+- Resolve contradictions
+- Interpret discoveries
+- Maintain historical canon
+
+The office should occasionally disagree with Truth.
+
+---
+
+# ADDENDUM J
+# ARCHAEOLOGICAL FOLKLORE
+
+Poems found within:
+
+Mountain Ring
+
+and
+
+Endless Dunes
+
+should act as historical evidence.
+
+Poems are not merely stories.
+
+Poems may contain:
+
+- Lost measurements
+- Historical accounts
+- Technical knowledge
+- Contradictory evidence
+
+A poem may become the first clue toward a major truth.
+
+---
+
+# ADDENDUM K
+# INFORMATION PRESERVATION
+
+Chronicle preserves:
+
+Events
+
+Truth preserves:
+
+Reality
+
+Historians preserve:
+
+Narratives
+
+Folklore preserves:
+
+Memory
+
+Anchors preserve:
+
+Location
+
+All systems are forms of preservation.
+
+This thematic consistency should remain throughout development.
+
+---
+
+# ADDENDUM L
+# THE DUNES AS LOST MEMORY
+
+The Endless Dunes are not primarily a dungeon.
+
+The Endless Dunes are primarily a repository of lost memory.
+
+The dungeon structure exists to gate access to:
+
+- Lost Histories
+- Original Truths
+- Ancient Records
+- Forgotten Realities
+
+Every major Dune discovery should potentially alter civilization's understanding of itself.
+
+---
+
+# ADDENDUM M
+# MOUNTAIN RING SIGNIFICANCE
+
+The Mountains are not merely terrain.
+
+The Mountains are civilization's archive layer.
+
+They preserve:
+
+- Infrastructure
+- Roads
+- Measurements
+- Archives
+- Terminus
+
+Most significant historical discoveries should originate here before deeper truths eventually lead toward the Dunes.
+
+---
+
+# ADDENDUM N
+# WORLD KNOWLEDGE STATES
+
+Not all truths are available at game start.
+
+At beginning of simulation:
+
+Villagers know:
+
+- Villages
+- Roads
+- Trade
+- Local History
+
+---
+
+Historians know:
+
+- Contradictions
+- Missing Records
+
+---
+
+House Terminus knows:
+
+- Unique observations regarding reality
+
+---
+
+No living villager possesses practical knowledge of:
+
+The Endless Dunes.
+
+The existence of the Dunes should be a major late-stage discovery.
+
+---
+
+# ADDENDUM O
+# CROW'S EYE GAMEPLAY DEFINITION
+
+Crow's Eye should not become:
+
+Dashboard Gameplay
+
+Crow's Eye should become:
+
+Investigative Gameplay
+
+Primary Loop:
+
+Observe
+↓
+Notice Something Strange
+↓
+Investigate
+↓
+Collect Evidence
+↓
+Update Theory
+↓
+Influence Through Dreams
+↓
+Observe Outcomes
+↓
+Discover Deeper Truth
+
+Curiosity is the primary gameplay mechanic.
+
+Not movement.
+
+Not combat.
+
+Not resource optimization.
+
+Understanding.
+
+# THE CROW
+
+The Crow is an independent force.
+
+The Crow is not controlled by the player.
+
+The Crow is not a character.
+
+The Crow is not a patron.
+
+The Crow represents:
+
+- Observation
+- Story Density
+- Emerging Legends
+- Civilization's Memory
+
+The Crow's interests do not necessarily align with Truth.
+
+The Crow values:
+
+Stories
+
+not
+
+Accuracy.
+
+The Crow should remain observable through Crow's Eye.
+
+The Crow should occasionally influence events independently of the player.
+
+# HOUSES
+
+Houses are long-lived civilizational entities.
+
+Individuals die.
+
+Houses persist.
+
+Houses accumulate:
+
+- Wealth
+- Influence
+- History
+- Archives
+- Secrets
+- Monopolies
+
+A House may become more historically important than any individual member.
+
+House identity should persist across generations.
+
+# DEATH
+
+Death is not failure.
+
+Death is historical transformation.
+
+When a person dies:
+
+- Their actions remain.
+- Their chronicle remains.
+- Their information remains.
+- Their influence may remain.
+
+Death should create historical consequences.
+
+Important deaths may create:
+
+- Legends
+- Poems
+- Political changes
+- Truth investigations
+
+# LEGENDS
+
+Legends are generated from historical weight.
+
+A legend is not necessarily true.
+
+A legend is not necessarily false.
+
+Legends represent:
+
+Civilization's memory of significance.
+
+Historical importance and Truth are separate values.
+
+Examples:
+
+Historically Important + False
+
+Historically Unimportant + True
+
+Both should be possible.
+
+# FAILURE
+
+Dark Forest should minimize traditional failure states.
+
+The player cannot permanently fail through lack of optimization.
+
+Failure should primarily create:
+
+- New stories
+- New myths
+- New historical outcomes
+
+Bad outcomes remain content.
+
+# TIME
+
+Time is a primary game mechanic.
+
+Civilization evolves through:
+
+- Days
+- Cycles
+- Years
+- Generations
+- Eras
+
+The player should regularly observe events whose consequences emerge years later.
+
+The simulation should reward long-term observation.
+
+# INVESTIGATION
+
+Investigation is the primary active gameplay mechanic.
+
+Investigation may involve:
+
+- Comparing records
+- Examining poems
+- Following people
+- Tracking contradictions
+- Reviewing chronicle entries
+- Sponsoring expeditions
+
+The goal of investigation is:
+
+Understanding.
+
+# EVIDENCE
+
+Truth requires evidence.
+
+Evidence can originate from:
+
+- Witnesses
+- Archives
+- Historical Records
+- Poems
+- Artifacts
+- Expedition Discoveries
+
+Different evidence types possess different reliability.
+
+Civilization should often possess insufficient evidence to know the full truth.
+
+# CIVILIZATIONAL MEMORY
+
+Civilization remembers through:
+
+Chronicle
+↓
+Truth
+↓
+History
+↓
+Folklore
+
+Each layer loses information.
+
+Each layer gains interpretation.
+
+Civilization should never remember reality perfectly.
+
+Memory should evolve over time.
+``
+
+# WORLD-SCALE PRINCIPLE
+
+The world must feel larger than civilization's understanding of it.
+
+The player should never feel that:
+
+"The map has been completed."
+
+New truths should continue to emerge.
+
+New mysteries should continue to appear.
+
+Exploration should increasingly shift from geography to understanding.
+
+Dark Forest is a game about discovering increasingly accurate models of reality rather than discovering final answers.
+
+# ADDENDUM Z
+# THE FOUR HISTORIES
+
+Every major event may ultimately exist in four forms.
+
+Chronicle
+
+What happened.
+
+---
+
+Truth
+
+What can be verified.
+
+---
+
+Official History
+
+What civilization teaches.
+
+---
+
+Folklore
+
+What civilization remembers.
+
+---
+
+These versions may disagree.
+
+The disagreement is often more important than the event itself.
+
+# POEMS AS HISTORICAL COMPRESSION
+
+Poems are not summaries.
+
+Poems are compressed cultural memory.
+
+A poem may represent:
+
+- Decades
+- Centuries
+- Multiple events
+- Entire historical arcs
+
+Purpose:
+
+Allow civilization to remember more than it can accurately retain.
+
+# FOLKLORE ANALYSIS
+
+All folklore may be evaluated using:
+
+Story Strength
+
+Truth Score
+
+Historical Weight
+
+Distortion Level
+
+Associated Forces
+
+Purpose:
+
+Allow comparison between popularity and accuracy.
+
+# THE FOREST AS REFUGE
+
+The Forest is not merely a biome.
+
+The Forest is a lifeboat for life inside a broken reality.
+
+Civilization survives because it remains attached to the Forest.
+
+Many historical systems should reinforce the fragility of civilization.
+
+# DUNE DISCOVERIES
+
+Major Dune discoveries should challenge accepted reality.
+
+Discoveries may invalidate:
+
+- Official History
+- House Narratives
+- Historical Assumptions
+- Religious Beliefs
+- Existing Truth Models
+
+The Dunes should regularly produce evidence that civilization was incomplete rather than maliciously incorrect.
+
+# ORIGINAL ANTHOLOGY STATUS
+
+The original Folk Anthology serves as the foundational folklore DNA of the simulation.
+
+Generated poems should inherit:
+
+- Structure
+- Tone
+- Symbolism
+- Relationship To Truth
+- Historical Compression Style
+
+The goal is procedural folklore.
+
+Not procedural rhyme.
+
+# FORCE FOLKLORE
+
+Forces should influence folklore generation.
+
+Poems may become associated with:
+
+- Forest
+- Crow
+- Truth
+- Crown
+- Houses
+- Huntsman
+- Wendigo
+- Tree
+
+Different forces encourage different narrative structures and distortions.
+
+# TERMINUS EFFECT
+
+Terminus should naturally generate:
+
+- Contradictory records
+- Unusual measurements
+- Historical inconsistencies
+- Cartographic anomalies
+
+Purpose:
+
+Provide an investigation path toward deeper reality mechanics.
+
+# THE TREE
+
+The Tree represents:
+
+Continuity
+
+The Tree values:
+
+Persistence
+
+The Tree opposes:
+
+Meaningless change
+
+The Tree encourages:
+
+- Stability
+- Tradition
+- Survival
+- Cultural continuity
+
+The Tree is not equivalent to Truth.
+
+A false story that preserves civilization may strengthen the Tree.
+
+A true story that destroys continuity may weaken it.
+
+Design Purpose:
+
+Provide tension between Truth and Stability.
+
+# THE HUNTSMAN
+
+The Huntsman represents:
+
+Selection
+
+The Huntsman creates:
+
+Heroes
+
+The Huntsman does not choose the worthy.
+
+The Huntsman creates situations that reveal worth.
+
+Purpose:
+
+Generate stories involving risk, challenge, sacrifice, and greatness.
+
+# BELIEF SYSTEMS
+
+Civilizations naturally construct interpretations of:
+
+- Forces
+- Poems
+- Historical Events
+- Truth Discoveries
+
+Belief systems emerge.
+
+They are not necessarily accurate.
+
+Purpose:
+
+Allow civilization to create meaning from incomplete understanding.
+
+# REPUTATION
+
+Individuals accumulate:
+
+- Trust
+- Credibility
+- Reliability
+
+Information value is affected by source reputation.
+
+Truth and reputation should influence one another.
+
+# TERMINUS LIMITATIONS
+
+House Terminus possesses superior observations.
+
+House Terminus does not possess complete understanding.
+
+Their theories may be more accurate than public theories while still remaining incomplete.
+
+This distinction is critical.
+
+# DUNE PRINCIPLE
+
+The Dunes contain deeper evidence.
+
+Not final answers.
+
+A Dune discovery should usually create:
+
+A better model
+
+not
+
+The final model.
+
+# CIVILIZATION PRINCIPLE
+
+Civilization is humanity's attempt to preserve memory against change.
+
+Villages are not merely settlements.
+
+Villages are repositories of continuity.
+
+History, truth, folklore, trade, and education all exist to resist loss.
+
+# WHAT THE GAME IS ACTUALLY ABOUT
+
+Dark Forest is not a game about discovering hidden facts.
+
+Dark Forest is a game about building increasingly accurate models of reality.
+
+Players should progress from:
+
+Assumption
+↓
+Observation
+↓
+Theory
+↓
+Evidence
+↓
+Better Theory
+
+The ultimate goal is not certainty.
+
+The ultimate goal is understanding.
+
+# ADDENDUM AB
+# THE CROWN
+
+The Crown is not merely a government.
+
+The Crown is a civilizational force.
+
+The Crown represents:
+
+Order.
+
+---
+
+The Crown's purpose is not to discover Truth.
+
+The Crown's purpose is to preserve civilization.
+
+These goals often overlap.
+
+Sometimes they conflict.
+
+---
+
+The Crown values:
+
+- Stability
+- Predictability
+- Continuity
+- Infrastructure
+- Education
+- Governance
+- Social Cohesion
+- Institutional Memory
+
+The Crown does not inherently value accuracy.
+
+The Crown values outcomes.
+
+---
+
+A dangerous truth may weaken the Crown.
+
+An incomplete truth may strengthen it.
+
+The Crown is concerned with consequences.
+
+---
+
+# THE CROWN AND HISTORY
+
+The Crown does not create Truth.
+
+The Crown influences what becomes widely taught.
+
+The Crown affects:
+
+- Educational Narratives
+- Historical Emphasis
+- Public Understanding
+- Institutional Priorities
+
+---
+
+Chronicle records:
+
+What happened.
+
+Truth verifies:
+
+What can be proven.
+
+History teaches:
+
+What civilization should remember.
+
+The Crown primarily influences the final layer.
+
+---
+
+# THE CROWN AND STABILITY
+
+The Crown views uncertainty as a threat.
+
+Not because uncertainty is evil.
+
+But because instability threatens civilization itself.
+
+The Crown prefers:
+
+Predictable understanding
+
+over
+
+Unrestricted uncertainty.
+
+---
+
+The Crown may delay, suppress, or regulate information without believing itself dishonest.
+
+The Crown evaluates information through the lens of civilizational consequences.
+
+---
+
+# THE CROWN AND TERMINUS
+
+The Crown is not aware of the full Terminus Secret.
+
+The Crown understands Terminus is unusual.
+
+The Crown does not possess sufficient evidence to understand why.
+
+This is intentional.
+
+---
+
+Some revelations may threaten:
+
+- Political Stability
+- Economic Stability
+- Public Confidence
+
+The Crown may resist those revelations.
+
+Not because they are false.
+
+But because they are disruptive.
+
+---
+
+# THE CROWN AND THE DUNES
+
+Many discoveries recovered from the Dunes will challenge accepted narratives.
+
+The Crown must continuously balance:
+
+Truth
+
+versus
+
+Stability
+
+---
+
+The player should occasionally encounter situations where:
+
+A discovery is accurate.
+
+But releasing it may create civilizational disruption.
+
+---
+
+The Crown should never be written as villainous by default.
+
+The Crown serves civilization first.
+
+Not Truth.
+
+---
+
+# NOBLE COVER-UPS
+
+Noble cover-ups should rarely originate from simple malice.
+
+Common reasons include:
+
+- Protecting succession
+- Maintaining legitimacy
+- Preserving alliances
+- Preventing panic
+- Protecting communities
+- Preserving institutional trust
+
+Many cover-ups should emerge from conflicting priorities rather than evil intent.
+
+---
+
+# ADDENDUM AC
+# THE WENDIGO
+179
+ 
+180
+The Wendigo is not merely a monster.
+181
+ 
+182
+The Wendigo is a force.
+183
+ 
+184
+---
+185
+ 
+186
+The Wendigo represents:
+187
+ 
+188
+Consumption.
+189
+ 
+190
+---
+191
+ 
+192
+The Wendigo consumes:
+193
+ 
+194
+- Resources
+195
+- Relationships
+196
+- Communities
+197
+- Institutions
+198
+- Memory
+199
+- Civilization
+200
+ 
+201
+---
+202
+ 
+203
+The Wendigo is civilization's natural counterforce.
+204
+ 
+205
+Where the Tree preserves.
+206
+ 
+207
+The Wendigo devours.
+208
+ 
+209
+Where the Crown organizes.
+210
+ 
+211
+The Wendigo fragments.
+212
+ 
+213
+Where Truth clarifies.
+214
+ 
+215
+The Wendigo obscures.
+216
+ 
+217
+---
+218
+ 
+219
+# THE WENDIGO AND CIVILIZATION
+220
+ 
+221
+The Wendigo thrives where:
+222
+ 
+223
+- Communities collapse
+224
+- Traditions break
+225
+- Histories are forgotten
+226
+- Isolation increases
+227
+- Desperation spreads
+228
+ 
+229
+The Wendigo is strongest when people stop belonging to something larger than themselves.
+230
+ 
+231
+---
+232
+ 
+233
+# THE WENDIGO AND THE FOREST
+234
+ 
+235
+The Forest creates possibility.
+236
+ 
+237
+The Wendigo exploits possibility.
+238
+ 
+239
+The Forest is indifferent.
+240
+ 
+241
+The Wendigo is hunger.
+242
+ 
+243
+---
+244
+ 
+245
+The Wendigo should not be treated as a singular creature.
+246
+ 
+247
+The Wendigo should be understood as a recurring pattern within reality.
+248
+ 
+249
+Individual Wendigo may exist.
+250
+ 
+251
+The Force behind them is larger.
+252
+ 
+253
+---
+254
+ 
+255
+# THE WENDIGO AND HISTORY
+256
+ 
+257
+The Wendigo destroys records.
+258
+ 
+259
+The Wendigo destroys continuity.
+260
+ 
+261
+The Wendigo attacks the mechanisms civilization uses to remember.
+262
+ 
+263
+A forgotten village is a victory for the Wendigo.
+264
+ 
+265
+A lost archive is a victory for the Wendigo.
+266
+ 
+267
+A broken lineage is a victory for the Wendigo.
+268
+ 
+269
+---
+270
+ 
+271
+# THE WENDIGO AND THE CROWN
+272
+ 
+273
+The Crown emerged partially as a response to Wendigo pressure.
+274
+ 
+275
+Civilization formed because disorder creates opportunities for consumption.
+276
+ 
+277
+---
+278
+ 
+279
+This creates a natural opposition:
+280
+ 
+281
+Crown
+282
+=
+283
+Order
+284
+ 
+285
+Wendigo
+286
+=
+287
+Consumption
+288
+ 
+289
+---
+290
+ 
+291
+Neither force completely wins.
+292
+ 
+293
+The tension between them helps shape history.
+294
+ 
+295
+---
+296
+ 
+297
+# THE WENDIGO AND TRUTH
+298
+ 
+299
+Truth protects reality.
+300
+ 
+301
+The Wendigo erodes reality.
+302
+ 
+303
+Many distortions, lost histories, and forgotten events may ultimately strengthen Wendigo influence.
+304
+ 
+305
+---
+306
+ 
+307
+# FORCE CONFLICTS
+308
+ 
+309
+Truth
+310
+→ Accuracy
+311
+ 
+312
+Crow
+313
+→ Stories
+314
+ 
+315
+Tree
+316
+→ Continuity
+317
+ 
+318
+Crown
+319
+→ Stability
+320
+ 
+321
+Forest
+322
+→ Possibility
+323
+ 
+324
+Wendigo
+325
+→ Consumption
+326
+ 
+327
+---
+328
+ 
+329
+These forces should naturally conflict.
+330
+ 
+331
+No force should be universally correct.
+332
+ 
+333
+No force should be universally evil.
+334
+ 
+335
+Major historical events should often emerge from the tensions between multiple forces simultaneously.
+
+# THE FOREST
+
+The Forest is not civilization.
+
+The Forest is not nature.
+
+The Forest is the mechanism through which life survives within a broken reality.
+
+The Forest represents:
+
+Possibility.
+
+The Forest values:
+
+- Adaptation
+- Survival
+- Emergence
+- Change
+
+The Forest does not pursue goals.
+
+The Forest creates conditions.
+
+Civilization interprets those conditions.
+
+The Forest is neither benevolent nor hostile.
+
+The Forest simply allows life to continue.
+
+# TRUTH LIMITATIONS
+
+Truth is not omniscience.
+
+Truth operates only through available evidence.
+
+Reality may exist beyond Truth's current understanding.
+
+Truth may improve.
+
+Truth may become more accurate.
+
+Truth should rarely become complete.
+
+Purpose:
+
+Allow discovery to remain meaningful.
+
+# HOUSE LIFE CYCLE
+
+Houses may:
+
+- Rise
+- Prosper
+- Fragment
+- Merge
+- Collapse
+- Disappear
+
+House death should create lasting consequences.
+
+The loss of a House should create:
+
+- Historical gaps
+- Economic disruption
+- Lost records
+- Poetic reinterpretation
+
+Not every House survives.
+
+# ARCHIVES
+
+Archives are repositories of preserved memory.
+
+Archives may contain:
+
+- Records
+- Measurements
+- Truth Fragments
+- Historical Documents
+- Poems
+- Maps
+
+Archives are one of civilization's primary defenses against loss.
+
+Different archives may disagree.
+
+# CARTOGRAPHY
+
+Maps are historical artifacts.
+
+Maps are not guaranteed to be accurate.
+
+Different maps may represent:
+
+- Different eras
+- Different assumptions
+- Different theories
+
+Cartography may become a source of evidence.
+
+Old maps should occasionally reveal contradictions.
+
+# FORCE INFLUENCE
+
+Forces rarely act directly.
+
+Forces exert pressure.
+
+Pressure alters probabilities.
+
+Examples:
+
+Truth
+→ Verification more likely
+
+Crow
+→ Legends more likely
+
+Tree
+→ Continuity more likely
+
+Crown
+→ Stability more likely
+
+Wendigo
+→ Consumption more likely
+
+Forest
+→ Unexpected outcomes more likely
+
+Design Principle:
+
+Forces influence.
+
+Forces do not command.
+
+# INFORMATION COMMODITIES
+
+Information should be treated as a resource equivalent to:
+
+- Food
+- Gold
+- Wood
+- Stone
+
+Information can be:
+
+- Generated
+- Purchased
+- Sold
+- Verified
+- Distorted
+- Lost
+
+Information should possess real economic value.
+
+Entire careers may emerge based on information exchange.
+
+# SCHOLARS
+
+Scholars seek knowledge.
+
+The Scholar's purpose is discovery.
+
+---
+
+# ARCHIVISTS
+
+Archivists preserve knowledge.
+
+The Archivist's purpose is preservation.
+
+---
+
+# HISTORIANS
+
+Historians interpret knowledge.
+
+The Historian's purpose is meaning.
+
+These careers should remain distinct.
+
+# LEGACY
+
+Legacy measures the persistence of influence through time.
+
+People may leave behind:
+
+- Descendants
+- Houses
+- Records
+- Poems
+- Legends
+- Historical Effects
+
+Legacy is independent of Truth.
+
+A false legend may possess immense Legacy.
+
+A true event may possess none.
+
+Legacy should be a major simulation metric.
+
+# THE FIVE PRESERVATION SYSTEMS
+
+Civilization resists loss through five primary mechanisms.
+
+Chronicle
+Preserves Events
+
+Truth
+Preserves Reality
+
+Archives
+Preserve Knowledge
+
+History
+Preserves Understanding
+
+Folklore
+Preserves Meaning
+
+These systems should frequently agree.
+
+They should never agree completely.
+
+The differences between them create the majority of historical mysteries.
+
+# NPC PHILOSOPHY
+
+NPCs are not agents executing tasks.
+
+NPCs are simulated people pursuing goals.
+
+NPCs should possess:
+
+- History
+- Relationships
+- Beliefs
+- Ambitions
+- Constraints
+- Incomplete Knowledge
+
+NPC actions should emerge from:
+
+Personality
++
+Career
++
+Relationships
++
+Information
++
+Circumstances
++
+Influence
+
+The goal is believable behavior.
+
+Not optimal behavior.
+
+# KNOWLEDGE STATES
+
+Knowledge exists at multiple levels.
+
+Personal Knowledge
+- Known by one individual
+
+House Knowledge
+- Known by a House
+
+Institutional Knowledge
+- Known by an organization
+
+Civilizational Knowledge
+- Widely accepted
+
+Truth
+- Independent of all knowledge states
+
+A thing may be:
+
+True
+
+and
+
+Unknown
+
+for centuries.
+
+# SECRETS
+
+A Mystery is something nobody understands.
+
+A Secret is something somebody understands but conceals.
+
+Secrets may exist at:
+
+- Individual level
+- House level
+- Institutional level
+- Civilizational level
+
+Examples:
+
+Terminus
+= Secret
+
+Nature of Reality
+= Mystery
+
+The distinction is important.
+
+# SOCIAL MEMORY
+
+Civilization remembers collectively.
+
+People may remember events they never experienced.
+
+Methods of transmission:
+
+- Stories
+- Poems
+- Education
+- Family Traditions
+- House Archives
+- Official History
+
+Social Memory should regularly diverge from Truth.
+
+# INFORMATION DECAY
+
+All information tends toward loss.
+
+Common causes:
+
+- Time
+- Death
+- Distortion
+- Disaster
+- Neglect
+- Wendigo Influence
+
+Preservation requires effort.
+
+The natural state of information is disappearance.
+`
+
+# WORLD EVENTS
+
+Certain events may exceed normal historical significance.
+
+Examples:
+
+- House Collapse
+- Crown Succession
+- Great Famine
+- Major Truth Discovery
+- Dune Revelation
+- Barrier Failure
+
+World Events should generate large-scale consequences across multiple systems.
+
+History should occasionally pivot around singular moments.
+
+# SIMULATION OWNERSHIP
+
+The simulation owns:
+
+- Actions
+- Decisions
+- Outcomes
+- Relationships
+- History
+
+The player owns:
+
+- Observation
+- Investigation
+- Influence
+- Interpretation
+
+The player may alter the probability of outcomes.
+
+The simulation determines which outcome occurs.
+
+This doctrine overrides all future feature design.
+
+# CORE CONCEPT DEFINITIONS
+
+Truth
+= What can be verified
+
+History
+= What civilization teaches
+
+Folklore
+= What civilization remembers
+
+Legacy
+= What persists
+
+Tree
+= Continuity
+
+Crow
+= Significance
+
+Wendigo
+= Consumption
+
+Crown
+= Order
+
+Forest
+= Possibility
+
+# ADDENDUM AU
+# NPC DECISION ARCHITECTURE
+
+NPCs should not make decisions based solely on optimization.
+
+NPC decisions emerge from multiple competing influences.
+
+Every decision should consider:
+
+- Personality
+- Career
+- Information Available
+- Relationships
+- Reputation
+- House Affiliation
+- Beliefs
+- Current Circumstances
+- Active Force Influences
+- Active Dreams
+
+Example:
+
+A Scholar and a Merchant may receive the same information.
+
+The Scholar may investigate.
+
+The Merchant may monetize it.
+
+Neither response is more correct.
+
+Behavior emerges from character.
+
+---
+
+NPCs should make mistakes.
+
+NPCs should misunderstand.
+
+NPCs should overestimate.
+
+NPCs should underestimate.
+
+NPCs should occasionally act irrationally.
+
+Perfect decisions should be rare.
+
+Believable decisions should be common.
+
+---
+
+Incomplete information should be a normal condition.
+
+Most NPCs should operate on:
+
+- Rumors
+- Assumptions
+- Partial Evidence
+- Personal Experience
+
+rather than complete knowledge.
+
+---
+
+The simulation should favor believable outcomes over optimal outcomes.
+
+# FORCE BIBLE DOCTRINE
+
+Forces are not factions.
+
+Forces are not NPC groups.
+
+Forces are not organizations.
+
+Forces are pressures acting upon civilization.
+
+---
+
+Forces influence:
+
+- Values
+- Probabilities
+- Narratives
+- Priorities
+- Historical Outcomes
+
+---
+
+Forces rarely act directly.
+
+Forces shape conditions.
+
+People create events.
+
+---
+
+Forest
+= Possibility
+
+Crow
+= Significance
+
+Tree
+= Continuity
+
+Truth
+= Accuracy
+
+Crown
+= Order
+
+Huntsman
+= Selection
+
+Wendigo
+= Consumption
+
+---
+
+No force should be universally correct.
+
+No force should be universally evil.
+
+History emerges through conflict between forces.
+
+# REALITY DOCTRINE
+
+Reality is intentionally larger than any known explanation.
+
+---
+
+Public Theory
+
+Exists.
+
+---
+
+Institutional Theory
+
+Exists.
+
+---
+
+House Theories
+
+Exist.
+
+---
+
+Evidence
+
+Exists.
+
+---
+
+Truth
+
+Exists.
+
+---
+
+Actual Reality
+
+May extend beyond all of them.
+
+---
+
+The goal of the simulation is not to reach absolute certainty.
+
+The goal is to continually improve understanding.
+
+Players should never reach a state where all major questions have been completely resolved.
+
+# THE PRIME DIRECTIVE
+
+When adding new systems, stories, mechanics, careers, forces, institutions, discoveries, poems, histories, archives, mysteries, expeditions, settlements, or world events:
+
+The feature must strengthen at least one of the following:
+
+- Memory
+- Truth
+- Civilization
+- Discovery
+- Mystery
+- Continuity
+- Loss
+
+If the feature does not strengthen one of those pillars, it does not belong in Dark Forest.
+
+---
+
+Dark Forest is not a game about content.
+
+Dark Forest is a game about understanding.
+
+Every feature should ultimately help answer:
+
+"What happened?"
+
+"What is true?"
+
+"What has been forgotten?"
+
+"What should be remembered?"
+
+"What are we still missing?"
+# ADDENDUM AZ
+# INSTITUTIONS
+
+Institutions are civilization's long-term memory structures.
+
+Individuals die.
+
+Institutions persist.
+
+Examples:
+
+- Houses
+- Historical Offices
+- Archives
+- Schools
+- Guilds
+- Religious Orders
+
+Institutions preserve:
+
+- Knowledge
+- Practices
+- Relationships
+- Authority
+- Cultural Memory
+
+Institutions may possess goals that outlive every living member.
+
+Institutions are one of civilization's primary defenses against loss.
+
+Institutions should occasionally become more historically important than individuals.
+
+# ADDENDUM BA
+# RELATIONSHIPS
+
+Relationships are one of the primary simulation systems.
+
+Relationships may exist between:
+
+- Individuals
+- Houses
+- Institutions
+- Communities
+
+Relationship Types:
+
+- Friendship
+- Rivalry
+- Loyalty
+- Distrust
+- Mentorship
+- Kinship
+- Obligation
+
+Relationships influence:
+
+- Information Sharing
+- Decision Making
+- Reputation
+- Legacy
+- Historical Outcomes
+
+Relationship networks should evolve continuously.
+
+No civilization exists without relationships.
+
+# ADDENDUM BB
+# SIGNIFICANCE
+
+Significance measures how strongly an event affects civilization.
+
+Significance is separate from Truth.
+
+Significance is separate from Legacy.
+
+---
+
+Examples:
+
+A false story may possess high Significance.
+
+A true event may possess low Significance.
+
+---
+
+Significance influences:
+
+- Chronicle Weight
+- Legend Formation
+- Poem Generation
+- Crow Interest
+- Historical Memory
+
+---
+
+The question:
+
+"Did it matter?"
+
+is different from:
+
+"Did it happen?"
+
+Both should be tracked independently.
+
