@@ -13,6 +13,7 @@ import './src_core_asset_budget.js';
 import './src_epoch_manager.js';
 import './src_systems_intel.js';
 import './src_systems_intel_tracker.js';
+import './src_systems_investigation.js';
 import './src_systems_world.js';
 
 import './src_systems_inventory.js';

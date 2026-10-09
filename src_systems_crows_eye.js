@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'LEGENDS', 'FORCES', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'LEGENDS', 'FORCES', 'MYSTERIES', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -220,6 +220,9 @@ class CrowsEyeSystem {
                 break;
             case 'FORCES':
                 contentHtml = this.renderForcesView();
+                break;
+            case 'MYSTERIES':
+                contentHtml = this.renderMysteriesView();
                 break;
             case 'CALIBRATION':
                 contentHtml = this.renderCalibrationView();
@@ -373,6 +376,52 @@ class CrowsEyeSystem {
                     <div>POP: ${v.population.current}/${v.population.capacity}</div>
                     <div>PROSPERITY: ${v.stats.prosperity}%</div>
                 </div>
+            </div>`;
+        });
+        html += `</div>`;
+        return html;
+    }
+
+    renderMysteriesView() {
+        if (!window.InvestigationManager) return "Investigation System Offline";
+        const mysteries = window.InvestigationManager.getMysteries();
+        
+        let html = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap:20px;">`;
+        mysteries.forEach(m => {
+            const progressColor = m.discoveryProgress >= 100 ? '#10b981' : m.discoveryProgress > 0 ? '#f59e0b' : '#92400e';
+            const stateLabel = m.state === 'RESOLVED' ? '[RESOLVED]' : m.state === 'INVESTIGATING' ? '[IN PROGRESS]' : '[UNSOLVED]';
+            
+            html += `<div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.4);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span style="font-weight:bold; color:#fbbf24;">${m.title}</span>
+                    <span style="color:${progressColor}; font-size:10px;">${stateLabel}</span>
+                </div>
+                <div style="font-size:12px; color:#94a3b8; margin-bottom:15px; line-height:1.4;">${m.description}</div>
+                
+                <div style="margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; font-size:10px; margin-bottom:3px;">
+                        <span style="color:#78350f;">INVESTIGATION PROGRESS</span>
+                        <span style="color:#fbbf24;">${m.discoveryProgress}%</span>
+                    </div>
+                    <div style="height:6px; background:#451a03; width:100%;">
+                        <div style="height:100%; background:${progressColor}; width:${m.discoveryProgress}%"></div>
+                    </div>
+                </div>
+
+                <div style="font-size:11px; border-top:1px solid #451a03; padding-top:10px;">
+                    <div style="color:#fbbf24; margin-bottom:5px;">EVIDENCE (${m.linkedEvidence.size})</div>
+                    ${Array.from(m.linkedEvidence).map(id => {
+                        const intel = window.IntelManager.lookup(id);
+                        return `<div style="color:#94a3b8; margin-bottom:2px;">• ${intel ? intel.payload.title : 'Unknown Record'}</div>`;
+                    }).join('') || '<div style="color:#451a03;">No evidence linked yet.</div>'}
+                </div>
+
+                ${m.contradictions.length > 0 ? `
+                    <div style="font-size:11px; border-top:1px solid #78350f; padding-top:10px; margin-top:10px;">
+                        <div style="color:#ef4444; margin-bottom:5px;">CONTRADICTIONS (${m.contradictions.length})</div>
+                        ${m.contradictions.map(c => `<div style="color:#f87171;">⚠️ ${c.reason}</div>`).join('')}
+                    </div>
+                ` : ''}
             </div>`;
         });
         html += `</div>`;
@@ -655,6 +704,33 @@ class CrowsEyeSystem {
                 const type = selectedEn.type;
                 
                 // --- PROGRESSIVE DISCLOSURE PANEL ---
+                let intelButtons = '';
+                if (window.IntelManager && window.InvestigationManager) {
+                     const intel = window.IntelManager.getIntelForNode(this.selectedEntityId);
+                     const mysteries = window.InvestigationManager.getMysteries().filter(m => m.state !== 'RESOLVED');
+                     
+                     if (intel.length > 0 && mysteries.length > 0) {
+                         intelButtons = `<div style="border-top:1px solid #78350f; padding-top:10px; margin-top:10px;">
+                             <span style="color:#fbbf24; font-size:11px;">LINK EVIDENCE TO MYSTERY</span>
+                             <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px;">
+                                 ${intel.map(i => `
+                                     <div style="font-size:10px; color:#94a3b8; background:rgba(255,255,255,0.05); padding:5px; border:1px solid #451a03;">
+                                         <div style="margin-bottom:3px;">${i.payload.title}</div>
+                                         <div style="display:flex; flex-wrap:wrap; gap:5px;">
+                                             ${mysteries.map(m => `
+                                                 <button style="background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:2px 5px; cursor:pointer;" 
+                                                     onclick="window.InvestigationManager.flagEvidence('${i.intel_id}', '${m.id}'); window.CrowsEye.updateTimer=1.0;">
+                                                     + ${m.title.split(' ')[1] || m.title}
+                                                 </button>
+                                             `).join('')}
+                                         </div>
+                                     </div>
+                                 `).join('')}
+                             </div>
+                         </div>`;
+                     }
+                }
+
                 inspectedHtml += `<div style="display:flex; flex-direction:column; gap:15px; font-size:13px;">
                     <div><span style="color:#78350f;">NAME:</span> <span style="color:#fbbf24; font-size:16px;">${ref.name || 'Unknown'}</span></div>
                     <div><span style="color:#78350f;">TYPE:</span> ${type === 'P' ? 'Player' : (type === 'A' || type === 'T') ? 'Adventurer' : type === 'V' ? 'Village' : 'Other'}</div>
@@ -694,6 +770,7 @@ class CrowsEyeSystem {
                     </div>`;
                 }
                 
+                inspectedHtml += intelButtons;
                 inspectedHtml += `</div>`;
             }
         }
