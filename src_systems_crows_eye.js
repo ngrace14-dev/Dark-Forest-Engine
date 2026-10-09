@@ -703,6 +703,29 @@ class CrowsEyeSystem {
                 const ref = selectedEn.ref;
                 const type = selectedEn.type;
                 
+                // --- DIVINE INFLUENCE PANEL ---
+                let dreamButtons = '';
+                if (window.DreamManager && type !== 'V' && type !== 'P') {
+                    const dreamState = window.DreamManager.getNPCState(this.selectedEntityId);
+                    const symbols = Object.keys(window.DreamManager.lexicon);
+                    
+                    dreamButtons = `<div style="border-top:1px solid #78350f; padding-top:10px; margin-top:10px;">
+                        <span style="color:#fbbf24; font-size:11px;">SEND SYMBOLIC DREAM</span>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px; margin-top:5px;">
+                            ${symbols.map(s => `
+                                <button style="background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px; font-size:9px; cursor:pointer;"
+                                    onclick="window.DreamManager.sendDream('${this.selectedEntityId}', '${s}'); window.CrowsEye.updateTimer=1.0;">
+                                    ${s}
+                                </button>
+                            `).join('')}
+                        </div>
+                        <div style="margin-top:10px; font-size:10px; color:#94a3b8;">
+                            ACTIVE DREAM: <span style="color:#fbbf24;">${dreamState.activeSymbol}</span> (${Math.floor(dreamState.intensity * 100)}%)<br>
+                            BOND: ${Math.floor(dreamState.bond * 100)}% | CORRUPTION: ${Math.floor(dreamState.corruption * 100)}%
+                        </div>
+                    </div>`;
+                }
+
                 // --- PROGRESSIVE DISCLOSURE PANEL ---
                 let intelButtons = '';
                 if (window.IntelManager && window.InvestigationManager) {
@@ -771,6 +794,7 @@ class CrowsEyeSystem {
                 }
                 
                 inspectedHtml += intelButtons;
+                inspectedHtml += dreamButtons;
                 inspectedHtml += `</div>`;
             }
         }
