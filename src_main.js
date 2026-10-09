@@ -24,6 +24,7 @@ import './src_systems_shift.js';
 import './src_systems_dune_investigation.js';
 import './src_systems_playback.js';
 import './src_systems_meaning.js';
+import './src_systems_knowledge.js';
 import './src_systems_world.js';
 
 import './src_systems_inventory.js';

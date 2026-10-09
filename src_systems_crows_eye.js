@@ -350,6 +350,7 @@ class CrowsEyeSystem {
                             <div style="border-left:2px solid #78350f; padding-left:15px;">
                                 <div style="font-size:11px; color:#fbbf24;">${i.payload.title}</div>
                                 <div style="font-size:10px; color:#94a3b8; margin-top:3px;">
+                                    TIER: <span style="color:#d97706;">${state.tier}</span> |
                                     BELIEF: <span style="color:${state.belief === 'CERTAINTY' ? '#10b981' : '#f59e0b'};">${state.belief}</span> | 
                                     ACCURACY: <span style="color:${state.isCorrect ? '#10b981' : '#ef4444'};">${state.isCorrect ? 'ACCURATE' : 'DISTORTED'}</span>
                                 </div>

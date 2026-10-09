@@ -88,8 +88,12 @@ class MeaningEngineSystem {
         const belief = (heldRecord.type === 'FACT') ? 'CERTAINTY' : 'DOUBT';
         const truthSync = (heldRecord.truth_state === objective.truth_state);
 
+        // KNOWLEDGE PIVOT: Identify the tier of this belief
+        const tier = window.KnowledgeSystem?.getKnowledgeTier(npcId, intelId) || 'PERSONAL';
+
         return {
             state: 'KNOWLEDGEABLE',
+            tier: tier,
             heldRecordId: heldRecord.intel_id,
             belief: belief,
             isCorrect: truthSync,
