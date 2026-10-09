@@ -46,6 +46,7 @@ class PersonhoodSystem {
                 identity,
                 bias: this.ARCHETYPES[identity].bias,
                 relationships: new Map(), // nodeId -> { type, weight, sinceDay }
+                ancestry: { parents: [], children: [], houseFounderDescent: false }, // --- LINEAGE PIVOT ---
                 beliefState: new Map(), // intelId -> { conviction, interpretation, lastUpdate }
                 beliefHistory: [] // History of conclusions drawn
             });

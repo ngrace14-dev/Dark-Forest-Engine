@@ -111,8 +111,13 @@ class DynastyManagerSystem {
     triggerSuccession(house) {
         const oldLeader = house.currentLeader;
         // Simple succession: find highest level member of house or generate new heir
-        const newLeaderId = `heir_${Math.random().toString(36).substr(2, 5)}`;
+        const newLeaderId = `lord_${house.id.split('_')[1]}_${house.lineage.length + 1}`;
         
+        // --- LEGACY TRANSFER PIVOT (Bible §36) ---
+        if (oldLeader) {
+            this.transferGenerationalLegacy(oldLeader, newLeaderId);
+        }
+
         house.lineage.push(oldLeader);
         house.currentLeader = newLeaderId;
 
@@ -126,6 +131,46 @@ class DynastyManagerSystem {
 
         window.ChronicleManager?.recordEvent(event);
         window.EventBus.emit('UI_LOG', `[DYNASTY] ${house.name} has a new leader: ${newLeaderId}`);
+    }
+
+    /**
+     * Transfers power, reputation, and beliefs from one generation to the next.
+     * Bible §1: Action -> Legend -> History.
+     */
+    transferGenerationalLegacy(parentID, childId) {
+        if (!window.PersonhoodManager) return;
+
+        const parent = window.PersonhoodManager.getProfile(parentID);
+        const child = window.PersonhoodManager.getProfile(childId);
+
+        // 1. ANCESTRY LINK
+        child.ancestry.parents.push(parentID);
+        parent.ancestry.children.push(childId);
+
+        // 2. BELIEF INHERITANCE WITH DRIFT (Bible §17)
+        Object.keys(parent.traits).forEach(t => {
+            const drift = (Math.random() * 0.2 - 0.1); // +/- 10% drift
+            child.traits[t] = Math.max(0, Math.min(1.0, parent.traits[t] + drift));
+        });
+
+        // 3. REPUTATION & FEUD INHERITANCE
+        parent.relationships.forEach((rel, targetId) => {
+            if (rel.type === 'RIVALRY' || rel.type === 'DISTRUST') {
+                // Feuds pass down but slightly diluted
+                window.PersonhoodManager.setRelationship(childId, targetId, rel.type, rel.weight * 0.7);
+            } else if (rel.type === 'LOYALTY' || rel.type === 'FRIENDSHIP') {
+                // Alliances pass down
+                window.PersonhoodManager.setRelationship(childId, targetId, rel.type, rel.weight * 0.6);
+            }
+        });
+
+        // 4. SECRET INHERITANCE
+        if (window.IntelManager) {
+            const inheritedIntel = window.IntelManager.getIntelForNode(parentID);
+            inheritedIntel.forEach(intel => {
+                window.IntelManager.grantOwnership(intel.intel_id, childId);
+            });
+        }
     }
 
     recordFeudEvent(houseA, houseB, reason) {

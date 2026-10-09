@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -220,6 +220,9 @@ class CrowsEyeSystem {
                 break;
             case 'HOUSE_HISTORY':
                 contentHtml = this.renderHouseHistoryView();
+                break;
+            case 'LINEAGES':
+                contentHtml = this.renderLineageView();
                 break;
             case 'ANTHOLOGY':
                 contentHtml = this.renderAnthologyView();
@@ -1475,6 +1478,75 @@ class CrowsEyeSystem {
         });
 
         html += `</div></div>`;
+        return html;
+    }
+
+    renderLineageView() {
+        if (!window.PersonhoodManager) return "Lineage Engine Offline";
+        
+        let targetId = this.selectedEntityId;
+        if (!targetId && window.GameCore?.playerObj) targetId = 'player';
+        
+        const profile = window.PersonhoodManager.getProfile(targetId);
+        const ent = window.GameCore?.activeEntities.find(e => e.id === targetId);
+        const name = ent ? ent.name : targetId;
+
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">LINEAGE & INHERITANCE: BLOODLINE OF ${name.toUpperCase()}</div>`;
+
+        if (!profile) return html + `<div style="font-size:11px; color:#451a03;">Select an entity to observe their generational flow.</div>`;
+
+        // 1. Lineage Map
+        html += `<div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:15px; text-align:center;">
+            <!-- Parents -->
+            <div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:15px;">
+                <div style="font-size:10px; color:#78350f; margin-bottom:10px;">ASCENDANTS (PARENTS)</div>
+                ${profile.ancestry.parents.map(p => `
+                    <div style="color:#fbbf24; font-size:12px; margin-bottom:5px;">${p}</div>
+                `).join('') || '<div style="color:#451a03; font-size:11px;">Unknown Origin</div>'}
+            </div>
+
+            <!-- Current -->
+            <div style="background:rgba(251,191,36,0.05); border:1px solid #fbbf24; padding:15px;">
+                <div style="font-size:10px; color:#fbbf24; margin-bottom:10px;">CURRENT SUBJECT</div>
+                <div style="font-weight:bold; color:#fbbf24; font-size:14px;">${name.toUpperCase()}</div>
+                <div style="font-size:10px; color:#94a3b8; margin-top:5px;">IDENTITY: ${profile.identity}</div>
+            </div>
+
+            <!-- Children -->
+            <div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:15px;">
+                <div style="font-size:10px; color:#78350f; margin-bottom:10px;">DESCENDANTS (CHILDREN)</div>
+                ${profile.ancestry.children.map(c => `
+                    <div style="color:#fbbf24; font-size:12px; margin-bottom:5px;">${c}</div>
+                `).join('') || '<div style="color:#451a03; font-size:11px;">No heirs identified.</div>'}
+            </div>
+        </div>`;
+
+        // 2. Legacy Flow
+        html += `<div style="background:rgba(255,255,255,0.02); border:1px solid #78350f; padding:20px;">
+            <div style="font-weight:bold; color:#fbbf24; font-size:12px; border-bottom:1px solid #451a03; padding-bottom:5px; margin-bottom:15px;">LEGACY TRANSFER ANALYSIS</div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px;">
+                <div>
+                    <div style="font-size:10px; color:#78350f; margin-bottom:5px;">INHERITED TRAITS (DRIFT)</div>
+                    ${Object.entries(profile.traits).map(([t, v]) => `
+                        <div style="font-size:11px; display:flex; justify-content:space-between; margin-bottom:3px;">
+                            <span style="color:#94a3b8;">${t.toUpperCase()}:</span>
+                            <span style="color:#fbbf24;">${Math.floor(v * 100)}%</span>
+                        </div>
+                    `).join('')}
+                </div>
+                <div>
+                    <div style="font-size:10px; color:#78350f; margin-bottom:5px;">INHERITED RELATIONSHIPS</div>
+                    ${Array.from(profile.relationships.entries()).slice(0, 5).map(([id, rel]) => `
+                        <div style="font-size:11px; margin-bottom:3px;">
+                            <span style="color:#ef4444;">${rel.type}</span>: ${id}
+                        </div>
+                    `).join('') || '<div style="color:#451a03; font-size:11px;">No inherited feuds or alliances.</div>'}
+                </div>
+            </div>
+        </div>`;
+
+        html += `</div>`;
         return html;
     }
 
