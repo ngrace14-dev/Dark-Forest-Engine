@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -236,6 +236,9 @@ class CrowsEyeSystem {
                 break;
             case 'CIV_PRESSURE':
                 contentHtml = this.renderCivPressureView();
+                break;
+            case 'HARVEST':
+                contentHtml = this.renderHarvestView();
                 break;
             case 'RUNES':
                 contentHtml = this.renderRunesView();
@@ -1402,6 +1405,76 @@ class CrowsEyeSystem {
         }
 
         html += `</div>`;
+        return html;
+    }
+
+    renderHarvestView() {
+        if (!window.HarvestEngine) return "Harvest Engine Offline";
+        const candidates = window.HarvestEngine.getCandidates().slice(0, 10);
+        
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">SIGNIFICANCE MONITOR: WENDIGO HARVEST PRESSURE</div>`;
+
+        if (candidates.length === 0) {
+            return html + `<div style="font-size:11px; color:#451a03;">No candidates of sufficient significance detected. Greatness has not yet blossomed in this epoch.</div>`;
+        }
+
+        html += `<div style="display:flex; flex-direction:column; gap:15px;">`;
+        
+        candidates.forEach(([nodeId, data]) => {
+            const ent = window.GameCore?.activeEntities.find(e => e.id === nodeId);
+            const name = ent ? ent.name : nodeId;
+            const pressurePercent = Math.min(100, (data.pressureScore / 1000) * 100);
+
+            html += `<div style="background:rgba(0,0,0,0.3); border:1px solid #78350f; padding:20px; border-left: 4px solid ${data.pressureScore > 800 ? '#ef4444' : '#fbbf24'};">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <div>
+                        <span style="font-weight:bold; color:#fbbf24; font-size:18px;">${name.toUpperCase()}</span>
+                        <span style="color:#78350f; font-size:10px; margin-left:10px;">[Status: ${data.status}]</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="color:#78350f; font-size:10px;">HARVEST PRESSURE SCORE</span>
+                        <div style="font-size:24px; color:${data.pressureScore > 800 ? '#ef4444' : '#fbbf24'};">${Math.floor(data.pressureScore)}</div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:20px; margin-bottom:15px;">
+                    <div>
+                        <div style="display:flex; justify-content:space-between; font-size:9px; margin-bottom:3px;">
+                            <span style="color:#78350f;">ORB RECOGNITION</span>
+                            <span style="color:#fbbf24;">${Math.floor(data.orbAttention * 100)}%</span>
+                        </div>
+                        <div style="height:4px; background:#1c1917; width:100%;">
+                            <div style="height:100%; background:#fbbf24; width:${data.orbAttention * 100}%;"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display:flex; justify-content:space-between; font-size:9px; margin-bottom:3px;">
+                            <span style="color:#78350f;">HUNTSMAN CULTIVATION</span>
+                            <span style="color:#fbbf24;">${Math.floor(data.huntsmanCultivation * 100)}%</span>
+                        </div>
+                        <div style="height:4px; background:#1c1917; width:100%;">
+                            <div style="height:100%; background:#d97706; width:${data.huntsmanCultivation * 100}%;"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display:flex; justify-content:space-between; font-size:9px; margin-bottom:3px;">
+                            <span style="color:#78350f;">WENDIGO INTEREST</span>
+                            <span style="color:#ef4444;">${Math.floor(pressurePercent)}%</span>
+                        </div>
+                        <div style="height:4px; background:#1c1917; width:100%;">
+                            <div style="height:100%; background:#ef4444; width:${pressurePercent}%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="font-size:10px; color:#94a3b8; line-height:1.4; background:rgba(0,0,0,0.2); padding:10px; border:1px solid #451a03;">
+                    Greatness is a beacon to those who harvest significance. This entity is currently being monitored by the cosmological forces of the Forest.
+                </div>
+            </div>`;
+        });
+
+        html += `</div></div>`;
         return html;
     }
 
