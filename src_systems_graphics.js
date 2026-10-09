@@ -30,7 +30,9 @@ class RenderPipeline {
     init(renderer, scene, pocketScene, camera) {
         if (window.EventBus) window.EventBus.on(String.fromCharCode(81,85,65,76,73,84,89,95,67,72,65,78,71,69,68), () => this.applyQualityPreset());
         this.renderer = renderer;
-        this.camera = camera;
+                this.camera = camera;
+        this.voidOverlay = null;
+        this.isVoidActive = false;
 
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.0));
         renderer.shadowMap.enabled = true;
@@ -89,6 +91,19 @@ class RenderPipeline {
             window.innerHeight
         );
         this.composer.addPass(this.passes.smaa);
+
+                window.EventBus.on('ENV_SET_VOID_OVERRIDE', (active) => {
+            this.isVoidActive = active;
+            if (active) {
+                this.passes.bloom.strength = 5.0;
+                this.passes.bloom.radius = 1.0;
+                if (this.ambientLight) this.ambientLight.intensity = 10.0;
+            } else {
+                this.passes.bloom.strength = 0.8;
+                this.passes.bloom.radius = 0.2;
+                if (this.ambientLight) this.ambientLight.intensity = 0.2;
+            }
+        });
 
         window.GameCore.passes = this.passes;
         this.setQuality(this.qualityTier);
