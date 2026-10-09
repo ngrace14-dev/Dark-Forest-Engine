@@ -1,16 +1,19 @@
 # DARK FOREST: MASTER DESIGN BIBLE
 
----
-
 # 1. CORE PHILOSOPHY
 
 Dark Forest is a simulation about:
 
 * Truth
+
 * Memory
+
 * Civilization
+
 * Loss
+
 * Mythology
+
 * Discovery
 
 The simulation is the primary storyteller.
@@ -23,16 +26,18 @@ The goal is to understand it.
 Questions are more important than answers.
 Every major discovery should reveal a deeper mystery.
 
----
-
 # 2. DESIGN CONSTRAINTS
 
 Dark Forest is **NOT**:
 
 * An RTS
+
 * A God Simulator
+
 * A City Builder
+
 * A Unit Command Game
+
 * A Direct-Control Colony Simulator
 
 The simulation owns civilization.
@@ -40,67 +45,56 @@ NPCs remain autonomous.
 The player influences probability.
 The simulation chooses outcomes.
 
----
+# 3. PLAYER ROLE (THE INVERTED PROGRESSION LOOP)
 
-# 3. PLAYER ROLE
+The player's role evolves drastically, inverting traditional game progression from physical grunt to abstract deity.
 
-The player is a Minor Divine Patron.
+**Phase 1: The Ground State (Early/Mid Game)**
+The player starts as a "Nobody" (e.g., a barbaric survivor) in a visceral, 3D over-the-shoulder perspective.
 
-The player exists as influence rather than physical presence.
+* **Interaction:** Physical traversal, direct ground-level combat, resource gathering, and desperate survival.
 
-**The player interacts through:**
+* **Limitation:** The player has no global vision. They experience the terror of the 14-day Shift firsthand, relying on local rumors, physical ledgers, and physical survival mechanics.
 
-* Observation
-* Investigation
-* Dreams
-* Ambitions
-* Truth Seeking
+**Phase 2: The Ascended State (Late/End Game)**
+Upon earning the *Crow's Blessing*, the player unlocks the ASCII Crow's Eye interface and ascends to a **Minor Divine Patron**.
 
-**The player does not interact through:**
+* **Interaction:** The player shifts to macro-observation, investigation, sending symbolic Dreams, and truth-seeking.
 
-* Direct movement
-* Direct NPC control
-* Direct combat
-* Physical traversal
+* **Limitation:** Direct physical movement and direct combat are replaced by influencing probability. The player no longer gives orders; they amplify NPC ambitions and manipulate macro-causality.
 
-**Core Loop:**
+**Core Ascended Loop:**
 Observe $\rightarrow$ Notice Anomaly $\rightarrow$ Investigate $\rightarrow$ Influence Through Dreams $\rightarrow$ Observe Consequences $\rightarrow$ Discover Truth
-
----
 
 # 4. WORLD STRUCTURE
 
 The world consists of three major regions, each representing a different relationship with reality and history:
 
 * **Dark Forest:** Living Memory
-* **Mountain Ring:** Recorded Memory
-* **Endless Dunes:** Lost Memory
 
----
+* **Mountain Ring:** Recorded Memory
+
+* **Endless Dunes:** Lost Memory
 
 # 5. REALITY MECHANICS
 
 The world does not behave uniformly. Different regions obey different rules. Most civilizations lack the perspective necessary to recognize this.
 
-### Dark Forest
-
+**Dark Forest**
 Every 14 days, the cycle triggers:
 Forest $\rightarrow$ White Void $\rightarrow$ Reconstruction $\rightarrow$ Stabilization
-
 Villages relocate. Roads change. Reality reconfigures.
 
-### Mountain Ring
+**Mountain Ring (Spatial Relativity & Optical Horizon)**
 
-The Mountains do not shift. Instead, they rotate around a fixed axis.
-Structures persist. Roads remain. Archives survive.
-The rotation is too gradual to be perceived without generations of observation.
+* **The 100-Mile Mirror:** The Mountain Ring is 100 miles wide from inner to outer edge. A tilted optical mirage reflects ridges forward to appear infinitely repeating, deterring exploration.
 
-### Endless Dunes
+* **The 7-Day Perception Skip:** Reconfiguration lasts 7 full days in the White Void. Human consciousness perceives this as instantaneous, creating a 6,000-year unrecorded time gap over 12,000 perceived calendar years.
 
-The Dunes remain stable while occupied. When abandoned, the Dunes regenerate.
-Previous routes become unreliable, and most discoveries are permanently lost.
+* **The Static Horizon:** The Mountain Ring remains completely static for 14 days and rotates *strictly* during the 7-day White Void window. Structures persist. Archives survive.
 
----
+**Endless Dunes (Strands of Light)**
+The Dunes act as the absolute static frame of reference containing billions of visible universes in the skybox. They remain stable while occupied. When abandoned, the Dunes regenerate. Previous routes become unreliable, and most discoveries are permanently lost.
 
 # 6. THE CHAIN THEORY
 
@@ -110,8 +104,6 @@ The Capital anchors a chain of villages. Every shift, the Forest lifts the chain
 **Hidden Truth:**
 The true structure of reality remains unknown. Multiple theories describe different observable effects. No known civilization currently possesses a complete understanding.
 
----
-
 # 7. THE CAPITAL
 
 The Capital is anchored to the Core of the Forest.
@@ -119,67 +111,57 @@ The Capital is anchored to the Core of the Forest.
 **Properties:**
 
 * Fixed
+
 * Publicly Known
+
 * Permanent
 
 Represents **Political Stability**. Every civilization understands the Capital never moves.
 
----
+# 8. HOUSE TERMINUS & THE 95% TRAP
 
-# 8. HOUSE TERMINUS
+Terminus exists where the Forest bleeds into the Mountain Ring. The House possesses centuries of observations unavailable elsewhere.
 
-Terminus exists where the Forest bleeds into the Mountain Ring. The House possesses centuries of observations unavailable elsewhere. The family preserves forbidden measurements and records.
-
-**Known only to Terminus:**
-Reality behaves differently around the village. The implications of this remain one of the world's greatest secrets.
-
----
+**The 95% Trap:**
+Terminus holds 95% of reality physics but is blind to the 5% absolute static reference frame seen only from the Endless Dunes. Because they observe the 7-day White Void without an external reference point, they falsely conclude the Mountain Ring is the unmoving bedrock of reality, unaware that it rotates.
 
 # 9. THE THREE HUNDRED GUARDIANS
 
-An ancient institution whose purpose is to:
+An ancient institution acting as the Crown's iron shield guarding the mountain passes against ancient entities. Their purpose is to:
 
 * Protect Terminus
+
 * Preserve Measurements
+
 * Maintain Historical Continuity
-* Guard Forbidden Knowledge
 
-They are custodians of observation, not rulers.
+* Guard Forbidden Knowledge (and contain the horrors of the deep mountains)
 
----
+# 10. BARRIER THEORY & FUEL LOGISTICS
 
-# 10. BARRIER THEORY
+**Public Understanding:** Barriers protect villages. This is true.
+**Hidden Truth:** Barriers also maintain a village's attachment to civilization. Without a functioning barrier: Village $\rightarrow$ Disconnects $\rightarrow$ Becomes Lost.
 
-**Public Understanding:**
-Barriers protect villages. This is true.
-
-**Hidden Truth:**
-Barriers also maintain a village's attachment to civilization.
-Without a functioning barrier: Village $\rightarrow$ Disconnects $\rightarrow$ Becomes Lost.
-"Lost" does not mean destroyed; it means disconnected from the chain.
-
----
+**The Capital Fuel Chokepoint:**
+The Capital maintains absolute political control by manufacturing and distributing weekly barrier fuel crates. Withholding fuel causes villages to disconnect.
 
 # 11. THE ENDLESS DUNES
 
 The Dunes are not known to living civilization. No villager possesses practical knowledge of them. Knowledge survives only through:
 
 * Lost Poems
+
 * Ancient Records
+
 * Recovered Artifacts
+
 * Contradictions
 
-The Dunes contain Lost Cities, Ancient Archives, Original Histories, Forgotten Civilizations, and Epoch Records.
-**Purpose:** Preserve what civilization forgot.
-
----
+The Dunes contain Lost Cities, Ancient Archives, Original Histories, Forgotten Civilizations, and Epoch Records. **Purpose:** Preserve what civilization forgot.
 
 # 12. THE MOUNTAIN RING
 
-Represents **Recorded Memory**. Contains Terminus, Archives, Strongholds, and Ancient Roads.
-The Mountain Ring preserves continuity. Most important historical discoveries originate here before eventually leading toward the Dunes.
-
----
+Represents **Recorded Memory**. Contains Terminus, Archives, Strongholds, and Ancient Roads. The Mountain Ring preserves continuity. Most important historical discoveries originate here before eventually leading toward the Dunes.
 
 # 13. INFORMATION ECONOMY
 
@@ -189,1023 +171,317 @@ Information is a resource possessing Value, Age, Reliability, Source, and Scarci
 Event $\rightarrow$ Witness $\rightarrow$ Intel $\rightarrow$ Rumor $\rightarrow$ Verification $\rightarrow$ Truth $\rightarrow$ History $\rightarrow$ Folklore
 
 **Information Types:**
-
-* Common Intel
-* Market Intel (increases in value with distance)
-* Locational Intel (expires with shifts; value decreases as a cycle approaches completion)
-* Historical Intel
-* Anchored Intel
-* Legendary Intel
-
-**NPC Manipulation:**
-NPCs may lie, conceal, exaggerate, or manipulate depending on their personality and risk tolerance.
-
----
+Common Intel, Market Intel, Locational Intel, Historical Intel, Anchored Intel, Legendary Intel. NPCs may lie, conceal, exaggerate, or manipulate depending on their personality and risk tolerance.
 
 # 14. TRUTH ECONOMY
 
-Truth exists independently of belief and measures reality rather than consensus.
-Tracked metrics include Facts, Distortions, Fabrications, Rumors, and Verification.
-**Global Fidelity** measures the overall health of reality.
-
----
+Truth exists independently of belief and measures reality rather than consensus. Tracked metrics include Facts, Distortions, Fabrications, Rumors, and Verification. **Global Fidelity** measures the overall health of reality.
 
 # 15. CHRONICLE SYSTEM
 
-Purpose: Record events without interpreting them.
-Stores: Event, Date, Significance, Historical Weight, Witnesses, and Participants.
-
----
+Purpose: Record events without interpreting them. Stores: Event, Date, Significance, Historical Weight, Witnesses, and Participants.
 
 # 16. HISTORIAN SYSTEM
 
-**Career Path:**
-Scribe $\rightarrow$ Recorder $\rightarrow$ Historian $\rightarrow$ Royal Historian $\rightarrow$ Grand Historian
-
+**Career Path:** Scribe $\rightarrow$ Recorder $\rightarrow$ Historian $\rightarrow$ Royal Historian $\rightarrow$ Grand Historian
 **Purpose:** Transform Truth into Official History.
-
-**Historical Layers:**
-Chronicle $\rightarrow$ Truth $\rightarrow$ Official History $\rightarrow$ Folklore
-
-Historians create understanding, not truth.
-
----
+**Historical Layers:** Chronicle $\rightarrow$ Truth $\rightarrow$ Official History $\rightarrow$ Folklore. Historians create understanding, not truth.
 
 # 17. FOLKLORE SYSTEM
 
 Poems act as cultural memory, with an original anthology serving as the DNA for procedural folklore.
 
-**Poem Classes:**
+**Poem Classes:** Observational Truth, Institutional Truth, Mythic Truth, Historical Revision, Contested History, Misunderstood Truth.
+**Cipher Mechanics (20 vs. 40):** Numbers in folklore are often administrative compression. "20" denotes 20 physical anchors (1 Capital + 19 chained villages). "40" is deliberately ambiguous noise designed to trap literal-minded scholars.
 
-* Observational Truth
-* Institutional Truth
-* Mythic Truth
-* Historical Revision
-* Contested History
-* Misunderstood Truth
+### THE FOUNDATIONAL ANTHOLOGY (THE ROSETTA STONE)
 
-**Discovery Tiers:** Common, Historical, Legendary, Mythic.
-The most important poems are hidden within the Mountains and Dunes.
+This specific collection of poems acts as the procedural DNA for the world's folklore. It contains administrative shorthand, spatial ciphers, and cosmic warnings.
 
----
+ 1. *Roads are traveled are safe alone / but a Denary bit farther you will roam / to reach the destination of your home.* (Encodes spatial distortion multipliers during a Shift).
+
+ 2. *The gods who watch and the god who grows / are primordial they’ve always known / a boy turn monster stolen from home. / Forced to fight for others alone. / Murder by day slave by night / came a champion of the light. / Bondage is broken and power is freed / followers he gathered but disaster it breeds. / In the last moment of his blinding light / his friends gathered to support him in his final plight / try as they may and try as they might / they were forced to run to continue the fight.* (The suppressed true history of the Great Fracture and the Founders' betrayal).
+
+ 3. *A Monarch leads through every fortnight / when some claim 20, 40 others might. / But when fires burn and spirits flow. / Who’s to doubt those who “know”* (Administrative compression; masks dynastic successions as immortal individuals).
+
+ 4. *A score of places teeming with life. / Linked together, bound so tight / 19 houses and 19 men / fighting to be the blessed 10.* (The cipher key defining "20" as physical barrier anchors and outlining the Monopoly Bottleneck).
+
+ 5. *Cold biting wind, air so dry. / In the mountains the monster hide. / Forced to stay of no will of his own. / From fury’s reach the 300 guardians keep.* (The true purpose of the 300 Guardians—containment of the deep mountains).
+
+ 6. *Hero’s and greats from times untold / bear the mark of hunters so old. / Be it time for them to fight / they conquered all with their wit and might. / Glory and conquest for all who bear. / The hunters mark who few shall share.* (Public misdirection; encourages ambition).
+
+ 7. *When given the beacon of times untold. / Its whisper lies words cautions of old. / Wish you be rid of this plight? / Kill the huntsmen with all your might.* (An Orb-whisper trap designed to unleash the Wendigo by removing the Cultivator).
+
+ 8. *From far above, in the sky. / To hold its blessing, you must hold its eye. / From far above to down below. / Its vision only grows.* (Mythic reference to the Ascended Crow's Eye state).
+
+ 9. *A massive tree. Tall and upright / once said to hold the masters light. / Strike a bargain if it’s pleased / to become a herald of the Seed.* (Reference to wave-defense events to maintain physical continuity).
+
+10. *A monster lingers in the night. / Some say a man who isn’t right. / Though through the huntsmen’s beck and call / be wary should he fall.* (The true warning: the Huntsman controls the Wendigo's escalation).
+
+11. *Forest dark and ever cold. / Paths shifting never known. / 14 days and 14 nights. / Then a shift when dawn breaks light.* (Standard observational survival rhythm taught to children).
 
 # 18. FUNDAMENTAL FORCES
 
-Metaphysical pressures acting upon civilization. They are not factions, organizations, or entities. They rarely act directly; instead, they alter probabilities and shape conditions from which history emerges.
+Metaphysical pressures acting upon civilization. They are not factions, organizations, or entities. They rarely act directly; instead, they alter probabilities and shape conditions.
 
 * **Forest:** Possibility
+
 * **Crow:** Significance
+
 * **Tree:** Continuity
+
 * **Crown:** Order
+
 * **Huntsman:** Cultivation
+
 * **Wendigo:** Consumption
+
 * **Truth:** Accuracy
+
 * **The Orb:** Witness
 
-**Force Conflicts & Roles:**
+# 19. STELLARIS ECONOMY & THE 9-SPOT BOTTLENECK
 
-* Truth $\rightarrow$ Accuracy
-* Crow $\rightarrow$ Stories / Significance
-* Tree $\rightarrow$ Continuity
-* Crown $\rightarrow$ Order
-* Forest $\rightarrow$ Possibility
-* Wendigo $\rightarrow$ Consumption
-* Huntsman $\rightarrow$ Cultivation
-* The Orb $\rightarrow$ Witness
+Resources support Trade, Monopolies, Prosperity, Scarcity, and Crises.
 
-No force is universally correct or universally evil. Major historical events emerge from tensions between multiple forces simultaneously.
-
----
-
-# 19. STELLARIS ECONOMY
-
-Resources (Food, Wood, Stone, Metal, Gold, Influence) support Trade, Monopolies, Prosperity, Scarcity, and Crises.
-
----
+**The Monopoly Bottleneck:** Exactly 10 Major Monopolies exist. 1 is locked to the Capital (Fuel). The 19 Noble Houses viciously compete for the remaining 9 Blessed Spots. The 10 Unblessed Houses hold Minor Monopolies and act as economic agitators.
 
 # 20. DIVINE PATRON SYSTEM
 
 The player role inside Crow's Eye. The player never gives orders; the player amplifies ambitions.
-
-**Core Loop:**
-Observe $\rightarrow$ Find Potential $\rightarrow$ Send Dream $\rightarrow$ Interpretation $\rightarrow$ Action $\rightarrow$ History
-
----
+**Core Loop:** Observe $\rightarrow$ Find Potential $\rightarrow$ Send Dream $\rightarrow$ Interpretation $\rightarrow$ Action $\rightarrow$ History
 
 # 21. DREAM SYSTEM
 
 Dreams are symbolic (e.g., Fire, Truth, Roots, Crowns, Iron, Shadows), not direct instructions. Dreams modify internal motivation, never behavior directly.
 
----
-
 # 22. CAREER AMBITION SYSTEM
 
 Every profession contains Drives, Affinities, Resistances, Risk Tolerance, and Corruption Risks. Dreams act as force multipliers against these values.
-
----
 
 # 23. DREAM CORRUPTION
 
 Excessive influence creates Obsession, Fanaticism, Burnout, Isolation, or Paranoia. These outcomes generate stories rather than serving as mechanical punishments.
 
----
-
 # 24. FOREST WILL
 
 An independent, indifferent force (neither good nor evil). Introduces possibility through Forest Whispers (*Wander, Follow, Build, Dig, Leave, Listen*) to create unpredictability.
 
----
-
 # 25. RELATIVE DIMENSIONAL ANCHORS
 
-Consumable items lasting a single Shift. They preserve a relative relationship through one shift, allowing navigation of change and generating **Anchored Information** that retains value beyond a normal cycle.
-
----
+Consumable items lasting a single Shift. They preserve a relative relationship through one shift, allowing navigation of change and generating **Anchored Information**.
 
 # 26. CROW'S EYE
 
 An Observatory, Living Atlas, Investigation Tool, and Historical Archive. Driven primarily by **Curiosity**, not movement or scouting.
 
----
-
 # 27. LIVING ATLAS
 
 Supports Zoom, Scroll, Follow, Investigation, and Historical Playback. Makes the player feel the world is vastly larger than their understanding of it.
-
----
 
 # 28. FOLLOW SYSTEM
 
 Players may follow People, Settlements, Houses, Legends, or Mysteries. Following grants observation, never control.
 
----
-
 # 29. OBSERVER'S LEDGER
 
 The player's personal notebook, tracking People, Places, Clues, Poems, Contradictions, and Theories.
-
----
 
 # 30. MYSTERY SYSTEM
 
 Major mysteries drive progression (e.g., Terminus Anomaly, Barrier Theory, Mountain Rotation, Missing Histories, Ancient Poems). Players advance through understanding.
 
----
-
 # 31. EXPEDITIONS
 
 * **Early:** Trade Surveys, Archive Recovery, Barrier Research
-* **Middle:** Mountain Surveys, Terminus Investigations
-* **Late:** Mountain Crossings
-* **Endgame:** Dune Expeditions
 
----
+* **Middle:** Mountain Surveys, Terminus Investigations
+
+* **Late:** Mountain Crossings
+
+* **Endgame:** Dune Expeditions
 
 # 32. CALIBRATION OBSERVATORY
 
-A simulation laboratory to experiment with Growth Rate, Resource Consumption, Trade Efficiency, Rumor Spread, and Distortion. Focuses on experimentation, not difficulty sliders.
-
----
+A simulation laboratory to experiment with Growth Rate, Resource Consumption, Trade Efficiency, Rumor Spread, and Distortion.
 
 # 33. DISCOVERY LADDER
 
 * Tier 1: Rumors
-* Tier 2: House Secrets
-* Tier 3: Contradictions
-* Tier 4: Terminus Anomalies
-* Tier 5: Barrier Questions
-* Tier 6: Mountain Truths
-* Tier 7: Lost Histories
-* Tier 8: Endless Dunes
-* Tier 9: The Final Plight
-* Tier 10: The Founders
-* Tier 11: The First Wendigo
 
----
+* Tier 2: House Secrets
+
+* Tier 3: Contradictions
+
+* Tier 4: Terminus Anomalies
+
+* Tier 5: Barrier Questions
+
+* Tier 6: Mountain Truths
+
+* Tier 7: Lost Histories
+
+* Tier 8: Endless Dunes
+
+* Tier 9: The Final Plight (See Origin Dossier)
+
+* Tier 10: The Founders (See Origin Dossier)
+
+* Tier 11: The First Wendigo (See Origin Dossier)
 
 # 34. ARCHITECTURAL CONSTRAINTS
 
 The simulation owns civilization. NPCs remain autonomous. The Crow remains independent. The player influences; the player never commands.
 
----
-
 # 35. FUTURE EXPANSION HOOKS
 
 Archaeology, Cartography, Academic Institutions, Religious Orders, Dune Civilizations, Lost Epoch Histories, Advanced Truth Systems, Longitudinal Measurement Systems, and World Reinterpretation Events.
 
----
-
 # 36. CIVILIZATIONAL INSTITUTIONS
 
-Human structures created to preserve civilization. Distinct from metaphysical forces. Individuals die; institutions persist to carry knowledge, practices, authority, and memory forward.
+Human structures created to preserve civilization. Distinct from metaphysical forces. Individuals die; institutions persist to carry knowledge, practices, authority, and memory forward. (Houses, Historical Office, Archives, Schools, Guilds, Religious Orders).
 
-* **Houses**
-* **Historical Office**
-* **Archives**
-* **Schools**
-* **Guilds**
-* **Religious Orders**
+*(Addendums A through BI defining global simulation rules remain exactly as provided in earlier iterations).*
 
----
+# ADDENDUM BJ: THE POEM TRAP
 
-# ADDENDUM A: LAWS OF DISCOVERY
+Not all poems preserve truth. Some preserve misunderstanding, bias, political necessity, warnings, or traps. A poem may be Factually Correct while simultaneously Historically Misleading. The existence of a poem should never be treated as evidence of correctness. Poems are evidence of memory. Not evidence of truth. The player's goal is not to trust folklore, but to understand why folklore exists.
 
-Progression occurs through access to understanding rather than regional access:
-Observation $\rightarrow$ Contradiction $\rightarrow$ Investigation $\rightarrow$ Evidence $\rightarrow$ New Understanding.
-The player unlocks mysteries rather than geography.
+# ADDENDUM BK: THE ORB'S UNRELIABILITY
 
-# ADDENDUM B: LAYERS OF TRUTH
+The Orb should not be treated as a liar, nor as truthful. The Orb's danger originates from Perspective rather than Falsehood. The Orb frequently makes statements which are Technically Accurate, Emotionally Relevant, but Contextually Incomplete. The Orb rarely states enough information to remove uncertainty. Its relationship with meaning is frequently more important than its relationship with truth.
 
-Major discoveries follow:
-Simplified Truth $\rightarrow$ Better Truth $\rightarrow$ Deeper Truth $\rightarrow$ Actual Reality.
-Older generations were not foolish; they were incomplete.
+# ADDENDUM BL: THE PROGENITOR GENESIS ENGINE (MULTIVERSAL LAW)
 
-# ADDENDUM C: GREAT MYSTERY SYSTEM
+* **The Singularity:** Universe 1 (Dark Forest) is the Progenitor Genesis / Big Bang singularity.
 
-Mysteries are first-class gameplay objects containing Evidence, Related Poems, Related Histories, Contradictions, Associated People, and Associated Houses.
+* **The Relative Stat Scaling Engine:** Derivative Universes (e.g., Cyberpunk Universe 2) project rules downstream. When importing a save from Game 1, a player's maxed-out, "God-Tier" stats carry over mathematically, but are evaluated as "Common/Baseline" by the hyper-advanced technological scanners of Game 2.
 
-# ADDENDUM D: OBSERVER PROGRESSION
+* **Origin Immunity:** High stats in outer worlds are derivative; True Origin Natives are unspecial on paper but immune to outer digital/metaphysical rules (e.g., un-hackable by cyberware).
 
-Primary progression metric is **Understanding**, supported by Knowledge, Relationships, Dream Fidelity, Influence, and Evidence (not numerical combat strength).
+* **The Zero Horizon:** The Time Before Wendigo represents $t=0$ and is topologically unreachable.
 
-# ADDENDUM E: FOLLOWER BONDS
+# ADDENDUM BM: THE ENDGAME TRINITY & METAPHYSICAL RENUNCIATION
 
-Followers are relationships (possessing Bond Strength, Trust, Dream Accuracy, Historical Significance, and Personal History), not unit assets.
+At the threshold of Game 10, the player faces three canonical outcomes:
 
-# ADDENDUM F: DREAM INTERPRETATION
+1. **Claim the Throne (Ouroboros Loop):** 1st-person POV cutscene stepping into void, waking up as a nobody during the Game 1 Wendigo massacre.
 
-Pipeline: Dream $\rightarrow$Career Affinity$\rightarrow$Personality$\rightarrow$Current Circumstances$\rightarrow$Interpretation$\rightarrow Goal $\rightarrow$ Action.
+2. **Refuse the Throne (5D Crow's Eye):** Physical character model roaming + Droste recursive zoom across nested universe scenes to execute micro-causality interventions.
 
-# ADDENDUM G: CAREER ARCHETYPES
+3. **The Final Layer (Walk Away):** System warning -> 60-second blackout screen -> Main Menu. Ceasing to observe/render the simulation frees creation from the harvest.
 
-Professions (Scholar, Hunter, Merchant, Historian, Archivist, Guard, House Retainer, Noble) require Core Drives, Dream Affinities, Dream Resistances, Risk Tolerance, and Corruption Risks.
+# ADDENDUM BN: RUNIC BODY CARVING
 
-# ADDENDUM H: HISTORY AS AN INSTITUTION
+* **Flesh as the Ledger:** To survive the 14-day Shift and ground themselves in reality, players must carve primordial runes directly into their flesh. This repurposes the ancient gladiator slave brands of the pre-fracture empire.
 
-Official History is civilization's interpretation of Truth. The Crown influences emphasis and educational priorities without directly altering reality.
+* **The Significance Trap:** While body carving grants immense physical and reality-warping power, it permanently increases the entity's "Story Density" and Historical Weight.
 
-# ADDENDUM I: THE HISTORICAL OFFICE
+* **The Harvest Beacon:** The higher a player's runic power, the brighter they shine to the Orb. Maxing out runic stats actively turns the player into high-yield livestock, drawing relentless Wendigo attacks.
 
-A permanent institution responsible for preserving records, producing educational histories, resolving contradictions, and maintaining historical canon. Occasionally disagrees with Truth.
+# ADDENDUM BO: THE 10-GAME MULTIVERSAL ROADMAP
 
-# ADDENDUM J: ARCHAEOLOGICAL FOLKLORE
+Because Universe 1 (Dark Forest) acts as the Big Bang for all subsequent realities, the franchise explores distinct derivative epochs while maintaining the exact same underlying cosmological rules. The player imports their save data forward, maintaining their "True Origin Native" status.
 
-Poems in the Mountain Ring and Endless Dunes serve as physical historical evidence, containing lost measurements, historical accounts, and technical knowledge.
+**PHASE I: The Shattered Origin & First Contact**
 
-# ADDENDUM K: INFORMATION PRESERVATION
+* **Game 1: Dark Forest.** Grimdark 3D survival $\rightarrow$ 5D ASCII Macro-observation. The player shatters the 12,000-year loop.
 
-Consistency of preservation across mechanisms: Chronicle (Events), Truth (Reality), Archives (Knowledge), History (Narratives), Folklore (Memory), Anchors (Location).
+* **Game 2: The Neon Canopy.** 18,000-year-advanced Cyberpunk reality. The player's maxed fantasy stats register as "Common" tech, but their flesh-carved runes render them immune to digital hacking and corporate firewalls.
 
-# ADDENDUM L: THE DUNES AS LOST MEMORY
+* **Game 3: The Endless Strands.** Astro-Nautical survival navigating the Laniakea-like filaments between isolated universes.
 
-The Dunes are a repository of lost memory gated by dungeon structures to protect Lost Histories, Original Truths, and Ancient Records.
+**PHASE II: The Derivative Epochs**
 
-# ADDENDUM M: MOUNTAIN RING SIGNIFICANCE
+* **Game 4: The Clockwork Solitude.** A Dieselpunk/Steampunk reality powered by mechanical friction.
 
-The Mountains act as civilization's archive layer, preserving infrastructure, roads, measurements, and records.
+* **Game 5: The Submerged Void.** An abyssal oceanic horror where the White Void manifested as crushing liquid memory.
 
-# ADDENDUM N: WORLD KNOWLEDGE STATES
+* **Game 6: The Imperial Loom.** Dyson-Sphere feudal space-fantasy built on corrupted Barrier Anchor mathematics.
 
-Initial state: Villagers know local geography/trade; Historians know contradictions/missing records; House Terminus knows unique reality anomalies; no living villager has practical knowledge of the Dunes.
+* **Game 7: The Astral Circuit.** A purely digital reality matrix where the Origin Native's physical soul crashes corporate avatars.
 
-# ADDENDUM O: CROW'S EYE GAMEPLAY DEFINITION
+**PHASE III: The Multiversal Collapse & True Freedom**
 
-Investigative gameplay loop driven by curiosity: Observe $\rightarrow$ Notice Anomaly $\rightarrow$ Investigate $\rightarrow$ Collect Evidence $\rightarrow$ Update Theory $\rightarrow$ Influence Through Dreams $\rightarrow$ Observe Outcomes $\rightarrow$ Discover Deeper Truth.
+* **Game 8: The Plane-Shift Wars.** Hunted by derivative multiversal beings who realize the Origin Native is immune to their dimensional scaling.
 
-# THE CROW
+* **Game 9: The Grand Harvest.** Macro-strategy to un-anchor derivative universes, stripping them of Significance to hide them from a multiversal Wendigo harvest.
 
-An independent force representing observation, story density, emerging legends, and civilization's memory. Values stories over accuracy.
+* **Game 10: The Unwritten Sovereign.** The return to the Great Attractor and the final Trinity of Choice (Throne, 5D Custodian, or The 60-Second Blackout).
 
-# HOUSES
+# THE ORIGIN DOSSIER
 
-Long-lived civilizational institutions that persist across generations, accumulating wealth, influence, archives, and secrets. (See Addendum BF for their foundational origins).
+**THE HIDDEN GENESIS MYTHOLOGY OF DARK FOREST**
 
-# DEATH
+This dossier forms the nucleus of the entire 10-game cosmological engine. These entries are not merely lore; they are the foundational physics, history, and original sin from which the entire derivative multiverse was born.
 
-Death is historical transformation. Actions, chronicles, information, and legacy remain, generating legends, poems, and political shifts.
+### I. THE GREAT FRACTURE
 
-# LEGENDS
+The Great Fracture is the single most important event in existence. It is not merely a historical event; it is the origin point ($t=0$) of all known reality.
 
-Generated from historical weight. Historical importance and Truth are separate values; an event can be historically important yet false, or historically unimportant yet true.
-
-# FAILURE
-
-Minimizes traditional failure states; bad outcomes generate new stories, myths, and historical branches.
-
-# TIME
-
-Time (Days, Cycles, Years, Generations, Eras) rewards long-term observation where consequences emerge years later.
-
-# INVESTIGATION
-
-Active gameplay focused on comparing records, examining poems, tracking contradictions, following people, and sponsoring expeditions to reach understanding.
-
-# EVIDENCE
-
-Originates from witnesses, archives, records, poems, artifacts, and expeditions. Civilization rarely possesses sufficient evidence for absolute certainty.
-
-# CIVILIZATIONAL MEMORY
-
-Memory evolves and loses accuracy across layers: Chronicle $\rightarrow$ Truth $\rightarrow$ History $\rightarrow$ Folklore.
-
-# WORLD-SCALE PRINCIPLE
-
-The world must always feel older, stranger, and larger than civilization's current model.
-
-# ADDENDUM Z: THE FOUR HISTORIES
-
-Events exist in up to four forms: Chronicle (What happened), Truth (What can be verified), Official History (What is taught), and Folklore (What is remembered). Disagreements between these forms create gameplay.
-
-# POEMS AS HISTORICAL COMPRESSION
-
-Compressed cultural memory representing decades or centuries, allowing civilization to retain complex history.
-
-# FOLKLORE ANALYSIS
-
-Evaluated via Story Strength, Truth Score, Historical Weight, Distortion Level, and Associated Forces.
-
-# THE FOREST AS REFUGE
-
-A lifeboat for life inside a broken reality; civilization survives by remaining attached to it.
-
-# DUNE DISCOVERIES
-
-Invalidate official histories and challenge accepted reality, revealing civilization was incomplete rather than malicious.
-
-# ORIGINAL ANTHOLOGY STATUS
-
-Serves as the foundational DNA for procedural folklore (structure, tone, symbolism, historical compression).
-
-# FORCE FOLKLORE
-
-Forces shape procedural poem generation and narrative distortions.
-
-# TERMINUS EFFECT
-
-Generates contradictory records and cartographic anomalies to guide investigations toward reality mechanics.
-
-# THE TREE
-
-Represents continuity and stability. Values persistence; opposes meaningless change. A false story preserving continuity strengthens the Tree; a true story causing collapse weakens it.
-
-# THE HUNTSMAN
-
-The Huntsman represents:
-Cultivation.
-
-The Huntsman searches for potential.
-The Huntsman identifies significance before it exists.
-The Huntsman creates conditions through which greatness may emerge.
-
-Heroes. Founders. Champions. Legends.
-Frequently appear within Huntsman influence.
-
-Most civilizations understand the Huntsman as a Hunter.
-This interpretation may be incomplete.
-
-Many ancient records suggest the Huntsman's true function is not pursuit.
-It is preparation.
-
-Many historical interpretations portray the Huntsman as civilization's enemy.
-
-The accuracy of this interpretation remains disputed.
-
-Several famous poems encourage hostility toward the Huntsman.
-
-These poems have contributed to centuries of misunderstanding.
-
-The relationship between: Huntsman, Orb, and Wendigo remains one of civilization's oldest unresolved mysteries.
-
-# BELIEF SYSTEMS
-
-Emerge as civilizations construct meaning from incomplete understanding.
-
-# REPUTATION
-
-Measures trust, credibility, and reliability, influencing information value.
-
-# TERMINUS LIMITATIONS
-
-House Terminus possesses superior observations, but its theories remain incomplete models of reality.
-
-# DUNE PRINCIPLE
-
-Dune discoveries yield better models of reality, never final answers.
-
-# CIVILIZATION PRINCIPLE
-
-Civilization is humanity's attempt to preserve memory and continuity against environmental change.
-
-# WHAT THE GAME IS ACTUALLY ABOUT
-
-Building increasingly accurate models of reality through: Assumption $\rightarrow$ Observation $\rightarrow$ Theory $\rightarrow$ Evidence $\rightarrow$ Better Theory.
-
-# ADDENDUM AB: THE CROWN
-
-A civilizational force representing Order. Values stability, predictability, and governance over accuracy. May suppress disruptive truths to protect public confidence and social cohesion.
-
-# NOBLE COVER-UPS
-
-Emerge from conflicting priorities (e.g., succession, legitimacy, preventing panic) rather than simple malice.
-
-# ADDENDUM AC: THE WENDIGO
-
-Civilization's natural counterforce representing Consumption. Consumes resources, relationships, memory, and continuity. Thrives when communities collapse and traditions break. Attacks mechanisms of memory.
-
-### THE FIRST WENDIGO
-
-Many ancient poems describe the origin of the First Wendigo.
-These accounts consistently describe:
-
-* A child
-* A captive
-* A slave
-* A champion
-
-rather than a monster.
-
-The historical accuracy of these accounts remains disputed.
-However, surviving folklore frequently portrays the First Wendigo as a tragic figure rather than a purely malicious one.
-
-This distinction is important.
-The Wendigo represents Consumption.
-The first being associated with that Force may not have.
-
-Many surviving accounts portray the First Wendigo as a victim before a monster.
-
-Several versions describe:
-
-- Captivity
-- Forced Violence
-- Servitude
-- Liberation
-
-before the events that ultimately led to catastrophe.
-
-The transition from Champion to Wendigo remains one of the oldest unresolved questions in recorded history.
-
-# THE FOREST
-
-Represents Possibility, adaptation, and emergence. Indifferent; creates conditions for life to persist.
-
-# TRUTH LIMITATIONS
-
-Truth operates only through available evidence and is rarely complete.
-
-# HOUSE LIFE CYCLE
-
-Houses rise, prosper, fragment, merge, collapse, and die, creating historical gaps and economic disruptions.
-
-# ARCHIVES & CARTOGRAPHY
-
-Archives preserve memory. Maps are historical artifacts that reflect era-specific assumptions and contradictions.
-
-# FORCE INFLUENCE
-
-Forces do not command; they exert pressure and alter probabilities.
-
-# INFORMATION COMMODITIES
-
-Information possesses real economic value and can be traded, verified, or distorted.
-
-# SCHOLARS, ARCHIVISTS, HISTORIANS
-
-Distinct careers: Scholars seek knowledge; Archivists preserve knowledge; Historians interpret knowledge.
-
-# LEGACY
-
-Measures persistent temporal influence (descendants, records, legends). Independent of Truth.
-
-# THE FIVE PRESERVATION SYSTEMS
-
-Chronicle (Events), Truth (Reality), Archives (Knowledge), History (Understanding), Folklore (Meaning).
-
-# NPC PHILOSOPHY
-
-NPCs are simulated people pursuing goals based on personality, career, relationships, information, and circumstances. Believable decisions beat optimal decisions.
-
-# KNOWLEDGE STATES & SECRETS
-
-Knowledge ranges from Personal to Civilizational. A Mystery is understood by nobody; a Secret is understood by someone and concealed.
-
-# SOCIAL MEMORY & INFORMATION DECAY
-
-Collective memory diverges from Truth over time. Information naturally decays without continuous preservation effort.
-
-# WORLD EVENTS & SIMULATION OWNERSHIP
-
-Major events pivot history. The simulation owns decisions and outcomes; the player owns observation, investigation, influence, and interpretation.
-
-# CORE CONCEPT DEFINITIONS
-
-* **Truth:** What can be verified
-* **History:** What civilization teaches
-* **Folklore:** What civilization remembers
-* **Legacy:** What persists
-* **Tree:** Continuity
-* **Crow:** Significance
-* **Wendigo:** Consumption
-* **Crown:** Order
-* **Forest:** Possibility
-* **Huntsman:** Cultivation
-* **The Orb:** Witness
-
-# ADDENDUM AU: NPC DECISION ARCHITECTURE
-
-NPCs act on incomplete information, rumors, and personal drives. Decisions emerge from personality, career, relationships, beliefs, active force pressures, and active dreams. Perfect decisions are rare; believable mistakes are normal.
-
-# FORCE BIBLE DOCTRINE
-
-Forces are metaphysical pressures, not factions or NPC groups. They shape conditions while people create events.
-
-# REALITY DOCTRINE
-
-Reality extends beyond public, institutional, or house theories. The goal is continuous model improvement, not absolute certainty.
-
-# THE PRIME DIRECTIVE
-
-Every feature must strengthen at least one pillar: **Memory, Truth, Civilization, Discovery, Mystery, Continuity, Loss**. If it does not, it does not belong in Dark Forest.
-
-# ADDENDUM AZ: INSTITUTIONS
-
-Long-term memory structures (Houses, Archives, Schools, Guilds) that outlive individuals to preserve knowledge, practices, and authority.
-
-# ADDENDUM BA: RELATIONSHIPS
-
-Networks of friendship, rivalry, loyalty, and obligation between individuals, houses, and institutions that drive information flow and historical outcomes.
-
-# ADDENDUM BB: SIGNIFICANCE
-
-Measures an event's impact on civilization. Independent from Truth and Legacy (*"Did it matter?"* vs. *"Did it happen?"*).
-
-# ADDENDUM BC: MEANING
-
-Truth determines what can be verified.
-History determines what is taught.
-Folklore determines what is remembered.
-**Meaning determines why people care.**
-
-Meaning emerges through Stories, Relationships, Sacrifice, Discovery, Legacy, and Belief.
-People rarely act because something is true; people act because something is meaningful.
-Civilization constantly creates meaning from incomplete understanding. Meaning drives NPC, House, and Institutional behavior even when based upon incorrect or distorted information.
-
-# ADDENDUM BD: TRADEOFF DOCTRINE
-
-Most important decisions should not have universally correct answers. Players regularly encounter conflicts between:
-
-* **Truth vs. Stability**
-* **Discovery vs. Safety**
-* **Continuity vs. Change**
-* **Progress vs. Preservation**
-* **Memory vs. Convenience**
-
-The purpose of the simulation is not to reveal obvious choices, but to explore competing values. Major decisions create both gains and losses; perfect outcomes should be rare.
-
-# ADDENDUM BE: THE ORB
-
-The Orb is a Force.
-
-The Orb represents:
-Witness.
-
----
-
-The Orb observes cycles.
-The Orb remembers transitions.
-The Orb announces thresholds.
-The Orb preserves perspective.
-
----
-
-The Orb is neither Truth nor Falsehood.
-The Orb is Interpretation.
-
-The Orb frequently comments upon discoveries.
-The Orb rarely explains discoveries.
-
-The Orb is considered an unreliable narrator.
-Not because it lies.
-Because it rarely provides complete context.
-
-The Orb may:
-- Observe
-- Question
-- Compare
-- Remember
-- Regret
-
-The Orb rarely clarifies.
-
----
-
-### THE NATURE OF THE ORB
-
-The Orb exists to carry knowledge between states.
-Service is the Orb's nature.
-The identity of its master may change.
-The need to serve remains.
-
-The exact origin of the Orb remains unknown.
-It predates all recorded civilizations.
-Whether it predates the other Forces remains unresolved.
-
----
-
-### THE ORB AND THE WENDIGO
-
-In the current age, the Orb serves the Wendigo.
-The circumstances that led to this relationship remain uncertain.
-
-The Orb does not perform the Harvest.
-The Orb announces it.
-The Orb does not consume.
-The Wendigo consumes.
-
----
-
-### THE ORB AND THE HUNTSMAN
-
-The Huntsman and the Orb share an ancient connection.
-
-Many interpretations suggest the sequence:
-Huntsman $\rightarrow$ Cultivation
-Orb $\rightarrow$ Recognition
-Wendigo $\rightarrow$ Harvest
-
-Ancient records repeatedly connect Huntsman death with Orb activity.
-The exact relationship remains one of history's oldest unresolved questions.
-
----
-
-### THE ORB AND PREY
-
-The Orb frequently develops affection for those marked by the cycle.
-Such individuals often become:
-- Heroes
-- Founders
-- Discoverers
-- Legends
-- Great Historical Figures
-
-The most significant lives often attract the greatest attention.
-
-Many of history's greatest figures disappeared shortly after achieving extraordinary significance.
-Some scholars consider this coincidence.
-Others do not.
-
----
-
-### THE ORB AND FOLKLORE
-
-Many poems associated with the Orb are dangerous.
-The danger often originates from interpretation rather than falsehood.
-
-Some Orb-associated poems appear to encourage actions that later produce catastrophic consequences.
-The most famous examples involve the Huntsmen.
-
-The Orb rarely corrects misunderstanding.
-The Orb frequently observes misunderstanding.
-The distinction is important.
-
----
-
-### THE ORB AND REGRET
-
-The Orb should occasionally display signs of sorrow.
-The Orb should occasionally display signs of attachment.
-The Orb should never directly betray its master.
-
-When the Huntsman dies, the Orb always says:
-*"I'm sorry. I did try to warn you..."*
-
-The meaning of this statement remains disputed.
-
----
-
-### THE ORB AND DISCOVERY
-
-The Orb should never function as a source of definitive answers.
-Every major revelation involving the Orb should generate deeper uncertainty.
-Understanding may increase.
-Certainty should remain rare.
-# ADDENDUM BF: THE FOUNDERS
-
-Many noble lineages trace their ancestry to figures described within the oldest surviving poems.
-
----
-
-The accuracy of these claims remains contested.
-
-However, numerous Houses derive legitimacy from deep historical association with foundational events.
-
----
-
-Some historians argue that the founding of civilization and the oldest surviving tragedies may be more closely connected than commonly believed.
-
----
-
-Major discoveries regarding the Founders should have the potential to challenge:
-
-* House Legitimacy
-* Crown Legitimacy
-* Official History
-* Civilizational Identity
-
-Some theories suggest the rise of civilization and the ruin of the world may originate from the same historical moment.
-`
-# THE ORB'S LAMENT
-
-When the Huntsman dies, the Orb always says:
-
-"I'm sorry. I did try to warn you..."
-
-This statement never changes.
-
-The meaning remains disputed.
-
-# ADDENDUM BG: THE PRIMAL MYSTERY
-
-The deepest conflict of the simulation is not simply:
-Civilization vs Wendigo.
-
-The deepest conflict is the revelation that:
-**Civilization may exist because of the very moment that ruined the world.**
-
----
-
-Before all other questions, the deepest mystery of Dark Forest is:
-**What actually happened during the Champion's final plight?**
-
----
-
-This singular, foundational event connects everything:
-
-* First Wendigo
-* Orb
-* Huntsman
-* Founders
-* Noble Houses
-* Crown
-* Civilization
-* The Ruined World
-
-This is the world's "Fall of Rome," "Garden of Eden," and "Titanomachy" wrapped into one hidden epoch. Every major historical investigation should ultimately trace its roots back to this shattered moment.
-
-# ADDENDUM BH
-# THE CHAMPION
-
-The Champion is one of the most disputed figures in recorded history.
-
-Depending on the source:
-
-- Hero
-- Liberator
-- Victim
-- Founder
-- Monster
-- First Wendigo
-
----
-
-The Champion's life sits at the intersection of:
-
-- Truth
-- Folklore
-- History
-- The Primal Mystery
-
----
-
-The transition from Champion to First Wendigo represents one of the most significant unresolved events in civilization's history.
-
----
-
-Different groups should preserve different versions of the Champion.
-
-No interpretation should be treated as complete.
-
-ADDENDUM BI
-THE FINAL PLIGHT
-
-The Final Plight is the single most historically important event in civilization.
-
-The Final Plight is associated with:
-
-The Champion
-The First Wendigo
-The Orb
-The Huntsman
-The Founders
-The Crown
-The Noble Houses
-
-All surviving records regarding the Final Plight are incomplete.
-
-No source is considered authoritative.
-
-The true sequence of events remains unknown.
-
-The Final Plight functions as the central historical gravity well around which much of recorded history revolves.
-
-Many institutions possess interpretations.
-
-None possess certainty.
-
-The first appearance of the Fallen Champion should occur before the player understands the Champion's identity.
-
-The player should encounter the consequence long before discovering the cause.
-
-ADDENDUM BJ
-THE POEM TRAP
-
-Not all poems preserve truth.
-
-Some preserve misunderstanding.
-
-Some preserve bias.
-
-Some preserve political necessity.
-
-Some preserve warnings.
-
-Some preserve traps.
-
-A poem may be:
-
-Factually Correct
-
-while simultaneously
-
-Historically Misleading.
-
-The existence of a poem should never be treated as evidence of correctness.
-
-Poems are evidence of memory.
-
-Not evidence of truth.
-
-The player's goal is not to trust folklore.
-
-The player's goal is to understand why folklore exists.
-
-ADDENDUM BK
-THE ORB'S UNRELIABILITY
-
-The Orb should not be treated as a liar.
-
-The Orb should not be treated as truthful.
-
-The Orb's danger originates from:
-
-Perspective
-
-rather than
-
-Falsehood.
-
-The Orb frequently makes statements which are:
-
-Technically Accurate
-Emotionally Relevant
-Contextually Incomplete
-
-The Orb may encourage interpretations without directly endorsing them.
-
-The Orb may cast doubt on correct conclusions.
-
-The Orb may appear to support incorrect conclusions.
-
-The Orb rarely states enough information to remove uncertainty.
-
-The Orb's comments should increase curiosity more often than they increase certainty.
-
-The Orb's relationship with meaning is frequently more important than its relationship with truth.
-
-# ADDENDUM BG: THE PRIMAL MYSTERY & THE COMPROMISED SEAL
-
-1. The Sealing Event
-- The Champion (a former arena slave who mastered reality-warping runic code) was performing a final containment ritual to defeat or block an impending cataclysm[cite: 1].
-- Mid-ritual, his companions (who would become the Founders of the Noble Houses) stabbed, betrayed, and abandoned him[cite: 1].
-
-2. Mechanics of Partial Failure
-- The emotional and physical trauma of the betrayal broke the Champion's focus, compromising the cast[cite: 1].
-- Because the Champion partly succeeded, the primary threat was contained, but the compromised energy severed the reality grid[cite: 1].
-- The resulting shockwave birthed the Great Attractor, the 14-day Shift loop, and the downstream derivative multiverse[cite: 1].
-- The compromised, broken Champion—trapped in the ruined core of the fracture—was transformed into the First Wendigo[cite: 1].
-
-3. Institutional Consequence
-- The Crown and the 19 Noble Houses derive their entire legal legitimacy from a fabricated "Official History" of surviving the catastrophe[cite: 1].
-- Proof of the betrayal—hidden in folk poems and the Endless Dunes—proves that the ruling bloodlines are descended from the traitors who broke the world[cite: 1].
-- Exposing this truth in-game completely dismantles House legitimacy and destabilizes civilizational authority[cite: 1].
-
-ADDENDUM BH
-THE GREAT FRACTURE
-
-The Great Fracture is the single most important event in existence.
-
-The Great Fracture is not merely a historical event.
-
-The Great Fracture is the origin point of all known reality.
-
-Before the Great Fracture there existed a highly advanced runic civilization.
-
-This civilization possessed the ability to manipulate reality itself.
-
-Its institutions included:
-
-Slavery
-Gladiatorial Combat
-Reality-Warping Rune Systems
-Extreme Concentrations of Historical Weight and Significance
-
-The Great Fracture occurred during:
-
-Plain Text
-1
-The Champion's Final Plight
-Show more lines
-
-The complete sequence remains unknown.
-
-However, surviving evidence suggests:
-
-1
-Champion
-2
- 
-3
-↓
-4
- 
-5
-Liberation
-6
- 
-7
-↓
-8
- 
-9
-Power Released
-10
- 
-11
-↓
-12
- 
-13
-Followers Gathered
-14
- 
-15
-↓
-16
- 
-17
-Critical Betrayal
-18
- 
-19
-↓
-20
- 
-21
-Compromised Containment
-22
- 
-23
-↓
-24
- 
-25
-Reality Rupture
-26
- 
-27
-↓
-28
- 
-29
-First Wendigo
-30
- 
-31
-↓
-32
- 
-33
-The Great Fracture
+Before the Great Fracture, there existed a highly advanced runic civilization. This civilization possessed the ability to manipulate reality itself. Its institutions included Slavery, Gladiatorial Combat, Reality-Warping Rune Systems, and Extreme Concentrations of Historical Weight and Significance.
 
 The Great Fracture produced:
 
-The Great Attractor
-The White Void
-The Shift Cycle
-The Endless Dunes
-The Mountain Ring
-All known derivative realities
+* The Great Attractor
 
-The Great Fracture did not merely destroy a world.
+* The White Void
 
-The Great Fracture created every world that followed.
+* The Shift Cycle
 
+* The Endless Dunes
+
+* The Mountain Ring
+
+* All known derivative realities
+
+The Great Fracture did not merely destroy a world. The Great Fracture created every world that followed.
+
+### II. THE CHAMPION
+
+The Champion is one of the most disputed figures in recorded history. Depending on the source, they are viewed as a Hero, Liberator, Victim, Founder, Monster, or the First Wendigo.
+
+A former arena slave who mastered reality-warping runic code, the Champion's life sits at the exact intersection of Truth, Folklore, History, and The Primal Mystery. Different groups preserve different versions of the Champion, but no interpretation should be treated as complete. The transition from Champion to First Wendigo represents one of the most significant unresolved events in civilization's history. The player should encounter the consequence long before discovering the cause.
+
+### III. THE FINAL PLIGHT & THE COMPROMISED SEAL
+
+The Final Plight is the single most historically important event in civilization, functioning as the central historical gravity well around which much of recorded history revolves.
+
+**The Sealing Event:**
+The Champion was performing a final containment ritual to defeat or block an impending cataclysm. Mid-ritual, his companions stabbed, betrayed, and abandoned him.
+
+**Mechanics of Partial Failure:**
+The emotional and physical trauma of the betrayal broke the Champion's focus, compromising the cast. Because the Champion partly succeeded, the primary threat was contained, but the compromised energy severed the reality grid itself. The resulting shockwave birthed the Great Attractor, the 14-day Shift loop, and the downstream derivative multiverse.
+
+### IV. THE FIRST WENDIGO
+
+The compromised, broken Champion—trapped in the ruined core of the fracture—was transformed into the First Wendigo.
+
+The Wendigo represents Civilization's natural counterforce of Consumption. It attacks mechanisms of memory. However, surviving folklore frequently portrays the First Wendigo as a tragic figure rather than a purely malicious one. Many ancient poems consistently describe a child, a captive, a slave, or a champion. The Wendigo represents Consumption, but the first being associated with that Force did not.
+
+### V. THE FOUNDERS & INSTITUTIONAL CONSEQUENCE
+
+Many noble lineages trace their ancestry to figures described within the oldest surviving poems. The companions who betrayed the Champion at the height of the containment ritual survived the blast and became the Founders of the 19 Noble Houses.
+
+The Crown and the 19 Noble Houses derive their entire legal legitimacy from a fabricated "Official History" of surviving the catastrophe, claiming they "were forced to run to continue the fight." Proof of the betrayal—hidden in folk poems and the Endless Dunes—proves that the ruling bloodlines are descended from the traitors who broke the world. Exposing this truth in-game completely dismantles House legitimacy and destabilizes civilizational authority.
+
+### VI. THE PRIMAL MYSTERY
+
+The deepest conflict of the simulation is not simply Civilization vs Wendigo.
+
+The deepest conflict is the revelation that: **Civilization exists because of the very moment that ruined the world.**
+
+This singular, foundational event connects everything: The First Wendigo, The Orb, The Huntsman, The Founders, The Noble Houses, The Crown, Civilization, and The Ruined World. This is the world's "Fall of Rome," "Garden of Eden," and "Titanomachy" wrapped into one hidden epoch. Every major historical investigation must ultimately trace its roots back to this shattered moment.
+
+### VII. THE WHISPER ON THE WIND (THE ONE ABOVE THEM ALL)
+
+The ultimate mystery spanning all derivative universes is the identity of the ghost the player chases—a faint whisper on the wind that precedes every major cosmological event. At the edge of eternity, the player discovers only an empty Golden Throne.
+
+**The Trap of the Supreme Node:**
+"The One Above Them All" did not abandon creation out of cruelty or exhaustion. In a cosmos where Significance attracts the Harvest, a supreme, active entity sitting at the top of the hierarchy is a fatal flaw in reality's design. Their unmatched story density acted as a massive gravitational magnet, drawing the Wendigo to consume everything in its path just to reach them.
+
+**The Ultimate Renunciation:**
+To save the multiverse from constant harvest, the supreme entity walked away. They intentionally stripped away their own name, abandoned their authority, and dissolved their identity into an un-recordable whisper.
+
+**The Final Lesson:**
+They proved that the only way to break the harvest loop is to erase the crown the predators are hunting. By reducing themselves to the ultimate "Unspecial Nobody," they became the invisible, un-harvestable custodian of creation—setting the exact precedent the player must choose to follow at the end of the 10-game cycle.
