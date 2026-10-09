@@ -14,6 +14,7 @@ import './src_epoch_manager.js';
 import './src_systems_intel.js';
 import './src_systems_intel_tracker.js';
 import './src_systems_investigation.js';
+import './src_systems_reputation.js';
 import './src_systems_world.js';
 
 import './src_systems_inventory.js';

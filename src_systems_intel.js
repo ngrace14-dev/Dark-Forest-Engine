@@ -274,9 +274,11 @@ window.IntelPropagation = {
         const newIntel = window.IntelManager.lookup(resulting_intel_id);
 
         // STEP C: Trust Verification & Plausibility Check (Phase 6.3 Hardening)
-        // If factions are enemies/rivals, target loses confidence in the info
+        // REPUTATION PIVOT: Use the new ReputationManager to calculate trust
         let trustFactor = 1.0;
-        if (this._areFactionsRivals(sourceNode.faction, targetNode.faction)) {
+        if (window.ReputationManager) {
+            trustFactor = window.ReputationManager.calculateTrust(sourceNode, targetNode);
+        } else if (this._areFactionsRivals(sourceNode.faction, targetNode.faction)) {
             trustFactor *= 0.5; 
         }
         
