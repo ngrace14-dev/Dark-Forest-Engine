@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -233,6 +233,9 @@ class CrowsEyeSystem {
             case 'FORCE_LAYER':
             case 'FORCE_LAYER':
                 contentHtml = this.renderForceLayer();
+                break;
+            case 'CIV_PRESSURE':
+                contentHtml = this.renderCivPressureView();
                 break;
             case 'MYSTERIES':
                 contentHtml = this.renderMysteriesView();
@@ -1274,6 +1277,49 @@ class CrowsEyeSystem {
                 <div style="margin-top:15px; border-top:1px solid #451a03; padding-top:10px;">
                     <button style="background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px 10px; font-size:10px; cursor:pointer;"
                         onclick="window.CrowsEye.selectedEntityId='${l.actorId}'; window.CrowsEye.updateTimer=1.0;">INSPECT LEGACY</button>
+                </div>
+            </div>`;
+        });
+
+        html += `</div></div>`;
+        return html;
+    }
+
+    renderCivPressureView() {
+        if (!window.InstabilityEngine) return "Pressure Engine Offline";
+        const crises = window.InstabilityEngine.getCrises();
+        
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">CIVILIZATION PRESSURE: INSTITUTIONAL INSTABILITY</div>`;
+
+        if (crises.length === 0) {
+            return html + `<div style="font-size:11px; color:#451a03;">Civilization is currently stable. No active schisms or political coverups detected.</div>`;
+        }
+
+        html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
+        
+        crises.forEach(c => {
+            const house = window.DynastyManager?.getHouse(c.houseId);
+            const intensity = c.intensity * 100;
+            
+            html += `<div style="background:rgba(239,68,68,0.05); border:1px solid #78350f; padding:20px; border-left: 4px solid #ef4444;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <div>
+                        <div style="font-weight:bold; color:#ef4444; font-size:16px;">${c.type}: ${house ? house.name : 'STATE'}</div>
+                        <div style="font-size:10px; color:#78350f;">START DAY: ${c.startDay}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="color:#78350f; font-size:10px;">INSTABILITY INTENSITY</span>
+                        <div style="font-size:18px; color:#ef4444;">${Math.floor(intensity)}%</div>
+                    </div>
+                </div>
+
+                <div style="font-size:12px; color:#94a3b8; line-height:1.4; margin-bottom:15px;">
+                    ${c.detail || 'Systemic instability caused by internal belief contradictions.'}
+                </div>
+
+                <div style="height:4px; background:#1c1917; width:100%;">
+                    <div style="height:100%; background:#ef4444; width:${intensity}%;"></div>
                 </div>
             </div>`;
         });
