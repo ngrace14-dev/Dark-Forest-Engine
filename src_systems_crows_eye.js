@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'PLAYBACK', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -211,6 +211,9 @@ class CrowsEyeSystem {
                 break;
             case 'CHRONICLE':
                 contentHtml = this.renderChronicleView();
+                break;
+            case 'OFFICIAL_HISTORY':
+                contentHtml = this.renderOfficialHistoryView();
                 break;
             case 'HOUSES':
                 contentHtml = this.renderHousesView();
@@ -649,6 +652,63 @@ class CrowsEyeSystem {
                             <span>${targetNode ? targetNode.label : 'Unknown Event'}</span>
                         </div>`;
                     }).join('') || '<div style="font-size:11px; color:#451a03;">No causal connections identified.</div>'}
+                </div>
+            </div>`;
+        });
+
+        html += `</div>`;
+        return html;
+    }
+
+    renderOfficialHistoryView() {
+        if (!window.HistoryOffice) return "Historical Office Offline";
+        
+        const worldEvents = window.ChronicleManager?.worldLedger.slice(-10).reverse() || [];
+        
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">INSTITUTIONAL NARRATIVE: LAYERED MEMORY</div>`;
+
+        worldEvents.forEach(e => {
+            const layers = window.HistoryOffice.getNarrativeLayers(e.id);
+            if (!layers) return;
+
+            html += `<div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:20px;">
+                <div style="font-weight:bold; color:#fbbf24; font-size:14px; margin-bottom:15px; display:flex; justify-content:space-between;">
+                    <span>EVENT: ${e.type} (Day ${e.timestamp.day})</span>
+                    <span style="color:#78350f; font-size:10px;">SIGNIFICANCE: ${e.significance}</span>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                    <!-- Layer 1: Chronicle -->
+                    <div style="border-left:2px solid #78350f; padding-left:10px;">
+                        <div style="font-size:10px; color:#78350f; font-weight:bold; margin-bottom:5px;">[1] CHRONICLE (What Happened)</div>
+                        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">${e.detail}</div>
+                    </div>
+
+                    <!-- Layer 2: Truth -->
+                    <div style="border-left:2px solid #10b981; padding-left:10px;">
+                        <div style="font-size:10px; color:#10b981; font-weight:bold; margin-bottom:5px;">[2] TRUTH (What is Objective)</div>
+                        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">${layers.truth ? layers.truth.payload.description : 'Undiscovered Truth.'}</div>
+                    </div>
+
+                    <!-- Layer 3: Official History -->
+                    <div style="border-left:2px solid #fbbf24; padding-left:10px;">
+                        <div style="font-size:10px; color:#fbbf24; font-weight:bold; margin-bottom:5px;">[3] OFFICIAL (What is Taught)</div>
+                        ${layers.official.map(o => `
+                            <div style="margin-bottom:8px;">
+                                <div style="font-size:9px; color:#d97706;">Published by: ${o.bias}</div>
+                                <div style="font-size:11px; color:#94a3b8; font-style:italic;">"${o.detail}"</div>
+                            </div>
+                        `).join('') || '<div style="font-size:11px; color:#451a03;">No official record published.</div>'}
+                    </div>
+
+                    <!-- Layer 4: Folklore -->
+                    <div style="border-left:2px solid #a855f7; padding-left:10px;">
+                        <div style="font-size:10px; color:#a855f7; font-weight:bold; margin-bottom:5px;">[4] FOLKLORE (What is Remembered)</div>
+                        ${layers.folklore.map(p => `
+                            <div style="font-size:11px; color:#94a3b8; line-height:1.4;">"${p.text.substring(0, 100)}..."</div>
+                        `).join('') || '<div style="font-size:11px; color:#451a03;">No folklore yet.</div>'}
+                    </div>
                 </div>
             </div>`;
         });

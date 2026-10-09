@@ -8,8 +8,9 @@
 
 class HistoryOfficeSystem {
     constructor() {
-        this.officialLedger = []; // Array of { title, detail, authority, bias, date }
+        this.officialLedger = []; // Array of { id, title, detail, authority, bias, date, originalEventId, truthId }
         this.narrativeWeight = new Map(); // Map<intel_id, weight> (How "official" a fact is)
+        this.educationRegistry = new Map(); // Map<villageId, Set<officialId>> (What is taught in each village)
         
         window.EventBus.on('ENGINE_READY', () => this.init());
         window.EventBus.on('HEARTBEAT_T1', () => this.processWorkQueue());
@@ -26,93 +27,125 @@ class HistoryOfficeSystem {
     processWorkQueue() {
         if (!window.ChronicleManager || !window.IntelManager) return;
 
-        // Find high-weight chronicle events that haven't been "Officialized"
-        const recentEvents = window.ChronicleManager.worldLedger.slice(-10);
+        // Find high-weight chronicle events
+        const recentEvents = window.ChronicleManager.worldLedger.slice(-20);
         
         recentEvents.forEach(event => {
-            if (event.isOfficial) return;
-
-            // NPCs with historian career roles perform "Review"
+            // Find NPCs with archivist/historian roles nearby archives or in Capital
             const historians = this.getAvailableHistorians();
             if (historians.length > 0) {
                 const historian = historians[Math.floor(Math.random() * historians.length)];
-                this.publishOfficialNarrative(event, historian);
+                
+                // Only "Officialize" if there is a verified Truth record (Bible §16)
+                const facts = Array.from(window.IntelManager.registry.values())
+                    .filter(i => i.type === 'FACT' && (i.payload.title.includes(event.type) || i.significance.historical === event.historicalWeight));
+                
+                if (facts.length > 0) {
+                    this.publishOfficialNarrative(event, facts[0], historian);
+                }
             }
         });
     }
 
     getAvailableHistorians() {
-        // Find NPCs with archivist/historian roles
         return window.GameCore?.activeEntities.filter(en => 
-            en.def?.role === 'Archivist' || en.def?.profession === 'historian'
+            en.def?.role === 'Archivist' || en.def?.profession === 'historian' || en.houseId === 'house_royal'
         ) || [];
     }
 
     /**
-     * Transforms a raw event into an "Official Narrative".
-     * Expresses Bible §16: "Historians create understanding, not truth."
+     * Transforms a raw event and its truth into an "Official Narrative".
+     * Bible §16: "The Crown may shape history without changing truth."
      */
-    publishOfficialNarrative(event, historian) {
-        // Narrative Bias (Bible §17 Addendum BJ)
-        // If the historian is from a specific House, they spin the event to favor them
+    publishOfficialNarrative(event, truth, historian) {
         const bias = historian.houseId || 'CROWN';
-        const spin = this.calculateNarrativeSpin(event, bias);
+        
+        // Check if this event already has an official version for this bias
+        if (this.officialLedger.some(n => n.originalEventId === event.id && n.bias === bias)) return;
+
+        const spin = this.calculateNarrativeSpin(event, truth, bias);
 
         const narrative = {
             id: 'hist_' + Math.random().toString(36).substr(2, 9),
-            title: `Official Record: ${event.type}`,
+            title: spin.title,
             detail: spin.detail,
             sourceEventId: event.id,
+            truthId: truth.intel_id,
             historianId: historian.id,
             authority: this.calculateAuthority(historian),
             bias: bias,
-            date: window.EngineParams?.worldDay || 0
+            date: window.EngineParams?.worldDay || 0,
+            divergence: spin.divergence // 0 to 1 score of how much it deviates from Chronicle
         };
 
         this.officialLedger.push(narrative);
-        event.isOfficial = true;
 
-        // Register as Intel Record (Type: FACT but with potential distortion)
+        // Register as Intel Record (Bible §16: Education Records)
         window.IntelManager.register({
             type: 'FACT',
             payload: {
                 title: narrative.title,
                 description: narrative.detail,
-                tags: ['OFFICIAL_HISTORY', bias]
+                tags: ['OFFICIAL_HISTORY', 'EDUCATIONAL', bias]
             },
-            significance: { political: 50, historical: event.historicalWeight },
-            truth_state: 'TRUE', // It's "True" that this is the official history
-            certainty: narrative.authority
+            significance: { political: 80, historical: event.historicalWeight },
+            truth_state: 'TRUE', // It's factually true that this is the Official Record
+            certainty: narrative.authority,
+            isAnchored: true // Official History survives Shifts
         });
 
-        window.EventBus.emit('UI_LOG', `[HISTORY] ${historian.name} published a new Official Record: ${narrative.title}`);
+        window.EventBus.emit('UI_LOG', `[HISTORY] ${bias.toUpperCase()} has published its official account of ${event.type}.`);
         window.EventBus.emit('HISTORY_PUBLISHED', narrative);
     }
 
-    calculateNarrativeSpin(event, bias) {
-        let detail = event.detail;
-        
-        // Revisionist History logic
-        if (bias === 'house_terminus') {
-            detail = detail.replace('The Shift', 'The Observed Stabilization');
-        } else if (bias === 'CROWN') {
-            detail = `By Royal Decree: ${detail}`;
+    calculateNarrativeSpin(event, truth, bias) {
+        let detail = truth.payload.description;
+        let title = `Chronicle of ${event.type}`;
+        let divergence = 0.1;
+
+        // Crown Narrative: Focus on Stability and Order (Bible §18)
+        if (bias === 'house_royal' || bias === 'CROWN') {
+            title = `Royal Decree on the ${event.type}`;
+            detail = `By the Grace of the Crown, order was maintained during the ${event.type}. ${detail}`;
+            if (event.type === 'DEFEAT' || event.type === 'die') {
+                detail = `A loyal servant of the realm transitioned to the Great Peace. The Chain remains unbroken.`;
+                divergence = 0.7;
+            }
+        } 
+        // House Terminus Narrative: Focus on Measurement and Knowledge (Bible §8)
+        else if (bias === 'house_terminus') {
+            title = `Terminus Observation: ${event.type}`;
+            detail = `Analytical data confirms the stability of the Mountain Ring despite the ${event.type}.`;
+            divergence = 0.3;
         }
 
-        return { detail };
+        return { title, detail, divergence };
     }
 
     calculateAuthority(historian) {
-        // Reputation affects how much the world believes this history (Phase 3)
         if (window.ReputationManager) {
             const rep = window.ReputationManager.getReputation(historian.id);
-            return rep.credibility;
+            const instRep = window.ReputationManager.getInstitutionReputation(historian.houseId);
+            return (rep.credibility * 0.4) + (instRep.authority * 0.6);
         }
         return 0.8;
     }
 
-    getOfficialHistory() {
-        return this.officialLedger;
+    /**
+     * Cross-references the 4 layers of an event.
+     */
+    getNarrativeLayers(eventId) {
+        const chronicle = window.ChronicleManager?.worldLedger.find(e => e.id === eventId);
+        if (!chronicle) return null;
+
+        const truth = Array.from(window.IntelManager?.registry.values() || [])
+            .find(i => i.significance.historical === chronicle.historicalWeight && i.type === 'FACT');
+
+        const official = this.officialLedger.filter(n => n.originalEventId === eventId);
+
+        const folklore = window.GameState?.anthology?.filter(p => p.originId === (chronicle.legendId || 'none'));
+
+        return { chronicle, truth, official, folklore };
     }
 }
 
