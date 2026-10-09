@@ -12,6 +12,9 @@ window.ChronicleManager = {
 
     // Per-Entity History (Scoped to ID)
     entityRecords: new Map(),
+    
+    // LEGEND ENGINE: Tracking weight for individuals (Bible §1)
+    npcHistoricalWeights: new Map(), // nodeId -> totalWeight
 
     init: function() {
         // Hydrate from existing worldEvents if they exist
@@ -22,17 +25,67 @@ window.ChronicleManager = {
 
     /**
      * Records a significant event into the world's memory.
-     * @param {Object} event - { actorId, type, detail, significance, historicalWeight }
+     * Bible §1: Action -> Intent -> Event -> Chronicle.
      */
     recordEvent: function(event) {
-        // ... existing code ...
-        // 5. Narrative Echo (Optional: UI Log for major events)
-        if (entry.significance > 80 || entry.historicalWeight > 100) {
-            window.EventBus.emit('UI_LOG', `[HISTORY] ${entry.detail}`);
+        // ... previous record logic ...
+
+        // 5. Weight Accumulation (Bible §1)
+        if (event.actorId) {
+            const currentWeight = this.npcHistoricalWeights.get(event.actorId) || 0;
+            const newWeight = currentWeight + (event.historicalWeight || 1);
+            this.npcHistoricalWeights.set(event.actorId, newWeight);
+
+            // CROW INTEREST: High weight individuals attract the Crow (Bible §18)
+            if (newWeight > 500 && !event.isLegendary) {
+                 this.checkLegendThreshold(event.actorId, newWeight);
+            }
         }
 
-        // 6. Snapshot periodic state for playback
+        // 6. Narrative Echo
+        if (event.significance > 80 || event.historicalWeight > 100) {
+            window.EventBus.emit('UI_LOG', `[HISTORY] ${event.detail}`);
+        }
+
         this.captureSnapshot();
+    },
+
+    /**
+     * Identifies if an individual has become a Legend.
+     */
+    checkLegendThreshold: function(nodeId, weight) {
+        const ent = window.GameCore?.activeEntities.find(e => e.id === nodeId);
+        if (!ent) return;
+
+        const legend = {
+            id: 'leg_' + Math.random().toString(36).substr(2, 9),
+            actorId: nodeId,
+            name: ent.name,
+            power: weight,
+            type: 'INDIVIDUAL',
+            title: this.generateLegendTitle({ actor: ent.name }),
+            archetype: this.identifyArchetype(ent, weight)
+        };
+
+        window.GameState.legends ??= [];
+        if (!window.GameState.legends.some(l => l.actorId === nodeId)) {
+            window.GameState.legends.push(legend);
+            window.EventBus.emit('UI_LOG', `🌟 [LEGEND] ${ent.name} has crossed the threshold of memory. A new legend is born.`);
+            window.EventBus.emit('LEGEND_CREATED', legend);
+        }
+    },
+
+    identifyArchetype: function(ent, weight) {
+        // Bible §22: Based on Drives and Force influence
+        const profile = window.PersonhoodManager?.getProfile(ent.id);
+        if (!profile) return 'UNSPECIAL';
+
+        const { aggression, loyalty, investigation } = profile.traits;
+
+        if (investigation > 0.7) return 'SCHOLAR';
+        if (aggression > 0.7) return 'MONSTER';
+        if (loyalty > 0.7) return 'FOUNDER';
+        return 'HERO';
     },
 
     captureSnapshot: function() {

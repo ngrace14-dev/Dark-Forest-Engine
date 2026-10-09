@@ -231,6 +231,7 @@ class CrowsEyeSystem {
                 contentHtml = this.renderForcesView();
                 break;
             case 'FORCE_LAYER':
+            case 'FORCE_LAYER':
                 contentHtml = this.renderForceLayer();
                 break;
             case 'MYSTERIES':
@@ -1223,6 +1224,61 @@ class CrowsEyeSystem {
         });
 
         html += `</div>`;
+        return html;
+    }
+
+    renderLegendsView() {
+        if (!window.ChronicleManager) return "Chronicle Offline";
+        const legends = window.GameState?.legends || [];
+        const weightMap = window.ChronicleManager.npcHistoricalWeights;
+        
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">LEGEND ENGINE: HISTORICAL INDIVIDUALS</div>`;
+
+        if (legends.length === 0) {
+            return html + `<div style="font-size:11px; color:#451a03;">No individuals have yet crossed the threshold of memory. Observe those of rising Significance.</div>`;
+        }
+
+        html += `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap:20px;">`;
+        
+        legends.forEach(l => {
+            const currentWeight = (weightMap ? weightMap.get(l.actorId) : 0) || l.power;
+            const percentToDeification = Math.min(100, (currentWeight / 1000) * 100);
+
+            html += `<div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:20px; border-top: 4px solid #fbbf24;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                    <div>
+                        <div style="font-weight:bold; color:#fbbf24; font-size:18px;">${l.name.toUpperCase()}</div>
+                        <div style="font-size:10px; color:#78350f;">ARCHETYPE: ${l.archetype || 'HERO'} | ID: ${l.id}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:10px; color:#78350f;">HISTORICAL WEIGHT</div>
+                        <div style="font-size:16px; color:#fbbf24;">${Math.floor(currentWeight)}</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:15px;">
+                    <div style="display:flex; justify-content:space-between; font-size:9px; margin-bottom:3px;">
+                        <span style="color:#78350f;">STORY DENSITY (DEIFICATION)</span>
+                        <span style="color:#fbbf24;">${Math.floor(percentToDeification)}%</span>
+                    </div>
+                    <div style="height:4px; background:#1c1917; width:100%;">
+                        <div style="height:100%; background:#fbbf24; width:${percentToDeification}%;"></div>
+                    </div>
+                </div>
+
+                <div style="font-size:12px; color:#94a3b8; line-height:1.4;">
+                    Known to history as: <span style="color:#fbbf24; font-style:italic;">"${l.title}"</span>
+                </div>
+
+                <div style="margin-top:15px; border-top:1px solid #451a03; padding-top:10px;">
+                    <button style="background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px 10px; font-size:10px; cursor:pointer;"
+                        onclick="window.CrowsEye.selectedEntityId='${l.actorId}'; window.CrowsEye.updateTimer=1.0;">INSPECT LEGACY</button>
+                </div>
+            </div>`;
+        });
+
+        html += `</div></div>`;
         return html;
     }
 
