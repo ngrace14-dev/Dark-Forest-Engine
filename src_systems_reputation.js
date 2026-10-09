@@ -92,6 +92,15 @@ class ReputationManagerSystem {
     }
 
     isRival(f1, f2) {
+        // DYNASTY PIVOT: Check for active blood-feuds (Bible §19)
+        if (window.DynastyManager) {
+            const feuds = window.DynastyManager.getFeuds();
+            const activeFeud = feuds.find(f => 
+                (f.houseA === f1 && f.houseB === f2) || (f.houseA === f2 && f.houseB === f1)
+            );
+            if (activeFeud && activeFeud.intensity > 5) return true;
+        }
+
         const rivals = [['monster', 'village'], ['forest', 'kingdom'], ['adventurer', 'monster']];
         return rivals.some(pair => pair.includes(f1) && pair.includes(f2));
     }
