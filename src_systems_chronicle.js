@@ -83,10 +83,8 @@ window.ChronicleManager = {
             window.GameState.legends ??= [];
             window.GameState.legends.push(legend);
 
-            // --- PHASE 8: FOLKLORE HOOK ---
-            if (Math.random() < 0.3) {
-                this.generatePoem(legend);
-            }
+            // --- PHASE 6: FOLKLORE HOOK ---
+            window.EventBus.emit('LEGEND_CREATED', legend);
             
             window.EventBus.emit('UI_LOG', `[LEGEND] A new story is taking root: ${legend.title}`);
         });
