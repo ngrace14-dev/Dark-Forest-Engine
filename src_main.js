@@ -21,6 +21,7 @@ import './src_systems_history_office.js';
 import './src_systems_dynasty.js';
 import './src_systems_events.js';
 import './src_systems_shift.js';
+import './src_systems_archives.js';
 import './src_systems_dune_investigation.js';
 import './src_systems_playback.js';
 import './src_systems_meaning.js';

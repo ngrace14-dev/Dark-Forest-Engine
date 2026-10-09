@@ -87,6 +87,13 @@ class ShiftDirectorSystem {
             window.EngineParams.worldEpoch = newEpoch;
         }
 
+        // MOUNTAIN PIVOT: The Ring Rotates (Bible §5)
+        // Strictly during the White Void skip.
+        if (window.EngineParams) {
+            window.EngineParams.mountainRotation = (window.EngineParams.mountainRotation || 0) + (Math.PI / 18); // 10 degree rotation
+            window.EventBus.emit('UI_LOG_DEBUG', `[VOID] Mountain Ring rotated to ${((window.EngineParams.mountainRotation * 180) / Math.PI).toFixed(1)} degrees.`);
+        }
+
         // 2. Migration of Settlements (Bible §7, §8)
         if (window.VillageManager) {
             window.VillageManager.shiftLocations();
