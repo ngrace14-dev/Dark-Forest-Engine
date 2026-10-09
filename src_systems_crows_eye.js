@@ -351,11 +351,15 @@ class CrowsEyeSystem {
                                 <div style="font-size:11px; color:#fbbf24;">${i.payload.title}</div>
                                 <div style="font-size:10px; color:#94a3b8; margin-top:3px;">
                                     TIER: <span style="color:#d97706;">${state.tier}</span> |
+                                    IDENTITY: <span style="color:#fbbf24;">${state.profile?.identity || 'UNKNOWN'}</span>
+                                </div>
+                                <div style="font-size:10px; color:#94a3b8; margin-top:2px;">
                                     BELIEF: <span style="color:${state.belief === 'CERTAINTY' ? '#10b981' : '#f59e0b'};">${state.belief}</span> | 
                                     ACCURACY: <span style="color:${state.isCorrect ? '#10b981' : '#ef4444'};">${state.isCorrect ? 'ACCURATE' : 'DISTORTED'}</span>
                                 </div>
                                 <div style="font-size:9px; color:#78350f; margin-top:5px;">WHY DO THEY BELIEVE IT?</div>
-                                <div style="font-size:9px; color:#94a3b8;">Lineage: ${lineage.map(l => `${l.faction} (Rel: ${l.reliabilityAtTime.toFixed(2)})`).join(' → ')}</div>
+                                <div style="font-size:9px; color:#94a3b8;">Interpretation: <span style="color:#fbbf24;">${state.conclusion?.interpretation || 'LITERAL'}</span></div>
+                                <div style="font-size:9px; color:#94a3b8;">Reason: ${state.reason}</div>
                             </div>
                         `;
                     }).join('') || '<div style="font-size:11px; color:#451a03;">Select an entity with knowledge to analyze beliefs.</div>'}

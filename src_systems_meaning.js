@@ -91,14 +91,20 @@ class MeaningEngineSystem {
         // KNOWLEDGE PIVOT: Identify the tier of this belief
         const tier = window.KnowledgeSystem?.getKnowledgeTier(npcId, intelId) || 'PERSONAL';
 
+        // PERSONHOOD PIVOT: Why do they believe this specific conclusion?
+        const profile = window.PersonhoodManager?.getProfile(npcId);
+        const conclusion = window.PersonhoodManager?.calculateConclusion(npcId, intelId);
+
         return {
             state: 'KNOWLEDGEABLE',
             tier: tier,
+            profile: profile,
+            conclusion: conclusion,
             heldRecordId: heldRecord.intel_id,
             belief: belief,
             isCorrect: truthSync,
-            certainty: heldRecord.certainty,
-            reason: truthSync ? 'Holds a verified record.' : 'Influenced by a distorted rumor lineage.'
+            certainty: conclusion ? conclusion.certainty : heldRecord.certainty,
+            reason: conclusion ? conclusion.reason : (truthSync ? 'Holds a verified record.' : 'Influenced by a distorted rumor lineage.')
         };
     }
 
