@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'PLAYBACK', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -247,6 +247,9 @@ class CrowsEyeSystem {
                 break;
             case 'RECORDED_MEMORY':
                 contentHtml = this.renderRecordedMemoryView();
+                break;
+            case 'LOST_MEMORY':
+                contentHtml = this.renderLostMemoryView();
                 break;
             case 'PLAYBACK':
                 contentHtml = this.renderPlaybackView();
@@ -1130,6 +1133,49 @@ class CrowsEyeSystem {
         </div>`;
 
         html += `</div>`;
+        return html;
+    }
+
+    renderLostMemoryView() {
+        if (!window.DuneInvestigation) return "Dune System Offline";
+        const records = window.DuneInvestigation.recoveredRecords;
+        
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">LOST MEMORY: UNFILTERED DUNE ARTIFACTS</div>`;
+
+        if (records.length === 0) {
+            return html + `<div style="font-size:11px; color:#451a03;">No ancient fragments have been recovered from the Endless Dunes. Journey into the sands to begin scanning.</div>`;
+        }
+
+        html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
+        
+        records.forEach(r => {
+            const official = window.HistoryOffice?.officialLedger.find(o => o.id === r.targetHistoryId);
+            
+            html += `<div style="background:rgba(0,0,0,0.5); border:1px solid #78350f; padding:20px; border-left: 4px solid ${r.tier === 'EPOCH' ? '#ef4444' : '#fbbf24'};">
+                <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:10px;">
+                    <div>
+                        <div style="font-weight:bold; color:#fbbf24; font-size:14px;">${r.title}</div>
+                        <div style="font-size:10px; color:#78350f;">FRAGMENT TIER: ${r.tier}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="color:#78350f; font-size:9px;">RECOVERED DAY ${r.day}</span>
+                    </div>
+                </div>
+
+                <div style="font-size:12px; color:#94a3b8; line-height:1.6; margin-bottom:15px;">"${r.detail}"</div>
+
+                ${official ? `
+                    <div style="margin-top:15px; border-top:1px solid #78350f; padding-top:10px; background:rgba(239,68,68,0.05); padding:10px; border:1px solid #ef4444;">
+                        <div style="font-size:10px; color:#ef4444; font-weight:bold; margin-bottom:5px;">⚠️ HISTORICAL CONTRADICTION</div>
+                        <div style="font-size:11px; color:#94a3b8;">This fragment directly challenges:</div>
+                        <div style="font-size:11px; color:#fbbf24; font-style:italic; margin-top:3px;">"${official.title}"</div>
+                    </div>
+                ` : ''}
+            </div>`;
+        });
+
+        html += `</div></div>`;
         return html;
     }
 
