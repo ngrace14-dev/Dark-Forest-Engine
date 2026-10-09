@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'LEGENDS', 'FORCES', 'MYSTERIES', 'NETWORKS', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'LEGENDS', 'FORCES', 'MYSTERIES', 'MEANING', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -224,8 +224,8 @@ class CrowsEyeSystem {
             case 'MYSTERIES':
                 contentHtml = this.renderMysteriesView();
                 break;
-            case 'NETWORKS':
-                contentHtml = this.renderNetworkView();
+            case 'MEANING':
+                contentHtml = this.renderMeaningView();
                 break;
             case 'CALIBRATION':
                 contentHtml = this.renderCalibrationView();
@@ -302,6 +302,65 @@ class CrowsEyeSystem {
              });
         }
         return entities;
+    }
+
+    renderMeaningView() {
+        if (!window.MeaningEngine) return "Meaning Engine Offline";
+        
+        const topEvents = window.MeaningEngine.getWhatMatters(5);
+        let html = `<div style="display:flex; flex-direction:column; gap:30px;">`;
+
+        html += `<div>
+            <div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px; margin-bottom:15px;">WHAT MATTERS? (SIGNIFICANCE ANALYSIS)</div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                ${topEvents.map(e => {
+                    const parties = window.MeaningEngine.getInterestedParties(e.id);
+                    return `
+                        <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:12px;">
+                            <div style="color:#fbbf24; font-weight:bold; font-size:12px;">${e.type} (Sig: ${e.significance})</div>
+                            <div style="font-size:10px; color:#94a3b8; margin:8px 0;">${e.detail}</div>
+                            
+                            <div style="border-top:1px solid #451a03; padding-top:8px;">
+                                <div style="font-size:9px; color:#78350f; margin-bottom:5px;">WHO CARES & WHY?</div>
+                                ${parties.map(p => `
+                                    <div style="font-size:9px; color:#94a3b8;">
+                                        • <span style="color:#d97706;">${p.name}</span>: ${p.reason}
+                                    </div>
+                                `).join('') || '<div style="font-size:9px; color:#451a03;">Universal indifference.</div>'}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>`;
+
+        // 4, 5, 6 - Subjective State Analysis
+        if (this.selectedEntityId) {
+             const knownIntel = window.IntelManager?.getIntelForNode(this.selectedEntityId) || [];
+             html += `<div>
+                <div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px; margin-bottom:15px;">KNOWLEDGE & BELIEF: ${this.selectedEntityId}</div>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    ${knownIntel.slice(0, 3).map(i => {
+                        const state = window.MeaningEngine.getSubjectiveState(this.selectedEntityId, i.intel_id);
+                        const lineage = window.MeaningEngine.getBeliefLineage(this.selectedEntityId, i.intel_id);
+                        return `
+                            <div style="border-left:2px solid #78350f; padding-left:15px;">
+                                <div style="font-size:11px; color:#fbbf24;">${i.payload.title}</div>
+                                <div style="font-size:10px; color:#94a3b8; margin-top:3px;">
+                                    BELIEF: <span style="color:${state.belief === 'CERTAINTY' ? '#10b981' : '#f59e0b'};">${state.belief}</span> | 
+                                    ACCURACY: <span style="color:${state.isCorrect ? '#10b981' : '#ef4444'};">${state.isCorrect ? 'ACCURATE' : 'DISTORTED'}</span>
+                                </div>
+                                <div style="font-size:9px; color:#78350f; margin-top:5px;">WHY DO THEY BELIEVE IT?</div>
+                                <div style="font-size:9px; color:#94a3b8;">Lineage: ${lineage.map(l => `${l.faction} (Rel: ${l.reliabilityAtTime.toFixed(2)})`).join(' → ')}</div>
+                            </div>
+                        `;
+                    }).join('') || '<div style="font-size:11px; color:#451a03;">Select an entity with knowledge to analyze beliefs.</div>'}
+                </div>
+             </div>`;
+        }
+
+        html += `</div>`;
+        return html;
     }
 
     renderActionsView() {
