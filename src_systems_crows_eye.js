@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'HOUSE_HISTORY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'PLAYBACK', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'HOUSE_HISTORY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'DREAMS', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -232,6 +232,9 @@ class CrowsEyeSystem {
                 break;
             case 'MEANING':
                 contentHtml = this.renderMeaningView();
+                break;
+            case 'DREAMS':
+                contentHtml = this.renderDreamsView();
                 break;
             case 'PLAYBACK':
                 contentHtml = this.renderPlaybackView();
@@ -845,6 +848,71 @@ class CrowsEyeSystem {
                 <div style="font-size:11px; color:#94a3b8; margin-bottom:10px; line-height:1.4;">${f.description}</div>
                 <div style="height:6px; background:#1c1917; width:100%;">
                     <div style="height:100%; background:#f59e0b; width:${percent}%;"></div>
+                </div>
+            </div>`;
+        });
+
+        html += `</div>`;
+        return html;
+    }
+
+    renderDreamsView() {
+        if (!window.DreamManager) return "Dream System Offline";
+        const dreams = window.DreamManager.npcDreams;
+        
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">DIVINE CATALYST: ACTIVE SYMBOLIC INFLUENCE</div>`;
+
+        if (dreams.size === 0) {
+            return html + `<div style="font-size:11px; color:#451a03;">You have not yet influenced the ambitions of mortals. Use the Inspection panel to send dreams.</div>`;
+        }
+
+        dreams.forEach((state, npcId) => {
+            const ent = window.GameCore?.activeEntities.find(e => e.id === npcId);
+            const name = ent ? ent.name : npcId;
+            const intensity = (state.intensity / 2) * 100;
+            const corruption = state.corruption * 100;
+
+            html += `<div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:15px; border-left: 4px solid ${corruption > 50 ? '#ef4444' : '#78350f'};">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <div>
+                        <span style="font-weight:bold; color:#fbbf24; font-size:16px;">${name.toUpperCase()}</span>
+                        <span style="color:#78350f; font-size:10px; margin-left:10px;">[Active: ${state.activeSymbol}]</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="color:#fbbf24; font-size:14px;">BOND: ${Math.floor(state.bond * 100)}%</span>
+                        <div style="font-size:9px; color:#94a3b8;">INTERPRETATION: ${state.interpretation || 'LITERAL'}</div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                    <div>
+                        <div style="display:flex; justify-content:space-between; font-size:10px; margin-bottom:3px;">
+                            <span style="color:#78350f;">DREAM INTENSITY</span>
+                            <span style="color:#fbbf24;">${Math.floor(intensity)}%</span>
+                        </div>
+                        <div style="height:4px; background:#1c1917; width:100%;">
+                            <div style="height:100%; background:#f59e0b; width:${intensity}%;"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display:flex; justify-content:space-between; font-size:10px; margin-bottom:3px;">
+                            <span style="color:#78350f;">CORRUPTION RISK</span>
+                            <span style="color:${corruption > 50 ? '#ef4444' : '#94a3b8'};">${Math.floor(corruption)}%</span>
+                        </div>
+                        <div style="height:4px; background:#1c1917; width:100%;">
+                            <div style="height:100%; background:#ef4444; width:${corruption}%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top:15px; border-top:1px solid #451a03; padding-top:10px;">
+                    <div style="font-size:9px; color:#78350f; margin-bottom:5px;">INFLUENCE HISTORY</div>
+                    <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                        ${state.history.slice(-5).map(h => `
+                            <span style="font-size:9px; background:#1c1917; padding:2px 5px; color:#94a3b8;">Day ${h.day}: ${h.symbol}</span>
+                        `).join('')}
+                    </div>
                 </div>
             </div>`;
         });
