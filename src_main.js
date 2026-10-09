@@ -30,6 +30,7 @@ import './src_systems_knowledge.js';
 import './src_systems_personhood.js';
 import './src_systems_conviction.js';
 import './src_systems_origin.js';
+import './src_systems_runes.js';
 import './src_systems_narrative_driver.js';
 import './src_systems_world.js';
 

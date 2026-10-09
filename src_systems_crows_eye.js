@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -236,6 +236,9 @@ class CrowsEyeSystem {
                 break;
             case 'CIV_PRESSURE':
                 contentHtml = this.renderCivPressureView();
+                break;
+            case 'RUNES':
+                contentHtml = this.renderRunesView();
                 break;
             case 'MYSTERIES':
                 contentHtml = this.renderMysteriesView();
@@ -1325,6 +1328,80 @@ class CrowsEyeSystem {
         });
 
         html += `</div></div>`;
+        return html;
+    }
+
+    renderRunesView() {
+        if (!window.RuneSystem) return "Rune System Offline";
+        
+        let targetId = this.selectedEntityId;
+        if (!targetId && window.GameCore?.playerObj) targetId = 'player';
+        
+        const state = window.RuneSystem.getCarvings(targetId);
+        const slots = window.RuneSystem.BODY_SLOTS;
+        
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">FLESH AS THE LEDGER: RUNIC CARVINGS</div>`;
+
+        // 1. Harvest & Significance Summary
+        const harvestPressure = (state.storyDensity * 100);
+        html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; background:rgba(255,255,255,0.02); padding:20px; border:1px solid #451a03;">
+            <div>
+                <div style="font-size:10px; color:#78350f; margin-bottom:5px;">STORY DENSITY (HISTORICAL WEIGHT)</div>
+                <div style="font-size:24px; color:#fbbf24;">${Math.floor(state.totalWeight)}</div>
+            </div>
+            <div>
+                <div style="display:flex; justify-content:space-between; font-size:10px; margin-bottom:5px;">
+                    <span style="color:#78350f;">HARVEST VISIBILITY (THE TRAP)</span>
+                    <span style="color:#ef4444;">${Math.floor(harvestPressure)}%</span>
+                </div>
+                <div style="height:8px; background:#1c1917; width:100%;">
+                    <div style="height:100%; background:#ef4444; width:${Math.min(100, harvestPressure)}%;"></div>
+                </div>
+                <div style="font-size:9px; color:#94a3b8; margin-top:5px;">Visibility to cosmological forces that consume greatness.</div>
+            </div>
+        </div>`;
+
+        // 2. Body Map
+        html += `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:15px;">`;
+        Object.entries(slots).forEach(([key, config]) => {
+            const carvings = state.slots[key] || [];
+            
+            html += `<div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:15px; border-top: 2px solid #78350f;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span style="font-weight:bold; color:#fbbf24; font-size:12px;">${key}</span>
+                    <span style="font-size:9px; color:#78350f;">SPACE: ${carvings.length}/${config.space}</span>
+                </div>
+                <div style="font-size:10px; color:#94a3b8; margin-bottom:10px;">${config.desc}</div>
+                
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    ${carvings.map(r => `
+                        <div style="font-size:11px; background:#1c1917; padding:5px; border-left:2px solid #fbbf24;">
+                            <div style="color:#fbbf24; font-weight:bold;">ᚱ ${r.force}</div>
+                            <div style="font-size:9px; color:#78350f;">Weight: +${r.weight}</div>
+                        </div>
+                    `).join('') || '<div style="font-size:9px; color:#451a03;">Unmarked skin.</div>'}
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+
+        // 3. Carving Buttons (For Testing/Player)
+        if (targetId === 'player') {
+             html += `<div style="margin-top:20px; border-top:1px solid #78350f; padding-top:20px;">
+                <div style="font-size:11px; color:#fbbf24; margin-bottom:10px;">INSCRIBE REALITY (BODY CARVING)</div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    ${Object.keys(window.RuneSystem.RUNE_TYPES).map(f => `
+                        <button style="background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px 10px; font-size:9px; cursor:pointer;"
+                            onclick="window.RuneSystem.carveRune('player', '${f}', 'BACK'); window.CrowsEye.updateTimer=1.0;">
+                            CARVE ${f}
+                        </button>
+                    `).join('')}
+                </div>
+             </div>`;
+        }
+
+        html += `</div>`;
         return html;
     }
 
