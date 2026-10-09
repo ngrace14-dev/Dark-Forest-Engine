@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'LEGENDS', 'FORCES', 'MYSTERIES', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'LEGENDS', 'FORCES', 'MYSTERIES', 'NETWORKS', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -223,6 +223,9 @@ class CrowsEyeSystem {
                 break;
             case 'MYSTERIES':
                 contentHtml = this.renderMysteriesView();
+                break;
+            case 'NETWORKS':
+                contentHtml = this.renderNetworkView();
                 break;
             case 'CALIBRATION':
                 contentHtml = this.renderCalibrationView();
@@ -475,6 +478,34 @@ class CrowsEyeSystem {
                 ${i.payload.title} - Spread over ${i.spread_generation} generations.
             </div>`;
         });
+        return html;
+    }
+
+    renderNetworkView() {
+        if (!window.PlaybackManager) return "Meaning Network Offline";
+        const data = window.PlaybackManager.getNetworkNodes();
+        
+        let html = `<div style="display:flex; flex-direction:column; gap:20px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">5D PERSPECTIVE: CAUSAL MEANING NETWORK</div>`;
+        
+        data.nodes.filter(n => n.type === 'MYSTERY').forEach(m => {
+            const mysteryLinks = data.links.filter(l => l.source === m.id);
+            
+            html += `<div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px; margin-bottom:15px;">
+                <div style="font-weight:bold; color:#fbbf24; font-size:16px;">${m.label}</div>
+                <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+                    ${mysteryLinks.map(l => {
+                        const targetNode = data.nodes.find(n => n.id === l.target);
+                        return `<div style="font-size:11px; color:#94a3b8; display:flex; gap:10px;">
+                            <span style="color:#78350f;">⤷ [${l.type}]</span>
+                            <span>${targetNode ? targetNode.label : 'Unknown Event'}</span>
+                        </div>`;
+                    }).join('') || '<div style="font-size:11px; color:#451a03;">No causal connections identified.</div>'}
+                </div>
+            </div>`;
+        });
+
+        html += `</div>`;
         return html;
     }
 
