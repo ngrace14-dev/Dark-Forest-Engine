@@ -31,17 +31,60 @@ class DynastyManagerSystem {
                 id: id,
                 name: `House ${name}`,
                 founder: `Founder ${name}`,
-                currentLeader: null,
+                currentLeader: `lord_${name.toLowerCase()}_0`,
                 lineage: [],
                 claims: [],
                 monopolies: [], // "Blessed Spots"
                 prestige: 100,
                 isBlessed: index < 9, // First 9 are "Blessed" (Bible §19)
-                archives: []
+                archives: [],
+                // --- PHASE: HOUSE HISTORY ADDITIONS ---
+                beliefs: {
+                    crown: Math.random() > 0.5 ? 'LOYAL' : 'SKEPTICAL',
+                    huntsman: 'FEARFUL',
+                    orb: 'OBSERVANT',
+                    shift: 'NECESSARY_EVIL'
+                },
+                secrets: new Set(), // Set of intel_id
+                chronicle: [], // Array of event objects
+                legacy: 0, // Total significance score
+                contribution: 0 // Contribution to civilization
             });
         });
 
         window.EventBus.emit('UI_LOG', '[Dynasty] Institutional Memory Engaged');
+    }
+
+    /**
+     * Records an event specifically into a House's institutional memory.
+     * Bible §36: "Institutions persist to carry knowledge forward."
+     */
+    recordHouseEvent(houseId, event) {
+        const house = this.houses.get(houseId);
+        if (!house) return;
+
+        house.chronicle.push({
+            id: event.id || `he_${Math.random().toString(36).substr(2, 5)}`,
+            type: event.type,
+            detail: event.detail,
+            day: window.EngineParams?.worldDay || 0,
+            significance: event.significance || 10
+        });
+
+        house.legacy += event.historicalWeight || 1;
+        house.prestige += Math.floor((event.significance || 10) / 10);
+    }
+
+    /**
+     * Add a secret that only this house knows.
+     * Bible: "House Secrets Category"
+     */
+    addHouseSecret(houseId, intelId) {
+        const house = this.houses.get(houseId);
+        if (house) {
+            house.secrets.add(intelId);
+            window.IntelManager?.shareToInstitution(intelId, houseId);
+        }
     }
 
     /**

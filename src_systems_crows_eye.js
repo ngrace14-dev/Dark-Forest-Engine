@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'LEGENDS', 'FORCES', 'MYSTERIES', 'MEANING', 'PLAYBACK', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'HOUSE_HISTORY', 'LEGENDS', 'FORCES', 'MYSTERIES', 'MEANING', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -214,6 +214,9 @@ class CrowsEyeSystem {
                 break;
             case 'HOUSES':
                 contentHtml = this.renderHousesView();
+                break;
+            case 'HOUSE_HISTORY':
+                contentHtml = this.renderHouseHistoryView();
                 break;
             case 'LEGENDS':
                 contentHtml = this.renderLegendsView();
@@ -678,6 +681,89 @@ class CrowsEyeSystem {
             }
         }, 100);
 
+        return html;
+    }
+
+    renderHouseHistoryView() {
+        if (!window.DynastyManager) return "Dynasty System Offline";
+        
+        const houses = Array.from(window.DynastyManager.houses.values());
+        let selectedHouse = houses[0]; // Default
+        
+        // If an entity is selected, find their house
+        if (this.selectedEntityId) {
+            const ent = window.GameCore?.activeEntities.find(e => e.id === this.selectedEntityId);
+            if (ent && ent.houseId) selectedHouse = window.DynastyManager.getHouse(ent.houseId);
+        }
+
+        let html = `<div style="display:grid; grid-template-columns: 300px 1fr; gap:30px;">`;
+
+        // 1. House Selector
+        html += `<div style="border-right:1px solid #78350f; padding-right:20px;">
+            <div style="font-size:12px; color:#78350f; margin-bottom:15px;">SELECT INSTITUTION</div>
+            ${houses.map(h => `
+                <div style="padding:8px; border:1px solid ${h.id === selectedHouse.id ? '#fbbf24' : '#451a03'}; 
+                    background:${h.id === selectedHouse.id ? 'rgba(251,191,36,0.1)' : 'transparent'}; 
+                    color:${h.isBlessed ? '#fbbf24' : '#92400e'}; cursor:pointer; font-size:11px; margin-bottom:5px;"
+                    onclick="window.CrowsEye.selectedEntityId='${h.currentLeader}'; window.CrowsEye.updateTimer=1.0;">
+                    ${h.name} ${h.isBlessed ? '★' : ''}
+                </div>
+            `).join('')}
+        </div>`;
+
+        // 2. House Detail
+        if (selectedHouse) {
+            html += `<div>
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:1px solid #78350f; padding-bottom:10px; margin-bottom:20px;">
+                    <div>
+                        <div style="font-size:24px; color:#fbbf24; font-weight:bold;">${selectedHouse.name.toUpperCase()}</div>
+                        <div style="font-size:12px; color:#94a3b8;">Lineage of ${selectedHouse.founder}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:10px; color:#78350f;">HISTORICAL LEGACY</div>
+                        <div style="font-size:20px; color:#fbbf24;">${Math.floor(selectedHouse.legacy)}</div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                    <!-- Beliefs -->
+                    <div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:15px;">
+                        <div style="color:#fbbf24; font-size:12px; border-bottom:1px solid #451a03; padding-bottom:5px; margin-bottom:10px;">INSTITUTIONAL BELIEFS</div>
+                        ${Object.entries(selectedHouse.beliefs).map(([k, v]) => `
+                            <div style="font-size:11px; display:flex; justify-content:space-between; margin-bottom:5px;">
+                                <span style="color:#78350f;">${k.toUpperCase()}:</span>
+                                <span style="color:#94a3b8;">${v}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <!-- Lineage -->
+                    <div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:15px;">
+                        <div style="color:#fbbf24; font-size:12px; border-bottom:1px solid #451a03; padding-bottom:5px; margin-bottom:10px;">SUCCESSION LINEAGE</div>
+                        <div style="font-size:11px; color:#94a3b8;">
+                            ${selectedHouse.lineage.slice(-5).reverse().map(l => `<div>• ${l}</div>`).join('') || 'Founder Generation'}
+                            <div style="color:#fbbf24; margin-top:5px;">Current: ${selectedHouse.currentLeader}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- House Chronicle -->
+                <div style="margin-top:20px;">
+                    <div style="color:#fbbf24; font-size:12px; border-bottom:1px solid #78350f; padding-bottom:5px; margin-bottom:10px;">HOUSE CHRONICLE</div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        ${selectedHouse.chronicle.slice(-10).reverse().map(e => `
+                            <div style="font-size:11px; background:rgba(255,255,255,0.02); padding:8px; border-left:2px solid #78350f;">
+                                <span style="color:#78350f;">[Day ${e.day}]</span> 
+                                <span style="color:#fbbf24;">${e.type}:</span> 
+                                <span style="color:#94a3b8;">${e.detail}</span>
+                            </div>
+                        `).join('') || '<div style="font-size:11px; color:#451a03;">No significant events recorded in House memory.</div>'}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        html += `</div>`;
         return html;
     }
 
