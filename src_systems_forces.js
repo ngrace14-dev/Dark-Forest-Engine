@@ -8,60 +8,110 @@ window.ForceManager = {
     forces: {
         'Forest': { 
             strength: 500, 
-            label: 'Growth & Corruption', 
-            description: 'The primal power of the woods.',
+            label: 'Possibility', 
+            description: 'Encourages unexpected outcomes and chaos.',
             metric: 'Corrupted Chunks',
+            pressure: 'unexpected_outcomes',
             value: 0 
         },
         'Crow': { 
             strength: 100, 
-            label: 'Story Density', 
-            description: 'The narrative weight of the world.',
+            label: 'Significance', 
+            description: 'Increases the historical weight and importance of events.',
             metric: 'Legend Count',
+            pressure: 'significance',
             value: 0
         },
         'Tree': { 
             strength: 300, 
-            label: 'The Great Pulse', 
-            description: 'The life-force of the deep redwoods.',
+            label: 'Continuity', 
+            description: 'Encourages survival, regrowth, and stable paths.',
             metric: 'Vitality',
+            pressure: 'continuity',
             value: 300
         },
         'Huntsman': { 
             strength: 400, 
-            label: 'The Balance', 
-            description: 'The mediator between man and beast.',
+            label: 'Cultivation', 
+            description: 'Encourages the development of greatness in individuals.',
             metric: 'Scorn Level',
+            pressure: 'greatness',
             value: 0
         },
         'Crown': { 
             strength: 600, 
-            label: 'Stability', 
-            description: 'The authority of the Royal Family.',
+            label: 'Order', 
+            description: 'Encourages stability, hierarchy, and political control.',
             metric: 'Territory Control',
-            value: 0
-        },
-        'Houses': { 
-            strength: 450, 
-            label: 'Influence', 
-            description: 'Political power of the noble families.',
-            metric: 'Trade Volume',
+            pressure: 'stability',
             value: 0
         },
         'Wendigo': { 
             strength: 200, 
-            label: 'The Hunger', 
-            description: 'The cold terror of the mountain peaks.',
+            label: 'Consumption', 
+            description: 'Encourages destruction, hunger, and loss of memory.',
             metric: 'Feral Activity',
+            pressure: 'consumption',
             value: 0
         },
         'Truth': { 
             strength: 500, 
-            label: 'Global Fidelity', 
-            description: 'The clarity of information in the world.',
+            label: 'Accuracy', 
+            description: 'Encourages verification and factual clarity.',
             metric: 'Verified Facts',
+            pressure: 'verification',
+            value: 0
+        },
+        'Orb': {
+            strength: 300,
+            label: 'Witness',
+            description: 'Encourages interpretation and observation.',
+            metric: 'Observer Count',
+            pressure: 'interpretation',
             value: 0
         }
+    },
+
+    /**
+     * Calculates the "Force Signature" for a major event.
+     * Bible §18: Every major event carries dominant, secondary, and opposing forces.
+     */
+    calculateSignature: function(event) {
+        const type = event.type.toUpperCase();
+        let dominant = 'Forest';
+        let secondary = 'Orb';
+        let opposing = 'Truth';
+
+        if (type.includes('DEFEAT') || type.includes('DEATH')) {
+            dominant = 'Wendigo';
+            secondary = 'Forest';
+            opposing = 'Tree';
+        } else if (type.includes('VERIFIED') || type.includes('TRUTH')) {
+            dominant = 'Truth';
+            secondary = 'Crow';
+            opposing = 'Wendigo';
+        } else if (type.includes('SUCCESSION') || type.includes('OFFICIAL')) {
+            dominant = 'Crown';
+            secondary = 'Crow';
+            opposing = 'Truth';
+        } else if (type.includes('LEGEND')) {
+            dominant = 'Crow';
+            secondary = 'Orb';
+            opposing = 'Wendigo';
+        }
+
+        return { dominant, secondary, opposing };
+    },
+
+    /**
+     * Probability Drift: Forces influence the chance of outcomes.
+     * Bible §18: "Probability shifts, not direct commands."
+     */
+    getDrift: function(forceName) {
+        const force = this.forces[forceName];
+        if (!force) return 1.0;
+        // High strength = higher probability shift (0.5 to 1.5x)
+        return 0.5 + (force.strength / 1000);
     },
 
     update: function(delta) {

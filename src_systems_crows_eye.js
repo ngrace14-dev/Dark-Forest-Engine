@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'HOUSE_HISTORY', 'LEGENDS', 'FORCES', 'MYSTERIES', 'MEANING', 'PLAYBACK', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'HOUSE_HISTORY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -223,6 +223,9 @@ class CrowsEyeSystem {
                 break;
             case 'FORCES':
                 contentHtml = this.renderForcesView();
+                break;
+            case 'FORCE_LAYER':
+                contentHtml = this.renderForceLayer();
                 break;
             case 'MYSTERIES':
                 contentHtml = this.renderMysteriesView();
@@ -811,6 +814,40 @@ class CrowsEyeSystem {
                 <div style="margin-top:10px; font-size:11px; color:#78350f;">Historical Power: ${Math.floor(l.power)}</div>
             </div>`;
         });
+        html += `</div>`;
+        return html;
+    }
+
+    renderForceLayer() {
+        if (!window.ForceManager) return "Forces Offline";
+        const forces = window.ForceManager.forces;
+        
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">METAPHYSICAL PRESSURE: ACTIVE FORCES</div>`;
+
+        Object.entries(forces).forEach(([name, f]) => {
+            const strength = f.strength || 0;
+            const percent = (strength / 1000) * 100;
+            const drift = window.ForceManager.getDrift(name).toFixed(2);
+
+            html += `<div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:15px; border-left: 4px solid ${strength > 700 ? '#ef4444' : '#78350f'};">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <div>
+                        <span style="font-weight:bold; color:#fbbf24; font-size:16px;">${name.toUpperCase()}</span>
+                        <span style="color:#78350f; font-size:10px; margin-left:10px;">[Pressure: ${f.pressure}]</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="color:#fbbf24; font-size:14px;">${strength}/1000</span>
+                        <div style="font-size:9px; color:#94a3b8;">PROBABILITY DRIFT: x${drift}</div>
+                    </div>
+                </div>
+                <div style="font-size:11px; color:#94a3b8; margin-bottom:10px; line-height:1.4;">${f.description}</div>
+                <div style="height:6px; background:#1c1917; width:100%;">
+                    <div style="height:100%; background:#f59e0b; width:${percent}%;"></div>
+                </div>
+            </div>`;
+        });
+
         html += `</div>`;
         return html;
     }

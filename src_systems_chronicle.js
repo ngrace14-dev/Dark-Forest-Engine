@@ -90,7 +90,9 @@ window.ChronicleManager = {
                 title: this.generateLegendTitle(event),
                 narrative: this.generateMythicNarrative(event),
                 power: event.historicalWeight * 1.5,
-                forces: this.identifyInvolvedForces(event)
+                forces: this.identifyInvolvedForces(event),
+                // FORCE PIVOT: Calculate Signature (Bible §18)
+                signature: window.ForceManager?.calculateSignature(event)
             };
             
             event.legendId = legend.id;
