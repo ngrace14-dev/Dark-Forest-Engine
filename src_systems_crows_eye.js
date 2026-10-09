@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'HOUSE_HISTORY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'PLAYBACK', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -217,6 +217,9 @@ class CrowsEyeSystem {
                 break;
             case 'HOUSE_HISTORY':
                 contentHtml = this.renderHouseHistoryView();
+                break;
+            case 'ANTHOLOGY':
+                contentHtml = this.renderAnthologyView();
                 break;
             case 'LEGENDS':
                 contentHtml = this.renderLegendsView();
@@ -971,6 +974,47 @@ class CrowsEyeSystem {
                     </div>
                     <div style="height:4px; background:#1c1917; width:100%;">
                         <div style="height:100%; background:${color}; width:${weightPercent}%;"></div>
+                    </div>
+                </div>
+            </div>`;
+        });
+
+        html += `</div></div>`;
+        return html;
+    }
+
+    renderAnthologyView() {
+        if (!window.FolkloreEngine) return "Anthology Offline";
+        const poems = window.FolkloreEngine.getAnthology();
+        
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">FOLKLORE ANTHOLOGY: CULTURAL MEMORY</div>`;
+
+        if (poems.length === 0) {
+            return html + `<div style="font-size:11px; color:#451a03;">The world has not yet crystallized its history into poetry. Perform more legendary deeds.</div>`;
+        }
+
+        html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
+        
+        poems.forEach(p => {
+            html += `<div style="background:rgba(251,191,36,0.02); border:1px solid #78350f; padding:20px; font-family: 'Times New Roman', serif;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:10px;">
+                    <div>
+                        <div style="font-weight:bold; color:#fbbf24; font-size:18px; font-style:italic;">${p.title}</div>
+                        <div style="font-size:10px; color:#78350f;">CLASS: ${p.class}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:10px; color:#78350f;">STORY STRENGTH</div>
+                        <div style="font-size:14px; color:#fbbf24;">${Math.floor(p.storyStrength)}</div>
+                    </div>
+                </div>
+
+                <div style="font-size:13px; color:#94a3b8; line-height:1.6; white-space:pre-wrap; font-style:italic;">"${p.text}"</div>
+
+                <div style="margin-top:20px; border-top:1px solid #451a03; padding-top:10px; font-family: monospace;">
+                    <div style="display:flex; justify-content:space-between; font-size:9px;">
+                        <span style="color:#78350f;">HISTORICAL WEIGHT: ${Math.floor(p.historicalWeight)}</span>
+                        <span style="color:#78350f;">DISTORTION: ${Math.floor(p.distortionLevel * 100)}%</span>
                     </div>
                 </div>
             </div>`;

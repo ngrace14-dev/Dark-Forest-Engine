@@ -8,6 +8,7 @@
 
 class FolkloreEngineSystem {
     constructor() {
+        this.anthology = [];
         // Rosetta Stone DNA from Bible §17
         this.dna = {
             'OBSERVATIONAL': [
@@ -30,6 +31,10 @@ class FolkloreEngineSystem {
                 "When given the beacon of times untold. / Its whisper lies words cautions of old.",
                 "Wish you be rid of this plight? / Kill the huntsmen with all your might.",
                 "A monster lingers in the night. / Some say a man who isn’t right."
+            ],
+            'REVISIONAL': [
+                "They say they fled to save the seed / but truth is buried beneath their greed.",
+                "The 19 walked where only 10 stay / the rest were lost along the way."
             ]
         };
 
@@ -42,54 +47,78 @@ class FolkloreEngineSystem {
     }
 
     /**
-     * Simulation creates a new poem based on a historical legend.
-     * Expresses Bible §1: Action -> Chronicle -> Legend -> Poem.
+     * Historical Compression Logic
+     * Bible §1: Chronicle -> Truth -> History -> Folklore -> Poem
      */
-    generatePoem(legend) {
+    generatePoem(legend, options = {}) {
         // Select Class based on Forces and Significance
         let poemClass = 'OBSERVATIONAL';
         if (legend.forces?.includes('Crown')) poemClass = 'INSTITUTIONAL';
         if (legend.power > 300) poemClass = 'MYTHIC';
         if (legend.forces?.includes('Wendigo') || legend.forces?.includes('Huntsman')) poemClass = 'WARNING';
+        
+        // PIVOT: Identify if this is revisional history (Bible §17)
+        if (legend.type === 'SUCCESSION' || legend.type === 'FEUD') poemClass = 'REVISIONAL';
 
         const stanzas = this.dna[poemClass];
         const baseStanza = stanzas[Math.floor(Math.random() * stanzas.length)];
         
-        // Narrative Compression (Bible §1)
-        // Turn raw data into symbolic shorthand
+        // 1. Distortion Engine (Bible §17 Addendum BJ)
+        // High distortion compresses more events and romanticizes more.
+        const distortionLevel = legend.power > 500 ? 0.8 : 0.3;
+        const distortedText = this.applyDistortion(baseStanza, poemClass, distortionLevel);
+
+        // 2. Narrative Synthesis
         const title = this.generateSymbolicTitle(legend);
         const verse = this.generateContextualVerse(legend);
 
         const poem = {
             id: 'poem_' + Math.random().toString(36).substr(2, 9),
             title: title,
-            text: `${baseStanza}\n${verse}`,
+            text: `${distortedText}\n${verse}`,
             class: poemClass,
             originId: legend.id,
             historicalWeight: legend.power,
+            distortionLevel: distortionLevel,
+            storyStrength: (legend.power / 10) * (1.0 + distortionLevel),
             // Poem Trap: Evidence of memory, not truth (Addendum BJ)
-            fidelity: 0.3 + Math.random() * 0.4 
+            fidelity: 0.2 + (Math.random() * 0.5) 
         };
 
-        // Register with IntelManager as Evidence (Bible §17)
+        this.anthology.push(poem);
+
+        // Register as Evidence/Intel (Bible §17)
         if (window.IntelManager) {
             window.IntelManager.register({
                 type: 'RUMOR',
                 payload: {
                     title: poem.title,
                     description: poem.text,
-                    tags: ['FOLKLORE', poemClass]
+                    tags: ['FOLKLORE', poemClass, 'POEM_TRAP']
                 },
-                significance: { historical: legend.power },
+                significance: { historical: legend.power, crow: poem.storyStrength },
                 rarity: legend.power > 500 ? 'LEGENDARY' : 'RARE',
                 certainty: poem.fidelity
             });
         }
 
-        window.GameState.anthology ??= [];
-        window.GameState.anthology.push(poem);
-        window.EventBus.emit('UI_LOG', `[FOLKLORE] A new ${poemClass.toLowerCase()} poem has been composed: ${poem.title}`);
+        window.GameState.anthology = this.anthology;
+        window.EventBus.emit('UI_LOG', `[FOLKLORE] A new ${poemClass.toLowerCase()} poem has crystallized: ${poem.title}`);
         window.EventBus.emit('POEM_COMPOSED', poem);
+    }
+
+    applyDistortion(text, pClass, level) {
+        let result = text;
+        // Rules for "The Poem Trap"
+        if (pClass === 'INSTITUTIONAL' && level > 0.5) {
+            // Omit internal house names and replace with "Hero" or "Founder"
+            result = result.replace(/House \w+/g, "The Great Founders");
+        }
+        if (pClass === 'MYTHIC') {
+            // Romanticize: Replace specific numbers with symbols
+            result = result.replace(/\d+/g, "a score of");
+        }
+        return result;
     }
 
     generateSymbolicTitle(legend) {
@@ -106,6 +135,10 @@ class FolkloreEngineSystem {
             `Behold the ${legend.title}, and the oath that was sworn.`
         ];
         return templates[Math.floor(Math.random() * templates.length)];
+    }
+
+    getAnthology() {
+        return this.anthology;
     }
 }
 
