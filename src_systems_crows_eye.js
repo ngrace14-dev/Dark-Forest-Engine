@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'PLAYBACK', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -250,6 +250,9 @@ class CrowsEyeSystem {
                 break;
             case 'LOST_MEMORY':
                 contentHtml = this.renderLostMemoryView();
+                break;
+            case 'ORIGIN_DOSSIER':
+                contentHtml = this.renderOriginView();
                 break;
             case 'PLAYBACK':
                 contentHtml = this.renderPlaybackView();
@@ -1176,6 +1179,50 @@ class CrowsEyeSystem {
         });
 
         html += `</div></div>`;
+        return html;
+    }
+
+    renderOriginView() {
+        if (!window.OriginEngine) return "Origin Engine Offline";
+        const dossier = window.OriginEngine.getDossier();
+        
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">THE ORIGIN DOSSIER: ENDGAME MODELS</div>`;
+
+        dossier.forEach(cat => {
+            const currentModelDesc = window.OriginEngine.models[Object.keys(this.categories || {}).find(k => this.categories[k].title === cat.title)]?.[cat.model] || 'Standard historical interpretation.';
+            const confidence = cat.confidence * 100;
+
+            html += `<div style="background:rgba(255,255,255,0.02); border:1px solid #78350f; padding:20px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                    <div>
+                        <div style="font-weight:bold; color:#fbbf24; font-size:16px;">${cat.title.toUpperCase()}</div>
+                        <div style="font-size:10px; color:#78350f;">ACTIVE MODEL: <span style="color:#fbbf24;">${cat.model}</span></div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="color:#78350f; font-size:10px;">MODEL CONFIDENCE</span>
+                        <div style="font-size:18px; color:#fbbf24;">${Math.floor(confidence)}%</div>
+                    </div>
+                </div>
+
+                <div style="font-size:12px; color:#94a3b8; font-style:italic; margin-bottom:15px; background:rgba(0,0,0,0.2); padding:10px; border-left:2px solid #fbbf24;">
+                    "${currentModelDesc}"
+                </div>
+
+                <div style="font-size:11px;">
+                    <div style="color:#78350f; margin-bottom:5px;">SUPPORTING FRAGMENTS (${cat.evidence.length})</div>
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        ${cat.evidence.map(e => `
+                            <div style="color:#94a3b8; border-left:1px solid #451a03; padding-left:10px;">
+                                • ${e.title} <span style="color:#78350f; font-size:9px;">(Tier: ${e.tier})</span>
+                            </div>
+                        `).join('') || '<div style="color:#451a03;">Awaiting evidence from the Endless Dunes.</div>'}
+                    </div>
+                </div>
+            </div>`;
+        });
+
+        html += `</div>`;
         return html;
     }
 

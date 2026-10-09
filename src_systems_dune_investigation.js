@@ -83,12 +83,17 @@ class DuneInvestigationSystem {
         // Find an Official Record to contradict
         const official = window.HistoryOffice?.officialLedger[Math.floor(Math.random() * (window.HistoryOffice.officialLedger.length || 1))];
         
+        // ORIGIN PIVOT: Assign fragment to a dossier category
+        const categories = ['CHAMPION', 'FOUNDERS', 'SEAL', 'WENDIGO', 'FRACTURE'];
+        const category = categories[Math.floor(Math.random() * categories.length)];
+
         const record = {
             id: 'rec_' + Math.random().toString(36).substr(2, 9),
             title: `Recovered Record: ${archive.tier}`,
             detail: this.generateFragmentDetail(archive, official),
             tier: archive.tier,
             targetHistoryId: official ? official.id : null,
+            originCategory: category,
             day: window.EngineParams?.worldDay || 0
         };
 
@@ -100,13 +105,16 @@ class DuneInvestigationSystem {
             payload: {
                 title: record.title,
                 description: record.detail,
-                tags: ['LOST_MEMORY', archive.tier, 'ORIGIN_DOSSIER']
+                tags: ['LOST_MEMORY', archive.tier, 'ORIGIN_DOSSIER', category]
             },
             significance: { historical: archive.tier === 'EPOCH' ? 1000 : 500 },
             truth_state: 'TRUE',
             certainty: 1.0,
             isAnchored: true // Dune truth is eternal
         });
+
+        // Trigger Origin Processing
+        window.EventBus.emit('DUNE_FRAGMENT_RECOVERED', record);
 
         // Trigger Investigation Contradiction
         if (official && window.InvestigationManager) {
