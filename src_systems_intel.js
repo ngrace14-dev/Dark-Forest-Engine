@@ -30,6 +30,26 @@ class IntelManagerSystem {
         this.registry = new Map(); // Map<intel_id, Intel_ID Object> (The Immutable Master Ledger)
         this.archive = new Map();  // Map<intel_id, Intel_ID Object> (Historical/Legendary Records)
         this.ownershipRegistry = new Map(); // Map<intel_id, Set<node_id>> (Who physically holds references)
+        this.institutionalSilos = new Map(); // Map<institution_id, Set<intel_id>>
+    }
+
+    /**
+     * Share knowledge with an entire institution (e.g., Noble House, 300 Guardians).
+     */
+    shareToInstitution(intel_id, institutionId) {
+        if (!this.institutionalSilos.has(institutionId)) {
+            this.institutionalSilos.set(institutionId, new Set());
+        }
+        this.institutionalSilos.get(institutionId).add(intel_id);
+    }
+
+    /**
+     * Get all intel known to an institution.
+     */
+    getIntelForInstitution(institutionId) {
+        return Array.from(this.institutionalSilos.get(institutionId) || [])
+            .map(id => this.registry.get(id))
+            .filter(i => i !== null);
     }
 
     _generateId() {
@@ -187,6 +207,22 @@ window.IntelManager = new IntelManagerSystem();
 // ==========================================
 window.IntelPropagation = {
     
+    /**
+     * Simulates the institutional sync. NPCs in the same House or Institution share archives.
+     */
+    syncInstitutionalArchives: function(sourceNPC, targetNPC) {
+        const sourceInst = sourceNPC.institutionId || sourceNPC.houseId;
+        const targetInst = targetNPC.institutionId || targetNPC.houseId;
+        
+        if (sourceInst && sourceInst === targetInst) {
+            const instIntel = window.IntelManager.getIntelForInstitution(sourceInst);
+            instIntel.forEach(intel => {
+                // High fidelity institutional sharing (0.98)
+                this.sync(sourceNPC, targetNPC, intel.intel_id, 0.98);
+            });
+        }
+    },
+
     /**
      * Simulates the "Telephone Game" exchange of a single Intel record between two nodes.
      * @param {Object} sourceNode - { id, type (HUNTER, CARAVAN, etc), faction }
