@@ -193,39 +193,68 @@ window.SystemRegistry.register('AISystem', AISystem);
 
 
 window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
-
-
-
-
-
-
-
     if(!window.GameCore || !window.GameCore.playerObj) return;
     const pPos = window.GameCore.playerObj.visual.position;
-    const obstacles = window.GameCore.activeEntities.filter(e => e.def.isObstacle);
     const now = performance.now();
 
     window.GameCore.activeEntities.forEach(en => {
         if(en.body && en.body.isDynamic && en.body.isDynamic()) { const p = en.body.translation(); en.visual.position.set(p.x, p.y, p.z); }
         if (en.def.type !== 'npc') return;
 
-        // --- AI DISTANCE THROTTLING (Kenshi Optimization) ---
+        // --- AI DISTANCE THROTTLING ---
         const distToPlayer = en.visual.position.distanceTo(pPos);
-
-        // 1. Throttling logic
-        if (distToPlayer > 100) {
-            // Extreme distance: Run logic once every 2 seconds
-            if (!en.lastAiUpdate || now - en.lastAiUpdate < 2000) return;
-        } else if (distToPlayer > 50) {
-            // Far distance: Run logic at 10 FPS
-            if (!en.lastAiUpdate || now - en.lastAiUpdate < 100) return;
-        }
+        if (distToPlayer > 100) { if (!en.lastAiUpdate || now - en.lastAiUpdate < 2000) return; }
+        else if (distToPlayer > 50) { if (!en.lastAiUpdate || now - en.lastAiUpdate < 100) return; }
         en.lastAiUpdate = now;
 
-        if (en.staggeredUntil && now < en.staggeredUntil) {
-                    en.body.setLinvel({ x: 0, y: en.body.linvel().y, z: 0 }, true);
-                    return;
+        // --- PHASE 5: NPC COGNITION ENGINE ---
+        // Bible §22: Every profession contains Drives, Affinities, and Dreams
+        en.ambitions = en.ambitions || {
+            aggression: 0.3,
+            fortification: 0.3,
+            patience: 0.5,
+            investigation: 0.2,
+            authority: 0.2,
+            stealth: 0.1
+        };
+
+        // Apply Divine Influence (Bible §21)
+        if (window.DreamManager) {
+            Object.keys(en.ambitions).forEach(key => {
+                const mod = window.DreamManager.getNPCDriveModifier(en.id, key);
+                en.ambitions[key] = Math.min(2.0, (en.ambitions[key] || 0.3) * mod);
+            });
         }
+
+        // Belief-Based Targeting (Phase 2 Integration)
+        // NPCs target based on what they *know*, not just global proximity
+        let cognitiveTarget = null;
+        if (window.IntelManager) {
+             const knownIntel = window.IntelManager.getIntelForNode(en.id);
+             // If they know about a rumor at a location, they might investigate it
+             const rumor = knownIntel.find(i => i.type === 'RUMOR' && i.payload.target_coord);
+             if (rumor && en.ambitions.investigation > 0.7) {
+                 cognitiveTarget = new window.THREE.Vector3(rumor.payload.target_coord.x, 0, rumor.payload.target_coord.z);
+             }
+        }
+
+        if (en.staggeredUntil && now < en.staggeredUntil) {
+            en.body.setLinvel({ x: 0, y: en.body.linvel().y, z: 0 }, true);
+            return;
+        }
+
+        // --- REPUTATION PIVOT (Phase 3 Integration) ---
+        // NPCs avoid rivals and follow allies based on Trust scores
+        if (window.ReputationManager) {
+            const nearby = window.GameCore.SpatialGrid.getNearbyEntities(en.visual.position.x, en.visual.position.z, 20);
+            const rival = nearby.find(n => window.ReputationManager.calculateTrust(en, n) < 0.2);
+            if (rival && en.ambitions.aggression > 0.6) {
+                attackNpc(en, rival);
+                return;
+            }
+        }
+
+        // ... existing caravan/companion/squad logic ...
 
         if (en.caravanId) {
             const village = window.VillageManager.villages.find(candidate => candidate.id === en.villageId);
