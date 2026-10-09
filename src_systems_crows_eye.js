@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'LEGENDS', 'FORCES', 'MYSTERIES', 'MEANING', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'LEGENDS', 'FORCES', 'MYSTERIES', 'MEANING', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -226,6 +226,9 @@ class CrowsEyeSystem {
                 break;
             case 'MEANING':
                 contentHtml = this.renderMeaningView();
+                break;
+            case 'PLAYBACK':
+                contentHtml = this.renderPlaybackView();
                 break;
             case 'CALIBRATION':
                 contentHtml = this.renderCalibrationView();
@@ -357,6 +360,71 @@ class CrowsEyeSystem {
                     }).join('') || '<div style="font-size:11px; color:#451a03;">Select an entity with knowledge to analyze beliefs.</div>'}
                 </div>
              </div>`;
+        }
+
+        html += `</div>`;
+        return html;
+    }
+
+    renderPlaybackView() {
+        if (!window.ChronicleManager) return "Chronicle Offline";
+        const snapshots = Array.from(window.ChronicleManager.snapshots.keys()).sort((a, b) => a - b);
+        if (snapshots.length === 0) return "No archaeological snapshots captured yet. Wait for a Shift.";
+
+        const currentDay = window.PlaybackManager?.currentPlaybackDay || snapshots[snapshots.length - 1];
+        const snap = window.ChronicleManager.snapshots.get(currentDay);
+        
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        
+        // 1. Archaeology Controls
+        html += `<div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:20px;">
+            <div style="font-weight:bold; color:#fbbf24; margin-bottom:15px; font-size:14px;">ARCHAEOLOGICAL TIMELINE</div>
+            <input type="range" min="${snapshots[0]}" max="${snapshots[snapshots.length-1]}" step="5" value="${currentDay}" 
+                style="width:100%; accent-color:#fbbf24; margin-bottom:10px;"
+                oninput="window.PlaybackManager.setPlaybackDay(parseInt(this.value)); window.CrowsEye.updateTimer=1.0;">
+            <div style="display:flex; justify-content:space-between; font-size:11px; color:#92400e;">
+                <span>DAY ${snapshots[0]}</span>
+                <span style="color:#fbbf24; font-size:14px; font-weight:bold;">CURRENT OBSERVATION: DAY ${currentDay}</span>
+                <span>DAY ${snapshots[snapshots.length-1]}</span>
+            </div>
+            <button style="margin-top:15px; background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px 15px; cursor:pointer; width:100%; font-size:10px;"
+                onclick="window.PlaybackManager.resetToPresent(); window.CrowsEye.updateTimer=1.0;">RESET TO PRESENT</button>
+        </div>`;
+
+        if (snap) {
+            // 2. Comparison Analysis
+            const present = window.ChronicleManager.snapshots.get(snapshots[snapshots.length - 1]);
+            const popDelta = snap.villages.reduce((s,v) => s + v.pop, 0) - present.villages.reduce((s,v) => s + v.pop, 0);
+            const fidelityDelta = (snap.truth - present.truth) * 100;
+
+            html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                <div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.3);">
+                    <div style="color:#78350f; font-size:10px; margin-bottom:5px;">WORLD POPULATION DELTA</div>
+                    <div style="font-size:18px; color:${popDelta >= 0 ? '#10b981' : '#ef4444'};">${popDelta > 0 ? '+' : ''}${popDelta}</div>
+                </div>
+                <div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.3);">
+                    <div style="color:#78350f; font-size:10px; margin-bottom:5px;">GLOBAL FIDELITY DELTA</div>
+                    <div style="font-size:18px; color:${fidelityDelta >= 0 ? '#10b981' : '#ef4444'};">${fidelityDelta > 0 ? '+' : ''}${fidelityDelta.toFixed(1)}%</div>
+                </div>
+            </div>`;
+
+            // 3. Historical Geography (Bible §27: Observing how villages changed)
+            html += `<div>
+                <div style="font-size:12px; color:#fbbf24; border-bottom:1px solid #451a03; padding-bottom:5px; margin-bottom:10px;">HISTORICAL GEOGRAPHY</div>
+                <table style="width:100%; font-size:11px; text-align:left;">
+                    <tr style="color:#78350f;"><th>SETTLEMENT</th><th>HOUSE</th><th>HISTORICAL POS</th><th>STATUS</th></tr>
+                    ${snap.villages.map(v => {
+                        const presentV = present.villages.find(pv => pv.id === v.id);
+                        const hasMoved = presentV && (Math.abs(v.x - presentV.x) > 100 || Math.abs(v.z - presentV.z) > 100);
+                        return `<tr>
+                            <td style="color:#fbbf24;">${v.name}</td>
+                            <td>${v.house}</td>
+                            <td>[${Math.round(v.x)}, ${Math.round(v.z)}]</td>
+                            <td style="color:${hasMoved ? '#f59e0b' : '#94a3b8'};">${hasMoved ? 'RECONFIGURED' : 'STABLE'}</td>
+                        </tr>`;
+                    }).join('')}
+                </table>
+            </div>`;
         }
 
         html += `</div>`;

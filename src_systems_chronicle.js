@@ -37,21 +37,35 @@ window.ChronicleManager = {
 
     captureSnapshot: function() {
         const day = window.EngineParams?.worldDay || 0;
-        if (day % 10 !== 0 || this.snapshots.has(day)) return;
+        // Bible §5: Reality Shift every 14 days. Capture on shifts and every 5 days for granularity.
+        if (day % 5 !== 0 || this.snapshots.has(day)) return;
 
         const snapshot = {
             day: day,
+            epoch: window.EngineParams?.worldEpoch || 0,
             villages: window.VillageManager.villages.map(v => ({
                 id: v.id,
+                name: v.name,
                 pop: v.population.current,
                 pros: v.stats.prosperity,
                 food: v.stats.food,
                 gold: v.stats.gold,
                 x: v.x,
-                z: v.z
+                z: v.z,
+                house: v.nobleHouse
             })),
             forces: JSON.parse(JSON.stringify(window.ForceManager?.forces || {})),
-            truth: window.IntelTracker?.stats.globalFidelity || 1.0
+            houses: Array.from(window.DynastyManager?.houses.values() || []).map(h => ({
+                id: h.id,
+                prestige: h.prestige,
+                isBlessed: h.isBlessed
+            })),
+            truth: window.IntelTracker?.stats.globalFidelity || 1.0,
+            activeMysteries: Array.from(window.InvestigationManager?.mysteries.values() || []).map(m => ({
+                id: m.id,
+                progress: m.discoveryProgress,
+                state: m.state
+            }))
         };
         this.snapshots.set(day, snapshot);
     },
