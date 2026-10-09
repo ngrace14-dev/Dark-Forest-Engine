@@ -45,7 +45,7 @@ class PersonhoodSystem {
                 traits,
                 identity,
                 bias: this.ARCHETYPES[identity].bias,
-                relationships: new Map(), // nodeId -> trustValue (0-1)
+                relationships: new Map(), // nodeId -> { type, weight, sinceDay }
                 beliefState: new Map(), // intelId -> { conviction, interpretation, lastUpdate }
                 beliefHistory: [] // History of conclusions drawn
             });
@@ -117,9 +117,20 @@ class PersonhoodSystem {
     getPersonalTrust(nodeId, sourceId, faction) {
         const profile = this.getProfile(nodeId);
         
-        // Check individual relationship first
+        // RELATIONSHIP PIVOT: Check for specific social bonds
         if (profile.relationships.has(sourceId)) {
-            return profile.relationships.get(sourceId);
+            const link = profile.relationships.get(sourceId);
+            const multipliers = {
+                'KINSHIP': 1.8,    // Family is absolute (Bible)
+                'LOYALTY': 1.5,
+                'FRIENDSHIP': 1.4,
+                'MENTORSHIP': 1.3,
+                'OBLIGATION': 1.1,
+                'ADMIRATION': 1.2,
+                'DISTRUST': 0.3,
+                'RIVALRY': 0.2     // Rivals reject truth from each other
+            };
+            return Math.min(1.0, (link.weight || 0.5) * (multipliers[link.type] || 1.0));
         }
 
         // Fallback to Institutional Trust (Phase 3 Integration)
@@ -130,10 +141,20 @@ class PersonhoodSystem {
         return 0.5;
     }
 
+    setRelationship(nodeId, targetId, type, weight = 0.5) {
+        const profile = this.getProfile(nodeId);
+        profile.relationships.set(targetId, {
+            type: type,
+            weight: weight,
+            sinceDay: window.EngineParams?.worldDay || 0
+        });
+    }
+
     updateRelationship(nodeId, targetId, delta) {
         const profile = this.getProfile(nodeId);
-        const current = profile.relationships.get(targetId) || 0.5;
-        profile.relationships.set(targetId, Math.max(0, Math.min(1.0, current + delta)));
+        const current = profile.relationships.get(targetId) || { type: 'NEUTRAL', weight: 0.5 };
+        current.weight = Math.max(0, Math.min(1.0, current.weight + delta));
+        profile.relationships.set(targetId, current);
     }
 }
 

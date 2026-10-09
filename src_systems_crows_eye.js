@@ -180,7 +180,7 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'HOUSE_HISTORY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'DREAMS', 'PLAYBACK', 'CALIBRATION'];
+        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'HOUSES', 'HOUSE_HISTORY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'PLAYBACK', 'CALIBRATION'];
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
@@ -235,6 +235,9 @@ class CrowsEyeSystem {
                 break;
             case 'DREAMS':
                 contentHtml = this.renderDreamsView();
+                break;
+            case 'RELATIONSHIPS':
+                contentHtml = this.renderRelationshipsView();
                 break;
             case 'PLAYBACK':
                 contentHtml = this.renderPlaybackView();
@@ -918,6 +921,62 @@ class CrowsEyeSystem {
         });
 
         html += `</div>`;
+        return html;
+    }
+
+    renderRelationshipsView() {
+        if (!window.PersonhoodManager) return "Social Matrix Offline";
+        
+        let targetId = this.selectedEntityId;
+        if (!targetId && window.GameCore?.playerObj) targetId = 'player';
+        
+        const profile = window.PersonhoodManager.getProfile(targetId);
+        const ent = window.GameCore?.activeEntities.find(e => e.id === targetId);
+        const name = ent ? ent.name : targetId;
+
+        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">SOCIAL MATRIX: RELATIONSHIPS OF ${name.toUpperCase()}</div>`;
+
+        if (!profile || profile.relationships.size === 0) {
+            return html + `<div style="font-size:11px; color:#451a03;">This individual has no established social links. Select a different entity to observe.</div>`;
+        }
+
+        html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
+        
+        profile.relationships.forEach((link, id) => {
+            const targetEnt = window.GameCore?.activeEntities.find(e => e.id === id);
+            const targetName = targetEnt ? targetEnt.name : id;
+            const weightPercent = link.weight * 100;
+            
+            let color = '#94a3b8';
+            if (link.type === 'KINSHIP' || link.type === 'LOYALTY') color = '#fbbf24';
+            if (link.type === 'RIVALRY' || link.type === 'DISTRUST') color = '#ef4444';
+            if (link.type === 'FRIENDSHIP') color = '#10b981';
+
+            html += `<div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:15px; border-left: 3px solid ${color};">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <div>
+                        <span style="font-weight:bold; color:#fbbf24; font-size:13px;">${targetName.toUpperCase()}</span>
+                        <div style="font-size:10px; color:${color}; font-weight:bold;">${link.type}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="color:#78350f; font-size:9px;">BOND SINCE DAY ${link.sinceDay}</span>
+                    </div>
+                </div>
+
+                <div>
+                    <div style="display:flex; justify-content:space-between; font-size:9px; margin-bottom:3px;">
+                        <span style="color:#78350f;">BOND INTENSITY</span>
+                        <span style="color:#fbbf24;">${Math.floor(weightPercent)}%</span>
+                    </div>
+                    <div style="height:4px; background:#1c1917; width:100%;">
+                        <div style="height:100%; background:${color}; width:${weightPercent}%;"></div>
+                    </div>
+                </div>
+            </div>`;
+        });
+
+        html += `</div></div>`;
         return html;
     }
 
