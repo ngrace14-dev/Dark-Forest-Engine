@@ -178,6 +178,9 @@ class IntelManagerSystem {
 
             // 2. Epoch Purge: Did it survive the wave of white?
             if (record.epoch_created < currentEpoch) {
+                // ANCHOR PIVOT: Anchored Intel survives (Bible §25)
+                if (record.isAnchored) return;
+
                 const totalSignificance = record.significance.historical + record.significance.crow;
                 if (totalSignificance > 50 || record.rarity === window.IntelEnums.RARITY.LEGENDARY) {
                     // Archive High-Value Info
@@ -196,6 +199,21 @@ class IntelManagerSystem {
                 this.ownershipRegistry.delete(intel_id);
             }
         }
+    }
+
+    /**
+     * Decays locational information that isn't anchored after a Shift.
+     * Bible §25: Locational info expires with shifts.
+     */
+    applyShiftDecay() {
+        this.registry.forEach((intel, id) => {
+            if (intel.payload.target_coord && !intel.isAnchored) {
+                 intel.certainty = Math.max(0.1, intel.certainty * 0.2);
+                 intel.type = window.IntelEnums.TYPES.RUMOR;
+                 intel.payload.description = `[POST-SHIFT] ${intel.payload.description} (Location unreliable)`;
+                 window.EventBus.emit('UI_LOG_DEBUG', `[SHIFT] Information decayed: ${intel.payload.title}`);
+            }
+        });
     }
 }
 

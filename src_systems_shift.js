@@ -107,13 +107,42 @@ class ShiftDirectorSystem {
         window.EventBus.emit('ENV_SET_VOID_OVERRIDE', false);
         window.EventBus.emit('UI_LOG', '🌲 [STABILIZATION] Reconstruction complete. Reality has stabilized.');
         
-        // 1. Regenerate Road Network for the new geography
+        // 1. Information Decay (Bible §25)
+        if (window.IntelManager) {
+            window.IntelManager.applyShiftDecay();
+        }
+
+        // 2. Civilizational Disruption (Bible §10, §19)
+        if (window.VillageManager) {
+            window.VillageManager.villages.forEach(v => {
+                // Prosperity drops due to trade link destruction
+                v.stats.prosperity = Math.max(0, v.stats.prosperity - 15);
+                v.tradeDisruptionUntil = window.EngineParams.worldDay + 2;
+                
+                // Disconnected villages risk becoming "Lost"
+                if (v.barrierIntegrity < 20) {
+                    v.isLost = true;
+                    window.EventBus.emit('UI_LOG', `💀 [VOID] ${v.name} has disconnected from the Chain and is LOST.`);
+                }
+            });
+        }
+
+        // 3. Regenerate Road Network for the new geography
         if (window.RoadManager && window.VillageManager) {
             window.RoadManager.generateRoads(window.VillageManager.villages);
         }
 
-        // 2. Force full chunk refresh
+        // 4. Force full chunk refresh
         window.EventBus.emit('WORLD_REGENERATE');
+
+        // 5. Chronicle the Shift Outcome (Bible §15)
+        window.ChronicleManager?.recordEvent({
+            actorId: 'WORLD',
+            type: 'SHIFT_COMPLETE',
+            detail: `The World has stabilized. Epoch ${window.EngineParams.worldEpoch} has begun.`,
+            significance: 150,
+            historicalWeight: 100
+        });
         
         window.EventBus.emit('UI_LOG', `[STABILIZATION] Current Epoch: ${window.EngineParams.worldEpoch}.`);
     }
