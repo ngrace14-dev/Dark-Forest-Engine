@@ -26,6 +26,7 @@ import './src_systems_playback.js';
 import './src_systems_meaning.js';
 import './src_systems_knowledge.js';
 import './src_systems_personhood.js';
+import './src_systems_conviction.js';
 import './src_systems_world.js';
 
 import './src_systems_inventory.js';

@@ -94,17 +94,19 @@ class MeaningEngineSystem {
         // PERSONHOOD PIVOT: Why do they believe this specific conclusion?
         const profile = window.PersonhoodManager?.getProfile(npcId);
         const conclusion = window.PersonhoodManager?.calculateConclusion(npcId, intelId);
+        const conviction = window.ConvictionEngine?.getConvictionState(npcId, intelId);
 
         return {
             state: 'KNOWLEDGEABLE',
             tier: tier,
             profile: profile,
             conclusion: conclusion,
+            conviction: conviction,
             heldRecordId: heldRecord.intel_id,
             belief: belief,
             isCorrect: truthSync,
-            certainty: conclusion ? conclusion.certainty : heldRecord.certainty,
-            reason: conclusion ? conclusion.reason : (truthSync ? 'Holds a verified record.' : 'Influenced by a distorted rumor lineage.')
+            certainty: conviction ? conviction.conviction : heldRecord.certainty,
+            reason: conviction?.interpretation === 'CRISIS' ? 'Faith shattered by contradiction.' : (conclusion ? conclusion.reason : (truthSync ? 'Holds a verified record.' : 'Influenced by a distorted rumor lineage.'))
         };
     }
 

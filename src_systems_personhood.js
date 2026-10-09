@@ -46,6 +46,7 @@ class PersonhoodSystem {
                 identity,
                 bias: this.ARCHETYPES[identity].bias,
                 relationships: new Map(), // nodeId -> trustValue (0-1)
+                beliefState: new Map(), // intelId -> { conviction, interpretation, lastUpdate }
                 beliefHistory: [] // History of conclusions drawn
             });
         }
@@ -104,6 +105,10 @@ class PersonhoodSystem {
             conclusion.reason = 'High individual cynicism led to the total rejection of the source.';
         } else {
             conclusion.state = 'ACCEPTED';
+            
+            // CONVICTION PIVOT: Track initial conviction
+            const beliefState = profile.beliefState.get(intelId) || { conviction: conclusion.certainty, interpretation: conclusion.interpretation, lastUpdate: Date.now() };
+            profile.beliefState.set(intelId, beliefState);
         }
 
         return conclusion;

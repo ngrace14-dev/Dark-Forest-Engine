@@ -361,6 +361,7 @@ class CrowsEyeSystem {
                                 </div>
                                 <div style="font-size:10px; color:#94a3b8; margin-top:2px;">
                                     BELIEF: <span style="color:${state.belief === 'CERTAINTY' ? '#10b981' : '#f59e0b'};">${state.belief}</span> | 
+                                    CONVICTION: <span style="color:#fbbf24;">${Math.floor((state.conviction?.conviction || 0.5) * 100)}%</span> |
                                     ACCURACY: <span style="color:${state.isCorrect ? '#10b981' : '#ef4444'};">${state.isCorrect ? 'ACCURATE' : 'DISTORTED'}</span>
                                 </div>
                                 <div style="font-size:9px; color:#78350f; margin-top:5px;">WHY DO THEY BELIEVE IT?</div>
