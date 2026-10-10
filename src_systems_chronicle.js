@@ -114,12 +114,14 @@ window.ChronicleManager = {
                 house: v.nobleHouse
             })),
             forces: JSON.parse(JSON.stringify(window.ForceManager?.forces || {})),
-            houses: Array.from(window.DynastyManager?.houses.values() || []).map(h => ({
+                        houses: Array.from(window.DynastyManager?.houses.values() || []).map(h => ({
                 id: h.id,
                 prestige: h.prestige,
                 isBlessed: h.isBlessed
             })),
+            legendCount: window.GameState?.legends?.length || 0,
             truth: window.IntelTracker?.stats.globalFidelity || 1.0,
+
             activeMysteries: Array.from(window.InvestigationManager?.mysteries.values() || []).map(m => ({
                 id: m.id,
                 progress: m.discoveryProgress,

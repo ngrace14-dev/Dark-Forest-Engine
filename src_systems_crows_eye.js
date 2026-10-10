@@ -442,13 +442,14 @@ class CrowsEyeSystem {
                 onclick="window.PlaybackManager.resetToPresent(); window.CrowsEye.updateTimer=1.0;">RESET TO PRESENT</button>
         </div>`;
 
-        if (snap) {
+                if (snap) {
             // 2. Comparison Analysis
             const present = window.ChronicleManager.snapshots.get(snapshots[snapshots.length - 1]);
             const popDelta = snap.villages.reduce((s,v) => s + v.pop, 0) - present.villages.reduce((s,v) => s + v.pop, 0);
             const fidelityDelta = (snap.truth - present.truth) * 100;
+            const legendCount = snap.legendCount || 0;
 
-            html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+            html += `<div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:15px;">
                 <div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.3);">
                     <div style="color:#78350f; font-size:10px; margin-bottom:5px;">WORLD POPULATION DELTA</div>
                     <div style="font-size:18px; color:${popDelta >= 0 ? '#10b981' : '#ef4444'};">${popDelta > 0 ? '+' : ''}${popDelta}</div>
@@ -457,7 +458,12 @@ class CrowsEyeSystem {
                     <div style="color:#78350f; font-size:10px; margin-bottom:5px;">GLOBAL FIDELITY DELTA</div>
                     <div style="font-size:18px; color:${fidelityDelta >= 0 ? '#10b981' : '#ef4444'};">${fidelityDelta > 0 ? '+' : ''}${fidelityDelta.toFixed(1)}%</div>
                 </div>
+                <div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.3);">
+                    <div style="color:#78350f; font-size:10px; margin-bottom:5px;">HISTORICAL LEGENDS</div>
+                    <div style="font-size:18px; color:#fbbf24;">${legendCount}</div>
+                </div>
             </div>`;
+
 
             // 3. Historical Geography (Bible §27: Observing how villages changed)
             html += `<div>
