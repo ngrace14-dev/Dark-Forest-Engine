@@ -1614,20 +1614,21 @@ class CrowsEyeSystem {
         return html;
     }
 
-    generateAsciiGrid(entities, px, pz) {
+        generateAsciiGrid(entities, px, pz) {
         const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
         const mountainRadius = forestSide / 2;
         const mountainWidth = window.WorldGenConfig?.mountainRingWidthMeters || 160934.4;
         const totalRadius = (mountainRadius + mountainWidth);
+        const duneStart = totalRadius + 50000;
         
         const gridSize = 40; 
-        const worldSpan = (totalRadius * 2) / this.zoom; 
+        const worldSpan = (totalRadius * 2.5) / this.zoom; 
         const cellSpan = worldSpan / gridSize;
         
         const cellEntities = Array(gridSize).fill().map(() => Array(gridSize).fill(null));
         const grid = Array(gridSize).fill().map(() => Array(gridSize).fill(' ')); 
         
-        const typePriority = { 'P': 6, 'T': 5, 'V': 4, 'A': 3, 'M': 2, '#': 1, 'R': 0.5, '.': 0.1, ' ': 0 };
+        const typePriority = { 'K': 10, 'P': 9, 'T': 8, 'V': 7, 'A': 6, 'M': 5, '#': 4, 'R': 3, '.': 2, 'D': 1, ' ': 0 };
         
         const mapToGrid = (x, z) => {
             const relativeX = x - this.pan.x + (worldSpan / 2);
@@ -1643,11 +1644,23 @@ class CrowsEyeSystem {
                 const wz = (gz * cellSpan) - (worldSpan / 2) + this.pan.z;
                 const dist = Math.sqrt(wx*wx + wz*wz); 
                 
-                if (dist <= totalRadius) {
-                    if (dist > mountainRadius) grid[gz][gx] = 'R';
-                    else grid[gz][gx] = '.';
+                if (dist <= mountainRadius) {
+                    grid[gz][gx] = '.'; // Dark Forest: Living Memory
+                } else if (dist <= totalRadius) {
+                    grid[gz][gx] = 'R'; // Mountain Ring: Recorded Memory
+                } else if (dist > duneStart) {
+                    grid[gz][gx] = 'D'; // Endless Dunes: Lost Memory
+                } else {
+                    grid[gz][gx] = ' '; // White Void
                 }
             }
+        }
+
+        // Add fixed Capital
+        const capGrid = mapToGrid(0, 0);
+        if (capGrid.gx >= 0 && capGrid.gx < gridSize && capGrid.gz >= 0 && capGrid.gz < gridSize) {
+            grid[capGrid.gz][capGrid.gx] = 'K';
+            cellEntities[capGrid.gz][capGrid.gx] = { id: 'capital', type: 'K', ref: { name: 'The Capital', nobleHouse: 'Crown' } };
         }
 
         entities.forEach(en => {
@@ -1662,11 +1675,11 @@ class CrowsEyeSystem {
         });
         
         let gridHtml = `<div style="display:flex; justify-content:space-between; font-size:12px; color:#78350f; margin-bottom:10px;">
-            <div>Zoom: ${this.zoom.toFixed(1)}x</div>
-            <div>Pan: ${Math.round(this.pan.x)}, ${Math.round(this.pan.z)}</div>
+            <div>Region: ${this.getRegionName(this.pan.x, this.pan.z)}</div>
+            <div>Zoom: ${this.zoom.toFixed(1)}x | Day: ${window.EngineParams?.worldDay || 0}</div>
         </div>`;
         
-        gridHtml += `<div style="line-height: 1.1; font-size: 16px; letter-spacing: 2px; font-family: monospace; cursor: move; user-select: none;">`;
+        gridHtml += `<div style="line-height: 1.1; font-size: 16px; letter-spacing: 2px; font-family: monospace; cursor: move; user-select: none; background: rgba(0,0,0,0.5); padding: 10px; border: 1px solid #451a03;">`;
         for (let gz = 0; gz < gridSize; gz++) {
             for (let gx = 0; gx < gridSize; gx++) {
                 const en = cellEntities[gz][gx];
@@ -1674,14 +1687,23 @@ class CrowsEyeSystem {
                 const isSelected = en && this.selectedEntityId === en.id;
                 
                 const style = isSelected ? 'background-color: #fbbf24; color: #000; font-weight: bold;' : '';
-                const color = char === 'R' ? '#4b5563' : char === 'V' ? '#10b981' : char === 'P' ? '#3b82f6' : char === 'T' ? '#f59e0b' : '#94a3b8';
-                const dataId = en && en.id ? `data-id="${en.id}"` : '';
+                let color = '#451a03';
+                if (char === 'R') color = '#78350f'; // Mountain
+                if (char === '.') color = '#064e3b'; // Forest
+                if (char === 'D') color = '#92400e'; // Dunes
+                if (char === 'V') color = '#10b981'; // Village
+                if (char === 'K') color = '#fbbf24'; // Capital
+                if (char === 'P') color = '#3b82f6'; // Player
+                if (char === 'T') color = '#f59e0b'; // Target
+                if (char === 'A') color = '#fbbf24'; // Adventurer
                 
+                const dataId = en && en.id ? `data-id="${en.id}"` : '';
                 gridHtml += `<span style="${style} color: ${color};" ${dataId}>${char}</span>`;
             }
             gridHtml += '\n';
         }
         gridHtml += `</div>`;
+
 
         let inspectedHtml = '';
         if (this.selectedEntityId) {
@@ -1786,8 +1808,21 @@ class CrowsEyeSystem {
             }
         }
         
-        return { gridHtml, inspectedHtml };
+                return { gridHtml, inspectedHtml };
     }
+
+    getRegionName(x, z) {
+        const dist = Math.sqrt(x*x + z*z);
+        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
+        const mountainRadius = forestSide / 2;
+        const mountainWidth = window.WorldGenConfig?.mountainRingWidthMeters || 160934.4;
+        const totalRadius = (mountainRadius + mountainWidth);
+
+        if (dist < mountainRadius) return "DARK FOREST (Living Memory)";
+        if (dist < totalRadius) return "MOUNTAIN RING (Recorded Memory)";
+        return "ENDLESS DUNES (Lost Memory)";
+    }
+
 
 
 }
