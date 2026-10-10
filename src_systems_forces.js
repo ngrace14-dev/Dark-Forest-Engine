@@ -62,15 +62,24 @@ window.ForceManager = {
             pressure: 'verification',
             value: 0
         },
-        'Orb': {
+                'Orb': {
             strength: 300,
             label: 'Witness',
             description: 'Encourages interpretation and observation.',
             metric: 'Observer Count',
             pressure: 'interpretation',
             value: 0
+        },
+        'Houses': { 
+            strength: 400, 
+            label: 'Prosperity', 
+            description: 'Encourages economic growth and resource accumulation.',
+            metric: 'Total Prosperity',
+            pressure: 'prosperity',
+            value: 0 
         }
     },
+
 
     /**
      * Calculates the "Force Signature" for a major event.
@@ -164,14 +173,15 @@ window.ForceManager = {
         force.strength = 300 + (occupied * 100);
     },
 
-    recalculateHouses: function() {
+        recalculateHouses: function() {
         const force = this.forces['Houses'];
-        if (!window.VillageManager) return;
+        if (!force || !window.VillageManager?.villages) return;
         
         const prosperity = window.VillageManager.villages.reduce((acc, v) => acc + (v.stats.prosperity || 0), 0);
         force.value = Math.floor(prosperity / 10);
         force.strength = Math.min(1000, 200 + (prosperity / 2));
     },
+
 
     recalculateWendigo: function() {
         const force = this.forces['Wendigo'];
