@@ -1714,9 +1714,9 @@ class CrowsEyeSystem {
                 const ref = selectedEn.ref;
                 const type = selectedEn.type;
                 
-                // --- DIVINE INFLUENCE PANEL ---
+                                // --- DIVINE INFLUENCE PANEL ---
                 let dreamButtons = '';
-                if (window.DreamManager && type !== 'V' && type !== 'P') {
+                if (window.DreamManager && type !== 'V' && type !== 'K') {
                     const dreamState = window.DreamManager.getNPCState(this.selectedEntityId);
                     const symbols = Object.keys(window.DreamManager.lexicon);
                     
@@ -1731,11 +1731,12 @@ class CrowsEyeSystem {
                             `).join('')}
                         </div>
                         <div style="margin-top:10px; font-size:10px; color:#94a3b8;">
-                            ACTIVE DREAM: <span style="color:#fbbf24;">${dreamState.activeSymbol}</span> (${Math.floor(dreamState.intensity * 100)}%)<br>
-                            BOND: ${Math.floor(dreamState.bond * 100)}% | CORRUPTION: ${Math.floor(dreamState.corruption * 100)}%
+                            ACTIVE: <span style="color:#fbbf24;">${dreamState.activeSymbol}</span> (${Math.floor(dreamState.intensity * 100)}%)<br>
+                            BOND: ${Math.floor(dreamState.bond * 100)}% | RISK: ${Math.floor(dreamState.corruption * 100)}%
                         </div>
                     </div>`;
                 }
+
 
                 // --- PROGRESSIVE DISCLOSURE PANEL ---
                 let intelButtons = '';
