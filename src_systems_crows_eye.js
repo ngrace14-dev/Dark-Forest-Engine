@@ -979,14 +979,18 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderHousesView() {
+        renderHousesView() {
         if (!window.VillageManager) return "No House Data";
         
         // Calculate House Metrics
         const villages = window.VillageManager.villages;
-        const mostProsperous = [...villages].sort((a, b) => b.stats.prosperity - a.stats.prosperity)[0];
+        const mostProsperous = [...villages].sort((a, b) => (b.stats?.prosperity || 0) - (a.stats?.prosperity || 0))[0];
         const monopolyKing = [...villages].sort((a, b) => (b.hasMonopoly ? 1 : 0) - (a.hasMonopoly ? 1 : 0))[0];
-        const mostThreatened = [...villages].sort((a, b) => a.barrierIntegrity - b.barrierIntegrity)[0];
+        const mostThreatened = [...villages].sort((a, b) => (a.barrierIntegrity || 0) - (b.barrierIntegrity || 0))[0];
+
+        // 9-Spot Bottleneck Analysis (Bible §19)
+        const blessedCount = villages.filter(v => v.hasMonopoly && v.id !== 0).length;
+        const unblessedCount = villages.filter(v => !v.hasMonopoly && v.id !== 0).length;
 
         let html = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:20px; font-size:10px; background:rgba(0,0,0,0.5); padding:10px; border:1px solid #78350f;">
             <div style="color:#fbbf24;">MOST POWERFUL: ${mostProsperous?.nobleHouse}</div>
@@ -994,23 +998,37 @@ class CrowsEyeSystem {
             <div style="color:#ef4444;">NEAR COLLAPSE: ${mostThreatened?.nobleHouse}</div>
         </div>`;
 
+        html += `<div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px; margin-bottom:20px;">
+            <div style="font-weight:bold; color:#fbbf24; margin-bottom:10px;">THE 9-SPOT BOTTLENECK (§19)</div>
+            <div style="display:flex; align-items:center; gap:5px; margin-bottom:5px;">
+                ${Array(9).fill(0).map((_, i) => `
+                    <div style="width:20px; height:20px; border:1px solid #78350f; background:${i < blessedCount ? '#fbbf24' : '#1c1917'}; display:flex; align-items:center; justify-content:center; color:#000; font-size:10px; font-weight:bold;">
+                        ${i < blessedCount ? '★' : ''}
+                    </div>
+                `).join('')}
+            </div>
+            <div style="font-size:10px; color:#94a3b8;">${blessedCount} Blessed Houses / ${unblessedCount} Economic Agitators.</div>
+        </div>`;
+
         html += `<table style="width:100%; text-align:left; border-collapse:collapse;">
             <tr style="color:#fbbf24; border-bottom: 1px solid #78350f;">
-                <th>HOUSE</th><th>LEADER</th><th>MONOPOLY</th><th>PROSPERITY</th><th>WARD</th>
+                <th>HOUSE</th><th>LEADER</th><th>STATUS</th><th>PROSPERITY</th><th>BARRIER</th>
             </tr>`;
         villages.forEach(v => {
             const wardColor = v.barrierIntegrity < 30 ? '#ef4444' : v.barrierIntegrity < 70 ? '#f59e0b' : '#10b981';
+            const statusLabel = v.id === 0 ? '<span style="color:#fbbf24;">[ANCHOR]</span>' : (v.hasMonopoly ? '<span style="color:#fbbf24;">[BLESSED]</span>' : '<span style="color:#78350f;">[UNBLOCKED]</span>');
             html += `<tr style="border-bottom: 1px solid rgba(120,53,15,0.3);">
-                <td style="padding:10px 0;">${v.nobleHouse}</td>
-                <td>${v.nobleLeader}</td>
-                <td style="color:${v.hasMonopoly ? '#fbbf24' : '#92400e'}">${v.hasMonopoly ? v.industry.produces : 'None'}</td>
-                <td>${v.stats.prosperity.toFixed(1)}%</td>
+                <td style="padding:10px 0; color:#fbbf24; cursor:pointer;" data-id="village_${v.id}">${v.nobleHouse}</td>
+                <td style="font-size:11px;">${v.nobleLeader}</td>
+                <td style="font-size:10px;">${statusLabel}</td>
+                <td>${v.stats?.prosperity.toFixed(1)}%</td>
                 <td style="color:${wardColor}">${v.barrierIntegrity}%</td>
             </tr>`;
         });
         html += `</table>`;
         return html;
     }
+
 
     renderLegendsView() {
         const legends = window.GameState?.legends || [];
@@ -1757,6 +1775,7 @@ class CrowsEyeSystem {
             return { gx, gz };
         };
 
+                // 1. Geography Base
         for (let gz = 0; gz < gridSize; gz++) {
             for (let gx = 0; gx < gridSize; gx++) {
                 const wx = (gx * cellSpan) - (worldSpan / 2) + this.pan.x;
@@ -1775,19 +1794,26 @@ class CrowsEyeSystem {
             }
         }
 
-                // Add Road Continuity (Bible §18)
-                if (window.RoadManager?.roadNodes) {
-                    window.RoadManager.roadNodes.forEach((node, idx) => {
-                        if (idx % 2 === 0) { // Every 2nd node for visible continuity
-                            const { gx, gz } = mapToGrid(node.x, node.z);
-                            if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
-                                if (grid[gz][gx] === '.' || grid[gz][gx] === ' ') {
-                                    grid[gz][gx] = '#';
-                                }
-                            }
-                        }
-                    });
+        // Add Road Continuity & Chain Integrity (Bible §6, §10)
+        const villages = window.VillageManager?.villages || [];
+        if (window.RoadManager?.roadNodes) {
+            window.RoadManager.roadNodes.forEach((node, idx) => {
+                const { gx, gz } = mapToGrid(node.x, node.z);
+                if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
+                    // Chain Integrity: Visual connection between villages
+                    // Find which two villages this node is between
+                    const vIdx = Math.floor((idx / window.RoadManager.roadNodes.length) * (villages.length - 1));
+                    const v1 = villages[vIdx];
+                    const v2 = villages[vIdx + 1];
+                    const integrity = Math.min(v1?.barrierIntegrity || 100, v2?.barrierIntegrity || 100);
+
+                    if (integrity > 20 && (grid[gz][gx] === '.' || grid[gz][gx] === ' ')) {
+                        grid[gz][gx] = integrity > 70 ? '#' : ':';
+                    }
                 }
+            });
+        }
+
 
                 // 5. Instability Layer
 
@@ -1847,7 +1873,7 @@ class CrowsEyeSystem {
 
                 
                 let color = '#451a03';
-                if (char === 'R') color = '#78350f'; // Mountain
+                                if (char === 'R') color = '#78350f'; // Mountain
                 if (char === '.') color = '#064e3b'; // Forest
                 if (char === 'D') color = '#92400e'; // Dunes
                 if (char === 'V') color = '#10b981'; // Village
@@ -1856,6 +1882,8 @@ class CrowsEyeSystem {
                 if (char === 'T') color = '#f59e0b'; // Target
                 if (char === 'A') color = '#fbbf24'; // Adventurer
                 if (char === '!') color = '#ef4444'; // Crisis
+                if (char === ':') color = '#451a03'; // Weak Road
+
                 
                 const dataId = en && en.id ? `data-id="${en.id}"` : '';
                 gridHtml += `<span style="${style} color: ${color};" ${dataId}>${char}</span>`;
