@@ -120,7 +120,7 @@ class InvestigationManagerSystem {
         }
     }
 
-    findConflict(intelA, intelB) {
+        findConflict(intelA, intelB) {
         // Logic 1: Factual Contradiction (Same location/event, different truth claim)
         if (intelA.payload.target_coord && intelB.payload.target_coord) {
             const dist = Math.hypot(intelA.payload.target_coord.x - intelB.payload.target_coord.x, 
@@ -140,7 +140,21 @@ class InvestigationManagerSystem {
         return null;
     }
 
+    /**
+     * Cross-checks if a specific piece of intel is involved in any active contradiction.
+     */
+    findContradictionForIntel(intelId) {
+        let found = null;
+        this.mysteries.forEach(m => {
+            if (found) return;
+            const conflict = m.contradictions.find(c => c.ids.includes(intelId));
+            if (conflict) found = conflict;
+        });
+        return found;
+    }
+
     onIntelVerified(intel) {
+
         this.mysteries.forEach(m => {
             if (m.linkedEvidence.has(intel.intel_id)) {
                 this.calculateProgress(m.id);

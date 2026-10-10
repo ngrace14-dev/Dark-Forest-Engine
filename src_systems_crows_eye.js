@@ -382,7 +382,7 @@ class CrowsEyeSystem {
             </div>
         </div>`;
 
-        // 4, 5, 6 - Subjective State Analysis
+                // 4, 5, 6 - Subjective State Analysis
         if (this.selectedEntityId) {
              const knownIntel = window.IntelManager?.getIntelForNode(this.selectedEntityId) || [];
              html += `<div>
@@ -391,8 +391,11 @@ class CrowsEyeSystem {
                     ${knownIntel.slice(0, 3).map(i => {
                         const state = window.MeaningEngine.getSubjectiveState(this.selectedEntityId, i.intel_id);
                         const lineage = window.MeaningEngine.getBeliefLineage(this.selectedEntityId, i.intel_id);
+                        const contradiction = window.InvestigationManager?.findContradictionForIntel(i.intel_id);
+                        
                         return `
-                            <div style="border-left:2px solid #78350f; padding-left:15px;">
+                            <div style="border-left:2px solid ${contradiction ? '#ef4444' : '#78350f'}; padding-left:15px; position:relative;">
+                                ${contradiction ? '<div style="position:absolute; left:-6px; top:0; color:#ef4444; font-weight:bold;">!</div>' : ''}
                                 <div style="font-size:11px; color:#fbbf24;">${i.payload.title}</div>
                                 <div style="font-size:10px; color:#94a3b8; margin-top:3px;">
                                     TIER: <span style="color:#d97706;">${state.tier}</span> |
@@ -412,6 +415,7 @@ class CrowsEyeSystem {
                 </div>
              </div>`;
         }
+
 
         html += `</div>`;
         return html;
