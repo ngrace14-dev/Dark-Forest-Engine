@@ -311,7 +311,7 @@ class CrowsEyeSystem {
         return { gridHtml: healthHtml + gridData.gridHtml, inspectedHtml: gridData.inspectedHtml };
     }
 
-    gatherEntities() {
+        gatherEntities() {
         const narrator = window.GameState?.narrator || {};
         const entities = [];
         
@@ -338,6 +338,7 @@ class CrowsEyeSystem {
         
         if (window.VillageManager?.villages) {
             window.VillageManager.villages.forEach(v => {
+                if (v.id === 0) return; // Skip capital, handled by K
                 entities.push({ type: 'V', x: v.x, z: v.z, id: `village_${v.id}`, ref: v });
             });
         }
@@ -349,6 +350,7 @@ class CrowsEyeSystem {
         }
         return entities;
     }
+
 
     renderMeaningView() {
         if (!window.MeaningEngine) return "Meaning Engine Offline";

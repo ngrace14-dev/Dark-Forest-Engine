@@ -102,7 +102,7 @@ window.VillageManager = {
         this.shiftLocations();
     },
     
-    // --- PHASE 1.5: VILLAGE CHAIN REPOSITIONING ---
+        // --- PHASE 1.5: VILLAGE CHAIN REPOSITIONING ---
     shiftLocations: function() {
         if (this.villages.length < 2) return;
         
@@ -112,9 +112,9 @@ window.VillageManager = {
         capital.z = 0;
         
         // 2. Terminus (Index 19) is pushed to the edge of the mountain ring
-        // We use the Epoch Manager's PRNG to determine the angle so it's consistent for the seed
         const prng = window.EpochManagerInstance ? window.EpochManagerInstance.prng : Math.random;
-        const mountainRadius = (window.WorldGenConfig ? window.WorldGenConfig.darkForestSideMeters / 2 : 287921.6) - 5000;
+        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
+        const mountainRadius = (forestSide / 2) - 5000;
         const terminusAngle = prng() * Math.PI * 2;
         
         const terminus = this.villages[this.villages.length - 1];
@@ -126,16 +126,12 @@ window.VillageManager = {
         
         for (let i = 1; i <= totalMiddleNodes; i++) {
             const village = this.villages[i];
-            
-            // t is how far along the chain we are (0.0 to 1.0)
             const t = i / (totalMiddleNodes + 1);
             
-            // Linear interpolation between Capital (0,0) and Terminus
             const baseX = terminus.x * t;
             const baseZ = terminus.z * t;
             
-            // Add procedural perpendicular offset to make it a jagged chain rather than a straight line
-            // Maximum deviation is 20% of the total distance to Terminus
+            // Add procedural perpendicular offset (The "Jagged Chain")
             const maxDeviation = mountainRadius * 0.2;
             const deviationDirX = -Math.sin(terminusAngle);
             const deviationDirZ = Math.cos(terminusAngle);
@@ -143,20 +139,21 @@ window.VillageManager = {
             
             village.x = baseX + (deviationDirX * deviationAmount);
             village.z = baseZ + (deviationDirZ * deviationAmount);
-            
-            // Optional: Snap to the nearest "good terrain" here if you wanted, but for now exact math coordinates are fine
+        }
+
+        // 4. Anchor Analysis: Sync with Force Manager
+        if (window.ForceManager) {
+            window.ForceManager.update(0);
         }
         
-        // 4. Regenerate the road network to match the new coordinates
+        // 5. Regenerate the road network to match the new coordinates
         if (window.RoadManager && window.RoadManager.generateRoads) {
             window.RoadManager.generateRoads(this.villages);
         }
         
         window.EventBus.emit('UI_LOG', "🌲 The Village Chain has repositioned.");
-        if(window.EngineState && (window.EngineState.currentAssetTab === 'villages' || window.EngineState.currentAssetTab === 'world')) {
-            window.EventBus.emit('RENDER_ASSETS');
-        }
     },
+
     // --- SIMULATION SLICING (Kenshi Style) ---
     // Instead of simulating all 20 villages at once, we do 1 per logic tick
     simulationIndex: 0,
