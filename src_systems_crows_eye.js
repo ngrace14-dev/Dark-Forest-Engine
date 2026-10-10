@@ -1640,7 +1640,8 @@ class CrowsEyeSystem {
         const cellEntities = Array(gridSize).fill().map(() => Array(gridSize).fill(null));
         const grid = Array(gridSize).fill().map(() => Array(gridSize).fill(' ')); 
         
-        const typePriority = { 'K': 10, 'P': 9, 'T': 8, 'V': 7, 'A': 6, 'M': 5, '#': 4, 'R': 3, '.': 2, 'D': 1, ' ': 0 };
+                const typePriority = { 'K': 10, 'P': 9, 'T': 8, 'V': 7, '!': 6.5, 'A': 6, 'M': 5, '#': 4, 'R': 3, '.': 2, 'D': 1, ' ': 0 };
+
         
         const mapToGrid = (x, z) => {
             const relativeX = x - this.pan.x + (worldSpan / 2);
@@ -1668,7 +1669,22 @@ class CrowsEyeSystem {
             }
         }
 
+                // 5. Instability Layer
+        crises.forEach(c => {
+            const house = window.DynastyManager?.getHouse(c.houseId);
+            const intensity = c.intensity * 100;
+            
+            // Add a Pressure indicator to the map if location is known
+            if (house && house.location) {
+                const { gx, gz } = mapToGrid(house.location.x, house.location.z);
+                if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
+                    grid[gz][gx] = '!'; // Instability Marker
+                }
+            }
+        });
+
         // Add fixed Capital
+
         const capGrid = mapToGrid(0, 0);
         if (capGrid.gx >= 0 && capGrid.gx < gridSize && capGrid.gz >= 0 && capGrid.gz < gridSize) {
             grid[capGrid.gz][capGrid.gx] = 'K';
@@ -1699,7 +1715,7 @@ class CrowsEyeSystem {
                 const isSelected = en && this.selectedEntityId === en.id;
                 
                 const style = isSelected ? 'background-color: #fbbf24; color: #000; font-weight: bold;' : '';
-                let color = '#451a03';
+                                let color = '#451a03';
                 if (char === 'R') color = '#78350f'; // Mountain
                 if (char === '.') color = '#064e3b'; // Forest
                 if (char === 'D') color = '#92400e'; // Dunes
@@ -1708,6 +1724,8 @@ class CrowsEyeSystem {
                 if (char === 'P') color = '#3b82f6'; // Player
                 if (char === 'T') color = '#f59e0b'; // Target
                 if (char === 'A') color = '#fbbf24'; // Adventurer
+                if (char === '!') color = '#ef4444'; // Crisis
+
                 
                 const dataId = en && en.id ? `data-id="${en.id}"` : '';
                 gridHtml += `<span style="${style} color: ${color};" ${dataId}>${char}</span>`;
