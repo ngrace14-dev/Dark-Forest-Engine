@@ -2157,8 +2157,17 @@ renderer.setAnimationLoop(() => {
         fixedUpdateLogic(fixedTimeStep);
         accumulator -= fixedTimeStep;
     }
-    updateCameraAndShadows(delta);
+        updateCameraAndShadows(delta);
+
+    if (window.EngineConfig?.crowsEyeMode) {
+        if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'hidden';
+        return; 
+    } else {
+        if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'visible';
+    }
+
     if (window.RenderPipeline) {
+
         window.RenderPipeline.render();
     } else {
         if (window.Profiler) window.Profiler.begin(String.fromCharCode(82,101,110,100,101,114,101,114));
