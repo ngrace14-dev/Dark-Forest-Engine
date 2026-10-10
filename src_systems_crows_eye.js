@@ -195,7 +195,8 @@ class CrowsEyeSystem {
                 const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'WATCHLIST', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
+                const views = ['MAP', 'WATCHLIST', 'ACTIONS', 'LOGISTICS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
+
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px; overflow-x:auto; white-space:nowrap; scrollbar-width:none;">`;
 
         views.forEach(v => {
@@ -217,10 +218,14 @@ class CrowsEyeSystem {
                 contentHtml = mapData.gridHtml;
                 inspectedHtml = mapData.inspectedHtml;
                 break;
-            case 'ACTIONS':
+                        case 'ACTIONS':
                 contentHtml = this.renderActionsView();
                 break;
+            case 'LOGISTICS':
+                contentHtml = this.renderLogisticsView();
+                break;
             case 'ECONOMY':
+
                 contentHtml = this.renderEconomyView();
                 break;
             case 'INTEL':
@@ -578,7 +583,63 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderActionsView() {
+        renderLogisticsView() {
+        if (!window.VillageManager) return "Logistics Engine Offline";
+        
+        const villages = window.VillageManager.villages;
+        const capital = villages[0];
+        const day = window.EngineParams?.worldDay || 0;
+        
+        // 1. World Fuel Reserve
+        const totalEssence = villages.reduce((acc, v) => acc + (v.stats.essence || 0), 0);
+        const avgIntegrity = villages.reduce((acc, v) => acc + (v.barrierIntegrity || 0), 0) / villages.length;
+        
+        let html = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:25px;">
+            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px;">
+                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">WORLD BARRIER ESSENCE</div>
+                <div style="font-size:24px; color:#fbbf24;">${totalEssence} Units</div>
+            </div>
+            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px;">
+                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">AVG CHAIN INTEGRITY</div>
+                <div style="font-size:24px; color:${avgIntegrity > 70 ? '#10b981' : '#f59e0b'};">${avgIntegrity.toFixed(1)}%</div>
+            </div>
+        </div>`;
+
+        html += `<div style="font-weight:bold; color:#fbbf24; margin-bottom:15px; border-bottom:1px solid #78350f; padding-bottom:5px;">THE FUEL CHOKEPOINT (§10)</div>`;
+
+        html += `<table style="width:100%; text-align:left; border-collapse:collapse; font-size:12px;">
+            <tr style="color:#78350f; border-bottom: 1px solid #451a03;">
+                <th>SETTLEMENT</th><th>STOCK</th><th>CONSUMPTION</th><th>RISK</th><th>CONNECTION</th>
+            </tr>`;
+
+        villages.forEach(v => {
+            const consumption = Math.max(1, Math.ceil(v.population.current / 5000));
+            const stock = v.stats.essence || 0;
+            const daysRemaining = Math.floor(stock / consumption);
+            
+            let riskColor = '#10b981';
+            let riskLabel = 'STABLE';
+            if (daysRemaining < 3) { riskColor = '#f59e0b'; riskLabel = 'LOW'; }
+            if (daysRemaining < 1) { riskColor = '#ef4444'; riskLabel = 'CRITICAL'; }
+
+            // Check connection to Capital
+            const dist = Math.hypot(v.x, v.z);
+            const roadStrength = v.barrierIntegrity > 70 ? 'SECURE' : (v.barrierIntegrity > 20 ? 'WEAK' : 'DISCONNECTED');
+            const connectionColor = roadStrength === 'SECURE' ? '#10b981' : (roadStrength === 'WEAK' ? '#f59e0b' : '#ef4444');
+
+            html += `<tr style="border-bottom: 1px solid rgba(120,53,15,0.2);">
+                <td style="padding:10px 0; color:#fbbf24; cursor:pointer;" data-id="village_${v.id}">${v.name}</td>
+                <td>${stock} <span style="font-size:10px; color:#94a3b8;">(${daysRemaining}d)</span></td>
+                <td>-${consumption}/day</td>
+                <td style="color:${riskColor}; font-weight:bold;">${riskLabel}</td>
+                <td style="color:${connectionColor}; font-size:10px;">${roadStrength}</td>
+            </tr>`;
+        });
+
+        html += `</table>`;
+        return html;
+    }
+
         const entities = this.gatherEntities().filter(e => e.ref && (e.ref.currentTask || e.type === 'V' || e.type === 'A' || e.type === 'T'));
         let html = `<table style="width:100%; text-align:left; border-collapse:collapse;">
             <tr style="color:#fbbf24; border-bottom: 1px solid #78350f;">
