@@ -40,7 +40,7 @@ class PersonhoodSystem {
             const archetypeKeys = Object.keys(this.ARCHETYPES);
             const identity = archetypeKeys[Math.floor(Math.random() * archetypeKeys.length)];
 
-            this.profiles.set(nodeId, {
+                        this.profiles.set(nodeId, {
                 id: nodeId,
                 traits,
                 identity,
@@ -50,9 +50,15 @@ class PersonhoodSystem {
                 beliefState: new Map(), // intelId -> { conviction, interpretation, lastUpdate }
                 beliefHistory: [] // History of conclusions drawn
             });
+
+            // --- LEGACY REGISTRATION ---
+            if (window.LegacyManager) {
+                window.LegacyManager.registerEntity(nodeId);
+            }
         }
         return this.profiles.get(nodeId);
     }
+
 
     /**
      * Answers: Why did THIS person arrive at THIS belief?

@@ -38,7 +38,7 @@ class RuneCarvingSystem {
         window.EventBus.emit('UI_LOG', '[Runes] Flesh-Ledger System Initialized');
     }
 
-    /**
+        /**
      * Carves a rune into the body of an entity.
      * Bible §BN: "Permanently increases Story Density and Historical Weight."
      */
@@ -81,7 +81,13 @@ class RuneCarvingSystem {
             historicalWeight: rune.weight
         });
 
+        // LEGACY INTEGRATION: Runes increase permanent significance
+        if (window.LegacyManager) {
+            window.LegacyManager.addSignificance(nodeId, rune.weight);
+        }
+
         // Increase Force Attraction (Harvest Beacon)
+
         if (window.ForceManager) {
             // More runes make you brighter to the Crow and the Wendigo
             window.ForceManager.forces['Crow'].strength += 10;

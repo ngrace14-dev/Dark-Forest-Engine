@@ -128,7 +128,7 @@ window.GameState = {
         feats: 0,
         secretProgress: 0
     },
-    forestBlessing: {
+        forestBlessing: {
         active: false,
         tier: 'none',
         name: 'No forest blessing',
@@ -138,8 +138,18 @@ window.GameState = {
         dangerSense: false,
         combatLuck: 0,
         teleportLuck: 0
+    },
+    playerLegacy: {
+        id: 'player',
+        bloodlineId: 'bloodline_wanderer',
+        storyDensity: 0,
+        inheritedTraits: {},
+        generation: 1,
+        karmicDebt: 0,
+        significanceLevel: 'UNKNOWN'
     }
 };
+
 
 window.EngineState = {
     factions: [
