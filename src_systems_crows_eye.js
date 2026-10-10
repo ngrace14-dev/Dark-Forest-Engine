@@ -1588,7 +1588,7 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderForcesView() {
+        renderForcesView() {
         if (!window.ForceManager) return "No Force Data";
         
         // Story Density Metrics
@@ -1607,6 +1607,7 @@ class CrowsEyeSystem {
         let html = densityHtml + `<div style="display:flex; flex-direction:column; gap:20px;">`;
         Object.entries(window.ForceManager.forces).forEach(([name, data]) => {
             const percent = (data.strength / 1000) * 100;
+            const drift = window.ForceManager.getDrift(name).toFixed(2);
             
             // Influence mapping
             let influenceHtml = '';
@@ -1625,29 +1626,32 @@ class CrowsEyeSystem {
                     Avg Prosperity: ${this.lastStats?.prosperity.toFixed(1)}%
                 </div>`;
             } else if (name === 'Crow') {
-                const legends = window.GameState?.legends?.length || 0;
                 influenceHtml = `<div style="font-size:10px; color:#d97706; margin-top:5px;">
-                    + ${legends} Recorded Legends<br>
-                    + ${window.GameState?.anthology?.length || 0} Folktales Written
+                    + ${legendsCount} Recorded Legends<br>
+                    + ${poemsCount} Folktales Written
                 </div>`;
             }
 
-            html += `<div>
+            html += `<div style="border-left: 2px solid ${percent > 70 ? '#fbbf24' : '#451a03'}; padding-left: 15px;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                    <span style="font-weight:bold; color:#fbbf24;">${name}</span>
+                    <div>
+                        <span style="font-weight:bold; color:#fbbf24;">${name.toUpperCase()}</span>
+                        <span style="color:#78350f; font-size:10px; margin-left: 10px;">[Drift: x${drift}]</span>
+                    </div>
                     <span style="color:#78350f;">${data.strength} / 1000</span>
                 </div>
-                <div style="font-size:11px; margin-bottom:5px;">${data.description}</div>
-                <div style="height:8px; background:#451a03; width:100%;">
+                <div style="font-size:11px; margin-bottom:5px; color:#94a3b8;">${data.description}</div>
+                <div style="height:6px; background:#451a03; width:100%;">
                     <div style="height:100%; background:#f59e0b; width:${percent}%"></div>
                 </div>
-                <div style="font-size:10px; margin-top:5px; color:#92400e;">Current ${data.metric}: ${data.value}</div>
+                <div style="font-size:10px; margin-top:5px; color:#92400e;">Source: ${data.metric} (${data.value})</div>
                 ${influenceHtml}
             </div>`;
         });
         html += `</div>`;
         return html;
     }
+
 
         generateAsciiGrid(entities, px, pz) {
         const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
