@@ -2,13 +2,15 @@
  * Crow's Eye System - Phase 2 (Registration & State)
  */
 class CrowsEyeSystem {
-    constructor() {
+        constructor() {
         this.isActive = false;
         this.overlay = null;
         this.updateTimer = 0;
         this.selectedEntityId = null;
+        this.followedEntityIds = new Set(); // Bible §28
         this.currentView = 'MAP'; // Default view
         this.zoom = 1.0;
+
         this.pan = { x: 0, z: 0 };
         this.isDragging = false;
         this.lastStats = null;
@@ -66,7 +68,7 @@ class CrowsEyeSystem {
         this.overlay.style.overflowY = 'auto';
         this.overlay.style.backdropFilter = 'blur(10px)';
         
-        this.overlay.addEventListener('click', (e) => {
+                this.overlay.addEventListener('click', (e) => {
             if (e.target.tagName === 'SPAN' && e.target.dataset.id) {
                 this.selectedEntityId = e.target.dataset.id;
                 this.updateTimer = 1.0; // Force immediate update
@@ -75,7 +77,17 @@ class CrowsEyeSystem {
                 this.currentView = e.target.dataset.view;
                 this.updateTimer = 1.0;
             }
+            if (e.target.dataset.action === 'follow') {
+                const id = e.target.dataset.id;
+                if (this.followedEntityIds.has(id)) {
+                    this.followedEntityIds.delete(id);
+                } else {
+                    this.followedEntityIds.add(id);
+                }
+                this.updateTimer = 1.0;
+            }
         });
+
 
         // Dragging & Zooming Logic
         this.overlay.addEventListener('mousedown', (e) => {
@@ -180,11 +192,12 @@ class CrowsEyeSystem {
         // Calculate Trends (Delta Analysis)
         this.updateTrends();
 
-        const narrator = window.GameState?.narrator || {};
+                const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
-        let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
+        const views = ['MAP', 'WATCHLIST', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
+        let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px; overflow-x:auto; white-space:nowrap; scrollbar-width:none;">`;
+
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
             navHtml += `<div data-view="${v}" style="cursor:pointer; padding:5px 10px; font-weight:bold; ${activeStyle}">${v}</div>`;
@@ -194,8 +207,12 @@ class CrowsEyeSystem {
         let contentHtml = '';
         let inspectedHtml = '';
 
-        switch (this.currentView) {
+                switch (this.currentView) {
+            case 'WATCHLIST':
+                contentHtml = this.renderWatchlistView();
+                break;
             case 'MAP':
+
                 const mapData = this.renderMapView();
                 contentHtml = mapData.gridHtml;
                 inspectedHtml = mapData.inspectedHtml;
@@ -294,7 +311,52 @@ class CrowsEyeSystem {
         </div>`;
     }
 
-        renderMapView() {
+        renderWatchlistView() {
+            if (this.followedEntityIds.size === 0) {
+                return `<div style="text-align:center; padding:100px; color:#451a03;">
+                    <div style="font-size:48px; margin-bottom:20px;">∅</div>
+                    <div>Your Watchlist is empty.</div>
+                    <div style="font-size:11px; margin-top:10px;">Select entities on the map or in the action ledger to follow them (§28).</div>
+                </div>`;
+            }
+
+            const allEntities = this.gatherEntities();
+            let html = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
+
+            this.followedEntityIds.forEach(id => {
+                const ent = allEntities.find(e => e.id === id);
+                const ref = ent?.ref;
+                if (!ref) return;
+
+                const significance = window.ChronicleManager?.npcHistoricalWeights.get(id) || 0;
+                const region = this.getRegionName(ent.x, ent.z).split(' (')[0];
+                const dist = Math.hypot(ent.x, ent.z) / 1000;
+
+                html += `<div style="background:rgba(255,255,255,0.05); border:1px solid #78350f; padding:15px; border-left: 4px solid #fbbf24;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <div style="font-weight:bold; color:#fbbf24; cursor:pointer;" data-id="${id}">${ref.name || 'Unknown'}</div>
+                        <div style="color:#78350f; font-size:10px;">SIG: ${significance}</div>
+                    </div>
+                
+                    <div style="font-size:11px; margin-bottom:8px;">
+                        <div style="color:#94a3b8;">LOC: <span style="color:#fbbf24;">${region}</span> (${dist.toFixed(1)}km)</div>
+                        <div style="color:#94a3b8;">TASK: <span style="color:#d97706;">${ref.currentTask || 'Idle'}</span></div>
+                        <div style="color:#94a3b8;">GOAL: <span style="color:#92400e;">${ref.taskTarget || 'None'}</span></div>
+                    </div>
+
+                    <div style="border-top:1px solid #451a03; padding-top:10px; display:flex; gap:10px;">
+                        <button style="background:transparent; border:1px solid #78350f; color:#78350f; padding:2px 8px; font-size:9px; cursor:pointer;"
+                            onclick="window.CrowsEye.pan.x=${ent.x}; window.CrowsEye.pan.z=${ent.z}; window.CrowsEye.currentView='MAP'; window.CrowsEye.updateTimer=1.0;">CENTER MAP</button>
+                        <button style="background:transparent; border:1px solid #ef4444; color:#ef4444; padding:2px 8px; font-size:9px; cursor:pointer;"
+                            data-action="follow" data-id="${id}">UNFOLLOW</button>
+                    </div>
+                </div>`;
+            });
+
+            html += `</div>`;
+            return html;
+        }
+
         const snapshots = Array.from(window.ChronicleManager?.snapshots.keys() || []).sort((a, b) => a - b);
         const currentPlaybackDay = window.PlaybackManager?.currentPlaybackDay;
         const isHistory = currentPlaybackDay !== undefined && currentPlaybackDay < (window.EngineParams?.worldDay || 0);
@@ -1752,16 +1814,21 @@ class CrowsEyeSystem {
         
         gridHtml += `<div style="line-height: 1.1; font-size: 16px; letter-spacing: 2px; font-family: monospace; cursor: move; user-select: none; background: rgba(0,0,0,0.5); padding: 10px; border: 1px solid #451a03;">`;
                 for (let gz = 0; gz < gridSize; gz++) {
-            for (let gx = 0; gx < gridSize; gx++) {
-                const en = cellEntities[gz][gx];
-                const char = grid[gz][gx];
-                const isSelected = en && this.selectedEntityId === en.id;
-                const isLegendary = en && (en.significance > 500); // Bible §BN: Significance Trap
+                    for (let gx = 0; gx < gridSize; gx++) {
+                        const en = cellEntities[gz][gx];
+                        const char = grid[gz][gx];
+                        const isSelected = en && this.selectedEntityId === en.id;
+                        const isLegendary = en && (en.significance > 500); // Bible §BN: Significance Trap
+                        const isFollowed = en && this.followedEntityIds.has(en.id);
                 
-                let style = isSelected ? 'background-color: #fbbf24; color: #000; font-weight: bold;' : '';
-                if (isLegendary && !isSelected) {
-                    style = 'text-shadow: 0 0 8px #fbbf24; color: #fff; font-weight: bold;';
-                }
+                        let style = isSelected ? 'background-color: #fbbf24; color: #000; font-weight: bold;' : '';
+                        if (isLegendary && !isSelected) {
+                            style = 'text-shadow: 0 0 8px #fbbf24; color: #fff; font-weight: bold;';
+                        }
+                        if (isFollowed && !isSelected) {
+                            style += ' border-bottom: 2px solid #3b82f6;';
+                        }
+
                 
                 let color = '#451a03';
                 if (char === 'R') color = '#78350f'; // Mountain
@@ -1873,15 +1940,25 @@ class CrowsEyeSystem {
                     }
                 }
 
-                const history = window.ChronicleManager?.getHistoryFor(this.selectedEntityId).slice(-5).reverse() || [];
+                                const history = window.ChronicleManager?.getHistoryFor(this.selectedEntityId).slice(-5).reverse() || [];
                 if (history.length > 0) {
                     inspectedHtml += `<div style="border-top:1px solid #451a03; padding-top:10px;">
                         <span style="color:#fbbf24;">RECENT HISTORY</span><br>
                         ${history.map(e => `<span style="color:#78350f;">[Day ${e.timestamp.day}]</span> ${e.detail}`).join('<br>')}
                     </div>`;
                 }
+
+                // --- FOLLOW BUTTON ---
+                const isFollowing = this.followedEntityIds.has(this.selectedEntityId);
+                inspectedHtml += `<div style="border-top:1px solid #78350f; padding-top:15px; margin-top:10px;">
+                    <button data-action="follow" data-id="${this.selectedEntityId}" style="width:100%; padding:10px; background:${isFollowing ? '#1e3a8a' : '#451a03'}; color:#fbbf24; border:1px solid #78350f; cursor:pointer; font-weight:bold;">
+                        ${isFollowing ? '✓ FOLLOWING' : '+ FOLLOW ENTITY'}
+                    </button>
+                    <div style="font-size:9px; color:#78350f; margin-top:5px; text-align:center;">Followed entities are tracked in the Watchlist (§28).</div>
+                </div>`;
                 
                 inspectedHtml += intelButtons;
+
                 inspectedHtml += dreamButtons;
                 inspectedHtml += `</div>`;
             }
