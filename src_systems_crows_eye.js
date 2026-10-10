@@ -166,9 +166,12 @@ class CrowsEyeSystem {
             </div>
         </div>`;
 
-        return html;
+                return html;
     }
+
+    update(dt) {
         if (!this.isActive || !this.overlay) return;
+
         
         this.updateTimer += dt;
         if (this.updateTimer < 0.1) return; // Faster update for UI responsiveness
