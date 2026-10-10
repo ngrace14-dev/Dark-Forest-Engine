@@ -269,9 +269,10 @@ class CrowsEyeSystem {
             case 'MYSTERIES':
                 contentHtml = this.renderMysteriesView();
                 break;
-            case 'MEANING':
-                contentHtml = this.renderMeaningView();
+                        case 'MEANING':
+                contentHtml = this.renderMeaningView() + '<br>' + this.renderNetworkView();
                 break;
+
             case 'DREAMS':
                 contentHtml = this.renderDreamsView();
                 break;
@@ -1774,7 +1775,22 @@ class CrowsEyeSystem {
             }
         }
 
+                // Add Road Continuity (Bible §18)
+                if (window.RoadManager?.roadNodes) {
+                    window.RoadManager.roadNodes.forEach((node, idx) => {
+                        if (idx % 2 === 0) { // Every 2nd node for visible continuity
+                            const { gx, gz } = mapToGrid(node.x, node.z);
+                            if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
+                                if (grid[gz][gx] === '.' || grid[gz][gx] === ' ') {
+                                    grid[gz][gx] = '#';
+                                }
+                            }
+                        }
+                    });
+                }
+
                 // 5. Instability Layer
+
         crises.forEach(c => {
             const house = window.DynastyManager?.getHouse(c.houseId);
             const intensity = c.intensity * 100;
