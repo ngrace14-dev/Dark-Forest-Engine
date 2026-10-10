@@ -294,10 +294,23 @@ class CrowsEyeSystem {
         </div>`;
     }
 
-    renderMapView() {
-        const entities = this.gatherEntities();
-        const px = window.GameCore?.playerObj?.visual?.position?.x || 0;
-        const pz = window.GameCore?.playerObj?.visual?.position?.z || 0;
+        renderMapView() {
+        const snapshots = Array.from(window.ChronicleManager?.snapshots.keys() || []).sort((a, b) => a - b);
+        const currentPlaybackDay = window.PlaybackManager?.currentPlaybackDay;
+        const isHistory = currentPlaybackDay !== undefined && currentPlaybackDay < (window.EngineParams?.worldDay || 0);
+        
+        let entities = [];
+        let px = 0, pz = 0;
+
+        if (isHistory && window.ChronicleManager?.snapshots.has(currentPlaybackDay)) {
+            const snap = window.ChronicleManager.snapshots.get(currentPlaybackDay);
+            entities = snap.villages.map(v => ({ type: 'V', x: v.x, z: v.z, id: `village_${v.id}`, ref: v }));
+            // Add archived adventurers if we had them in snapshots (future addition)
+        } else {
+            entities = this.gatherEntities();
+            px = window.GameCore?.playerObj?.visual?.position?.x || 0;
+            pz = window.GameCore?.playerObj?.visual?.position?.z || 0;
+        }
         
         // World Health Dashboard
         let healthHtml = `<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:20px; font-size:10px; background:rgba(0,0,0,0.5); padding:10px; border:1px solid #78350f;">
@@ -307,41 +320,51 @@ class CrowsEyeSystem {
             <div>SECURITY: ${window.ForceManager?.forces['Forest'].strength < 600 ? 'SECURE' : 'THREATENED'}</div>
         </div>`;
 
+        if (isHistory) {
+            healthHtml = `<div style="margin-bottom:20px; font-size:12px; background:#451a03; padding:10px; border:1px solid #fbbf24; color:#fbbf24; text-align:center; font-weight:bold;">
+                ARCHAEOLOGICAL VIEW: DAY ${currentPlaybackDay} (Historical Record)
+            </div>`;
+        }
+
         const gridData = this.generateAsciiGrid(entities, px, pz);
         return { gridHtml: healthHtml + gridData.gridHtml, inspectedHtml: gridData.inspectedHtml };
     }
 
+
         gatherEntities() {
-        const narrator = window.GameState?.narrator || {};
-        const entities = [];
+            const narrator = window.GameState?.narrator || {};
+            const entities = [];
         
-        if (window.GameCore?.playerObj?.visual) {
-            entities.push({ type: 'P', x: window.GameCore.playerObj.visual.position.x, z: window.GameCore.playerObj.visual.position.z, id: 'player', ref: window.GameCore.playerObj });
-        }
+            if (window.GameCore?.playerObj?.visual) {
+                entities.push({ type: 'P', x: window.GameCore.playerObj.visual.position.x, z: window.GameCore.playerObj.visual.position.z, id: 'player', ref: window.GameCore.playerObj });
+            }
         
-        if (window.GameCore?.activeEntities) {
-            window.GameCore.activeEntities.forEach(en => {
-                if (en.def?.faction === 'monster' || en.def?.faction === 'forest') {
-                    if (en.visual) entities.push({ type: 'M', x: en.visual.position.x, z: en.visual.position.z, id: en.id, ref: en });
-                }
-            });
-        }
+            if (window.GameCore?.activeEntities) {
+                window.GameCore.activeEntities.forEach(en => {
+                    const significance = window.ChronicleManager?.npcHistoricalWeights.get(en.id) || 0;
+                    if (en.def?.faction === 'monster' || en.def?.faction === 'forest') {
+                        if (en.visual) entities.push({ type: 'M', x: en.visual.position.x, z: en.visual.position.z, id: en.id, ref: en, significance });
+                    }
+                });
+            }
         
-        if (window.AdventurerManager?.records) {
-            window.AdventurerManager.records.forEach(rec => {
-                if (rec.position) {
-                    const isTarget = narrator.targetId === rec.id;
-                    entities.push({ type: isTarget ? 'T' : 'A', x: rec.position.x, z: rec.position.z, id: rec.id, ref: rec });
-                }
-            });
-        }
+            if (window.AdventurerManager?.records) {
+                window.AdventurerManager.records.forEach(rec => {
+                    if (rec.position) {
+                        const isTarget = narrator.targetId === rec.id;
+                        const significance = window.ChronicleManager?.npcHistoricalWeights.get(rec.id) || 0;
+                        entities.push({ type: isTarget ? 'T' : 'A', x: rec.position.x, z: rec.position.z, id: rec.id, ref: rec, significance });
+                    }
+                });
+            }
         
-        if (window.VillageManager?.villages) {
-            window.VillageManager.villages.forEach(v => {
-                if (v.id === 0) return; // Skip capital, handled by K
-                entities.push({ type: 'V', x: v.x, z: v.z, id: `village_${v.id}`, ref: v });
-            });
-        }
+            if (window.VillageManager?.villages) {
+                window.VillageManager.villages.forEach(v => {
+                    if (v.id === 0) return; // Skip capital, handled by K
+                    entities.push({ type: 'V', x: v.x, z: v.z, id: `village_${v.id}`, ref: v, significance: 0 });
+                });
+            }
+
 
         if (window.RoadManager?.pathNodes) {
              window.RoadManager.pathNodes.forEach((node, idx) => {
@@ -1708,14 +1731,19 @@ class CrowsEyeSystem {
         </div>`;
         
         gridHtml += `<div style="line-height: 1.1; font-size: 16px; letter-spacing: 2px; font-family: monospace; cursor: move; user-select: none; background: rgba(0,0,0,0.5); padding: 10px; border: 1px solid #451a03;">`;
-        for (let gz = 0; gz < gridSize; gz++) {
+                for (let gz = 0; gz < gridSize; gz++) {
             for (let gx = 0; gx < gridSize; gx++) {
                 const en = cellEntities[gz][gx];
                 const char = grid[gz][gx];
                 const isSelected = en && this.selectedEntityId === en.id;
+                const isLegendary = en && (en.significance > 500); // Bible §BN: Significance Trap
                 
-                const style = isSelected ? 'background-color: #fbbf24; color: #000; font-weight: bold;' : '';
-                                let color = '#451a03';
+                let style = isSelected ? 'background-color: #fbbf24; color: #000; font-weight: bold;' : '';
+                if (isLegendary && !isSelected) {
+                    style = 'text-shadow: 0 0 8px #fbbf24; color: #fff; font-weight: bold;';
+                }
+                
+                let color = '#451a03';
                 if (char === 'R') color = '#78350f'; // Mountain
                 if (char === '.') color = '#064e3b'; // Forest
                 if (char === 'D') color = '#92400e'; // Dunes
@@ -1725,13 +1753,13 @@ class CrowsEyeSystem {
                 if (char === 'T') color = '#f59e0b'; // Target
                 if (char === 'A') color = '#fbbf24'; // Adventurer
                 if (char === '!') color = '#ef4444'; // Crisis
-
                 
                 const dataId = en && en.id ? `data-id="${en.id}"` : '';
                 gridHtml += `<span style="${style} color: ${color};" ${dataId}>${char}</span>`;
             }
             gridHtml += '\n';
         }
+
         gridHtml += `</div>`;
 
 
