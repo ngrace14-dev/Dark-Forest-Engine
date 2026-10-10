@@ -2159,12 +2159,15 @@ renderer.setAnimationLoop(() => {
     }
         updateCameraAndShadows(delta);
 
-    if (window.EngineConfig?.crowsEyeMode) {
-        if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'hidden';
-        return; 
-    } else {
-        if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'visible';
-    }
+            if (window.EngineConfig?.crowsEyeMode) {
+            if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'hidden';
+            if (window.Tone && window.Tone.Destination) window.Tone.Destination.mute = true;
+            return; 
+        } else {
+            if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'visible';
+            if (window.Tone && window.Tone.Destination) window.Tone.Destination.mute = false;
+        }
+
 
     if (window.RenderPipeline) {
 
