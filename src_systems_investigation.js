@@ -15,8 +15,11 @@ class InvestigationManagerSystem {
         window.EventBus.on('INTEL_VERIFIED', (intel) => this.onIntelVerified(intel));
     }
 
-    init() {
+        init() {
+        this.discoveryTier = 1; // Bible §33
+        
         // Initialize core mysteries from the Design Bible
+
         this.registerMystery({
             id: 'terminus_anomaly',
             title: 'The Terminus Anomaly',
@@ -82,7 +85,7 @@ class InvestigationManagerSystem {
         window.EventBus.emit('INVESTIGATION_UPDATED', mysteryId);
     }
 
-    calculateProgress(mysteryId) {
+        calculateProgress(mysteryId) {
         const mystery = this.mysteries.get(mysteryId);
         if (!mystery) return;
         
@@ -90,7 +93,24 @@ class InvestigationManagerSystem {
         // Basic progress: just counting linked evidence for now. 
         // In future phases, this will require specific high-weight facts.
         mystery.discoveryProgress = Math.min(100, evidenceCount * 25);
+
+        if (mystery.discoveryProgress >= 100 && mystery.state !== 'RESOLVED') {
+            this.resolveMystery(mysteryId);
+        }
     }
+
+    resolveMystery(mysteryId) {
+        const mystery = this.mysteries.get(mysteryId);
+        if (!mystery) return;
+
+        mystery.state = 'RESOLVED';
+        this.discoveryTier = Math.max(this.discoveryTier, mystery.tier + 1);
+
+        window.EventBus.emit('UI_LOG', `🌟 [DISCOVERY] Mystery Solved: ${mystery.title}`);
+        window.EventBus.emit('UI_LOG', `[DISCOVERY] World Understanding Level: Tier ${this.discoveryTier}`);
+        window.EventBus.emit('MYSTERY_RESOLVED', mysteryId);
+    }
+
 
     /**
      * Automatically scans for logical conflicts in the linked evidence.

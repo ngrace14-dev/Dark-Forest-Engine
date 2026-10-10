@@ -596,15 +596,30 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderMysteriesView() {
+        renderMysteriesView() {
         if (!window.InvestigationManager) return "Investigation System Offline";
         const mysteries = window.InvestigationManager.getMysteries();
+        const currentTier = window.InvestigationManager.discoveryTier;
+
+        let html = `<div style="margin-bottom:20px; background:rgba(251,191,36,0.1); padding:15px; border:1px solid #fbbf24;">
+            <div style="font-weight:bold; color:#fbbf24; font-size:14px; margin-bottom:5px;">WORLD DISCOVERY LEVEL: TIER ${currentTier}</div>
+            <div style="font-size:10px; color:#94a3b8;">Solve higher-tier mysteries to ascend the ladder of understanding (§33).</div>
+        </div>`;
         
-        let html = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap:20px;">`;
+        html += `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap:20px;">`;
         mysteries.forEach(m => {
+            const isAvailable = currentTier >= m.tier;
             const progressColor = m.discoveryProgress >= 100 ? '#10b981' : m.discoveryProgress > 0 ? '#f59e0b' : '#92400e';
             const stateLabel = m.state === 'RESOLVED' ? '[RESOLVED]' : m.state === 'INVESTIGATING' ? '[IN PROGRESS]' : '[UNSOLVED]';
             
+            if (!isAvailable) {
+                html += `<div style="border:1px solid #451a03; padding:15px; background:rgba(0,0,0,0.6); opacity:0.5; filter:grayscale(1);">
+                    <div style="color:#78350f; font-weight:bold;">[TIER ${m.tier} LOCKED]</div>
+                    <div style="font-size:11px; color:#451a03; margin-top:10px;">Reach Discovery Level ${m.tier} to investigate this anomaly.</div>
+                </div>`;
+                return;
+            }
+
             html += `<div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.4);">
                 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
                     <span style="font-weight:bold; color:#fbbf24;">${m.title}</span>
@@ -641,6 +656,7 @@ class CrowsEyeSystem {
         html += `</div>`;
         return html;
     }
+
 
     renderIntelView() {
         if (!window.IntelManager) return "No Intel Data";
