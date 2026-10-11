@@ -49,9 +49,36 @@ class FolkloreEngineSystem {
         window.EventBus.on('LEGEND_CREATED', (legend) => this.generatePoem(legend));
     }
 
-    init() {
+        init() {
+        this.persistentAnthology = this.loadCrossRunFolklore();
+        this.anthology = [...this.persistentAnthology];
         window.EventBus.emit('UI_LOG', '[Folklore] Poem DNA Engine Active');
     }
+
+    /**
+     * Cross-Run Persistence (§17, §BO)
+     * Boilerplate: Retrieves previous run epitaphs from local storage.
+     */
+    loadCrossRunFolklore() {
+        const stored = localStorage.getItem('dark-forest-persistent-folklore');
+        if (stored) {
+            try {
+                return JSON.parse(stored);
+            } catch (e) {
+                return [];
+            }
+        }
+        return [];
+    }
+
+    saveCrossRunFolklore(poem) {
+        const existing = this.loadCrossRunFolklore();
+        existing.push(poem);
+        // Limit to last 5 deaths to keep flavor text rare and impactful
+        if (existing.length > 5) existing.shift();
+        localStorage.setItem('dark-forest-persistent-folklore', JSON.stringify(existing));
+    }
+
 
     /**
      * Historical Compression Logic
@@ -165,8 +192,10 @@ class FolkloreEngineSystem {
             fidelity: 1.0 // Epitaphs are objective markers of a run's end
         };
 
-        this.anthology.push(finalPoem);
+                this.anthology.push(finalPoem);
+        this.saveCrossRunFolklore(finalPoem); // Persist for next run (§17)
         window.GameState.anthology = this.anthology;
+
         window.EventBus.emit('UI_LOG', `📜 [FOLKLORE] A final lament has been written for your deeds.`);
         return finalPoem;
     }
