@@ -1261,21 +1261,40 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderAnthologyView() {
+        renderAnthologyView() {
         if (!window.FolkloreEngine) return "Anthology Offline";
         const poems = window.FolkloreEngine.getAnthology();
         
         let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
-        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">FOLKLORE ANTHOLOGY: CULTURAL MEMORY</div>`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">FOLKLORE ANTHOLOGY: THE POEM TRAP (§BJ)</div>`;
 
         if (poems.length === 0) {
             return html + `<div style="font-size:11px; color:#451a03;">The world has not yet crystallized its history into poetry. Perform more legendary deeds.</div>`;
         }
 
+        // Cipher Analysis (Bible §17)
+        const commonNumbers = poems.filter(p => p.text.includes('20') || p.text.includes('score'));
+        const ambigNumbers = poems.filter(p => p.text.includes('40') || p.text.includes('others might'));
+
+        html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
+            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:12px;">
+                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">CIPHER DETECTED: "20"</div>
+                <div style="font-size:11px; color:#fbbf24;">Linked to physical village anchors.</div>
+            </div>
+            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:12px;">
+                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">CIPHER DETECTED: "40"</div>
+                <div style="font-size:11px; color:#ef4444;">Deliberate noise/Scholarly trap (§17).</div>
+            </div>
+        </div>`;
+
         html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
         
         poems.forEach(p => {
-            html += `<div style="background:rgba(251,191,36,0.02); border:1px solid #78350f; padding:20px; font-family: 'Times New Roman', serif;">
+            const mystery = window.InvestigationManager?.mysteries.get('founder_betrayal');
+            const isRevealing = p.class === 'REVISIONAL' && mystery?.state === 'RESOLVED';
+
+            html += `<div style="background:rgba(251,191,36,0.02); border:1px solid ${isRevealing ? '#fbbf24' : '#78350f'}; padding:20px; font-family: 'Times New Roman', serif; position:relative;">
+                ${isRevealing ? '<div style="position:absolute; top:0; right:0; background:#fbbf24; color:#000; padding:2px 10px; font-size:9px; font-weight:bold;">CIPHER CRACKED</div>' : ''}
                 <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:10px;">
                     <div>
                         <div style="font-weight:bold; color:#fbbf24; font-size:18px; font-style:italic;">${p.title}</div>
@@ -1294,6 +1313,7 @@ class CrowsEyeSystem {
                         <span style="color:#78350f;">HISTORICAL WEIGHT: ${Math.floor(p.historicalWeight)}</span>
                         <span style="color:#78350f;">DISTORTION: ${Math.floor(p.distortionLevel * 100)}%</span>
                     </div>
+                    ${p.class === 'INSTITUTIONAL' ? '<div style="font-size:8px; color:#451a03; margin-top:5px;">⚠️ WARNING: Institutional revisions may omit betrayal details (§V).</div>' : ''}
                 </div>
             </div>`;
         });
@@ -1301,6 +1321,7 @@ class CrowsEyeSystem {
         html += `</div></div>`;
         return html;
     }
+
 
         renderRecordedMemoryView() {
         if (!window.MountainArchives) return "Archive Network Offline";
