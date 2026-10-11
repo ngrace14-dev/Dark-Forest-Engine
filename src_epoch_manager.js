@@ -2,14 +2,20 @@ import { createNoise2D } from 'simplex-noise';
 import alea from 'alea';
 
 export class EpochManager {
-    constructor() {
+        constructor() {
         this.baseSeed = window.EngineParams.worldSeed || 'dark_forests_1337';
         this.currentEpoch = window.EngineParams.lastCycleDay ? Math.floor(window.EngineParams.lastCycleDay / window.EngineParams.cycleLengthDays) : 0;
         this.currentSeed = this._generateEpochSeed();
         this.prng = alea(this.currentSeed);
         this.noise2D = createNoise2D(this.prng);
         
-                // Configuration for the World's scale and biomes
+        // REGIONAL RELATIVITY (Bible §5)
+        this.mountainRotation = 0; // Cumulative rotation in radians
+        this.duneSeed = this.baseSeed; // Regenerates when abandoned
+        this.isDuneOccupied = false;
+        
+        // ... previous config ...
+
         // STABILITY: Prefer global config if defined, otherwise use internal defaults
         this.config = window.WorldGenConfig || {
             noiseScale: 0.015,
@@ -39,10 +45,55 @@ export class EpochManager {
         return this.currentEpoch;
     }
 
+        update(dt) {
+        // --- THE 7-DAY PERCEPTION SKIP (§5) ---
+        // During the 14-day shift, the world rotates, but NPC consciousness "skips".
+        // This is simulated by rotating the Mountain Ring strictly when the cycle resets.
+    }
+
+    rotateMountains() {
+        // Bible §5: Mountain Ring rotates strictly during the 7-day White Void window.
+        // We simulate this by applying a large, random rotational offset every Epoch.
+        const rotationStep = (this.prng() * 0.5 + 0.5) * Math.PI; 
+        this.mountainRotation += rotationStep;
+        
+        window.EventBus.emit('MOUNTAIN_ROTATED', this.mountainRotation);
+        window.EventBus.emit('UI_LOG', '[ARCHIVES] Discrepancy detected in star chart baseline (§8).');
+    }
+
+    updateDuneState(occupied) {
+        // Bible §11: Dunes remain stable while occupied. When abandoned, they regenerate.
+        if (!occupied && this.isDuneOccupied) {
+            this.duneSeed = `${this.baseSeed}_dune_${Date.now()}`;
+            window.EventBus.emit('UI_LOG', '[DUNES] Abandoned routes lost to the shifting sands (§11).');
+        }
+        this.isDuneOccupied = occupied;
+    }
+
     // Mathematical representation of the world given current epoch
     getNoise(x, z) {
+        const dist = Math.sqrt(x*x + z*z);
+        const halfForestSide = this.config.darkForestSideMeters / 2;
+        const mountainWidth = this.config.mountainRingWidthMeters;
+        
+        // Apply Mountain Rotation (Bible §5)
+        if (dist > halfForestSide && dist <= halfForestSide + mountainWidth) {
+            const angle = Math.atan2(z, x) + this.mountainRotation;
+            const rx = Math.cos(angle) * dist;
+            const rz = Math.sin(angle) * dist;
+            return this.noise2D(rx * this.config.noiseScale, rz * this.config.noiseScale);
+        }
+
+        // Apply Dune Regeneration (Bible §11)
+        if (dist > halfForestSide + mountainWidth) {
+            const dunePrng = alea(this.duneSeed);
+            const duneNoise = createNoise2D(dunePrng);
+            return duneNoise(x * this.config.noiseScale, z * this.config.noiseScale);
+        }
+
         return this.noise2D(x * this.config.noiseScale, z * this.config.noiseScale);
     }
+
 
     getBiome(x, z) {
         const halfForestSide = this.config.darkForestSideMeters / 2;
