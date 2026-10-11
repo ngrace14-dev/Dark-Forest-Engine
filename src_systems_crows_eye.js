@@ -1439,51 +1439,62 @@ class CrowsEyeSystem {
     }
 
         renderOriginView() {
-        if (!window.OriginEngine) return "Origin Engine Offline";
-        const dossier = window.OriginEngine.getDossier();
+            if (!window.OriginEngine) return "Origin Engine Offline";
+            const dossier = window.OriginEngine.getDossier();
         
-        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
-        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">THE ORIGIN DOSSIER: ENDGAME MODELS</div>`;
+            let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+            html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">THE ORIGIN DOSSIER: THE ZERO HORIZON (§Dossier)</div>`;
 
-        dossier.forEach(cat => {
-            const currentModelDesc = window.OriginEngine.models[Object.keys(window.OriginEngine.categories).find(k => window.OriginEngine.categories[k].title === cat.title)]?.[cat.model] || 'Standard historical interpretation.';
-            const confidence = cat.confidence * 100;
-            const mystery = window.InvestigationManager?.mysteries.get('founder_betrayal');
-            const isUnlockingTruth = mystery?.state === 'RESOLVED' && cat.title === 'The Founders';
+            dossier.forEach(cat => {
+                const currentModelDesc = window.OriginEngine.models[Object.keys(window.OriginEngine.categories).find(k => window.OriginEngine.categories[k].title === cat.title)]?.[cat.model] || 'Standard historical interpretation.';
+                const confidence = cat.confidence * 100;
+            
+                // Mystery cross-checks
+                const mysteryMap = { 'The Founders': 'founder_betrayal', 'The Great Fracture': 'origin_fracture', 'The First Wendigo': 'first_wendigo' };
+                const mId = mysteryMap[cat.title];
+                const mystery = mId ? window.InvestigationManager?.mysteries.get(mId) : null;
+                const isUnlockingTruth = mystery?.state === 'RESOLVED';
 
-            html += `<div style="background:rgba(255,255,255,0.02); border:1px solid ${isUnlockingTruth ? '#fbbf24' : '#78350f'}; padding:20px; position:relative; overflow:hidden;">
-                ${isUnlockingTruth ? '<div style="position:absolute; top:0; right:0; background:#fbbf24; color:#000; padding:2px 10px; font-size:9px; font-weight:bold;">LEGITIMACY CRUMBLED</div>' : ''}
-                <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                    <div>
-                        <div style="font-weight:bold; color:#fbbf24; font-size:16px;">${cat.title.toUpperCase()}</div>
-                        <div style="font-size:10px; color:#78350f;">ACTIVE MODEL: <span style="color:${isUnlockingTruth ? '#ef4444' : '#fbbf24'};">${cat.model}</span></div>
+                html += `<div style="background:rgba(255,255,255,0.02); border:1px solid ${isUnlockingTruth ? '#fbbf24' : '#78350f'}; padding:20px; position:relative; overflow:hidden;">
+                    ${isUnlockingTruth ? `<div style="position:absolute; top:0; right:0; background:#fbbf24; color:#000; padding:2px 10px; font-size:9px; font-weight:bold;">ZERO HORIZON BREACHED</div>` : ''}
+                    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                        <div>
+                            <div style="font-weight:bold; color:#fbbf24; font-size:16px;">${cat.title.toUpperCase()}</div>
+                            <div style="font-size:10px; color:#78350f;">ACTIVE MODEL: <span style="color:${isUnlockingTruth ? '#ef4444' : '#fbbf24'};">${cat.model}</span></div>
+                        </div>
+                        <div style="text-align:right;">
+                            <span style="color:#78350f; font-size:10px;">HISTORICAL CONFIDENCE</span>
+                            <div style="font-size:18px; color:#fbbf24;">${Math.floor(confidence)}%</div>
+                        </div>
                     </div>
-                    <div style="text-align:right;">
-                        <span style="color:#78350f; font-size:10px;">MODEL CONFIDENCE</span>
-                        <div style="font-size:18px; color:#fbbf24;">${Math.floor(confidence)}%</div>
+
+                    <div style="font-size:12px; color:#94a3b8; font-style:italic; margin-bottom:15px; background:rgba(0,0,0,0.2); padding:10px; border-left:2px solid ${isUnlockingTruth ? '#ef4444' : '#fbbf24'};">
+                        "${currentModelDesc}"
                     </div>
-                </div>
 
-                <div style="font-size:12px; color:#94a3b8; font-style:italic; margin-bottom:15px; background:rgba(0,0,0,0.2); padding:10px; border-left:2px solid ${isUnlockingTruth ? '#ef4444' : '#fbbf24'};">
-                    "${currentModelDesc}"
-                </div>
-
-                <div style="font-size:11px;">
-                    <div style="color:#78350f; margin-bottom:5px;">SUPPORTING FRAGMENTS (${cat.evidence.length})</div>
-                    <div style="display:flex; flex-direction:column; gap:5px;">
-                        ${cat.evidence.map(e => `
-                            <div style="color:#94a3b8; border-left:1px solid #451a03; padding-left:10px;">
-                                • ${e.title} <span style="color:#78350f; font-size:9px;">(Tier: ${e.tier})</span>
-                            </div>
-                        `).join('') || '<div style="color:#451a03;">Awaiting evidence from the Endless Dunes.</div>'}
+                    <div style="font-size:11px;">
+                        <div style="color:#78350f; margin-bottom:5px;">ARCHAEOLOGICAL FRAGMENTS (${cat.evidence.length})</div>
+                        <div style="display:flex; flex-direction:column; gap:5px;">
+                            ${cat.evidence.map(e => `
+                                <div style="color:#94a3b8; border-left:1px solid #451a03; padding-left:10px;">
+                                    • ${e.title} <span style="color:#78350f; font-size:9px;">(Tier: ${e.tier})</span>
+                                </div>
+                            `).join('') || '<div style="color:#451a03;">Awaiting evidence from the Endless Dunes (§11).</div>'}
+                        </div>
                     </div>
-                </div>
-            </div>`;
-        });
 
-        html += `</div>`;
-        return html;
-    }
+                    ${cat.title === 'The First Wendigo' && isUnlockingTruth ? `
+                        <div style="margin-top:15px; border-top:1px solid #ef4444; padding-top:10px; color:#f87171; font-size:10px;">
+                            ⚠️ FINAL TRUTH: The Wendigo is not a monster. It is a man who was stabbed mid-ritual.
+                        </div>
+                    ` : ''}
+                </div>`;
+            });
+
+            html += `</div>`;
+            return html;
+        }
+
 
 
     renderLegendsView() {

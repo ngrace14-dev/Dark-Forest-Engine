@@ -47,7 +47,7 @@ class InvestigationManagerSystem {
             clues: []
         });
 
-        this.registerMystery({
+                this.registerMystery({
             id: 'founder_betrayal',
             title: 'The Final Plight',
             description: 'The Founders claim they were forced to run. Ancient poems suggest betrayal.',
@@ -55,6 +55,25 @@ class InvestigationManagerSystem {
             category: 'HISTORY',
             clues: []
         });
+
+        this.registerMystery({
+            id: 'origin_fracture',
+            title: 'The Great Fracture',
+            description: 'What occurred at t=0? Evidence suggests a runic civilization before the Shift.',
+            tier: 10,
+            category: 'ORIGIN',
+            clues: []
+        });
+
+        this.registerMystery({
+            id: 'first_wendigo',
+            title: 'The First Wendigo',
+            description: 'The transition from Champion to Monster. Was it a failure or a choice?',
+            tier: 11,
+            category: 'ORIGIN',
+            clues: []
+        });
+
         
         window.EventBus.emit('UI_LOG', '[Investigation] Workbench Initialized');
     }
