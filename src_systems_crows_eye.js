@@ -1,4 +1,4 @@
-/**
+ nex/**
  * Crow's Eye System - Phase 2 (Registration & State)
  */
 class CrowsEyeSystem {
@@ -860,15 +860,36 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderOfficialHistoryView() {
+
+
+
+
+
+
+
+        renderOfficialHistoryView() {
         if (!window.HistoryOffice) return "Historical Office Offline";
         
         const worldEvents = window.ChronicleManager?.worldLedger.slice(-10).reverse() || [];
+        const institutions = window.PersonhoodManager?.institutions || {};
         
         let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
-        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">INSTITUTIONAL NARRATIVE: LAYERED MEMORY</div>`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">INSTITUTIONAL NARRATIVE: SILOED MEMORY (§36)</div>`;
+
+        // Institution Status
+        html += `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:15px; margin-bottom:10px;">
+            ${Object.entries(institutions).map(([id, inst]) => `
+                <div style="background:rgba(255,255,255,0.05); border:1px solid #451a03; padding:10px;">
+                    <div style="color:#fbbf24; font-size:11px; font-weight:bold;">${inst.label.toUpperCase()}</div>
+                    <div style="color:#78350f; font-size:9px;">Focus: ${inst.focus}</div>
+                    <div style="color:#94a3b8; font-size:9px;">Siloed Records: ${inst.siloedIntel.size}</div>
+                </div>
+            `).join('')}
+        </div>`;
 
         worldEvents.forEach(e => {
+
+
             const layers = window.HistoryOffice.getNarrativeLayers(e.id);
             if (!layers) return;
 

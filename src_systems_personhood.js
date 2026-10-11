@@ -14,11 +14,19 @@ class PersonhoodSystem {
             SURVIVOR: { bias: 'CAUTION', desc: 'Focuses on immediate safety and resource preservation.' },
             ZEALOT: { bias: 'FAITH', desc: 'Unwavering belief in House or Force directives.' },
             SKEPTIC: { bias: 'TRUTH', desc: 'Questions authority and official narratives.' },
-            OPPORTUNIST: { bias: 'GREED', desc: 'Views information through the lens of personal gain.' }
+            OPPORTUNIST: { bias: 'GREED', desc: 'Views information through the lens of personal gain.' },
+            SCHOLAR: { bias: 'PATTERNS', desc: 'Prioritizes poem decoding and pattern recognition.' } // Bible §36
+        };
+
+        this.institutions = {
+            'historical_office': { label: 'Historical Office', focus: 'STABILITY', siloedIntel: new Set() },
+            'guardians_300': { label: 'The 300 Guardians', focus: 'CONTINUITY', siloedIntel: new Set() },
+            'scholastic_order': { label: 'The Scholastic Order', focus: 'TRUTH', siloedIntel: new Set() }
         };
 
         window.EventBus.on('ENGINE_READY', () => this.init());
     }
+
 
     init() {
         window.EventBus.emit('UI_LOG', '[Personhood] Cognitive Filters Active');
@@ -60,7 +68,7 @@ class PersonhoodSystem {
     }
 
 
-    /**
+        /**
      * Answers: Why did THIS person arrive at THIS belief?
      * Bible §14: Truth Economy.
      */
@@ -78,7 +86,17 @@ class PersonhoodSystem {
             reason: 'Standard interpretation.'
         };
 
+        // --- INSTITUTIONAL SILOING (Bible §8, §36) ---
+        // If the NPC belongs to an institution that wants to keep this forbidden
+        if (profile.institutionId && this.institutions[profile.institutionId]?.siloedIntel.has(intelId)) {
+            conclusion.state = 'SUPPRESSED';
+            conclusion.interpretation = 'FORBIDDEN';
+            conclusion.reason = 'Institutional directives mandate the concealment of this information.';
+            return conclusion;
+        }
+
         // 1. TRUST FILTER (Bible §13)
+
         // If the source of the intel is a rival or untrusted, skepticism increases
         const provenance = intel.provenance[0];
         let trust = 0.5;
