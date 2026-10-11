@@ -1302,7 +1302,7 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderRecordedMemoryView() {
+        renderRecordedMemoryView() {
         if (!window.MountainArchives) return "Archive Network Offline";
         const measurements = window.MountainArchives.getMeasurements();
         const theories = Array.from(window.MountainArchives.activeTheories.values());
@@ -1310,43 +1310,69 @@ class CrowsEyeSystem {
         let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
         html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">RECORDED MEMORY: LONGITUDINAL OBSERVATIONS</div>`;
 
-        // 1. Current Theories (Bible §8)
+        // 1. Current Theories & Flaws (Bible §8)
         html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
-            ${theories.map(t => `
-                <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px;">
-                    <div style="font-weight:bold; color:#fbbf24; font-size:14px; margin-bottom:10px;">${t.name.toUpperCase()}</div>
-                    <div style="font-size:11px; color:#94a3b8; line-height:1.4;">${t.description}</div>
-                    <div style="margin-top:10px; border-top:1px solid #451a03; padding-top:10px; font-size:10px; color:#78350f;">
-                        CONCLUDED FLAW: ${t.flaw}
+            ${theories.map(t => {
+                const mystery = window.InvestigationManager?.mysteries.get('mountain_rotation');
+                const isDisproven = mystery?.state === 'RESOLVED';
+                return `
+                    <div style="background:rgba(251,191,36,0.05); border:1px solid ${isDisproven ? '#ef4444' : '#78350f'}; padding:15px;">
+                        <div style="font-weight:bold; color:${isDisproven ? '#ef4444' : '#fbbf24'}; font-size:14px; margin-bottom:10px;">
+                            ${t.name.toUpperCase()} ${isDisproven ? '[DISPROVEN]' : ''}
+                        </div>
+                        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">${t.description}</div>
+                        <div style="margin-top:10px; border-top:1px solid #451a03; padding-top:10px; font-size:10px; color:${isDisproven ? '#ef4444' : '#78350f'};">
+                            OBSERVED FLAW: ${t.flaw}
+                        </div>
                     </div>
-                </div>
-            `).join('')}
+                `;
+            }).join('')}
         </div>`;
 
-        // 2. Multi-Generation Measurements
+        // 2. Relative Dimensional Anchors (Bible §25)
+        const anchoredIntel = Array.from(window.IntelManager?.registry.values() || []).filter(i => i.isAnchored);
+        if (anchoredIntel.length > 0) {
+            html += `<div>
+                <div style="font-size:12px; color:#fbbf24; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:5px;">RELATIVE DIMENSIONAL ANCHORS (§25)</div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:10px;">
+                    ${anchoredIntel.map(i => `
+                        <div style="font-size:10px; background:rgba(120,53,15,0.1); border:1px solid #78350f; padding:10px;">
+                            <div style="color:#fbbf24; font-weight:bold;">${i.payload.title}</div>
+                            <div style="color:#94a3b8; margin-top:5px;">This information is physically anchored and survives the 14-day Shift without distortion.</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+        }
+
+        // 3. Longitudinal Trends
         html += `<div>
-            <div style="font-size:12px; color:#fbbf24; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:5px;">LONG-TERM TRENDS</div>
+            <div style="font-size:12px; color:#fbbf24; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:5px;">LONG-TERM TRENDS: THE 7-DAY PERCEPTION SKIP (§5)</div>
             <table style="width:100%; font-size:11px; text-align:left; border-collapse:collapse;">
                 <tr style="color:#78350f; border-bottom:1px solid #451a03;">
                     <th style="padding:10px;">EPOCH</th>
                     <th>STAR CHART ROTATION</th>
-                    <th>OBJECTIVE ROTATION</th>
-                    <th>TIMESTAMP</th>
+                    <th>TERRAIN ROTATION</th>
+                    <th>DISCREPANCY</th>
                 </tr>
-                ${measurements.map(m => `
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
-                        <td style="padding:10px; color:#fbbf24;">EPOCH ${m.epoch}</td>
-                        <td style="color:#94a3b8;">${m.starChart.constellationDelta.toFixed(2)} rad</td>
-                        <td style="color:#fbbf24;">${m.rotation.toFixed(2)} rad</td>
-                        <td style="color:#78350f;">Day ${m.timestamp}</td>
-                    </tr>
-                `).join('') || '<tr><td colspan="4" style="text-align:center; padding:20px; color:#451a03;">Awaiting sufficient epoch data for analysis.</td></tr>'}
+                ${measurements.map(m => {
+                    const discrepancy = Math.abs(m.starChart.observedRotation - m.rotation);
+                    return `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                            <td style="padding:10px; color:#fbbf24;">EPOCH ${m.epoch}</td>
+                            <td style="color:#94a3b8;">${m.starChart.constellationDelta.toFixed(3)} rad</td>
+                            <td style="color:#fbbf24;">${m.rotation.toFixed(3)} rad</td>
+                            <td style="color:#ef4444;">${discrepancy > 0.01 ? 'DETECTED' : 'STABLE'}</td>
+                        </tr>
+                    `;
+                }).join('') || '<tr><td colspan="4" style="text-align:center; padding:20px; color:#451a03;">Awaiting sufficient epoch data for longitudinal analysis.</td></tr>'}
             </table>
         </div>`;
 
         html += `</div>`;
         return html;
     }
+
 
     renderLostMemoryView() {
         if (!window.DuneInvestigation) return "Dune System Offline";
