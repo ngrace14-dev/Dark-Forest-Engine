@@ -1798,20 +1798,34 @@ class CrowsEyeSystem {
     }
 
         renderForcesView() {
-        if (!window.ForceManager) return "No Force Data";
+            if (!window.ForceManager) return "No Force Data";
         
-        // Story Density Metrics
-        const day = window.EngineParams?.worldDay || 1;
-        const totalEvents = window.ChronicleManager?.worldLedger.length || 0;
-        const eventsPerDay = (totalEvents / day).toFixed(2);
-        const legendsCount = window.GameState?.legends?.length || 0;
-        const poemsCount = window.GameState?.anthology?.length || 0;
+            // Story Density Metrics
+            const day = window.EngineParams?.worldDay || 1;
+            const totalEvents = window.ChronicleManager?.worldLedger.length || 0;
+            const eventsPerDay = (totalEvents / day).toFixed(2);
+            const legendsCount = window.GameState?.legends?.length || 0;
+            const poemsCount = window.GameState?.anthology?.length || 0;
+
+            // Crisis Tracking (Bible §WarManager)
+            const crisis = window.WarManager?.crisis;
         
-        let densityHtml = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:20px; font-size:10px; background:rgba(0,0,0,0.5); padding:15px; border:1px solid #d97706;">
-            <div>EVENTS/DAY: ${eventsPerDay}</div>
-            <div>LEGENDS/TOTAL: ${legendsCount}</div>
-            <div>FOLKLORE ITEMS: ${poemsCount}</div>
-        </div>`;
+            let densityHtml = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:20px; font-size:10px; background:rgba(0,0,0,0.5); padding:15px; border:1px solid #d97706;">
+                <div>EVENTS/DAY: ${eventsPerDay}</div>
+                <div>LEGENDS/TOTAL: ${legendsCount}</div>
+                <div>FOLKLORE ITEMS: ${poemsCount}</div>
+            </div>`;
+
+            if (crisis?.active) {
+                densityHtml += `<div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; padding:15px; margin-bottom:20px; position:relative;">
+                    <div style="font-weight:bold; color:#ef4444; margin-bottom:5px;">⚠️ ACTIVE WORLD CRISIS: ${crisis.type.toUpperCase().replace(/_/g, ' ')}</div>
+                    <div style="font-size:11px; color:#f87171;">Eruption Strength: ${(crisis.strength * 100).toFixed(0)}% | Est. Days to Escalation: ${crisis.daysToEruption}</div>
+                    <div style="height:4px; background:#450a0a; width:100%; margin-top:10px;">
+                        <div style="height:100%; background:#ef4444; width:${(crisis.strength * 100)}%;"></div>
+                    </div>
+                </div>`;
+            }
+
 
         let html = densityHtml + `<div style="display:flex; flex-direction:column; gap:20px;">`;
         Object.entries(window.ForceManager.forces).forEach(([name, data]) => {
