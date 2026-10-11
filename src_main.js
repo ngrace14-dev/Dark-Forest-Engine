@@ -84,7 +84,9 @@ import './src/animation_tools/MixamoRetargeting.js';
 import './src_firebase.js';
 import './src_multiplayer.js';
 import './src_systems_editor.js';
+import './src_systems_attractor.js';
 import './src_systems_crows_eye.js';
+
 import './src_systems_dev_tools.js';
 import './src_systems_health.js';
 

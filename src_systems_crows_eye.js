@@ -1,7 +1,8 @@
- next u/**
+ /**
  * Crow's Eye System - Phase 2 (Registration & State)
  */
 class CrowsEyeSystem {
+
         constructor() {
         this.isActive = false;
         this.overlay = null;
@@ -195,7 +196,8 @@ class CrowsEyeSystem {
                 const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-                const views = ['MAP', 'WATCHLIST', 'ACTIONS', 'LOGISTICS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'EXPEDITIONS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
+                const views = ['MAP', 'WATCHLIST', 'ACTIONS', 'LOGISTICS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'EXPEDITIONS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'ATTRACTOR', 'CALIBRATION'];
+
 
 
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px; overflow-x:auto; white-space:nowrap; scrollbar-width:none;">`;
@@ -292,9 +294,13 @@ class CrowsEyeSystem {
                 contentHtml = this.renderLostMemoryView();
                 break;
                         case 'ORIGIN_DOSSIER':
-                contentHtml = this.renderOriginView();
-                break;
-            case 'EXPEDITIONS':
+                            contentHtml = this.renderOriginView();
+                            break;
+                        case 'ATTRACTOR':
+                            contentHtml = this.renderAttractorView();
+                            break;
+                        case 'EXPEDITIONS':
+
                 contentHtml = this.renderExpeditionView();
                 break;
             case 'PLAYBACK':
@@ -722,12 +728,14 @@ class CrowsEyeSystem {
             </tr>`;
         });
 
-        html += `</table>`;
+                html += `</table>`;
         return html;
     }
 
+    renderActionsView() {
         const entities = this.gatherEntities().filter(e => e.ref && (e.ref.currentTask || e.type === 'V' || e.type === 'A' || e.type === 'T'));
         let html = `<table style="width:100%; text-align:left; border-collapse:collapse;">
+
             <tr style="color:#fbbf24; border-bottom: 1px solid #78350f;">
                 <th>ENTITY</th><th>TASK</th><th>GOAL</th><th>REASON</th><th>POS</th>
             </tr>`;
@@ -2040,23 +2048,32 @@ class CrowsEyeSystem {
         };
 
                 // 1. Geography Base
-        for (let gz = 0; gz < gridSize; gz++) {
-            for (let gx = 0; gx < gridSize; gx++) {
-                const wx = (gx * cellSpan) - (worldSpan / 2) + this.pan.x;
-                const wz = (gz * cellSpan) - (worldSpan / 2) + this.pan.z;
-                const dist = Math.sqrt(wx*wx + wz*wz); 
+                for (let gz = 0; gz < gridSize; gz++) {
+                    for (let gx = 0; gx < gridSize; gx++) {
+                        const wx = (gx * cellSpan) - (worldSpan / 2) + this.pan.x;
+                        const wz = (gz * cellSpan) - (worldSpan / 2) + this.pan.z;
+                        const dist = Math.sqrt(wx*wx + wz*wz); 
                 
-                if (dist <= mountainRadius) {
-                    grid[gz][gx] = '.'; // Dark Forest: Living Memory
-                } else if (dist <= totalRadius) {
-                    grid[gz][gx] = 'R'; // Mountain Ring: Recorded Memory
-                } else if (dist > duneStart) {
-                    grid[gz][gx] = 'D'; // Endless Dunes: Lost Memory
-                } else {
-                    grid[gz][gx] = ' '; // White Void
+                        if (dist <= mountainRadius) {
+                            grid[gz][gx] = '.'; // Dark Forest: Living Memory
+                        } else if (dist <= totalRadius) {
+                            grid[gz][gx] = 'R'; // Mountain Ring: Recorded Memory
+                        } else if (dist > duneStart) {
+                            grid[gz][gx] = 'D'; // Endless Dunes: Lost Memory
+                        } else {
+                            grid[gz][gx] = ' '; // White Void
+                        }
+
+                        // --- THE ATTRACTOR SINGULARITY (§BM) ---
+                        if (window.AttractorSystem?.isChoiceActive) {
+                            const attractorDist = Math.sqrt(wx*wx + wz*wz);
+                            if (attractorDist < 5000) {
+                                grid[gz][gx] = '○'; // The Singularity
+                            }
+                        }
+                    }
                 }
-            }
-        }
+
 
         // Add Road Continuity & Chain Integrity (Bible §6, §10)
         const villages = window.VillageManager?.villages || [];
@@ -2145,8 +2162,10 @@ class CrowsEyeSystem {
                 if (char === 'P') color = '#3b82f6'; // Player
                 if (char === 'T') color = '#f59e0b'; // Target
                 if (char === 'A') color = '#fbbf24'; // Adventurer
-                if (char === '!') color = '#ef4444'; // Crisis
+                                if (char === '!') color = '#ef4444'; // Crisis
                 if (char === ':') color = '#451a03'; // Weak Road
+                if (char === '○') color = '#fbbf24'; // Singularity
+
 
                 
                 const dataId = en && en.id ? `data-id="${en.id}"` : '';
