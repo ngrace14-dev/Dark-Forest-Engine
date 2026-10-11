@@ -51,24 +51,29 @@ export class EpochManager {
         // This is simulated by rotating the Mountain Ring strictly when the cycle resets.
     }
 
-    rotateMountains() {
+        rotateMountains() {
         // Bible §5: Mountain Ring rotates strictly during the 7-day White Void window.
         // We simulate this by applying a large, random rotational offset every Epoch.
         const rotationStep = (this.prng() * 0.5 + 0.5) * Math.PI; 
         this.mountainRotation += rotationStep;
         
         window.EventBus.emit('MOUNTAIN_ROTATED', this.mountainRotation);
-        window.EventBus.emit('UI_LOG', '[ARCHIVES] Discrepancy detected in star chart baseline (§8).');
+        if (window.EngineConfig?.showSystemReasoning) {
+            window.EventBus.emit('UI_LOG', '[DEV] Discrepancy detected in star chart baseline (§8).');
+        }
     }
 
     updateDuneState(occupied) {
         // Bible §11: Dunes remain stable while occupied. When abandoned, they regenerate.
         if (!occupied && this.isDuneOccupied) {
             this.duneSeed = `${this.baseSeed}_dune_${Date.now()}`;
-            window.EventBus.emit('UI_LOG', '[DUNES] Abandoned routes lost to the shifting sands (§11).');
+            if (window.EngineConfig?.showSystemReasoning) {
+                window.EventBus.emit('UI_LOG', '[DEV] Abandoned routes lost to the shifting sands (§11).');
+            }
         }
         this.isDuneOccupied = occupied;
     }
+
 
     // Mathematical representation of the world given current epoch
     getNoise(x, z) {

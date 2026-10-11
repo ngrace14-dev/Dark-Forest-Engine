@@ -2,7 +2,9 @@ window.EngineConfig = {
     quality: { shadowsEnabled: true, renderScale: 1.0, grassDensity: 1.0, volumetricFog: true, shaderTier: String.fromCharCode(72,73,71,72) },
     world: { chunkRadius: 5, dayLengthSeconds: 1200 },
     crowsEyeMode: false,
+    showSystemReasoning: false, // DEV ONLY: Exposes internal logic and conclusions (§BQ)
     performance: { lodThresholdSq: 900, maxEntities: 1000 },
+
     applyQualityPreset: function(preset) {
         if (preset === String.fromCharCode(76,79,87)) {
             this.quality.shadowsEnabled = false; this.quality.renderScale = 0.5; this.quality.grassDensity = 0.1; this.quality.volumetricFog = false; this.quality.shaderTier = String.fromCharCode(76,79,87); this.world.chunkRadius = 3;

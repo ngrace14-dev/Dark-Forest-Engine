@@ -1,4 +1,4 @@
- nex/**
+ next u/**
  * Crow's Eye System - Phase 2 (Registration & State)
  */
 class CrowsEyeSystem {
@@ -195,7 +195,8 @@ class CrowsEyeSystem {
                 const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-                const views = ['MAP', 'WATCHLIST', 'ACTIONS', 'LOGISTICS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
+                const views = ['MAP', 'WATCHLIST', 'ACTIONS', 'LOGISTICS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'EXPEDITIONS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
+
 
         let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px; overflow-x:auto; white-space:nowrap; scrollbar-width:none;">`;
 
@@ -290,10 +291,14 @@ class CrowsEyeSystem {
             case 'LOST_MEMORY':
                 contentHtml = this.renderLostMemoryView();
                 break;
-            case 'ORIGIN_DOSSIER':
+                        case 'ORIGIN_DOSSIER':
                 contentHtml = this.renderOriginView();
                 break;
+            case 'EXPEDITIONS':
+                contentHtml = this.renderExpeditionView();
+                break;
             case 'PLAYBACK':
+
                 contentHtml = this.renderPlaybackView();
                 break;
             case 'CALIBRATION':
@@ -474,38 +479,42 @@ class CrowsEyeSystem {
         </div>`;
 
                 // 4, 5, 6 - Subjective State Analysis
-        if (this.selectedEntityId) {
-             const knownIntel = window.IntelManager?.getIntelForNode(this.selectedEntityId) || [];
-             html += `<div>
-                <div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px; margin-bottom:15px;">KNOWLEDGE & BELIEF: ${this.selectedEntityId}</div>
-                <div style="display:flex; flex-direction:column; gap:10px;">
-                    ${knownIntel.slice(0, 3).map(i => {
-                        const state = window.MeaningEngine.getSubjectiveState(this.selectedEntityId, i.intel_id);
-                        const lineage = window.MeaningEngine.getBeliefLineage(this.selectedEntityId, i.intel_id);
-                        const contradiction = window.InvestigationManager?.findContradictionForIntel(i.intel_id);
+                if (this.selectedEntityId) {
+                     const knownIntel = window.IntelManager?.getIntelForNode(this.selectedEntityId) || [];
+                     html += `<div>
+                        <div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px; margin-bottom:15px;">KNOWLEDGE & BELIEF: ${this.selectedEntityId}</div>
+                        <div style="display:flex; flex-direction:column; gap:10px;">
+                            ${knownIntel.slice(0, 3).map(i => {
+                                const state = window.MeaningEngine.getSubjectiveState(this.selectedEntityId, i.intel_id);
+                                const contradiction = window.InvestigationManager?.findContradictionForIntel(i.intel_id);
+                                const showDev = window.EngineConfig?.showSystemReasoning;
                         
-                        return `
-                            <div style="border-left:2px solid ${contradiction ? '#ef4444' : '#78350f'}; padding-left:15px; position:relative;">
-                                ${contradiction ? '<div style="position:absolute; left:-6px; top:0; color:#ef4444; font-weight:bold;">!</div>' : ''}
-                                <div style="font-size:11px; color:#fbbf24;">${i.payload.title}</div>
-                                <div style="font-size:10px; color:#94a3b8; margin-top:3px;">
-                                    TIER: <span style="color:#d97706;">${state.tier}</span> |
-                                    IDENTITY: <span style="color:#fbbf24;">${state.profile?.identity || 'UNKNOWN'}</span>
-                                </div>
-                                <div style="font-size:10px; color:#94a3b8; margin-top:2px;">
-                                    BELIEF: <span style="color:${state.belief === 'CERTAINTY' ? '#10b981' : '#f59e0b'};">${state.belief}</span> | 
-                                    CONVICTION: <span style="color:#fbbf24;">${Math.floor((state.conviction?.conviction || 0.5) * 100)}%</span> |
-                                    ACCURACY: <span style="color:${state.isCorrect ? '#10b981' : '#ef4444'};">${state.isCorrect ? 'ACCURATE' : 'DISTORTED'}</span>
-                                </div>
-                                <div style="font-size:9px; color:#78350f; margin-top:5px;">WHY DO THEY BELIEVE IT?</div>
-                                <div style="font-size:9px; color:#94a3b8;">Interpretation: <span style="color:#fbbf24;">${state.conclusion?.interpretation || 'LITERAL'}</span></div>
-                                <div style="font-size:9px; color:#94a3b8;">Reason: ${state.reason}</div>
-                            </div>
-                        `;
-                    }).join('') || '<div style="font-size:11px; color:#451a03;">Select an entity with knowledge to analyze beliefs.</div>'}
-                </div>
-             </div>`;
-        }
+                                let borderStyle = '#78350f';
+                                if (showDev && contradiction) borderStyle = '#ef4444';
+
+                                return `
+                                    <div style="border-left:2px solid ${borderStyle}; padding-left:15px; position:relative;">
+                                        ${showDev && contradiction ? '<div style="position:absolute; left:-6px; top:0; color:#ef4444; font-weight:bold;">!</div>' : ''}
+                                        <div style="font-size:11px; color:#fbbf24;">${i.payload.title}</div>
+                                        <div style="font-size:10px; color:#94a3b8; margin-top:3px;">
+                                            TIER: <span style="color:#d97706;">${state.tier}</span> |
+                                            IDENTITY: <span style="color:#fbbf24;">${state.profile?.identity || 'UNKNOWN'}</span>
+                                        </div>
+                                        <div style="font-size:10px; color:#94a3b8; margin-top:2px;">
+                                            BELIEF: <span style="color:${state.belief === 'CERTAINTY' ? '#10b981' : '#f59e0b'};">${state.belief}</span> | 
+                                            CONVICTION: <span style="color:#fbbf24;">${Math.floor((state.conviction?.conviction || 0.5) * 100)}%</span>
+                                            ${showDev ? ` | ACCURACY: <span style="color:${state.isCorrect ? '#10b981' : '#ef4444'};">${state.isCorrect ? 'ACCURATE' : 'DISTORTED'}</span>` : ''}
+                                        </div>
+                                        <div style="font-size:9px; color:#78350f; margin-top:5px;">WHY DO THEY BELIEVE IT?</div>
+                                        <div style="font-size:9px; color:#94a3b8;">Interpretation: <span style="color:#fbbf24;">${state.conclusion?.interpretation || 'LITERAL'}</span></div>
+                                        <div style="font-size:9px; color:#94a3b8;">Reason: ${state.reason}</div>
+                                    </div>
+                                `;
+                            }).join('') || '<div style="font-size:11px; color:#451a03;">Select an entity with knowledge to analyze beliefs.</div>'}
+                        </div>
+                     </div>`;
+                }
+
 
 
         html += `</div>`;
@@ -583,7 +592,84 @@ class CrowsEyeSystem {
         return html;
     }
 
-        renderLogisticsView() {
+        renderExpeditionView() {
+            if (!window.AdventurerManager) return "Expedition Office Offline";
+        
+            const adventurers = window.AdventurerManager.records.filter(a => a.alive);
+            const day = window.EngineParams?.worldDay || 0;
+        
+            let html = `<div style="display:flex; flex-direction:column; gap:20px;">`;
+            html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">EXPEDITION MANAGEMENT: DISTANT OPERATIONS (§31)</div>`;
+
+            if (adventurers.length === 0) {
+                return html + `<div style="font-size:11px; color:#451a03;">No active expeditions are currently documented.</div>`;
+            }
+
+            html += `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap:20px;">`;
+
+            adventurers.forEach(a => {
+                const region = this.getRegionName(a.position.x, a.position.z).split(' (')[0];
+                const dist = Math.hypot(a.position.x, a.position.z) / 1000;
+                const healthPercent = (a.hp / 100) * 100;
+                const moralePercent = a.morale || 0;
+
+                html += `<div style="background:rgba(0,0,0,0.4); border:1px solid #78350f; padding:20px; border-top: 4px solid ${a.hp < 30 ? '#ef4444' : '#fbbf24'};">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                        <div>
+                            <div style="font-weight:bold; color:#fbbf24; font-size:16px;">${a.name.toUpperCase()}</div>
+                            <div style="font-size:10px; color:#78350f;">LEVEL ${a.level} | ${region}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <span style="color:#78350f; font-size:10px;">OBJECTIVE</span>
+                            <div style="font-size:14px; color:#fbbf24;">${a.quest.type.toUpperCase()}</div>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:15px;">
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-size:9px; margin-bottom:3px;">
+                                <span style="color:#78350f;">VITALITY</span>
+                                <span style="color:${a.hp < 30 ? '#ef4444' : '#fbbf24'};">${Math.floor(healthPercent)}%</span>
+                            </div>
+                            <div style="height:4px; background:#1c1917; width:100%;">
+                                <div style="height:100%; background:${a.hp < 30 ? '#ef4444' : '#fbbf24'}; width:${healthPercent}%;"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-size:9px; margin-bottom:3px;">
+                                <span style="color:#78350f;">MORALE</span>
+                                <span style="color:#fbbf24;">${Math.floor(moralePercent)}%</span>
+                            </div>
+                            <div style="height:4px; background:#1c1917; width:100%;">
+                                <div style="height:100%; background:#d97706; width:${moralePercent}%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="font-size:11px; color:#94a3b8; margin-bottom:10px;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>SUPPLIES:</span>
+                            <span style="color:#fbbf24;">${a.supplies} Packs</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>STORY HEAT:</span>
+                            <span style="color:#d97706;">${a.storyHeat.toFixed(1)}</span>
+                        </div>
+                    </div>
+
+                    <div style="border-top:1px solid #451a03; padding-top:10px; display:flex; gap:10px;">
+                        <button style="flex:1; background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px; font-size:10px; cursor:pointer;"
+                            onclick="window.CrowsEye.pan.x=${a.position.x}; window.CrowsEye.pan.z=${a.position.z}; window.CrowsEye.currentView='MAP'; window.CrowsEye.updateTimer=1.0;">LOCATE PARTY</button>
+                        <button style="flex:1; background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px; font-size:10px; cursor:pointer;"
+                            onclick="window.CrowsEye.selectedEntityId='${a.id}'; window.CrowsEye.updateTimer=1.0;">INSPECT STATUS</button>
+                    </div>
+                </div>`;
+            });
+
+            html += `</div></div>`;
+            return html;
+        }
+
         if (!window.VillageManager) return "Logistics Engine Offline";
         
         const villages = window.VillageManager.villages;
@@ -1283,40 +1369,44 @@ class CrowsEyeSystem {
     }
 
         renderAnthologyView() {
-        if (!window.FolkloreEngine) return "Anthology Offline";
-        const poems = window.FolkloreEngine.getAnthology();
+            if (!window.FolkloreEngine) return "Anthology Offline";
+            const poems = window.FolkloreEngine.getAnthology();
+            const showDev = window.EngineConfig?.showSystemReasoning;
         
-        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
-        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">FOLKLORE ANTHOLOGY: THE POEM TRAP (§BJ)</div>`;
+            let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+            html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">FOLKLORE ANTHOLOGY: THE POEM TRAP (§BJ)</div>`;
 
-        if (poems.length === 0) {
-            return html + `<div style="font-size:11px; color:#451a03;">The world has not yet crystallized its history into poetry. Perform more legendary deeds.</div>`;
-        }
+            if (poems.length === 0) {
+                return html + `<div style="font-size:11px; color:#451a03;">The world has not yet crystallized its history into poetry. Perform more legendary deeds.</div>`;
+            }
 
-        // Cipher Analysis (Bible §17)
-        const commonNumbers = poems.filter(p => p.text.includes('20') || p.text.includes('score'));
-        const ambigNumbers = poems.filter(p => p.text.includes('40') || p.text.includes('others might'));
+            // Cipher Analysis (Bible §17)
+            if (showDev) {
+                const commonNumbers = poems.filter(p => p.text.includes('20') || p.text.includes('score'));
+                const ambigNumbers = poems.filter(p => p.text.includes('40') || p.text.includes('others might'));
 
-        html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
-            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:12px;">
-                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">CIPHER DETECTED: "20"</div>
-                <div style="font-size:11px; color:#fbbf24;">Linked to physical village anchors.</div>
-            </div>
-            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:12px;">
-                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">CIPHER DETECTED: "40"</div>
-                <div style="font-size:11px; color:#ef4444;">Deliberate noise/Scholarly trap (§17).</div>
-            </div>
-        </div>`;
+                html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
+                    <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:12px;">
+                        <div style="color:#78350f; font-size:10px; margin-bottom:5px;">CIPHER DETECTED: "20"</div>
+                        <div style="font-size:11px; color:#fbbf24;">Linked to physical village anchors.</div>
+                    </div>
+                    <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:12px;">
+                        <div style="color:#78350f; font-size:10px; margin-bottom:5px;">CIPHER DETECTED: "40"</div>
+                        <div style="font-size:11px; color:#ef4444;">Deliberate noise/Scholarly trap (§17).</div>
+                    </div>
+                </div>`;
+            }
 
-        html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
+            html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
         
-        poems.forEach(p => {
-            const mystery = window.InvestigationManager?.mysteries.get('founder_betrayal');
-            const isRevealing = p.class === 'REVISIONAL' && mystery?.state === 'RESOLVED';
+            poems.forEach(p => {
+                const mystery = window.InvestigationManager?.mysteries.get('founder_betrayal');
+                const isRevealing = showDev && p.class === 'REVISIONAL' && mystery?.state === 'RESOLVED';
 
-            html += `<div style="background:rgba(251,191,36,0.02); border:1px solid ${isRevealing ? '#fbbf24' : '#78350f'}; padding:20px; font-family: 'Times New Roman', serif; position:relative;">
-                ${isRevealing ? '<div style="position:absolute; top:0; right:0; background:#fbbf24; color:#000; padding:2px 10px; font-size:9px; font-weight:bold;">CIPHER CRACKED</div>' : ''}
-                <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:10px;">
+                html += `<div style="background:rgba(251,191,36,0.02); border:1px solid ${isRevealing ? '#fbbf24' : '#78350f'}; padding:20px; font-family: 'Times New Roman', serif; position:relative;">
+                    ${isRevealing ? '<div style="position:absolute; top:0; right:0; background:#fbbf24; color:#000; padding:2px 10px; font-size:9px; font-weight:bold;">PATTERN RECOGNIZED</div>' : ''}
+                    <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:10px;">
+
                     <div>
                         <div style="font-weight:bold; color:#fbbf24; font-size:18px; font-style:italic;">${p.title}</div>
                         <div style="font-size:10px; color:#78350f;">CLASS: ${p.class}</div>
@@ -1345,75 +1435,77 @@ class CrowsEyeSystem {
 
 
         renderRecordedMemoryView() {
-        if (!window.MountainArchives) return "Archive Network Offline";
-        const measurements = window.MountainArchives.getMeasurements();
-        const theories = Array.from(window.MountainArchives.activeTheories.values());
+            if (!window.MountainArchives) return "Archive Network Offline";
+            const measurements = window.MountainArchives.getMeasurements();
+            const theories = Array.from(window.MountainArchives.activeTheories.values());
+            const showDev = window.EngineConfig?.showSystemReasoning;
         
-        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
-        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">RECORDED MEMORY: LONGITUDINAL OBSERVATIONS</div>`;
+            let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+            html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">RECORDED MEMORY: LONGITUDINAL OBSERVATIONS</div>`;
 
-        // 1. Current Theories & Flaws (Bible §8)
-        html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
-            ${theories.map(t => {
-                const mystery = window.InvestigationManager?.mysteries.get('mountain_rotation');
-                const isDisproven = mystery?.state === 'RESOLVED';
-                return `
-                    <div style="background:rgba(251,191,36,0.05); border:1px solid ${isDisproven ? '#ef4444' : '#78350f'}; padding:15px;">
-                        <div style="font-weight:bold; color:${isDisproven ? '#ef4444' : '#fbbf24'}; font-size:14px; margin-bottom:10px;">
-                            ${t.name.toUpperCase()} ${isDisproven ? '[DISPROVEN]' : ''}
+            // 1. Current Theories & Flaws (Bible §8)
+            html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                ${theories.map(t => {
+                    const mystery = window.InvestigationManager?.mysteries.get('mountain_rotation');
+                    const isDisproven = showDev && mystery?.state === 'RESOLVED';
+                    return `
+                        <div style="background:rgba(251,191,36,0.05); border:1px solid ${isDisproven ? '#ef4444' : '#78350f'}; padding:15px;">
+                            <div style="font-weight:bold; color:${isDisproven ? '#ef4444' : '#fbbf24'}; font-size:14px; margin-bottom:10px;">
+                                ${t.name.toUpperCase()} ${isDisproven ? '[DISPROVEN]' : ''}
+                            </div>
+                            <div style="font-size:11px; color:#94a3b8; line-height:1.4;">${t.description}</div>
+                            <div style="margin-top:10px; border-top:1px solid #451a03; padding-top:10px; font-size:10px; color:${isDisproven ? '#ef4444' : '#78350f'};">
+                                OBSERVED FLAW: ${t.flaw}
+                            </div>
                         </div>
-                        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">${t.description}</div>
-                        <div style="margin-top:10px; border-top:1px solid #451a03; padding-top:10px; font-size:10px; color:${isDisproven ? '#ef4444' : '#78350f'};">
-                            OBSERVED FLAW: ${t.flaw}
-                        </div>
-                    </div>
-                `;
-            }).join('')}
-        </div>`;
-
-        // 2. Relative Dimensional Anchors (Bible §25)
-        const anchoredIntel = Array.from(window.IntelManager?.registry.values() || []).filter(i => i.isAnchored);
-        if (anchoredIntel.length > 0) {
-            html += `<div>
-                <div style="font-size:12px; color:#fbbf24; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:5px;">RELATIVE DIMENSIONAL ANCHORS (§25)</div>
-                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:10px;">
-                    ${anchoredIntel.map(i => `
-                        <div style="font-size:10px; background:rgba(120,53,15,0.1); border:1px solid #78350f; padding:10px;">
-                            <div style="color:#fbbf24; font-weight:bold;">${i.payload.title}</div>
-                            <div style="color:#94a3b8; margin-top:5px;">This information is physically anchored and survives the 14-day Shift without distortion.</div>
-                        </div>
-                    `).join('')}
-                </div>
+                    `;
+                }).join('')}
             </div>`;
+
+            // 2. Relative Dimensional Anchors (Bible §25)
+            const anchoredIntel = Array.from(window.IntelManager?.registry.values() || []).filter(i => i.isAnchored);
+            if (anchoredIntel.length > 0) {
+                html += `<div>
+                    <div style="font-size:12px; color:#fbbf24; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:5px;">RELATIVE DIMENSIONAL ANCHORS (§25)</div>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:10px;">
+                        ${anchoredIntel.map(i => `
+                            <div style="font-size:10px; background:rgba(120,53,15,0.1); border:1px solid #78350f; padding:10px;">
+                                <div style="color:#fbbf24; font-weight:bold;">${i.payload.title} ${showDev ? '[ANCHORED]' : ''}</div>
+                                <div style="color:#94a3b8; margin-top:5px;">${showDev ? 'This information is physically anchored and survives the 14-day Shift without distortion.' : 'A fragment of history that has remained unchanged across cycles.'}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+            }
+
+            // 3. Longitudinal Trends
+            html += `<div>
+                <div style="font-size:12px; color:#fbbf24; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:5px;">LONG-TERM TRENDS: THE 7-DAY PERCEPTION SKIP (§5)</div>
+                <table style="width:100%; font-size:11px; text-align:left; border-collapse:collapse;">
+                    <tr style="color:#78350f; border-bottom:1px solid #451a03;">
+                        <th style="padding:10px;">EPOCH</th>
+                        <th>STAR CHART ROTATION</th>
+                        <th>TERRAIN ROTATION</th>
+                        ${showDev ? '<th>DISCREPANCY</th>' : ''}
+                    </tr>
+                    ${measurements.map(m => {
+                        const discrepancy = Math.abs(m.starChart.observedRotation - m.rotation);
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                                <td style="padding:10px; color:#fbbf24;">EPOCH ${m.epoch}</td>
+                                <td style="color:#94a3b8;">${m.starChart.constellationDelta.toFixed(3)} rad</td>
+                                <td style="color:#fbbf24;">${m.rotation.toFixed(3)} rad</td>
+                                ${showDev ? `<td style="color:#ef4444;">${discrepancy > 0.01 ? 'DETECTED' : 'STABLE'}</td>` : ''}
+                            </tr>
+                        `;
+                    }).join('') || '<tr><td colspan="4" style="text-align:center; padding:20px; color:#451a03;">Awaiting sufficient epoch data for longitudinal analysis.</td></tr>'}
+                </table>
+            </div>`;
+
+            html += `</div>`;
+            return html;
         }
 
-        // 3. Longitudinal Trends
-        html += `<div>
-            <div style="font-size:12px; color:#fbbf24; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:5px;">LONG-TERM TRENDS: THE 7-DAY PERCEPTION SKIP (§5)</div>
-            <table style="width:100%; font-size:11px; text-align:left; border-collapse:collapse;">
-                <tr style="color:#78350f; border-bottom:1px solid #451a03;">
-                    <th style="padding:10px;">EPOCH</th>
-                    <th>STAR CHART ROTATION</th>
-                    <th>TERRAIN ROTATION</th>
-                    <th>DISCREPANCY</th>
-                </tr>
-                ${measurements.map(m => {
-                    const discrepancy = Math.abs(m.starChart.observedRotation - m.rotation);
-                    return `
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
-                            <td style="padding:10px; color:#fbbf24;">EPOCH ${m.epoch}</td>
-                            <td style="color:#94a3b8;">${m.starChart.constellationDelta.toFixed(3)} rad</td>
-                            <td style="color:#fbbf24;">${m.rotation.toFixed(3)} rad</td>
-                            <td style="color:#ef4444;">${discrepancy > 0.01 ? 'DETECTED' : 'STABLE'}</td>
-                        </tr>
-                    `;
-                }).join('') || '<tr><td colspan="4" style="text-align:center; padding:20px; color:#451a03;">Awaiting sufficient epoch data for longitudinal analysis.</td></tr>'}
-            </table>
-        </div>`;
-
-        html += `</div>`;
-        return html;
-    }
 
 
     renderLostMemoryView() {
@@ -1462,6 +1554,7 @@ class CrowsEyeSystem {
         renderOriginView() {
             if (!window.OriginEngine) return "Origin Engine Offline";
             const dossier = window.OriginEngine.getDossier();
+            const showDev = window.EngineConfig?.showSystemReasoning;
         
             let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
             html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">THE ORIGIN DOSSIER: THE ZERO HORIZON (§Dossier)</div>`;
@@ -1474,10 +1567,10 @@ class CrowsEyeSystem {
                 const mysteryMap = { 'The Founders': 'founder_betrayal', 'The Great Fracture': 'origin_fracture', 'The First Wendigo': 'first_wendigo' };
                 const mId = mysteryMap[cat.title];
                 const mystery = mId ? window.InvestigationManager?.mysteries.get(mId) : null;
-                const isUnlockingTruth = mystery?.state === 'RESOLVED';
+                const isUnlockingTruth = showDev && mystery?.state === 'RESOLVED';
 
                 html += `<div style="background:rgba(255,255,255,0.02); border:1px solid ${isUnlockingTruth ? '#fbbf24' : '#78350f'}; padding:20px; position:relative; overflow:hidden;">
-                    ${isUnlockingTruth ? `<div style="position:absolute; top:0; right:0; background:#fbbf24; color:#000; padding:2px 10px; font-size:9px; font-weight:bold;">ZERO HORIZON BREACHED</div>` : ''}
+                    ${isUnlockingTruth ? `<div style="position:absolute; top:0; right:0; background:#fbbf24; color:#000; padding:2px 10px; font-size:9px; font-weight:bold;">FOUNDATIONAL DISCREPANCY DETECTED</div>` : ''}
                     <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
                         <div>
                             <div style="font-weight:bold; color:#fbbf24; font-size:16px;">${cat.title.toUpperCase()}</div>
@@ -1492,6 +1585,7 @@ class CrowsEyeSystem {
                     <div style="font-size:12px; color:#94a3b8; font-style:italic; margin-bottom:15px; background:rgba(0,0,0,0.2); padding:10px; border-left:2px solid ${isUnlockingTruth ? '#ef4444' : '#fbbf24'};">
                         "${currentModelDesc}"
                     </div>
+
 
                     <div style="font-size:11px;">
                         <div style="color:#78350f; margin-bottom:5px;">ARCHAEOLOGICAL FRAGMENTS (${cat.evidence.length})</div>
