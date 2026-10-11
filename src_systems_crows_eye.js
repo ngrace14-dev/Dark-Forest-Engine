@@ -1555,11 +1555,23 @@ class CrowsEyeSystem {
             if (!window.OriginEngine) return "Origin Engine Offline";
             const dossier = window.OriginEngine.getDossier();
             const showDev = window.EngineConfig?.showSystemReasoning;
+            const isNative = window.GameState?.playerLegacy?.isOriginNative;
         
             let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
-            html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">THE ORIGIN DOSSIER: THE ZERO HORIZON (§Dossier)</div>`;
+            html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px; display:flex; justify-content:space-between;">
+                <span>THE ORIGIN DOSSIER: THE ZERO HORIZON (§Dossier)</span>
+                ${isNative ? '<span style="color:#fbbf24; font-size:10px;">[NATIVE STATUS: VERIFIED]</span>' : ''}
+            </div>`;
+
+            if (isNative) {
+                html += `<div style="background:rgba(251,191,36,0.05); border:1px solid #fbbf24; padding:15px; margin-bottom:10px;">
+                    <div style="color:#fbbf24; font-size:11px; font-weight:bold;">ORIGIN IMMUNITY DETECTED (§BL)</div>
+                    <div style="font-size:10px; color:#94a3b8; margin-top:5px;">You are a Progenitor Genesis entity. You are mathematically immune to derivative metaphysical rules. Your stats carry absolute historical weight.</div>
+                </div>`;
+            }
 
             dossier.forEach(cat => {
+
                 const currentModelDesc = window.OriginEngine.models[Object.keys(window.OriginEngine.categories).find(k => window.OriginEngine.categories[k].title === cat.title)]?.[cat.model] || 'Standard historical interpretation.';
                 const confidence = cat.confidence * 100;
             

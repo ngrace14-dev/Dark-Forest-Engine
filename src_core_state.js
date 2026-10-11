@@ -139,16 +139,18 @@ window.GameState = {
         combatLuck: 0,
         teleportLuck: 0
     },
-    playerLegacy: {
+        playerLegacy: {
         id: 'player',
         bloodlineId: 'bloodline_wanderer',
         storyDensity: 0,
         inheritedTraits: {},
         generation: 1,
         karmicDebt: 0,
-        significanceLevel: 'UNKNOWN'
+        significanceLevel: 'UNKNOWN',
+        isOriginNative: true // Bible §BL: Origin Immunity
     }
 };
+
 
 
 window.EngineState = {
