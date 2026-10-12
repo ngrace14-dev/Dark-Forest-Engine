@@ -21,7 +21,59 @@ class EngineIntegrity {
             this.initOwnership();
             this.runFullDiagnostics();
             this.startActivityMonitor();
+            this.initObservatory();
         });
+    }
+
+    initObservatory() {
+        // Register the Observatory with the debug console
+        window.EventBus.on('CMD_OBSERVATORY', () => this.printHeartbeatReport());
+        console.log("%c[Observatory] Type 'window.EventBus.emit(\"CMD_OBSERVATORY\")' for full Heartbeat.", "color: #10b981;");
+    }
+
+    printHeartbeatReport() {
+        console.group("%c[Civilization Heartbeat Report]", "color: #fbbf24; font-weight: bold; font-size: 14px;");
+        
+        // 1. Statistics
+        const stats = {
+            population: window.VillageManager?.villages.reduce((s, v) => s + v.population.current, 0) || 0,
+            activeHouses: window.DynastyManager?.houses.size || 0,
+            activeRumors: window.IntelTracker?.stats.falseFacts || 0,
+            verifiedTruths: window.IntelTracker?.stats.trueFacts || 0,
+            folkloreEntries: window.FolkloreEngine?.getAnthology?.().length || 0
+        };
+        console.table(stats);
+
+        // 2. Significance Tracking
+        const weights = window.ChronicleManager?.npcHistoricalWeights || new Map();
+        const livingFigures = Array.from(weights.entries())
+            .filter(([id]) => window.GameCore?.activeEntities.some(e => e.id === id))
+            .sort((a, b) => b[1] - a[1]);
+        
+        console.group("Significance Tracking");
+        console.log(`Most Significant Living: ${livingFigures[0]?.[0] || 'None'} (Weight: ${livingFigures[0]?.[1] || 0})`);
+        console.log(`Most Significant House: ${[...window.DynastyManager?.houses.values() || []].sort((a, b) => b.legacy - a.legacy)[0]?.name || 'None'}`);
+        console.groupEnd();
+
+        // 3. Lifecycle Visualization
+        this.logLifecycle();
+
+        console.groupEnd();
+    }
+
+    logLifecycle() {
+        const flow = [
+            { stage: 'Event', count: window.ChronicleManager?.worldLedger?.length || 0 },
+            { stage: 'Intel', count: window.IntelManager?.registry?.size || 0 },
+            { stage: 'Truth', count: window.IntelTracker?.stats.trueFacts || 0 },
+            { stage: 'Folklore', count: window.FolkloreEngine?.getAnthology?.().length || 0 }
+        ];
+        
+        let visual = "LIFECYCLE: ";
+        flow.forEach((f, i) => {
+            visual += `${f.stage}(${f.count}) ${i < flow.length - 1 ? '→ ' : ''}`;
+        });
+        console.log(`%c${visual}`, "color: #94a3b8; font-family: monospace;");
     }
 
     initOwnership() {
