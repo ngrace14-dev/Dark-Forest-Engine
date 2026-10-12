@@ -2,7 +2,7 @@
  * Crow's Eye System - Phase 2 (Registration & State)
  */
 class CrowsEyeSystem {
-    constructor() {
+        constructor() {
         this.isActive = false;
         this.overlay = null;
         this.updateTimer = 0;
@@ -10,32 +10,30 @@ class CrowsEyeSystem {
         this.currentView = 'MAP'; // Default view
         this.zoom = 1.0;
         this.pan = { x: 0, z: 0 };
+        this.velocity = { x: 0, z: 0 };
         this.isDragging = false;
         this.lastStats = null;
         this.trends = {};
+        this.keys = {};
         window.EventBus.on('ENGINE_READY', () => this.init());
     }
 
-        init() {
+    init() {
         this.isActive = window.EngineConfig?.crowsEyeMode || false;
         this.followedEntityIds = new Set(); // Bible §28
         this.createOverlay();
 
         window.addEventListener('keydown', (e) => {
+            this.keys[e.key.toLowerCase()] = true;
+            
             if (e.key === 'Escape' && this.isActive) {
                 window.EngineConfig.applyQualityPreset('crows_eye');
                 window.EventBus.emit('ENV_UPDATE');
             }
+        });
 
-            // --- KEYBOARD NAVIGATION (WASD/Arrows) ---
-            if (this.isActive && this.currentView === 'MAP') {
-                const moveSpeed = 5000 / this.zoom;
-                if (e.key === 'w' || e.key === 'ArrowUp') this.pan.z -= moveSpeed;
-                if (e.key === 's' || e.key === 'ArrowDown') this.pan.z += moveSpeed;
-                if (e.key === 'a' || e.key === 'ArrowLeft') this.pan.x -= moveSpeed;
-                if (e.key === 'd' || e.key === 'ArrowRight') this.pan.x += moveSpeed;
-                this.updateTimer = 1.0;
-            }
+        window.addEventListener('keyup', (e) => {
+            this.keys[e.key.toLowerCase()] = false;
         });
         
         window.EventBus.on('ENV_UPDATE', () => {
@@ -197,8 +195,43 @@ class CrowsEyeSystem {
                 return html;
     }
 
+        getRegionName(x, z) {
+        if (!window.EpochManagerInstance) return "Unknown Territory";
+        const biome = window.EpochManagerInstance.getBiome(x, z);
+        const name = window.EpochManagerInstance.config.biomes[biome]?.name || "The Void";
+        
+        // Add Compass Direction relative to center
+        const angle = Math.atan2(z, x) * (180 / Math.PI);
+        let dir = "North";
+        if (angle > -45 && angle <= 45) dir = "East";
+        else if (angle > 45 && angle <= 135) dir = "South";
+        else if (angle > 135 || angle <= -135) dir = "West";
+        
+        return `${dir} ${name}`;
+    }
+
     update(dt) {
         if (!this.isActive || !this.overlay) return;
+
+        // --- VELOCITY-BASED NAVIGATION ---
+        if (this.currentView === 'MAP') {
+            const accel = 100000 / this.zoom;
+            const friction = 0.9;
+            
+            if (this.keys['w'] || this.keys['arrowup']) this.velocity.z -= accel * dt;
+            if (this.keys['s'] || this.keys['arrowdown']) this.velocity.z += accel * dt;
+            if (this.keys['a'] || this.keys['arrowleft']) this.velocity.x -= accel * dt;
+            if (this.keys['d'] || this.keys['arrowright']) this.velocity.x += accel * dt;
+            
+            this.pan.x += this.velocity.x * dt;
+            this.pan.z += this.velocity.z * dt;
+            this.velocity.x *= friction;
+            this.velocity.z *= friction;
+            
+            if (Math.abs(this.velocity.x) > 0.1 || Math.abs(this.velocity.z) > 0.1) {
+                this.updateTimer = 1.0; // Keep refreshing while moving
+            }
+        }
         
         this.updateTimer += dt;
         if (this.updateTimer < 0.1) return; // Faster update for UI responsiveness
@@ -364,17 +397,37 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderMapView() {
+        renderMapView() {
         const entities = this.gatherEntities();
         const px = window.GameCore?.playerObj?.visual?.position?.x || 0;
         const pz = window.GameCore?.playerObj?.visual?.position?.z || 0;
         
-        // World Health Dashboard
-        let healthHtml = `<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:20px; font-size:10px; background:rgba(0,0,0,0.5); padding:10px; border:1px solid #78350f;">
-            <div>POPULATION: ${this.lastStats?.population > 10000 ? 'STABLE' : 'CRITICAL'}</div>
-            <div>ECONOMY: ${this.lastStats?.prosperity > 50 ? 'THRIVING' : 'STAGNANT'}</div>
-            <div>TRUTH: ${window.IntelTracker?.stats.globalFidelity > 0.7 ? 'PURE' : 'DISTORTED'}</div>
-            <div>SECURITY: ${window.ForceManager?.forces['Forest'].strength < 600 ? 'SECURE' : 'THREATENED'}</div>
+        // Visible Area Metrics (Task 4)
+        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 2000;
+        const worldSpan = (forestSide * 2) / this.zoom;
+        const miles = (worldSpan / 1609.34).toFixed(1);
+        const currentRegion = this.getRegionName(this.pan.x, this.pan.z);
+        
+        // Observatory Integration (Task 5)
+        const registry = window.IntelManager?.registry ? Array.from(window.IntelManager.registry.values()) : [];
+        const truthCount = registry.filter(i => i.truth_state === 'TRUE').length;
+        const rumorCount = registry.filter(i => i.truth_state === 'FALSE' || i.truth_state === 'UNKNOWN').length;
+        const folkloreCount = window.GameState?.anthology?.length || 0;
+
+        let healthHtml = `
+        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:10px; font-size:10px; background:rgba(0,0,0,0.7); padding:10px; border:1px solid #78350f;">
+            <div style="grid-column: span 4; border-bottom: 1px solid #451a03; padding-bottom:5px; margin-bottom:5px; color:#fbbf24; font-weight:bold; letter-spacing:1px;">
+                ATLAS DATA: ${currentRegion.toUpperCase()}
+            </div>
+            <div>VISIBLE AREA: ${miles} Miles</div>
+            <div>POPULATION: ${this.lastStats?.population || 0}</div>
+            <div>SETTLEMENTS: ${window.VillageManager?.villages.length || 0}</div>
+            <div>ZOOM: ${this.zoom.toFixed(1)}x</div>
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:20px; font-size:10px; background:rgba(0,0,0,0.5); padding:10px; border:1px solid #d97706; border-top:none;">
+            <div style="color:#10b981;">TRUTHS: ${truthCount}</div>
+            <div style="color:#f59e0b;">RUMORS: ${rumorCount}</div>
+            <div style="color:#a855f7;">FOLKLORE: ${folkloreCount}</div>
         </div>`;
 
         const gridData = this.generateAsciiGrid(entities, px, pz);
@@ -382,56 +435,44 @@ class CrowsEyeSystem {
     }
 
     gatherEntities() {
-        const narrator = window.GameState?.narrator || {};
         const entities = [];
+        const lod = this.zoom; // 0.1 (far) to 5.0 (close)
         
-        if (window.GameCore?.playerObj?.visual) {
-            entities.push({ type: 'P', x: window.GameCore.playerObj.visual.position.x, z: window.GameCore.playerObj.visual.position.z, id: 'player', ref: window.GameCore.playerObj });
+        // Settlement/Close LOD (lod > 1.5)
+        if (lod > 1.5) {
+            if (window.GameCore?.playerObj?.visual) {
+                entities.push({ type: 'P', x: window.GameCore.playerObj.visual.position.x, z: window.GameCore.playerObj.visual.position.z, id: 'player', ref: window.GameCore.playerObj });
+            }
+            if (window.GameCore?.activeEntities) {
+                window.GameCore.activeEntities.forEach(en => {
+                    if (en.def?.faction === 'monster' || en.def?.faction === 'forest') {
+                        if (en.visual) entities.push({ type: 'M', x: en.visual.position.x, z: en.visual.position.z, id: en.id, ref: en });
+                    }
+                });
+            }
         }
         
-        if (window.GameCore?.activeEntities) {
-            window.GameCore.activeEntities.forEach(en => {
-                if (en.def?.faction === 'monster' || en.def?.faction === 'forest') {
-                    if (en.visual) entities.push({ type: 'M', x: en.visual.position.x, z: en.visual.position.z, id: en.id, ref: en });
-                }
-                // --- MAP PIVOT: Show Caravans in 3D mode ---
-                if (en.caravanId) {
-                    entities.push({ type: 'C', x: en.visual.position.x, z: en.visual.position.z, id: en.caravanId, ref: en });
-                }
-            });
+        // Regional/Mid LOD (lod > 0.4)
+        if (lod > 0.4) {
+            if (window.AdventurerManager?.records) {
+                window.AdventurerManager.records.forEach(rec => {
+                    if (rec.position) entities.push({ type: 'a', x: rec.position.x, z: rec.position.z, id: rec.id, ref: rec });
+                });
+            }
+            if (window.RoadManager?.pathNodes) {
+                 window.RoadManager.pathNodes.forEach((node, idx) => {
+                     entities.push({ type: '#', x: node.x, z: node.z, id: `road_${idx}`, ref: { name: 'Road Node' } });
+                 });
+            }
         }
         
-        // --- MAP PIVOT: Abstract Entities (Unloaded) ---
-        if (window.AdventurerManager?.records) {
-            window.AdventurerManager.records.forEach(rec => {
-                // If not active in 3D, show abstract position
-                if (!rec.activeEntityId && rec.position) {
-                    entities.push({ type: 'a', x: rec.position.x, z: rec.position.z, id: rec.id, ref: rec });
-                } else if (rec.activeEntityId) {
-                    const en = window.GameCore.activeEntities.find(e => e.id === rec.activeEntityId);
-                    if (en) entities.push({ type: 'A', x: en.visual.position.x, z: en.visual.position.z, id: rec.id, ref: rec });
-                }
-            });
-        }
-        
+        // World/Far LOD (Always visible)
         if (window.VillageManager?.villages) {
             window.VillageManager.villages.forEach(v => {
                 entities.push({ type: 'V', x: v.x, z: v.z, id: `village_${v.id}`, ref: v });
-                
-                // Show abstract caravans
-                v.caravans.forEach(car => {
-                    if (car.status === 'traveling' && car.position) {
-                        entities.push({ type: 'c', x: car.position.x, z: car.position.z, id: car.id, ref: car });
-                    }
-                });
             });
         }
 
-        if (window.RoadManager?.pathNodes) {
-             window.RoadManager.pathNodes.forEach((node, idx) => {
-                 entities.push({ type: '#', x: node.x, z: node.z, id: `road_${idx}`, ref: { name: 'Road Node' } });
-             });
-        }
         return entities;
     }
 
