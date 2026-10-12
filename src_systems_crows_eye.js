@@ -11,12 +11,14 @@ class CrowsEyeSystem {
         this.zoom = 1.0;
         this.pan = { x: 0, z: 0 };
         this.velocity = { x: 0, z: 0 };
-        this.isDragging = false;
+                this.isDragging = false;
         this.lastStats = null;
         this.trends = {};
         this.keys = {};
+        this.isInspectionExpanded = false;
         window.EventBus.on('ENGINE_READY', () => this.init());
     }
+
 
     init() {
         this.isActive = window.EngineConfig?.crowsEyeMode || false;
@@ -76,9 +78,16 @@ class CrowsEyeSystem {
         this.overlay.style.backdropFilter = 'blur(10px)';
         
                 this.overlay.addEventListener('click', (e) => {
-            if (e.target.tagName === 'SPAN' && e.target.dataset.id) {
-                this.selectedEntityId = e.target.dataset.id;
-                this.updateTimer = 1.0; // Force immediate update
+                    if (e.target.dataset.action === 'toggle-inspect') {
+                        this.isInspectionExpanded = !this.isInspectionExpanded;
+                        this.updateTimer = 1.0;
+                        return;
+                    }
+                    if (e.target.tagName === 'SPAN' && e.target.dataset.id) {
+                        this.selectedEntityId = e.target.dataset.id;
+                        this.isInspectionExpanded = true;
+                        this.updateTimer = 1.0; // Force immediate update
+
                 
                 // --- MAP CLOCK PIVOT: Center view on selected if it has coordinates ---
                 const entities = this.gatherEntities();
@@ -121,14 +130,15 @@ class CrowsEyeSystem {
             }
         });
         window.addEventListener('mouseup', () => this.isDragging = false);
-        this.overlay.addEventListener('wheel', (e) => {
+                this.overlay.addEventListener('wheel', (e) => {
             if (this.currentView === 'MAP') {
                 e.preventDefault();
                 const delta = e.deltaY > 0 ? 0.9 : 1.1;
-                this.zoom = Math.max(0.1, Math.min(5.0, this.zoom * delta));
+                this.zoom = Math.max(0.005, Math.min(5.0, this.zoom * delta));
                 this.updateTimer = 1.0;
             }
         }, { passive: false });
+
         
         document.body.appendChild(this.overlay);
     }
@@ -243,19 +253,28 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-        const views = ['MAP', 'WATCHLIST', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
-        let navHtml = `<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
+                const views = ['MAP', 'WATCHLIST', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
+        let navHtml = `<div style="display:flex; gap:10px; margin-bottom:10px; border-bottom:1px solid #78350f; padding-bottom:5px; flex-shrink:0; flex-wrap:wrap; overflow:hidden;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
-            navHtml += `<div data-view="${v}" style="cursor:pointer; padding:5px 10px; font-weight:bold; ${activeStyle}">${v}</div>`;
+            navHtml += `<div data-view="${v}" style="cursor:pointer; padding:2px 10px; font-weight:bold; font-size:11px; ${activeStyle}">${v}</div>`;
         });
         navHtml += `</div>`;
 
         let contentHtml = '';
         let inspectedHtml = '';
+        
+        const isCosmological = this.zoom < 0.05;
+        const currentEffectiveView = (this.currentView === 'MAP' && isCosmological) ? 'COSMOLOGICAL' : this.currentView;
 
-                switch (this.currentView) {
+                switch (currentEffectiveView) {
+            case 'COSMOLOGICAL':
+                const cosmicData = this.renderCosmologicalView();
+                contentHtml = cosmicData.gridHtml;
+                inspectedHtml = cosmicData.inspectedHtml;
+                break;
             case 'WATCHLIST':
+
                 contentHtml = this.renderWatchlistView();
                 break;
             case 'MAP':
@@ -341,21 +360,42 @@ class CrowsEyeSystem {
                 break;
         }
 
-                this.overlay.innerHTML = `
-                <div style="max-width: 1600px; margin: 0 auto; display: grid; grid-template-columns: 1fr 400px; gap: 20px; height: 100vh; box-sizing: border-box; padding: 20px; overflow: hidden;">
-                    <div style="display: flex; flex-direction: column; height: 100%; overflow: hidden; min-height: 0;">
-                        <div style="font-size: 24px; color: #f59e0b; margin-bottom: 10px; flex-shrink: 0;">CROW'S EYE - ${this.currentView}</div>
+                                this.overlay.innerHTML = `
+                <div style="width: 100%; height: 100vh; display: grid; grid-template-columns: 1fr ${this.isInspectionExpanded ? '400px' : '40px'}; grid-template-rows: auto 1fr auto; gap: 0; box-sizing: border-box; overflow: hidden; background: #040608;">
+                    <!-- HEADER -->
+                    <div style="grid-column: 1 / span 2; background: #000; border-bottom: 1px solid #451a03; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 10;">
+                        <div style="font-size: 20px; color: #f59e0b; font-weight: bold; letter-spacing: 2px;">CROW'S EYE - ${currentEffectiveView}</div>
+                        <div style="color: #78350f; font-size: 12px;">WORLD DAY: ${worldDay} | TIME: ${window.EngineParams?.timeOfDay?.toFixed(1) || 0}h</div>
+                    </div>
+
+                    <!-- MAIN CONTENT AREA -->
+                    <div style="display: flex; flex-direction: column; height: 100%; overflow: hidden; min-height: 0; padding: 10px 20px;">
                         ${navHtml}
-                        <div style="flex-grow: 1; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 20px; border: 1px solid #451a03; min-height: 0; box-sizing: border-box;">
+                        <div id="ce-atlas-viewport" style="flex-grow: 1; overflow: hidden; background: rgba(0,0,0,0.3); border: 1px solid #451a03; min-height: 0; box-sizing: border-box; position: relative;">
                             ${contentHtml}
                         </div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.05); padding: 20px; border-left: 1px solid #78350f; overflow-y: auto; height: 100%; box-sizing: border-box; min-height: 0;">
-                        <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px; flex-shrink: 0;">INSPECTION</div>
-                        ${inspectedHtml || 'Select an entity to view deep telemetry.'}
+
+                    <!-- INSPECTION PANEL -->
+                    <div style="background: rgba(15, 23, 42, 0.9); border-left: 1px solid #78350f; display: flex; flex-direction: column; height: 100%; min-height: 0; transition: width 0.3s ease;">
+                        <div data-action="toggle-inspect" style="cursor: pointer; background: #1e1b4b; color: #fbbf24; padding: 10px; text-align: center; font-size: 12px; border-bottom: 1px solid #451a03;">
+                            ${this.isInspectionExpanded ? '▶ CLOSE' : '◀ INSPECT'}
+                        </div>
+                        <div style="flex-grow: 1; overflow-y: auto; padding: 20px; display: ${this.isInspectionExpanded ? 'block' : 'none'};">
+                            <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px;">INSPECTION</div>
+                            ${inspectedHtml || '<div style="color: #451a03; text-align: center; margin-top: 50px;">Select an entity to view deep telemetry.</div>'}
+                        </div>
+                    </div>
+
+                    <!-- FOOTER -->
+                    <div style="grid-column: 1 / span 2; background: #000; border-top: 1px solid #451a03; padding: 5px 20px; font-size: 10px; color: #451a03; display: flex; justify-content: space-between; z-index: 10;">
+                        <div>ACTIVE RUNTIME PATH: SIMULATION_STABLE</div>
+                        <div>DARK FOREST CONSTITUTION COMPLIANT</div>
+                        <div>COORD: [${Math.round(this.pan.x)}, ${Math.round(this.pan.z)}] | ZOOM: ${this.zoom.toFixed(3)}x</div>
                     </div>
                 </div>`;
     }
+
 
     renderWatchlistView() {
         if (this.followedEntityIds.size === 0) {
@@ -1756,216 +1796,180 @@ class CrowsEyeSystem {
         return html;
     }
 
-        generateAsciiGrid(entities, px, pz) {
-            const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
-            const mountainRadius = forestSide / 2;
-            const mountainWidth = window.WorldGenConfig?.mountainRingWidthMeters || 160934.4;
-            const totalRadius = (mountainRadius + mountainWidth);
-            const renderRadius = totalRadius * 1.5; // Include Endless Dunes (§11)
+        renderCosmologicalView() {
+            const forestSide = window.WorldGenConfig?.darkForestSideMeters || 2000;
+            const width = 80;
+            const height = 40;
+            const grid = Array(height).fill(0).map(() => Array(width).fill(' '));
         
-            const gridSize = 40; 
-            const worldSpan = (renderRadius * 2) / this.zoom; 
-            const cellSpan = worldSpan / gridSize;
-        
-            const cellEntities = Array(gridSize).fill().map(() => Array(gridSize).fill(null));
-            const grid = Array(gridSize).fill().map(() => Array(gridSize).fill(' ')); 
-        
-            const typePriority = { 
-                'P': 10, 'C': 9, 'V': 8, 'B': 7, 
-                '👑': 6, '🛒': 6, '📚': 6, '⚒️': 6, '🙂': 6,
-                'M': 5, 'a': 4, '#': 3, 'R': 2, '.': 1, '~': 0.5, ' ': 0 
-            };
-        
-            const mapToGrid = (x, z) => {
-                const relativeX = x - this.pan.x + (worldSpan / 2);
-                const relativeZ = z - this.pan.z + (worldSpan / 2);
-                const gx = Math.floor(relativeX / cellSpan);
-                const gz = Math.floor(relativeZ / cellSpan);
-                return { gx, gz };
-            };
-
-            for (let gz = 0; gz < gridSize; gz++) {
-                for (let gx = 0; gx < gridSize; gx++) {
-                    const wx = (gx * cellSpan) - (worldSpan / 2) + this.pan.x;
-                    const wz = (gz * cellSpan) - (worldSpan / 2) + this.pan.z;
-                    const dist = Math.sqrt(wx*wx + wz*wz); 
-                
-                    if (dist <= totalRadius) {
-                        if (dist > mountainRadius) grid[gz][gx] = '⛰️'; // R
-                        else grid[gz][gx] = '🌲'; // .
-                    } else {
-                        grid[gz][gx] = '🏜️'; // ~
+            // 1. Great Attractor (Center Gold Particles)
+            const centerX = Math.floor(width / 2);
+            const centerY = Math.floor(height / 2);
+            const GA_RADIUS = 3;
+            for (let y = -GA_RADIUS; y <= GA_RADIUS; y++) {
+                for (let x = -GA_RADIUS; x <= GA_RADIUS; x++) {
+                    const d = Math.sqrt(x*x + y*y);
+                    if (d < GA_RADIUS) {
+                        const char = Math.random() > 0.5 ? '*' : '.';
+                        const color = '#fbbf24';
+                        grid[centerY + y][centerX + x] = `<span style="color:${color}; animation: flicker ${1 + Math.random()}s infinite;">${char}</span>`;
                     }
                 }
             }
 
-            entities.forEach(en => {
-                const { gx, gz } = mapToGrid(en.x, en.z);
-                if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
-                    const currentType = grid[gz][gx];
-                    const currentPriority = typePriority[currentType] || 0;
-                    const newPriority = typePriority[en.type] || 0;
+            // 2. Rosen Bridge Network (Cosmic Filaments)
+            const bridges = [
+                { x1: 0.2, y1: 0.2, x2: 0.5, y2: 0.5 },
+                { x1: 0.8, y1: 0.1, x2: 0.5, y2: 0.5 },
+                { x1: 0.1, y1: 0.9, x2: 0.5, y2: 0.5 },
+                { x1: 0.9, y1: 0.8, x2: 0.5, y2: 0.5 },
+                { x1: 0.2, y1: 0.2, x2: 0.1, y2: 0.9 },
+                { x1: 0.8, y1: 0.1, x2: 0.9, y2: 0.8 }
+            ];
 
-                    if (newPriority > currentPriority) {
-                        grid[gz][gx] = en.type;
-                        cellEntities[gz][gx] = en;
+            bridges.forEach(b => {
+                const px1 = Math.floor(b.x1 * width);
+                const py1 = Math.floor(b.y1 * height);
+                const px2 = Math.floor(b.x2 * width);
+                const py2 = Math.floor(b.y2 * height);
+            
+                this.drawBresenham(grid, px1, py1, px2, py2, '<span style="color:#1e293b;">·</span>');
+            });
+
+            // 3. World Entities (Ancient Atlas Style)
+            const gaNodes = [
+                { x: 0.5, y: 0.5, label: 'THE GREAT ATTRACTOR', color: '#fbbf24' },
+                { x: 0.3, y: 0.3, label: 'DARK FOREST', color: '#10b981' },
+                { x: 0.7, y: 0.2, label: 'MOUNTAIN RING', color: '#94a3b8' },
+                { x: 0.1, y: 0.8, label: 'ENDLESS DUNES', color: '#f59e0b' },
+                { x: 0.9, y: 0.7, label: 'ROSEN BRIDGE ALPHA', color: '#6366f1' }
+            ];
+
+            gaNodes.forEach(node => {
+                const gx = Math.floor(node.x * width);
+                const gy = Math.floor(node.y * height);
+                if (grid[gy] && grid[gy][gx]) {
+                    grid[gy][gx] = `<span style="color:${node.color}; font-weight:bold; cursor:pointer;" title="${node.label}">◎</span>`;
+                    // Add label if space permits
+                    if (gx + 2 < width) {
+                        const label = node.label.substring(0, 10);
+                        for (let i = 0; i < label.length; i++) {
+                            if (gx + 2 + i < width) {
+                                grid[gy][gx + 2 + i] = `<span style="color:#451a03; font-size:8px;">${label[i]}</span>`;
+                            }
+                        }
                     }
                 }
             });
-        
-            let gridHtml = `<div style="display:flex; justify-content:space-between; font-size:12px; color:#78350f; margin-bottom:10px; flex-shrink: 0;">
-                <div>Zoom: ${this.zoom.toFixed(1)}x</div>
-                <div>Pan: ${Math.round(this.pan.x)}, ${Math.round(this.pan.z)}</div>
+
+            const gridHtml = `<style>
+                @keyframes flicker { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+            </style>
+            <div style="font-family:monospace; line-height:1; white-space:pre; background:#000; padding:20px; text-align:center; border:1px double #451a03;">
+                ${grid.map(row => row.join('')).join('\n')}
             </div>`;
-        
-            gridHtml += `<div style="line-height: 1.1; font-size: 1.8vh; letter-spacing: 2px; font-family: monospace; cursor: move; user-select: none; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 0;">`;
-            for (let gz = 0; gz < gridSize; gz++) {
-                let line = '';
-                for (let gx = 0; gx < gridSize; gx++) {
-                    const en = cellEntities[gz][gx];
-                    let char = grid[gz][gx];
-                
-                    // Visual Remapping
-                    if (char === 'P') char = '👤';
-                    if (char === 'V') char = '🏠';
-                    if (char === 'C') char = '🏰';
-                    if (char === 'M') char = '👾';
-                    if (char === '#') char = '▪';
-                    if (char === 'B') char = '🧱';
 
-                    const isSelected = en && this.selectedEntityId === en.id;
-                    const style = isSelected ? 'background-color: #fbbf24; border-radius: 2px;' : '';
-                
-                    // Color mapping for non-emojis or specific highlights
-                    let color = '#94a3b8';
-                    if (char === '▪') color = '#78350f';
-                    if (char === '👤') color = '#3b82f6';
-                    if (char === '🏰') color = '#fbbf24';
+            return { gridHtml, inspectedHtml: 'Cosmological Scale: Observing the Great Attractor and the Rosen Bridge Network.' };
+        }
 
-                    const dataId = en && en.id ? `data-id="${en.id}"` : '';
-                    line += `<span style="${style} color: ${color};" ${dataId}>${char}</span>`;
-                }
-                gridHtml += `<div style="height: 1.1em; display: flex;">${line}</div>`;
+        drawBresenham(grid, x0, y0, x1, y1, char) {
+            let dx = Math.abs(x1 - x0);
+            let dy = Math.abs(y1 - y0);
+            let sx = (x0 < x1) ? 1 : -1;
+            let sy = (y0 < y1) ? 1 : -1;
+            let err = dx - dy;
+
+            while (true) {
+                if (grid[y0] && grid[y0][x0]) grid[y0][x0] = char;
+                if (x0 === x1 && y0 === y1) break;
+                let e2 = 2 * err;
+                if (e2 > -dy) { err -= dy; x0 += sx; }
+                if (e2 < dx) { err += dx; y0 += sy; }
             }
-            gridHtml += `</div>`;
+        }
+
+        generateAsciiGrid(entities, px, pz) {
+        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 2000;
+        const width = 80;
+        const height = 40;
+        const grid = Array(height).fill(0).map(() => Array(width).fill(' '));
+        
+        const worldToGrid = (wx, wz) => {
+            const gx = Math.floor(((wx - this.pan.x) / (forestSide * 2 / this.zoom) + 0.5) * width);
+            const gy = Math.floor(((wz - this.pan.z) / (forestSide * 2 / this.zoom) + 0.5) * height);
+            return { gx, gy };
+        };
+
+        entities.forEach(ent => {
+            const { gx, gy } = worldToGrid(ent.x, ent.z);
+            if (gx >= 0 && gx < width && gy >= 0 && gy < height) {
+                let color = '#fbbf24';
+                if (ent.type === 'P') color = '#ef4444';
+                if (ent.type === 'V') color = '#10b981';
+                if (ent.type === 'C') color = '#fbbf24';
+                if (ent.type === 'M') color = '#92400e';
+                if (ent.type === '#') color = '#1e293b';
+                
+                const isSelected = this.selectedEntityId === ent.id;
+                const style = isSelected ? `color:#fff; background:${color}; font-weight:bold;` : `color:${color};`;
+                grid[gy][gx] = `<span style="${style} cursor:pointer;" data-id="${ent.id}">${ent.type}</span>`;
+            }
+        });
+
+        const gridHtml = `<div style="font-family:monospace; line-height:1; white-space:pre; background:#000; padding:20px; text-align:center; border:1px double #451a03;">${grid.map(row => row.join('')).join('\n')}</div>`;
 
         let inspectedHtml = '';
         if (this.selectedEntityId) {
-            const selectedEn = entities.find(e => e.id === this.selectedEntityId);
-            if (selectedEn && selectedEn.ref) {
-                const ref = selectedEn.ref;
-                const type = selectedEn.type;
-                
-                // --- DIVINE INFLUENCE PANEL ---
-                let dreamButtons = '';
-                if (window.DreamManager && type !== 'V' && type !== 'P') {
-                    const dreamState = window.DreamManager.getNPCState(this.selectedEntityId);
-                    const symbols = Object.keys(window.DreamManager.lexicon);
-                    
-                    dreamButtons = `<div style="border-top:1px solid #78350f; padding-top:10px; margin-top:10px;">
-                        <span style="color:#fbbf24; font-size:11px;">SEND SYMBOLIC DREAM</span>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px; margin-top:5px;">
-                            ${symbols.map(s => `
-                                <button style="background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px; font-size:9px; cursor:pointer;"
-                                    onclick="window.DreamManager.sendDream('${this.selectedEntityId}', '${s}'); window.CrowsEye.updateTimer=1.0;">
-                                    ${s}
-                                </button>
-                            `).join('')}
+            const ent = entities.find(e => e.id === this.selectedEntityId);
+            if (ent) {
+                const ref = ent.ref;
+                inspectedHtml = `
+                    <div style="font-size:14px; line-height:1.6;">
+                        <div style="font-weight:bold; color:#fbbf24; font-size:18px; margin-bottom:5px;">${ref.name || 'UNKNOWN ENTITY'}</div>
+                        <div style="color:#78350f; font-size:10px; margin-bottom:15px;">ID: ${ent.id}</div>
+                        
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px; background:rgba(255,255,255,0.05); padding:10px; border:1px solid #451a03;">
+                            <div>COORD X: <span style="color:#fbbf24;">${Math.round(ent.x)}</span></div>
+                            <div>COORD Z: <span style="color:#fbbf24;">${Math.round(ent.z)}</span></div>
+                            <div>FACTION: <span style="color:#10b981;">${ref.def?.faction?.toUpperCase() || 'NEUTRAL'}</span></div>
+                            <div>STATUS: <span style="color:#f59e0b;">${ref.hp > 0 ? 'ACTIVE' : 'DECEASED'}</span></div>
                         </div>
-                        <div style="margin-top:10px; font-size:10px; color:#94a3b8;">
-                            ACTIVE DREAM: <span style="color:#fbbf24;">${dreamState.activeSymbol}</span> (${Math.floor(dreamState.intensity * 100)}%)<br>
-                            BOND: ${Math.floor(dreamState.bond * 100)}% | CORRUPTION: ${Math.floor(dreamState.corruption * 100)}%
+
+                        <div style="margin-bottom:15px;">
+                            <div style="font-weight:bold; color:#fbbf24; border-bottom:1px solid #451a03; margin-bottom:5px; padding-bottom:2px;">TELEMETRY</div>
+                            <div style="font-size:12px; color:#94a3b8;">
+                                HP: ${Math.floor(ref.hp || 0)} / ${ref.maxHp || 100}<br>
+                                POISE: ${Math.floor(ref.poise || 0)}<br>
+                                TASK: ${ref.currentTask || 'IDLE'}<br>
+                                TARGET: ${ref.taskTarget || 'NONE'}
+                            </div>
                         </div>
-                    </div>`;
-                }
 
-                // --- PROGRESSIVE DISCLOSURE PANEL ---
-                let intelButtons = '';
-                if (window.IntelManager && window.InvestigationManager) {
-                     const intel = window.IntelManager.getIntelForNode(this.selectedEntityId);
-                     const mysteries = window.InvestigationManager.getMysteries().filter(m => m.state !== 'RESOLVED');
-                     
-                     if (intel.length > 0 && mysteries.length > 0) {
-                         intelButtons = `<div style="border-top:1px solid #78350f; padding-top:10px; margin-top:10px;">
-                             <span style="color:#fbbf24; font-size:11px;">LINK EVIDENCE TO MYSTERY</span>
-                             <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px;">
-                                 ${intel.map(i => `
-                                     <div style="font-size:10px; color:#94a3b8; background:rgba(255,255,255,0.05); padding:5px; border:1px solid #451a03;">
-                                         <div style="margin-bottom:3px;">${i.payload.title}</div>
-                                         <div style="display:flex; flex-wrap:wrap; gap:5px;">
-                                             ${mysteries.map(m => `
-                                                 <button style="background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:2px 5px; cursor:pointer;" 
-                                                     onclick="window.InvestigationManager.flagEvidence('${i.intel_id}', '${m.id}'); window.CrowsEye.updateTimer=1.0;">
-                                                     + ${m.title.split(' ')[1] || m.title}
-                                                 </button>
-                                             `).join('')}
-                                         </div>
-                                     </div>
-                                 `).join('')}
-                             </div>
-                         </div>`;
-                     }
-                }
+                        ${ref.industry ? `
+                            <div style="margin-bottom:15px;">
+                                <div style="font-weight:bold; color:#fbbf24; border-bottom:1px solid #451a03; margin-bottom:5px; padding-bottom:2px;">VILLAGE STATS</div>
+                                <div style="font-size:12px; color:#94a3b8;">
+                                    HOUSE: ${ref.nobleHouse}<br>
+                                    PROSPERITY: ${ref.stats.prosperity.toFixed(1)}%<br>
+                                    INDUSTRY: ${ref.industry.industry} (${ref.industry.produces})
+                                </div>
+                            </div>
+                        ` : ''}
 
-                inspectedHtml += `<div style="display:flex; flex-direction:column; gap:15px; font-size:13px;">
-                    <div><span style="color:#78350f;">NAME:</span> <span style="color:#fbbf24; font-size:16px;">${ref.name || 'Unknown'}</span></div>
-                    <div><span style="color:#78350f;">TYPE:</span> ${type === 'P' ? 'Player' : (type === 'A' || type === 'T') ? 'Adventurer' : type === 'V' ? 'Village' : 'Other'}</div>
-                    <div><span style="color:#78350f;">LOC:</span> [${Math.round(selectedEn.x)}, ${Math.round(selectedEn.z)}]</div>
-                    <div style="border-top:1px solid #451a03; padding-top:10px;">
-                        <span style="color:#fbbf24;">INTENT</span><br>
-                        Task: ${ref.currentTask || 'Idle'}<br>
-                        Goal: ${ref.taskTarget || 'None'}<br>
-                        Reason: ${ref.taskReason || 'N/A'}
-                    </div>`;
-
-                if (type === 'V') {
-                    inspectedHtml += `<div style="border-top:1px solid #451a03; padding-top:10px;">
-                        <span style="color:#fbbf24;">CIVILIZATION</span><br>
-                        Noble House: ${ref.nobleHouse}<br>
-                        Population: ${ref.population.current}<br>
-                        Prosperity: ${ref.stats.prosperity}%<br>
-                        Trade Disruption: ${ref.tradeDisruptionUntil > window.EngineParams.worldDay ? 'ACTIVE' : 'NONE'}
-                    </div>`;
-                }
-
-                if (window.IntelManager) {
-                    const knownIntel = window.IntelManager.getIntelForNode(this.selectedEntityId);
-                    if (knownIntel.length > 0) {
-                        inspectedHtml += `<div style="border-top:1px solid #451a03; padding-top:10px;">
-                            <span style="color:#fbbf24;">KNOWN INTEL (${knownIntel.length})</span><br>
-                            ${knownIntel.slice(0, 3).map(i => `- ${i.payload.title}`).join('<br>')}
-                        </div>`;
-                    }
-                }
-
-                                const history = window.ChronicleManager?.getHistoryFor(this.selectedEntityId).slice(-5).reverse() || [];
-                if (history.length > 0) {
-                    inspectedHtml += `<div style="border-top:1px solid #451a03; padding-top:10px;">
-                        <span style="color:#fbbf24;">RECENT HISTORY</span><br>
-                        ${history.map(e => `<span style="color:#78350f;">[Day ${e.timestamp.day}]</span> ${e.detail}`).join('<br>')}
-                    </div>`;
-                }
-
-                // --- FOLLOW BUTTON ---
-                const isFollowing = this.followedEntityIds.has(this.selectedEntityId);
-                inspectedHtml += `<div style="border-top:1px solid #78350f; padding-top:15px; margin-top:10px;">
-                    <button data-action="follow" data-id="${this.selectedEntityId}" style="width:100%; padding:10px; background:${isFollowing ? '#1e3a8a' : '#451a03'}; color:#fbbf24; border:1px solid #78350f; cursor:pointer; font-weight:bold;">
-                        ${isFollowing ? '✓ FOLLOWING' : '+ FOLLOW ENTITY'}
-                    </button>
-                    <div style="font-size:9px; color:#78350f; margin-top:5px; text-align:center;">Followed entities are tracked in the Watchlist (§28).</div>
-                </div>`;
-                
-                inspectedHtml += intelButtons;
-                inspectedHtml += dreamButtons;
-                inspectedHtml += `</div>`;
+                        <div style="display:flex; gap:10px; margin-top:20px;">
+                            <button style="flex:1; background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:8px; cursor:pointer; font-size:11px;"
+                                data-action="follow" data-id="${ent.id}">${this.followedEntityIds.has(ent.id) ? 'UNFOLLOW' : 'FOLLOW'}</button>
+                            <button style="flex:1; background:#1e1b4b; color:#fbbf24; border:1px solid #451a03; padding:8px; cursor:pointer; font-size:11px;"
+                                onclick="window.CrowsEye.pan.x=${ent.x}; window.CrowsEye.pan.z=${ent.z}; window.CrowsEye.updateTimer=1.0;">CENTER</button>
+                        </div>
+                    </div>
+                `;
             }
         }
-        
+
         return { gridHtml, inspectedHtml };
     }
-
-
 }
 
 window.CrowsEye = new CrowsEyeSystem();
-export default window.CrowsEye;
+
