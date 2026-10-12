@@ -194,8 +194,10 @@ class CrowsEyeSystem {
             </div>
         </div>`;
 
-        return html;
+                return html;
     }
+
+    update(dt) {
         if (!this.isActive || !this.overlay) return;
         
         this.updateTimer += dt;
@@ -264,10 +266,10 @@ class CrowsEyeSystem {
             case 'FORCES':
                 contentHtml = this.renderForcesView();
                 break;
-            case 'FORCE_LAYER':
-            case 'FORCE_LAYER':
+                        case 'FORCE_LAYER':
                 contentHtml = this.renderForceLayer();
                 break;
+
             case 'CIV_PRESSURE':
                 contentHtml = this.renderCivPressureView();
                 break;
@@ -978,21 +980,6 @@ class CrowsEyeSystem {
             </tr>`;
         });
         html += `</table>`;
-        return html;
-    }
-
-    renderLegendsView() {
-        const legends = window.GameState?.legends || [];
-        if (legends.length === 0) return "No legends have been recorded yet.";
-        let html = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
-        legends.forEach(l => {
-            html += `<div style="border:1px solid #fbbf24; padding:15px; background:rgba(251,191,36,0.05);">
-                <div style="font-size:18px; color:#fbbf24; font-weight:bold; margin-bottom:10px;">${l.title}</div>
-                <div style="font-style:italic; font-size:13px; line-height:1.4;">"${l.narrative}"</div>
-                <div style="margin-top:10px; font-size:11px; color:#78350f;">Historical Power: ${Math.floor(l.power)}</div>
-            </div>`;
-        });
-        html += `</div>`;
         return html;
     }
 
