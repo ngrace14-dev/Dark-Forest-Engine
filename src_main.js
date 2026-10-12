@@ -86,6 +86,7 @@ import './src_multiplayer.js';
 import './src_systems_editor.js';
 import './src_systems_attractor.js';
 import './src_systems_crows_eye.js';
+import './src/systems/integrity.js';
 
 import './src_systems_dev_tools.js';
 import './src_systems_health.js';
