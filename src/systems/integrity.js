@@ -8,10 +8,92 @@ class EngineIntegrity {
             classValidation: [],
             simHealth: [],
             viewRegistry: [],
-            startup: []
+            startup: [],
+            activity: []
         };
         
-        window.EventBus.on('ENGINE_READY', () => this.runFullDiagnostics());
+        this.ownershipMap = new Map();
+        this.tickData = new Map();
+        this.activityDeltas = new Map();
+        this.monitoringCadence = 5000; // 5 seconds
+        
+        window.EventBus.on('ENGINE_READY', () => {
+            this.initOwnership();
+            this.runFullDiagnostics();
+            this.startActivityMonitor();
+        });
+    }
+
+    initOwnership() {
+        // Ownership Validation (Bible §28 compliance)
+        // Format: [ManagerName, { Creator, Authority, Consumer }]
+        const registry = [
+            ['ChronicleManager', { creator: 'WorldDirector', authority: 'TimeStream', consumer: ['CrowsEye', 'FolkloreEngine'] }],
+            ['IntelManager', { creator: 'NarrativeDriver', authority: 'TruthEngine', consumer: ['VillageManager', 'MeaningEngine'] }],
+            ['ForceManager', { creator: 'Cosmology', authority: 'Forest', consumer: ['InstabilityEngine', 'EventSystem'] }],
+            ['PersonhoodManager', { creator: 'SocialMatrix', authority: 'Identity', consumer: ['DynastyManager', 'DreamManager'] }]
+        ];
+        
+        registry.forEach(([name, data]) => this.ownershipMap.set(name, data));
+    }
+
+    startActivityMonitor() {
+        setInterval(() => this.validateActivity(), this.monitoringCadence);
+        this.log('startup', "Activity Monitor active (5s Cadence)");
+    }
+
+    validateActivity() {
+        const now = Date.now();
+        
+        // 1. Tick Health Validation
+        const systemsToMonitor = ['ChronicleManager', 'IntelManager', 'VillageManager', 'ForceManager'];
+        systemsToMonitor.forEach(sys => {
+            const instance = window[sys];
+            if (!instance) return;
+
+            // Proxy check for "Last Tick" based on data mutation
+            const currentSize = this.getSystemActivityMetric(sys);
+            const lastData = this.tickData.get(sys) || { size: 0, timestamp: now };
+
+            if (currentSize !== lastData.size) {
+                this.tickData.set(sys, { size: currentSize, timestamp: now });
+                this.activityDeltas.set(sys, (this.activityDeltas.get(sys) || 0) + (currentSize - lastData.size));
+            } else if (now - lastData.timestamp > 30000) { // 30 second stall
+                this.log('activity', `STALL DETECTED: ${sys} hasn't produced data in >30s`, 'warn');
+            }
+        });
+
+        // 2. Simulation Activity Validation
+        this.validateSimulationActivity();
+    }
+
+    getSystemActivityMetric(sys) {
+        switch(sys) {
+            case 'ChronicleManager': return window.ChronicleManager?.worldLedger?.length || 0;
+            case 'IntelManager': return window.IntelManager?.registry?.size || 0;
+            case 'VillageManager': return window.VillageManager?.villages?.length || 0;
+            case 'ForceManager': return Object.keys(window.ForceManager?.forces || {}).length;
+            default: return 0;
+        }
+    }
+
+    validateSimulationActivity() {
+        // Lifecycle Verification (Operational Flow)
+        const counts = {
+            events: window.ChronicleManager?.worldLedger?.length || 0,
+            intel: window.IntelManager?.registry?.size || 0,
+            folklore: window.FolkloreEngine?.getAnthology?.().length || 0,
+            meaning: window.MeaningEngine?.getWhatMatters?.(100).length || 0
+        };
+
+        if (counts.events > 0 && counts.folklore === 0 && counts.events > 10) {
+            this.log('activity', "Lifecycle Bottleneck: Events exist but zero Folklore generated.", 'warn');
+        }
+
+        if (window.IntelTracker?.stats) {
+            const stats = window.IntelTracker.stats;
+            this.log('activity', `Activity Report: ${stats.trueFacts} Truths, ${stats.falseFacts} Rumors active.`);
+        }
     }
 
     runFullDiagnostics() {
@@ -21,9 +103,20 @@ class EngineIntegrity {
         this.validateClassStructure('CrowsEyeSystem', window.CrowsEye);
         this.validateCrowsEyeRegistry();
         this.validateSimulationHealth();
+        this.validateOwnershipCompliance();
         this.generateRegressionReport();
 
         console.groupEnd();
+    }
+
+    validateOwnershipCompliance() {
+        this.ownershipMap.forEach((data, name) => {
+            if (!window[name]) {
+                this.log('simHealth', `OWNERSHIP ERROR: Registered system ${name} is missing.`, 'error');
+                return;
+            }
+            this.log('simHealth', `System ${name} owned by ${data.creator}, Authority: ${data.authority}`);
+        });
     }
 
     // 1. Class Structure Validator
@@ -131,6 +224,10 @@ class EngineIntegrity {
     log(category, message, level = 'info') {
         this.diagnostics[category].push({ message, level, timestamp: Date.now() });
         const colors = { info: '#94a3b8', warn: '#f59e0b', error: '#ef4444' };
+        
+        // Suppress excessive logging of regular activity
+        if (category === 'activity' && level === 'info' && Math.random() > 0.1) return;
+
         console.log(`%c[${category.toUpperCase()}] ${message}`, `color: ${colors[level]}`);
     }
 }
