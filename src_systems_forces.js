@@ -62,15 +62,24 @@ window.ForceManager = {
             pressure: 'verification',
             value: 0
         },
-        'Orb': {
+                'Orb': {
             strength: 300,
             label: 'Witness',
             description: 'Encourages interpretation and observation.',
             metric: 'Observer Count',
             pressure: 'interpretation',
             value: 0
+        },
+        'Houses': { 
+            strength: 400, 
+            label: 'Prosperity', 
+            description: 'Encourages economic growth and resource accumulation.',
+            metric: 'Total Prosperity',
+            pressure: 'prosperity',
+            value: 0 
         }
     },
+
 
     /**
      * Calculates the "Force Signature" for a major event.
@@ -103,16 +112,17 @@ window.ForceManager = {
         return { dominant, secondary, opposing };
     },
 
-    /**
+        /**
      * Probability Drift: Forces influence the chance of outcomes.
      * Bible §18: "Probability shifts, not direct commands."
      */
     getDrift: function(forceName) {
         const force = this.forces[forceName];
         if (!force) return 1.0;
-        // High strength = higher probability shift (0.5 to 1.5x)
-        return 0.5 + (force.strength / 1000);
+        // High strength = higher probability shift (0.8 to 1.2x)
+        return 0.8 + (force.strength / 2500);
     },
+
 
     update: function(delta) {
         // Recalculate strengths based on world state
@@ -133,16 +143,15 @@ window.ForceManager = {
         force.strength = Math.min(1000, 100 + (legends * 50) + (totalHistoricalWeight / 10));
     },
 
-    recalculateTruth: function() {
+        recalculateTruth: function() {
         const force = this.forces['Truth'];
-        if (!window.IntelManager) return;
+        if (!force || !window.IntelTracker) return;
         
-        const facts = Array.from(window.IntelManager.registry.values()).filter(i => i.type === window.IntelEnums.TYPES.FACT).length;
-        const total = window.IntelManager.registry.size || 1;
-        
-        force.value = facts;
-        force.strength = Math.floor((facts / total) * 1000);
+        const fidelity = window.IntelTracker.stats.globalFidelity;
+        force.value = Math.floor(fidelity * 100);
+        force.strength = Math.floor(fidelity * 1000);
     },
+
 
     recalculateCrown: function() {
         const force = this.forces['Crown'];
@@ -164,14 +173,15 @@ window.ForceManager = {
         force.strength = 300 + (occupied * 100);
     },
 
-    recalculateHouses: function() {
+        recalculateHouses: function() {
         const force = this.forces['Houses'];
-        if (!window.VillageManager) return;
+        if (!force || !window.VillageManager?.villages) return;
         
         const prosperity = window.VillageManager.villages.reduce((acc, v) => acc + (v.stats.prosperity || 0), 0);
         force.value = Math.floor(prosperity / 10);
         force.strength = Math.min(1000, 200 + (prosperity / 2));
     },
+
 
     recalculateWendigo: function() {
         const force = this.forces['Wendigo'];

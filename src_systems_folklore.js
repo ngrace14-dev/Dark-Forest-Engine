@@ -32,19 +32,53 @@ class FolkloreEngineSystem {
                 "Wish you be rid of this plight? / Kill the huntsmen with all your might.",
                 "A monster lingers in the night. / Some say a man who isn’t right."
             ],
-            'REVISIONAL': [
+                        'REVISIONAL': [
                 "They say they fled to save the seed / but truth is buried beneath their greed.",
                 "The 19 walked where only 10 stay / the rest were lost along the way."
+            ],
+            'EPITAPH': [
+                "The Wanderer came with runes of old / a tale of fire and iron told.",
+                "Through shifting woods and mountain cold / they sought the truth that none could hold.",
+                "A hero's mark on skin was carved / while cities thrived and peasants starved.",
+                "They spoke to stars and dreamed of light / until the Wendigo brought the night."
             ]
         };
+
 
         window.EventBus.on('ENGINE_READY', () => this.init());
         window.EventBus.on('LEGEND_CREATED', (legend) => this.generatePoem(legend));
     }
 
-    init() {
+        init() {
+        this.persistentAnthology = this.loadCrossRunFolklore();
+        this.anthology = [...this.persistentAnthology];
         window.EventBus.emit('UI_LOG', '[Folklore] Poem DNA Engine Active');
     }
+
+    /**
+     * Cross-Run Persistence (§17, §BO)
+     * Boilerplate: Retrieves previous run epitaphs from local storage.
+     */
+    loadCrossRunFolklore() {
+        const stored = localStorage.getItem('dark-forest-persistent-folklore');
+        if (stored) {
+            try {
+                return JSON.parse(stored);
+            } catch (e) {
+                return [];
+            }
+        }
+        return [];
+    }
+
+    saveCrossRunFolklore(poem) {
+        const existing = this.loadCrossRunFolklore();
+        existing.push(poem);
+        // Limit to last 5 deaths to keep flavor text rare and impactful
+        if (existing.length > 5) existing.shift();
+        localStorage.setItem('dark-forest-persistent-folklore', JSON.stringify(existing));
+    }
+
 
     /**
      * Historical Compression Logic
@@ -137,9 +171,35 @@ class FolkloreEngineSystem {
         return templates[Math.floor(Math.random() * templates.length)];
     }
 
-    getAnthology() {
-        return this.anthology;
+        /**
+     * Run Summary Epitaph
+     * Bible §17: Synthesizes a player's entire run into a final folk lament.
+     */
+    generateRunEpitaph(playerData, history) {
+        const deeds = history.filter(h => h.actorId === 'player').slice(-5);
+        const topDeed = deeds.sort((a,b) => b.significance - a.significance)[0];
+        
+        const stanzas = this.dna['EPITAPH'];
+        const base = stanzas[Math.floor(Math.random() * stanzas.length)];
+        
+        const finalPoem = {
+            id: 'epitaph_' + Date.now(),
+            title: `The Final Plight of ${playerData.renown?.title || 'the Unbloody'}`,
+            text: `${base}\nIn the end, ${topDeed ? topDeed.detail : 'the silence of the woods'} was all that remained.`,
+            class: 'EPITAPH',
+            historicalWeight: (playerData.renown?.score || 0) * 10,
+            storyStrength: 100,
+            fidelity: 1.0 // Epitaphs are objective markers of a run's end
+        };
+
+                this.anthology.push(finalPoem);
+        this.saveCrossRunFolklore(finalPoem); // Persist for next run (§17)
+        window.GameState.anthology = this.anthology;
+
+        window.EventBus.emit('UI_LOG', `📜 [FOLKLORE] A final lament has been written for your deeds.`);
+        return finalPoem;
     }
+
 }
 
 window.FolkloreEngine = new FolkloreEngineSystem();

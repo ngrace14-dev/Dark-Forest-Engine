@@ -30,22 +30,21 @@ class RoadManager {
         }
     }
 
-    generateRoads(villages) {
+        generateRoads(villages) {
         if (!villages || villages.length < 2) {
             this.generateWorldRoads();
             return;
         }
 
         this.roadNodes = [];
+        
+        // Bible §6: The Chain of Villages
+        // Villages are connected in a specific sequence: Capital (0) -> V1 -> ... -> Terminus (19)
         const waypoints = villages.map(v => new THREE.Vector3(v.x, 0, v.z));
         
-        // Close the loop if there are enough villages
-        if (waypoints.length > 2) {
-            waypoints.push(waypoints[0].clone());
-        }
-
-        const curve = new THREE.CatmullRomCurve3(waypoints, true);
-        const points = curve.getPoints(Math.max(50, villages.length * 20));
+        // Create a C-shape chain anchoring to the Capital and ending at Terminus
+        const curve = new THREE.CatmullRomCurve3(waypoints, false); // false = Open chain, not a loop
+        const points = curve.getPoints(Math.max(100, villages.length * 30));
 
         for (let i = 0; i < points.length; i++) {
             const pt = points[i];
@@ -54,6 +53,7 @@ class RoadManager {
             }
         }
     }
+
 
     getRoadPointsNear(chunkX, chunkZ, searchRadius = 90) {
         const cx = chunkX * 60 + 30;

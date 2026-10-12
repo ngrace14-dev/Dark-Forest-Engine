@@ -762,7 +762,19 @@ function updateCombatHitboxes(delta) {
 
 function fixedUpdateLogic(delta) {
     if (window.Heartbeat) window.Heartbeat.update(delta);
+    
+    // Update Regional Relativity State
+    if (window.EpochManagerInstance && window.GameCore?.playerObj) {
+        const pPos = window.GameCore.playerObj.visual.position;
+        const dist = Math.sqrt(pPos.x*pPos.x + pPos.z*pPos.z);
+        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
+        const totalRadius = (forestSide / 2) + (window.WorldGenConfig?.mountainRingWidthMeters || 160934.4);
+        
+        window.EpochManagerInstance.updateDuneState(dist > totalRadius);
+    }
+
     if (window.AssetBudget) window.AssetBudget.update();
+
     if (window.Profiler) window.Profiler.begin('Physics');
     if (window.GameCore?.playerObj) {
         ChunkManager.update(window.GameCore.playerObj.visual.position);
@@ -1940,7 +1952,11 @@ window.EventBus?.on('BUILD_BASE_STRUCTURE', prefab => {
 // ==========================================
 
 window.EventBus?.on('WORLD_REGENERATE', () => {
+    if (window.EpochManagerInstance) {
+        window.EpochManagerInstance.rotateMountains();
+    }
     window.EventBus.emit('CLEAR_MAP'); 
+ 
     
     const keys = Array.from(ChunkManager.activeChunks.keys()); 
     keys.forEach(k => ChunkManager.unloadChunk(k)); 
@@ -1982,9 +1998,16 @@ window.EventBus?.on('CMD_TELEPORT', (pos) => {
 window.EventBus?.on('PLAYER_RESPAWN', () => { 
     if (!window.EngineParams.arenaMode && window.GameState.pStats.hp <= 0) {
         window.GameCore.recordCombatDefeat({ source: 'open-world', injury: `open-world defeat on day ${window.EngineParams.worldDay}` });
+        
+        // --- RUN SUMMARY EPITAPH (§17) ---
+        if (window.FolkloreEngine) {
+            const epitaph = window.FolkloreEngine.generateRunEpitaph(window.GameState, window.ChronicleManager.worldLedger);
+            // We don't show it here, it's crystallized in the Anthology for the NEXT run to discover.
+        }
     }
     
     const respawnY = safeGetTerrainHeight(0, 0) + 5.0; 
+ 
     
     if (window.GameCore.playerObj?.body) {
         window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -2157,8 +2180,20 @@ renderer.setAnimationLoop(() => {
         fixedUpdateLogic(fixedTimeStep);
         accumulator -= fixedTimeStep;
     }
-    updateCameraAndShadows(delta);
+        updateCameraAndShadows(delta);
+
+            if (window.EngineConfig?.crowsEyeMode) {
+            if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'hidden';
+            if (window.Tone && window.Tone.Destination) window.Tone.Destination.mute = true;
+            return; 
+        } else {
+            if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'visible';
+            if (window.Tone && window.Tone.Destination) window.Tone.Destination.mute = false;
+        }
+
+
     if (window.RenderPipeline) {
+
         window.RenderPipeline.render();
     } else {
         if (window.Profiler) window.Profiler.begin(String.fromCharCode(82,101,110,100,101,114,101,114));
@@ -2360,3 +2395,5 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 bootEngine(); 
+
+       

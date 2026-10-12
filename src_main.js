@@ -29,7 +29,9 @@ import './src_systems_playback.js';
 import './src_systems_meaning.js';
 import './src_systems_knowledge.js';
 import './src_systems_personhood.js';
+import './src_systems_legacy.js';
 import './src_systems_conviction.js';
+
 import './src_systems_origin.js';
 import './src_systems_runes.js';
 import './src_systems_narrative_driver.js';
@@ -82,7 +84,9 @@ import './src/animation_tools/MixamoRetargeting.js';
 import './src_firebase.js';
 import './src_multiplayer.js';
 import './src_systems_editor.js';
+import './src_systems_attractor.js';
 import './src_systems_crows_eye.js';
+
 import './src_systems_dev_tools.js';
 import './src_systems_health.js';
 

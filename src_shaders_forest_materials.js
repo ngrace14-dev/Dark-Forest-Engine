@@ -11,52 +11,66 @@ import * as THREE from 'three';
  * Replaces fragile regex injections with deterministic block assignments.
  */
 function assembleShader(shader, snippets) {
-    // 1. Vertex Declarations (always includes instanced data routing)
+        // 1. Vertex Declarations (always includes instanced data routing)
     const vertDecl = `
         uniform float uTime;
         uniform float uWindSpeed;
         
         #ifdef USE_INSTANCING
             attribute vec4 aInstanceData; // x: seed, y: lean, z: scale/height, w: windPhase
-            varying vec4 vInstanceData;
         #endif
+        varying vec4 vInstanceData;
         
         varying vec3 vWorldPos;
         varying vec3 vColorAttr;
+        varying vec3 vWorldNormal;
+        varying float vLocalY;
         ${snippets.VERTEX_DECLARATIONS || ''}
     `;
 
     // 2. Vertex Transform (world position capture and sway math)
     const vertTransform = `
         vColorAttr = color;
+        vLocalY = position.y;
         
         #ifdef USE_INSTANCING
             vInstanceData = aInstanceData;
             vWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
+            vWorldNormal = normalize(mat3(modelMatrix * instanceMatrix) * normal);
         #else
             vInstanceData = vec4(1.0, 0.0, 1.0, 0.0); // Fallback for non-instanced objects
             vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+            vWorldNormal = normalize(mat3(modelMatrix) * normal);
         #endif
         
         ${snippets.VERTEX_TRANSFORM || ''}
     `;
 
-    // 3. Fragment Declarations
-    const fragDecl = `
-        uniform float uFogIntensity;
-        uniform vec3 uForestSunDir;
-        uniform vec3 uForestSunCol;
-        uniform float uRawDebugMode;
+        // 3. Fragment Declarations
+        const fragDecl = `
+            uniform float uFogIntensity;
+            uniform vec3 uForestSunDir;
+            uniform vec3 uForestSunCol;
+            uniform float uRawDebugMode;
         
-        varying vec3 vWorldPos;
-        varying vec3 vColorAttr;
-        
-        #ifdef USE_INSTANCING
+            #ifdef USE_FOG
+                #ifndef FOG_PARAMS
+                    uniform float fogNear;
+                    uniform float fogFar;
+                #endif
+            #endif
+
+            varying vec3 vWorldPos;
+            varying vec3 vColorAttr;
             varying vec4 vInstanceData;
-        #endif
+            varying vec3 vWorldNormal;
+            varying float vLocalY;
         
-        ${snippets.FRAG_DECLARATIONS || ''}
-    `;
+            ${snippets.FRAG_DECLARATIONS || ''}
+        `;
+
+
+
 
     // Patch Vertex Shader
     shader.vertexShader = vertDecl + '\n' + shader.vertexShader;
@@ -93,21 +107,12 @@ function assembleShader(shader, snippets) {
         );
     }
 
-        shader.fragmentShader = shader.fragmentShader.replace(
+                                shader.fragmentShader = shader.fragmentShader.replace(
         '#include <fog_fragment>',
-        `
-        #ifdef USE_FOG
-            // FIX: Ensure fog uniforms are accessible if they aren't provided by the main shader chunk
-            #ifndef FOG_PARAMS
-                uniform float fogNear;
-                uniform float fogFar;
-            #endif
-            float fogFactorCustom = smoothstep( fogNear, fogFar, vFogDepth );
-            fogFactorCustom *= uFogIntensity; 
-            gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactorCustom );
-        #endif
-        `
+        ''
     );
+
+
 }
 
 /**
@@ -177,9 +182,10 @@ export function createCanopyMaterial(options = {}) {
                     // Warm, scattered light color
                     vec3 sssGlow = uForestSunCol * vec3(0.25, 0.60, 0.10) * transmission * backfacing * 1.5;
                     
-                    // Add SSS directly to the final lighting output (gl_FragColor is calculated after this chunk)
-                    outgoingLight += sssGlow * diffuseColor.rgb; 
+                                        // Add SSS directly to the final lighting output (gl_FragColor is calculated after this chunk)
+                    gl_FragColor.rgb += sssGlow * diffuseColor.rgb; 
                 }
+
             `
         });
     };
@@ -318,19 +324,14 @@ export function createTrunkMaterial(options = {}) {
                 // Weaterhing favors the lower trunk, tapering off as height increases
                 float heightMossMask = 1.0 - smoothstep(5.0, 30.0, vWorldPos.y);
                 
-                // Moss naturally favors the North/North-West sides of the tree in the northern hemisphere
+                                // Moss naturally favors the North/North-West sides of the tree in the northern hemisphere
                 // Using world normal mapping assuming Z is North/South and X is East/West
-                // Because 'normal' here is view-space, we reconstruct world normal for directional weathering
-                                #ifdef USE_INSTANCING
-                    vec3 worldNormal = normalize(mat3(modelMatrix * instanceMatrix) * normal);
-                #else
-                    vec3 worldNormal = normalize(mat3(modelMatrix) * normal);
-                #endif
+                // Because 'normal' here is view-space, we use the reconstructed vWorldNormal
                 
-                float directionalMoss = smoothstep(-0.2, 0.8, dot(worldNormal, normalize(vec3(-0.5, 0.2, -1.0))));
+                float directionalMoss = smoothstep(-0.2, 0.8, dot(vWorldNormal, normalize(vec3(-0.5, 0.2, -1.0))));
                 
                 // Slope bias: moss favors upward facing ledges and burls (Y > 0)
-                float slopeMoss = smoothstep(0.1, 0.9, worldNormal.y);
+                float slopeMoss = smoothstep(0.1, 0.9, vWorldNormal.y);
                 
                 // Combine masks with high-frequency procedural noise
                 float mossNoise = getMossNoise(vWorldPos, vInstanceData.x);
@@ -348,18 +349,11 @@ export function createTrunkMaterial(options = {}) {
                 
                 // --- Terrain Integration: Soil Blending & Contact Shadows ---
                 // Isolate the absolute base of the flared roots (0.0 to 1.5 meters)
-                // We use vWorldPos.y assuming terrain is roughly flat at the local tree origin.
-                // In a displaced terrain system, this might need local space Y instead, but world Y works for relatively flat groves.
+                // We use vLocalY which was passed from vertex shader
                 
-                #ifdef USE_INSTANCING
-                    // Get local Y to accurately detect the base regardless of terrain height
-                    float localY = (inverse(modelMatrix * instanceMatrix) * vec4(vWorldPos, 1.0)).y;
-                #else
-                    float localY = (inverse(modelMatrix) * vec4(vWorldPos, 1.0)).y;
-                #endif
-                
-                // Ground proximity factor: 1.0 at ground level (localY = 0), 0.0 at 1.5 meters up
-                float groundProximity = 1.0 - smoothstep(0.0, 1.5, localY);
+                // Ground proximity factor: 1.0 at ground level (vLocalY = 0), 0.0 at 1.5 meters up
+                float groundProximity = 1.0 - smoothstep(0.0, 1.5, vLocalY);
+
                 
                 // Soil & Leaf Litter Mesh Blending
                 // Deep, desaturated brown matching the forest floor material

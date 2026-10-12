@@ -30,13 +30,19 @@ window.ChronicleManager = {
     recordEvent: function(event) {
         // ... previous record logic ...
 
-        // 5. Weight Accumulation (Bible §1)
+                // 5. Weight Accumulation (Bible §1)
         if (event.actorId) {
             const currentWeight = this.npcHistoricalWeights.get(event.actorId) || 0;
             const newWeight = currentWeight + (event.historicalWeight || 1);
             this.npcHistoricalWeights.set(event.actorId, newWeight);
 
+            // LEGACY INTEGRATION: Feed weight into LegacyManager
+            if (window.LegacyManager) {
+                window.LegacyManager.addSignificance(event.actorId, event.historicalWeight || 1);
+            }
+
             // CROW INTEREST: High weight individuals attract the Crow (Bible §18)
+
             if (newWeight > 500 && !event.isLegendary) {
                  this.checkLegendThreshold(event.actorId, newWeight);
             }
@@ -108,12 +114,14 @@ window.ChronicleManager = {
                 house: v.nobleHouse
             })),
             forces: JSON.parse(JSON.stringify(window.ForceManager?.forces || {})),
-            houses: Array.from(window.DynastyManager?.houses.values() || []).map(h => ({
+                        houses: Array.from(window.DynastyManager?.houses.values() || []).map(h => ({
                 id: h.id,
                 prestige: h.prestige,
                 isBlessed: h.isBlessed
             })),
+            legendCount: window.GameState?.legends?.length || 0,
             truth: window.IntelTracker?.stats.globalFidelity || 1.0,
+
             activeMysteries: Array.from(window.InvestigationManager?.mysteries.values() || []).map(m => ({
                 id: m.id,
                 progress: m.discoveryProgress,

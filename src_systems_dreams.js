@@ -8,19 +8,36 @@
 
 class DreamManagerSystem {
     constructor() {
-        // Symbolic Lexicon and their primary effect mappings
-        this.lexicon = {
-            'FIRE':   { ambition: 'aggression',   multiplier: 1.5, XP: 'hunter',      desc: 'Heat, passion, and destruction.' },
-            'IRON':   { ambition: 'fortification', multiplier: 1.5, XP: 'blacksmith',  desc: 'Stability, defense, and tools.' },
-            'ROOTS':  { ambition: 'patience',      multiplier: 1.5, XP: 'farmer',      desc: 'Growth, ancestry, and slowing down.' },
-            'TRUTH':  { ambition: 'investigation', multiplier: 1.8, XP: 'archivist',   desc: 'Clarity, skepticism, and archives.' },
-            'CROWNS': { ambition: 'authority',    multiplier: 1.5, XP: 'noble_retainer', desc: 'Power, greed, and hierarchy.' },
-            'SHADOWS':{ ambition: 'stealth',      multiplier: 1.5, XP: 'info_broker', desc: 'Secrecy, deception, and the void.' }
+        // ... previous lexicon ...
+
+        // --- DIVINE PATRONAGE PATHS (§20, §22) ---
+        // Boilerplate for career-specific evolution
+        this.patronage = {
+            activePath: null, // 'ARCHIVIST', 'WARLORD', 'SHEPHERD', etc.
+            perks: new Set(),
+            unlockedSymbols: new Set()
+        };
+
+        this.PATH_REQUIREMENTS = {
+            'ARCHIVIST': { mysteryTier: 5, factsVerified: 20, desc: 'Patron of Truth and Pattern Recognition.' },
+            'WARLORD':   { significanceSent: 1000, legendarySuccessions: 2, desc: 'Patron of Ambition and Conflict.' },
+            'SHEPHERD':  { avgProsperity: 75, villagesSaved: 5, desc: 'Patron of Continuity and Growth.' }
         };
 
         this.npcDreams = new Map(); // Map<npc_id, { activeSymbol, intensity, bond, corruption }>
         window.EventBus.on('ENGINE_READY', () => this.init());
     }
+
+    /**
+     * Boilerplate: Evolution into a specific Patronage Path.
+     */
+    evolvePatronPath(pathId) {
+        if (!this.PATH_REQUIREMENTS[pathId]) return;
+        this.patronage.activePath = pathId;
+        window.EventBus.emit('UI_LOG', `✨ [ASCENSION] You have evolved into the ${pathId} Divine Patron.`);
+        // Placeholder for future logic: unlock specific high-tier symbols or perks here.
+    }
+
 
     init() {
         window.EventBus.emit('UI_LOG', '[DreamSystem] Divine Influence Channels Open');

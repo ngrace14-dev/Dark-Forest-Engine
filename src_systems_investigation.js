@@ -15,8 +15,11 @@ class InvestigationManagerSystem {
         window.EventBus.on('INTEL_VERIFIED', (intel) => this.onIntelVerified(intel));
     }
 
-    init() {
+        init() {
+        this.discoveryTier = 1; // Bible §33
+        
         // Initialize core mysteries from the Design Bible
+
         this.registerMystery({
             id: 'terminus_anomaly',
             title: 'The Terminus Anomaly',
@@ -44,7 +47,7 @@ class InvestigationManagerSystem {
             clues: []
         });
 
-        this.registerMystery({
+                this.registerMystery({
             id: 'founder_betrayal',
             title: 'The Final Plight',
             description: 'The Founders claim they were forced to run. Ancient poems suggest betrayal.',
@@ -52,6 +55,25 @@ class InvestigationManagerSystem {
             category: 'HISTORY',
             clues: []
         });
+
+        this.registerMystery({
+            id: 'origin_fracture',
+            title: 'The Great Fracture',
+            description: 'What occurred at t=0? Evidence suggests a runic civilization before the Shift.',
+            tier: 10,
+            category: 'ORIGIN',
+            clues: []
+        });
+
+        this.registerMystery({
+            id: 'first_wendigo',
+            title: 'The First Wendigo',
+            description: 'The transition from Champion to Monster. Was it a failure or a choice?',
+            tier: 11,
+            category: 'ORIGIN',
+            clues: []
+        });
+
         
         window.EventBus.emit('UI_LOG', '[Investigation] Workbench Initialized');
     }
@@ -82,7 +104,7 @@ class InvestigationManagerSystem {
         window.EventBus.emit('INVESTIGATION_UPDATED', mysteryId);
     }
 
-    calculateProgress(mysteryId) {
+        calculateProgress(mysteryId) {
         const mystery = this.mysteries.get(mysteryId);
         if (!mystery) return;
         
@@ -90,7 +112,24 @@ class InvestigationManagerSystem {
         // Basic progress: just counting linked evidence for now. 
         // In future phases, this will require specific high-weight facts.
         mystery.discoveryProgress = Math.min(100, evidenceCount * 25);
+
+        if (mystery.discoveryProgress >= 100 && mystery.state !== 'RESOLVED') {
+            this.resolveMystery(mysteryId);
+        }
     }
+
+    resolveMystery(mysteryId) {
+        const mystery = this.mysteries.get(mysteryId);
+        if (!mystery) return;
+
+        mystery.state = 'RESOLVED';
+        this.discoveryTier = Math.max(this.discoveryTier, mystery.tier + 1);
+
+        window.EventBus.emit('UI_LOG', `🌟 [DISCOVERY] Mystery Solved: ${mystery.title}`);
+        window.EventBus.emit('UI_LOG', `[DISCOVERY] World Understanding Level: Tier ${this.discoveryTier}`);
+        window.EventBus.emit('MYSTERY_RESOLVED', mysteryId);
+    }
+
 
     /**
      * Automatically scans for logical conflicts in the linked evidence.
@@ -120,7 +159,7 @@ class InvestigationManagerSystem {
         }
     }
 
-    findConflict(intelA, intelB) {
+        findConflict(intelA, intelB) {
         // Logic 1: Factual Contradiction (Same location/event, different truth claim)
         if (intelA.payload.target_coord && intelB.payload.target_coord) {
             const dist = Math.hypot(intelA.payload.target_coord.x - intelB.payload.target_coord.x, 
@@ -140,7 +179,21 @@ class InvestigationManagerSystem {
         return null;
     }
 
+    /**
+     * Cross-checks if a specific piece of intel is involved in any active contradiction.
+     */
+    findContradictionForIntel(intelId) {
+        let found = null;
+        this.mysteries.forEach(m => {
+            if (found) return;
+            const conflict = m.contradictions.find(c => c.ids.includes(intelId));
+            if (conflict) found = conflict;
+        });
+        return found;
+    }
+
     onIntelVerified(intel) {
+
         this.mysteries.forEach(m => {
             if (m.linkedEvidence.has(intel.intel_id)) {
                 this.calculateProgress(m.id);

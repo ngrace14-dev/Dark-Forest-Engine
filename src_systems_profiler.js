@@ -26,10 +26,17 @@ class EngineProfiler {
             memory: { heapUsed: 0, heapTotal: 0 }
         };
 
-        this.hudElement = this.createHUD();
+                this.hudElement = this.createHUD();
         this.lastFrameTime = performance.now();
+        this.isMinimized = false;
         
-        console.log("⚡ [Profiler] Phase 0 Instrumentation Initialized. Budgets locked.");
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'p' || e.key === 'P') {
+                this.toggleMinimize();
+            }
+        });
+
+        console.log("⚡ [Profiler] Phase 0 Instrumentation Initialized. Budgets locked. Press 'P' to minimize.");
     }
 
     createHUD() {
@@ -47,13 +54,33 @@ class EngineProfiler {
             padding: 10px;
             border: 1px solid #334155;
             z-index: 9999;
-            pointer-events: none;
+            pointer-events: auto;
             white-space: pre;
             text-shadow: 1px 1px 0 #000;
+            cursor: pointer;
+            transition: height 0.2s ease-out, width 0.2s ease-out;
+            overflow: hidden;
         `;
+        
+        hud.addEventListener('click', () => this.toggleMinimize());
+        
         document.body.appendChild(hud);
         return hud;
     }
+
+    toggleMinimize() {
+        this.isMinimized = !this.isMinimized;
+        if (this.isMinimized) {
+            this.hudElement.style.width = '120px';
+            this.hudElement.style.height = '18px';
+            this.hudElement.style.background = 'rgba(4, 6, 8, 0.5)';
+        } else {
+            this.hudElement.style.width = '320px';
+            this.hudElement.style.height = 'auto';
+            this.hudElement.style.background = 'rgba(4, 6, 8, 0.9)';
+        }
+    }
+
 
     begin(timerId) {
         this.timers.set(timerId, performance.now());
@@ -91,13 +118,20 @@ class EngineProfiler {
         }
     }
 
-    // Call this once at the very end of the main loop
+        // Call this once at the very end of the main loop
     update(renderer) {
         const now = performance.now();
         const totalFrameTime = now - this.lastFrameTime;
         this.lastFrameTime = now;
 
+        if (this.isMinimized) {
+            this.hudElement.innerHTML = `<span style="color:#94a3b8">PROFILER [P]</span> ${totalFrameTime.toFixed(1)}ms`;
+            this.accumulators.clear();
+            return;
+        }
+
         // Fetch memory if available (Chrome/Edge)
+
         if (performance.memory) {
             this.metrics.memory.heapUsed = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
             this.metrics.memory.heapTotal = (performance.memory.totalJSHeapSize / 1048576).toFixed(1);

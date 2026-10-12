@@ -35,7 +35,7 @@ class ShiftDirectorSystem {
         }
     }
 
-    /**
+        /**
      * Triggers the transition from Forest to White Void.
      */
     beginShift() {
@@ -43,10 +43,14 @@ class ShiftDirectorSystem {
         this.shiftProgress = 0;
 
         window.EventBus.emit('UI_LOG', '⚪ [VOID] THE SHIFT HAS BEGUN. REALITY IS DECONSTRUCTING.');
-        window.EventBus.emit('UI_LOG', '⚪ [VOID] Entering 7-Day Reconstruction Window...');
+        
+        if (window.EngineConfig?.showSystemReasoning) {
+            window.EventBus.emit('UI_LOG', '[DEV] Entering 7-Day Reconstruction Window (Perception Skip §5).');
+        }
 
         // 1. Visual Transition (White Void Post-Processing)
         window.EventBus.emit('ENV_SET_VOID_OVERRIDE', true);
+
 
         // 2. Information Decay (Bible §25)
         // Only Anchored Intel survives. Purge unverified rumors.
@@ -75,13 +79,16 @@ class ShiftDirectorSystem {
         }, 500); // Perceived time skip speed
     }
 
-    /**
+        /**
      * The objective moment of reality reconfiguration.
      */
     executeReconfiguration() {
-        window.EventBus.emit('UI_LOG', '[VOID] Epoch Boundary Crossed. Re-seeding Forest...');
+        if (window.EngineConfig?.showSystemReasoning) {
+            window.EventBus.emit('UI_LOG', '[DEV] Epoch Boundary Crossed. Re-seeding Forest...');
+        }
 
         // 1. Advance Epoch (Changes terrain seed)
+
         if (window.EpochManagerInstance) {
             const newEpoch = window.EpochManagerInstance.advanceEpoch();
             window.EngineParams.worldEpoch = newEpoch;

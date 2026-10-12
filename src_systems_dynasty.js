@@ -12,7 +12,8 @@ class DynastyManagerSystem {
         this.feuds = []; // Array of { houseA, houseB, reason, intensity, startDate }
         
         window.EventBus.on('ENGINE_READY', () => this.init());
-        window.EventBus.on('ENTITY_DIED', (data) => this.handleDeath(data));
+                window.EventBus.on('ENTITY_DIED', (data) => this.handleDeath(data));
+        window.EventBus.on('LEGACY_HARVESTED', (data) => this.handleLegacyHarvest(data));
         window.EventBus.on('HISTORY_PUBLISHED', (narrative) => this.processNarrative(narrative));
     }
 
@@ -50,10 +51,25 @@ class DynastyManagerSystem {
                 legacy: 0, // Total significance score
                 contribution: 0 // Contribution to civilization
             });
+
+            // Register House as a Bloodline in LegacyManager
+            if (window.LegacyManager) {
+                window.LegacyManager.getOrCreateBloodline(id);
+            }
         });
 
         window.EventBus.emit('UI_LOG', '[Dynasty] Institutional Memory Engaged');
     }
+
+    handleLegacyHarvest(data) {
+        const house = this.houses.get(data.bloodlineId);
+        if (house) {
+            house.legacy += data.significance;
+            house.prestige += Math.floor(data.significance / 100);
+            window.EventBus.emit('UI_LOG', `[DYNASTY] ${house.name} legacy strengthened by Generation ${data.generation}.`);
+        }
+    }
+
 
     /**
      * Records an event specifically into a House's institutional memory.
@@ -147,13 +163,24 @@ class DynastyManagerSystem {
         child.ancestry.parents.push(parentID);
         parent.ancestry.children.push(childId);
 
-        // 2. BELIEF INHERITANCE WITH DRIFT (Bible §17)
+                // 2. BELIEF INHERITANCE WITH DRIFT (Bible §17)
         Object.keys(parent.traits).forEach(t => {
             const drift = (Math.random() * 0.2 - 0.1); // +/- 10% drift
             child.traits[t] = Math.max(0, Math.min(1.0, parent.traits[t] + drift));
         });
 
+        // 2.5 LEGACY INHERITANCE (Bible §BN)
+        if (window.LegacyManager) {
+            const parentLegacy = window.LegacyManager.activeLegacies.get(parentID);
+            if (parentLegacy) {
+                const childLegacy = window.LegacyManager.registerEntity(childId, parentLegacy.bloodlineId);
+                // Inherit a portion of the parent's story density as "Starting Renown"
+                childLegacy.storyDensity = parentLegacy.storyDensity * 0.1;
+            }
+        }
+
         // 3. REPUTATION & FEUD INHERITANCE
+
         parent.relationships.forEach((rel, targetId) => {
             if (rel.type === 'RIVALRY' || rel.type === 'DISTRUST') {
                 // Feuds pass down but slightly diluted
