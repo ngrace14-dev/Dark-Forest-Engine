@@ -27,10 +27,35 @@ window.ChronicleManager = {
      * Records a significant event into the world's memory.
      * Bible §1: Action -> Intent -> Event -> Chronicle.
      */
-    recordEvent: function(event) {
-        // ... previous record logic ...
+        recordEvent: function(event) {
+        // 1. Validation & Enrichment
+        event.id ??= 'evt_' + Math.random().toString(36).substr(2, 9);
+        event.timestamp ??= {
+            day: window.EngineParams?.worldDay || 0,
+            epoch: window.EngineParams?.worldEpoch || 0,
+            year: (window.EngineParams?.worldEpoch || 0) * 1000 + (window.EngineParams?.worldDay || 0)
+        };
+        event.significance ??= 10;
+        event.historicalWeight ??= 5;
+        event.participants ??= [];
+        event.witnesses ??= [];
 
-                // 5. Weight Accumulation (Bible §1)
+        // 2. Global Ledger
+        this.worldLedger.push(event);
+
+        // 3. Entity Scoped Ledger
+        if (event.actorId) {
+            if (!this.entityRecords.has(event.actorId)) {
+                this.entityRecords.set(event.actorId, []);
+            }
+            this.entityRecords.get(event.actorId).push(event);
+        }
+
+        // 4. Witness Logic (Phase 3 Hook)
+        this.generateWitnessIntel(event);
+
+        // 5. Weight Accumulation (Bible §1)
+
         if (event.actorId) {
             const currentWeight = this.npcHistoricalWeights.get(event.actorId) || 0;
             const newWeight = currentWeight + (event.historicalWeight || 1);
@@ -139,12 +164,56 @@ window.ChronicleManager = {
         return this.worldLedger.slice(-limit).reverse();
     },
 
+        /**
+     * Phase 3 & 4: Witness Layer & Intel Pipeline
+     * Bible §13: Event -> Witness -> Intel
+     */
+    generateWitnessIntel: function(event) {
+        if (!window.IntelManager) return;
+
+        // 1. Identify Witnesses (Boilerplate: Entities near the event)
+        // For now, we simulate witnesses as the actor's village and nearby nodes
+        const witnesses = [...(event.witnesses || [])];
+        
+        if (event.actorId && !witnesses.includes(event.actorId)) {
+            witnesses.push(event.actorId);
+        }
+
+        // 2. Generate Intel for each witness
+        witnesses.forEach(witnessId => {
+            const intelId = window.IntelManager.register({
+                type: event.significance > 50 ? window.IntelEnums.TYPES.FACT : window.IntelEnums.TYPES.RUMOR,
+                payload: {
+                    title: event.type.toUpperCase().replace(/_/g, ' '),
+                    description: event.detail,
+                    timestamp_day: event.timestamp.day,
+                    tags: ['CHRONICLE', event.type]
+                },
+                significance: {
+                    historical: event.historicalWeight,
+                    crow: event.significance
+                },
+                certainty: 0.7, // Initial witness certainty
+                source_credibility: 0.8
+            });
+
+            window.IntelManager.grantOwnership(intelId, witnessId);
+        });
+
+        // 3. Folklore Hook (Phase 5)
+        if (event.historicalWeight > 100 || event.significance > 80) {
+            this.evolveNarrative(event);
+        }
+    },
+
     // --- PHASE 4: NARRATIVE EVOLUTION ---
-    evolveNarrative: function() {
+    evolveNarrative: function(triggerEvent) {
         // Find events with high historical weight that haven't become legends yet
-        const candidates = this.worldLedger.filter(e => e.historicalWeight > 100 && !e.legendId);
+        const candidates = triggerEvent ? [triggerEvent] : this.worldLedger.filter(e => e.historicalWeight > 100 && !e.legendId);
         
         candidates.forEach(event => {
+            if (event.legendId) return;
+
             const legend = {
                 id: 'leg_' + Math.random().toString(36).substr(2, 9),
                 originalEventId: event.id,
@@ -160,10 +229,13 @@ window.ChronicleManager = {
             window.GameState.legends ??= [];
             window.GameState.legends.push(legend);
 
-            // --- PHASE 6: FOLKLORE HOOK ---
-            window.EventBus.emit('LEGEND_CREATED', legend);
+                        // --- PHASE 6: FOLKLORE HOOK ---
+            if (window.FolkloreEngine) {
+                window.FolkloreEngine.generatePoem(legend);
+            }
             
             window.EventBus.emit('UI_LOG', `[LEGEND] A new story is taking root: ${legend.title}`);
+
         });
     },
 
@@ -184,28 +256,13 @@ window.ChronicleManager = {
         return forces;
     },
 
-    // --- PHASE 8: PROCEDURAL FOLKLORE ---
+        // --- PHASE 8: PROCEDURAL FOLKLORE --- (Redundant - moved to FolkloreEngine)
     generatePoem: function(legend) {
-        const verses = [
-            `In the shadow of the ${legend.forces.includes('Forest') ? 'Whispering Woods' : 'Tall Pines'},`,
-            `Where the ${legend.title} once stood,`,
-            `The ${legend.forces.includes('Crown') ? 'King\'s' : 'Villager\'s'} hearts were heavy,`,
-            `As they remembered the ${legend.originalEventId ? 'day of fire' : 'ancient story'}.`
-        ];
-        
-        const poem = {
-            id: 'poem_' + Math.random().toString(36).substr(2, 9),
-            title: `Lament of the ${legend.title}`,
-            text: verses.join('\n'),
-            classification: 'Historical Legend',
-            historicalWeight: legend.power,
-            truthScore: 500 + Math.random() * 400
-        };
-
-        window.GameState.anthology ??= [];
-        window.GameState.anthology.push(poem);
-        window.EventBus.emit('UI_LOG', `[FOLKLORE] A new poem has been written: ${poem.title}`);
+        if (window.FolkloreEngine) {
+            window.FolkloreEngine.generatePoem(legend);
+        }
     }
 };
+
 
 window.ChronicleManager.init();

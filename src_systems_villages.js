@@ -281,19 +281,21 @@ window.VillageManager = {
         if ((village.stats.essence || 0) >= essenceCost) {
             village.stats.essence -= essenceCost;
             village.barrierIntegrity = Math.min(100, village.barrierIntegrity + 8);
-        } else if (village.barrierIntegrity === 0) {
+        } else         if (village.barrierIntegrity === 0) {
             this.postVillageNeed(village, 'essence', essenceCost, 'fueling the rune barrier');
             if (Math.random() < 0.15 * (cal.monsters?.spawnFrequency || 1.0)) {
                 window.EventBus.emit('UI_LOG', `[BARRIER] ${village.name}'s ward is failing. Hunters must enter the woods.`);
                 window.ChronicleManager.recordEvent({
-                    actorId: village.id,
+                    actorId: `village_${village.id}`,
                     type: 'barrier_failure',
                     detail: `${village.name}'s protective barrier flickered and failed.`,
                     significance: 40,
-                    historicalWeight: 5
+                    historicalWeight: 10,
+                    witnesses: [`village_${village.id}`]
                 });
             }
         }
+
         village.provisionStock[village.provision.itemId] = (village.provisionStock[village.provision.itemId] || 0) + Math.max(1, Math.floor(production / 2));
         
         const consumptionBase = Math.ceil(village.population.current / 24);
@@ -346,16 +348,18 @@ window.VillageManager = {
             village.population.current += growth;
             village.lastGrowthDay = window.EngineParams.worldDay;
             
-            if (village.population.current > 10000 && !village.recordedMajorMilestone) {
-                village.recordedMajorMilestone = true;
-                window.ChronicleManager.recordEvent({
-                    actorId: village.id,
-                    type: 'growth_milestone',
-                    detail: `${village.name} has grown into a significant regional hub.`,
-                    significance: 100,
-                    historicalWeight: 50
-                });
-            }
+                    if (village.population.current > 10000 && !village.recordedMajorMilestone) {
+            village.recordedMajorMilestone = true;
+            window.ChronicleManager.recordEvent({
+                actorId: `village_${village.id}`,
+                type: 'growth_milestone',
+                detail: `${village.name} has grown into a significant regional hub with ${village.population.current} souls.`,
+                significance: 100,
+                historicalWeight: 50,
+                witnesses: [`village_${village.id}`, 'The Capital']
+            });
+        }
+
 
             window.EventBus.emit('UI_LOG', `[GROWTH] ${village.name} gained ${growth} residents from prosperity.`);
         }
@@ -424,13 +428,15 @@ window.VillageManager = {
                 village.terminusEliteGuard = Math.min(300, village.terminusEliteGuard + batch.count);
                 village.terminusRecruits.splice(i, 1);
                 
-                window.ChronicleManager.recordEvent({
-                    actorId: village.id,
+                                window.ChronicleManager.recordEvent({
+                    actorId: `village_${village.id}`,
                     type: 'elite_training',
                     detail: `The Elite 300 of Terminus has been bolstered by ${batch.count} new guards.`,
                     significance: 50,
-                    historicalWeight: 20
+                    historicalWeight: 20,
+                    witnesses: [`village_${village.id}`, 'House Terminus']
                 });
+
 
                 window.EventBus.emit('UI_LOG', `[TERMINUS] A batch of ${batch.count} elite guards have finished training and joined the 300.`);
             }
@@ -470,13 +476,15 @@ window.VillageManager = {
             if (!village.crises.includes('Famine')) {
                 village.crises.push('Famine');
                 window.EventBus.emit('UI_LOG', `[ECONOMY] ${village.name} is suffering from FAMINE.`);
-                window.ChronicleManager.recordEvent({
-                    actorId: village.id,
+                                window.ChronicleManager.recordEvent({
+                    actorId: `village_${village.id}`,
                     type: 'famine_start',
                     detail: `${village.name} has run out of food reserves.`,
                     significance: 70,
-                    historicalWeight: 20
+                    historicalWeight: 30,
+                    witnesses: [`village_${village.id}`, 'The Capital']
                 });
+
             }
             village.stats.prosperity = Math.max(0, village.stats.prosperity - 2);
             village.population.current = Math.max(10, village.population.current - Math.ceil(village.population.current * 0.01));

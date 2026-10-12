@@ -141,9 +141,22 @@ class FolkloreEngineSystem {
         window.EventBus.emit('POEM_COMPOSED', poem);
     }
 
-    applyDistortion(text, pClass, level) {
+        applyDistortion(text, pClass, level) {
         let result = text;
+        
+        // --- POEM TRAP: CIPHER DISTORTION (Bible §17, Addendum BJ) ---
+        // 20 = Administrative Truth (1 Capital + 19 Villages)
+        // 40 = Narrative Noise / Confusion
+        if (level > 0.5) {
+            if (result.includes('20')) {
+                result = result.replace(/20/g, Math.random() > 0.5 ? "a score" : "forty");
+            } else if (result.includes('score')) {
+                result = result.replace(/score/g, "forty");
+            }
+        }
+
         // Rules for "The Poem Trap"
+
         if (pClass === 'INSTITUTIONAL' && level > 0.5) {
             // Omit internal house names and replace with "Hero" or "Founder"
             result = result.replace(/House \w+/g, "The Great Founders");

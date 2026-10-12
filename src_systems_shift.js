@@ -149,14 +149,16 @@ class ShiftDirectorSystem {
         // 4. Force full chunk refresh
         window.EventBus.emit('WORLD_REGENERATE');
 
-        // 5. Chronicle the Shift Outcome (Bible §15)
+                // 5. Chronicle the Shift Outcome (Bible §15)
         window.ChronicleManager?.recordEvent({
             actorId: 'WORLD',
             type: 'SHIFT_COMPLETE',
             detail: `The World has stabilized. Epoch ${window.EngineParams.worldEpoch} has begun.`,
             significance: 150,
-            historicalWeight: 100
+            historicalWeight: 100,
+            witnesses: window.VillageManager ? window.VillageManager.villages.map(v => `village_${v.id}`) : []
         });
+
         
         window.EventBus.emit('UI_LOG', `[STABILIZATION] Current Epoch: ${window.EngineParams.worldEpoch}.`);
     }

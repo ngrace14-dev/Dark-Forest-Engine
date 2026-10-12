@@ -57,12 +57,25 @@ export class CharacterHealth {
     }
 
 
-    checkStatus() {
+        checkStatus() {
         if (this.limbs.head.hp <= 0 || this.limbs.torso.hp <= 0) {
             this.isAlive = false;
             this.logEvent(`💀 ${this.name} has died.`);
+            
+            // --- PHASE 1: CHRONICLE DEATH (Bible §1) ---
+            if (window.ChronicleManager) {
+                window.ChronicleManager.recordEvent({
+                    actorId: 'player',
+                    type: 'named_figure_death',
+                    detail: `${this.name} has succumbed to their injuries in the Dark Forest.`,
+                    significance: 120,
+                    historicalWeight: 80,
+                    witnesses: ['The Crow']
+                });
+            }
             return;
         }
+
 
                 if (this.limbs.leftLeg.hp <= 0 && this.limbs.rightLeg.hp <= 0) {
             this.penalties.speedMultiplier = 0.1;

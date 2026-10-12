@@ -42,17 +42,32 @@ class RoadManager {
         // Villages are connected in a specific sequence: Capital (0) -> V1 -> ... -> Terminus (19)
         const waypoints = villages.map(v => new THREE.Vector3(v.x, 0, v.z));
         
-        // Create a C-shape chain anchoring to the Capital and ending at Terminus
+                // Create a C-shape chain anchoring to the Capital and ending at Terminus
         const curve = new THREE.CatmullRomCurve3(waypoints, false); // false = Open chain, not a loop
         const points = curve.getPoints(Math.max(100, villages.length * 30));
 
+        const wasGenerated = this.roadNodes.length > 0;
+        
         for (let i = 0; i < points.length; i++) {
             const pt = points[i];
             if (Number.isFinite(pt.x) && Number.isFinite(pt.z)) {
                 this.roadNodes.push({ x: pt.x, z: pt.z, width: this.roadWidth });
             }
         }
+
+        // --- PHASE 1: CHRONICLE ROAD CREATION (Bible §6) ---
+        if (!wasGenerated && window.ChronicleManager) {
+            window.ChronicleManager.recordEvent({
+                actorId: 'WORLD',
+                type: 'road_connection_created',
+                detail: `A new arterial road has been established connecting ${villages[0].name} to ${villages[villages.length - 1].name}.`,
+                significance: 60,
+                historicalWeight: 20,
+                witnesses: villages.map(v => `village_${v.id}`)
+            });
+        }
     }
+
 
 
     getRoadPointsNear(chunkX, chunkZ, searchRadius = 90) {
