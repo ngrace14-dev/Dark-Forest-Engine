@@ -2101,8 +2101,9 @@ class CrowsEyeSystem {
 
 
                 // 5. Instability Layer
+                const crises = window.InstabilityEngine?.getCrises() || [];
+                crises.forEach(c => {
 
-        crises.forEach(c => {
             const house = window.DynastyManager?.getHouse(c.houseId);
             const intensity = c.intensity * 100;
             
