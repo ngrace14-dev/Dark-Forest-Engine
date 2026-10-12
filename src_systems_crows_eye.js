@@ -253,13 +253,14 @@ class CrowsEyeSystem {
         const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-                const views = ['MAP', 'WATCHLIST', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
-        let navHtml = `<div style="display:flex; gap:10px; margin-bottom:10px; border-bottom:1px solid #78350f; padding-bottom:5px; flex-shrink:0; flex-wrap:wrap; overflow:hidden;">`;
+                        const views = ['MAP', 'WATCHLIST', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
+        let navHtml = `<div style="display:flex; gap:10px; margin-bottom:5px; border-bottom:1px solid #78350f; padding-bottom:3px; flex-shrink:0; flex-wrap:wrap; overflow:hidden;">`;
         views.forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
-            navHtml += `<div data-view="${v}" style="cursor:pointer; padding:2px 10px; font-weight:bold; font-size:11px; ${activeStyle}">${v}</div>`;
+            navHtml += `<div data-view="${v}" style="cursor:pointer; padding:2px 5px; font-weight:bold; font-size:10px; ${activeStyle}">${v}</div>`;
         });
         navHtml += `</div>`;
+
 
         let contentHtml = '';
         let inspectedHtml = '';
@@ -360,16 +361,21 @@ class CrowsEyeSystem {
                 break;
         }
 
-                                this.overlay.innerHTML = `
-                <div style="width: 100%; height: 100vh; display: grid; grid-template-columns: 1fr ${this.isInspectionExpanded ? '400px' : '40px'}; grid-template-rows: auto 1fr auto; gap: 0; box-sizing: border-box; overflow: hidden; background: #040608;">
+                                                                this.overlay.innerHTML = `
+                <div style="width: 100%; height: 100vh; display: grid; grid-template-columns: 1fr ${this.isInspectionExpanded ? '400px' : '0px'}; grid-template-rows: auto 1fr auto; gap: 0; box-sizing: border-box; overflow: hidden; background: #040608;">
                     <!-- HEADER -->
-                    <div style="grid-column: 1 / span 2; background: #000; border-bottom: 1px solid #451a03; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 10;">
-                        <div style="font-size: 20px; color: #f59e0b; font-weight: bold; letter-spacing: 2px;">CROW'S EYE - ${currentEffectiveView}</div>
-                        <div style="color: #78350f; font-size: 12px;">WORLD DAY: ${worldDay} | TIME: ${window.EngineParams?.timeOfDay?.toFixed(1) || 0}h</div>
+                    <div style="grid-column: 1 / span 2; background: #000; border-bottom: 1px solid #451a03; padding: 5px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 10; height: 40px; box-sizing: border-box;">
+                        <div style="font-size: 16px; color: #f59e0b; font-weight: bold; letter-spacing: 2px;">CROW'S EYE - ${currentEffectiveView}</div>
+                        <div style="display: flex; gap: 20px; align-items: center;">
+                            <div style="color: #78350f; font-size: 11px;">DAY: ${worldDay} | TIME: ${window.EngineParams?.timeOfDay?.toFixed(1) || 0}h</div>
+                            <div data-action="toggle-inspect" style="cursor: pointer; background: #1e1b4b; color: #fbbf24; padding: 4px 10px; font-size: 10px; border: 1px solid #451a03;">
+                                ${this.isInspectionExpanded ? 'CLOSE INSPECT' : 'OPEN INSPECT'}
+                            </div>
+                        </div>
                     </div>
 
                     <!-- MAIN CONTENT AREA -->
-                    <div style="display: flex; flex-direction: column; height: 100%; overflow: hidden; min-height: 0; padding: 10px 20px;">
+                    <div style="display: flex; flex-direction: column; height: 100%; overflow: hidden; min-height: 0; padding: 5px 10px;">
                         ${navHtml}
                         <div id="ce-atlas-viewport" style="flex-grow: 1; overflow: hidden; background: rgba(0,0,0,0.3); border: 1px solid #451a03; min-height: 0; box-sizing: border-box; position: relative;">
                             ${contentHtml}
@@ -377,24 +383,22 @@ class CrowsEyeSystem {
                     </div>
 
                     <!-- INSPECTION PANEL -->
-                    <div style="background: rgba(15, 23, 42, 0.9); border-left: 1px solid #78350f; display: flex; flex-direction: column; height: 100%; min-height: 0; transition: width 0.3s ease;">
-                        <div data-action="toggle-inspect" style="cursor: pointer; background: #1e1b4b; color: #fbbf24; padding: 10px; text-align: center; font-size: 12px; border-bottom: 1px solid #451a03;">
-                            ${this.isInspectionExpanded ? '▶ CLOSE' : '◀ INSPECT'}
-                        </div>
-                        <div style="flex-grow: 1; overflow-y: auto; padding: 20px; display: ${this.isInspectionExpanded ? 'block' : 'none'};">
+                    <div style="background: rgba(15, 23, 42, 0.95); border-left: 1px solid #78350f; display: ${this.isInspectionExpanded ? 'flex' : 'none'}; flex-direction: column; height: 100%; min-height: 0; transition: width 0.3s ease; position: relative; z-index: 5;">
+                        <div style="flex-grow: 1; overflow-y: auto; padding: 20px;">
                             <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px;">INSPECTION</div>
                             ${inspectedHtml || '<div style="color: #451a03; text-align: center; margin-top: 50px;">Select an entity to view deep telemetry.</div>'}
                         </div>
                     </div>
 
                     <!-- FOOTER -->
-                    <div style="grid-column: 1 / span 2; background: #000; border-top: 1px solid #451a03; padding: 5px 20px; font-size: 10px; color: #451a03; display: flex; justify-content: space-between; z-index: 10;">
+                    <div style="grid-column: 1 / span 2; background: #000; border-top: 1px solid #451a03; padding: 3px 20px; font-size: 9px; color: #451a03; display: flex; justify-content: space-between; z-index: 10; height: 25px; box-sizing: border-box; align-items: center;">
                         <div>ACTIVE RUNTIME PATH: SIMULATION_STABLE</div>
-                        <div>DARK FOREST CONSTITUTION COMPLIANT</div>
+                        <div style="color: #fbbf24; opacity: 0.5;">DARK FOREST CONSTITUTION COMPLIANT</div>
                         <div>COORD: [${Math.round(this.pan.x)}, ${Math.round(this.pan.z)}] | ZOOM: ${this.zoom.toFixed(3)}x</div>
                     </div>
                 </div>`;
     }
+
 
 
     renderWatchlistView() {
@@ -437,13 +441,13 @@ class CrowsEyeSystem {
         return html;
     }
 
-        renderMapView() {
+                renderMapView() {
         const entities = this.gatherEntities();
         const px = window.GameCore?.playerObj?.visual?.position?.x || 0;
         const pz = window.GameCore?.playerObj?.visual?.position?.z || 0;
         
         // Visible Area Metrics (Task 4)
-        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 2000;
+        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
         const worldSpan = (forestSide * 2) / this.zoom;
         const miles = (worldSpan / 1609.34).toFixed(1);
         const currentRegion = this.getRegionName(this.pan.x, this.pan.z);
@@ -455,24 +459,24 @@ class CrowsEyeSystem {
         const folkloreCount = window.GameState?.anthology?.length || 0;
 
         let healthHtml = `
-        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:10px; font-size:10px; background:rgba(0,0,0,0.7); padding:10px; border:1px solid #78350f;">
-            <div style="grid-column: span 4; border-bottom: 1px solid #451a03; padding-bottom:5px; margin-bottom:5px; color:#fbbf24; font-weight:bold; letter-spacing:1px;">
-                ATLAS DATA: ${currentRegion.toUpperCase()}
+        <div style="display: flex; gap: 15px; margin-bottom: 5px; font-size: 10px; background: rgba(0,0,0,0.7); padding: 5px 15px; border: 1px solid #78350f; align-items: center; justify-content: space-between; flex-shrink: 0;">
+            <div style="color:#fbbf24; font-weight:bold; letter-spacing:1px; white-space: nowrap;">
+                ATLAS: ${currentRegion.toUpperCase()}
             </div>
-            <div>VISIBLE AREA: ${miles} Miles</div>
-            <div>POPULATION: ${this.lastStats?.population || 0}</div>
-            <div>SETTLEMENTS: ${window.VillageManager?.villages.length || 0}</div>
-            <div>ZOOM: ${this.zoom.toFixed(1)}x</div>
-        </div>
-        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:20px; font-size:10px; background:rgba(0,0,0,0.5); padding:10px; border:1px solid #d97706; border-top:none;">
-            <div style="color:#10b981;">TRUTHS: ${truthCount}</div>
-            <div style="color:#f59e0b;">RUMORS: ${rumorCount}</div>
-            <div style="color:#a855f7;">FOLKLORE: ${folkloreCount}</div>
+            <div style="display: flex; gap: 15px; color: #94a3b8;">
+                <div>AREA: ${miles}mi</div>
+                <div>POP: ${this.lastStats?.population || 0}</div>
+                <div style="color:#10b981;">TRUTH: ${truthCount}</div>
+                <div style="color:#f59e0b;">RUMOR: ${rumorCount}</div>
+                <div style="color:#a855f7;">FOLK: ${folkloreCount}</div>
+            </div>
+            <div style="color: #78350f;">ZOOM: ${this.zoom.toFixed(2)}x</div>
         </div>`;
 
         const gridData = this.generateAsciiGrid(entities, px, pz);
         return { gridHtml: healthHtml + gridData.gridHtml, inspectedHtml: gridData.inspectedHtml };
     }
+
 
         gatherEntities() {
         const entities = [];
@@ -1889,34 +1893,65 @@ class CrowsEyeSystem {
         }
 
         generateAsciiGrid(entities, px, pz) {
-        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 2000;
-        const width = 80;
-        const height = 40;
-        const grid = Array(height).fill(0).map(() => Array(width).fill(' '));
+            const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
+            const mountainWidth = window.WorldGenConfig?.mountainRingWidthMeters || 160934.4;
+            const halfSide = forestSide / 2;
         
-        const worldToGrid = (wx, wz) => {
-            const gx = Math.floor(((wx - this.pan.x) / (forestSide * 2 / this.zoom) + 0.5) * width);
-            const gy = Math.floor(((wz - this.pan.z) / (forestSide * 2 / this.zoom) + 0.5) * height);
-            return { gx, gy };
-        };
+            const width = 80;
+            const height = 40;
+            const grid = Array(height).fill(0).map(() => Array(width).fill(' '));
+        
+            const worldToGrid = (wx, wz) => {
+                const gx = Math.floor(((wx - this.pan.x) / (forestSide * 2 / this.zoom) + 0.5) * width);
+                const gy = Math.floor(((wz - this.pan.z) / (forestSide * 2 / this.zoom) + 0.5) * height);
+                return { gx, gy };
+            };
 
-        entities.forEach(ent => {
-            const { gx, gy } = worldToGrid(ent.x, ent.z);
-            if (gx >= 0 && gx < width && gy >= 0 && gy < height) {
-                let color = '#fbbf24';
-                if (ent.type === 'P') color = '#ef4444';
-                if (ent.type === 'V') color = '#10b981';
-                if (ent.type === 'C') color = '#fbbf24';
-                if (ent.type === 'M') color = '#92400e';
-                if (ent.type === '#') color = '#1e293b';
-                
-                const isSelected = this.selectedEntityId === ent.id;
-                const style = isSelected ? `color:#fff; background:${color}; font-weight:bold;` : `color:${color};`;
-                grid[gy][gx] = `<span style="${style} cursor:pointer;" data-id="${ent.id}">${ent.type}</span>`;
+            // 1. Geography Layer (Low-Res Background)
+            if (this.zoom < 2.0) {
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        // Reverse map grid to world to check biome
+                        const wx = ((x / width) - 0.5) * (forestSide * 2 / this.zoom) + this.pan.x;
+                        const wz = ((y / height) - 0.5) * (forestSide * 2 / this.zoom) + this.pan.z;
+                    
+                        const dist = Math.max(Math.abs(wx), Math.abs(wz));
+                    
+                        if (dist > halfSide + mountainWidth) {
+                            grid[y][x] = '<span style="color:#2d2016; opacity:0.3;">░</span>'; // Dunes
+                        } else if (dist > halfSide) {
+                            grid[y][x] = '<span style="color:#1e1b4b; opacity:0.4;">▲</span>'; // Mountains
+                        } else {
+                            // In the forest
+                            if (x % 3 === 0 && y % 2 === 0) {
+                                grid[y][x] = '<span style="color:#064e3b; opacity:0.2;">♠</span>'; // Trees
+                            } else {
+                                grid[y][x] = '<span style="color:#022c22; opacity:0.1;">·</span>';
+                            }
+                        }
+                    }
+                }
             }
-        });
 
-        const gridHtml = `<div style="font-family:monospace; line-height:1; white-space:pre; background:#000; padding:20px; text-align:center; border:1px double #451a03;">${grid.map(row => row.join('')).join('\n')}</div>`;
+            // 2. Entity Layer
+            entities.forEach(ent => {
+                const { gx, gy } = worldToGrid(ent.x, ent.z);
+                if (gx >= 0 && gx < width && gy >= 0 && gy < height) {
+                    let color = '#fbbf24';
+                    if (ent.type === 'P') color = '#ef4444';
+                    if (ent.type === 'V') color = '#10b981';
+                    if (ent.type === 'C') color = '#fbbf24';
+                    if (ent.type === 'M') color = '#92400e';
+                    if (ent.type === '#') color = '#1e293b';
+                
+                    const isSelected = this.selectedEntityId === ent.id;
+                    const style = isSelected ? `color:#fff; background:${color}; font-weight:bold;` : `color:${color};`;
+                    grid[gy][gx] = `<span style="${style} cursor:pointer;" data-id="${ent.id}">${ent.type}</span>`;
+                }
+            });
+
+            const gridHtml = `<div style="font-family:monospace; line-height:1; white-space:pre; background:#000; padding:10px; text-align:center; border:1px double #451a03; height: 100%; width: 100%; box-sizing: border-box; overflow: hidden; display: flex; align-items: center; justify-content: center;"><div style="display:inline-block; margin: auto;">${grid.map(row => row.join('')).join('\n')}</div></div>`;
+
 
         let inspectedHtml = '';
         if (this.selectedEntityId) {
