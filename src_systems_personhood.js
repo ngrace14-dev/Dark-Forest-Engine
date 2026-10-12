@@ -18,13 +18,16 @@ class PersonhoodSystem {
             SCHOLAR: { bias: 'PATTERNS', desc: 'Prioritizes poem decoding and pattern recognition.' } // Bible §36
         };
 
-        this.institutions = {
+                this.institutions = {
             'historical_office': { label: 'Historical Office', focus: 'STABILITY', siloedIntel: new Set() },
             'guardians_300': { label: 'The 300 Guardians', focus: 'CONTINUITY', siloedIntel: new Set() },
             'scholastic_order': { label: 'The Scholastic Order', focus: 'TRUTH', siloedIntel: new Set() }
         };
 
+        this.wendigoCandidates = []; // Array of { profile, lastPosition }
+
         window.EventBus.on('ENGINE_READY', () => this.init());
+
     }
 
 
@@ -175,13 +178,39 @@ class PersonhoodSystem {
         });
     }
 
-    updateRelationship(nodeId, targetId, delta) {
+        updateRelationship(nodeId, targetId, delta) {
         const profile = this.getProfile(nodeId);
         const current = profile.relationships.get(targetId) || { type: 'NEUTRAL', weight: 0.5 };
         current.weight = Math.max(0, Math.min(1.0, current.weight + delta));
         profile.relationships.set(targetId, current);
     }
+
+    /**
+     * Registers an NPC for rebirth as a Wendigo during the next Shift.
+     * Bible §10, §18: Consumption and Cold.
+     */
+    markForWendigoRebirth(nodeId, lastPosition) {
+        if (!this.profiles.has(nodeId)) return;
+        const profile = this.profiles.get(nodeId);
+        
+        // Prevent duplicates
+        if (this.wendigoCandidates.find(c => c.profile.id === nodeId)) return;
+
+        this.wendigoCandidates.push({
+            profile: JSON.parse(JSON.stringify(profile)), // Snapshotted profile
+            lastPosition: lastPosition.clone()
+        });
+
+        window.EventBus.emit('UI_LOG', `[NARRATIVE] The soul of ${profile.id} lingers in the frost...`);
+    }
+
+    consumeCandidates() {
+        const batch = [...this.wendigoCandidates];
+        this.wendigoCandidates = [];
+        return batch;
+    }
 }
+
 
 window.PersonhoodManager = new PersonhoodSystem();
 export default window.PersonhoodManager;

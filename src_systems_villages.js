@@ -147,12 +147,38 @@ window.VillageManager = {
         }
         
         // 5. Regenerate the road network to match the new coordinates
-        if (window.RoadManager && window.RoadManager.generateRoads) {
+                if (window.RoadManager && window.RoadManager.generateRoads) {
             window.RoadManager.generateRoads(this.villages);
+        }
+
+        // --- PHASE 10: WENDIGO REBIRTH (Bible §10, §18) ---
+        if (window.PersonhoodManager) {
+            const candidates = window.PersonhoodManager.consumeCandidates();
+            candidates.forEach(can => {
+                const spawnPos = can.lastPosition;
+                // Move spawn position slightly into the woods
+                spawnPos.x += (Math.random() - 0.5) * 50;
+                spawnPos.z += (Math.random() - 0.5) * 50;
+
+                const wendigo = window.GameCore.instantiatePrefab('Wendigo', spawnPos.x, window.WorldGenerator.getTerrainHeight(spawnPos.x, spawnPos.z), spawnPos.z, 'persistent');
+                if (wendigo) {
+                    wendigo.isSentient = true;
+                    wendigo.formerName = can.profile.id;
+                    wendigo.name = `Minor Wendigo (${can.profile.id})`;
+                    wendigo.relationships = can.profile.relationships; // It remembers
+                    wendigo.hungerLevel = 50;
+                    wendigo.isMinor = true;
+                    wendigo.hp = (wendigo.hp || 450) * 0.5; // Minor wendigos are weaker
+                    wendigo.attackDamage = (wendigo.attackDamage || 45) * 0.5;
+                    
+                    window.EventBus.emit('UI_LOG', `[VOID] The cold hunger has claimed ${can.profile.id}. A shadow stirs where they fell.`);
+                }
+            });
         }
         
         window.EventBus.emit('UI_LOG', "🌲 The Village Chain has repositioned.");
     },
+
 
     // --- SIMULATION SLICING (Kenshi Style) ---
     // Instead of simulating all 20 villages at once, we do 1 per logic tick

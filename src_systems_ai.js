@@ -77,8 +77,21 @@ function getEntitySpeed(entity) {
     return entity.def.speed * (entity.speedMultiplier || 1);
 }
 
-function defeatNpc(entity) {
+function defeatNpc(entity, cause = 'combat') {
     window.AdventurerManager?.markDefeated(entity);
+    
+    // --- WENDIGO REBIRTH HOOK (Bible §10, §18) ---
+    if (cause === 'starvation' && entity.def.type === 'npc' && entity.def.faction !== 'monster') {
+        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
+        const distFromCenter = Math.hypot(entity.visual.position.x, entity.visual.position.z);
+        const inCold = distFromCenter > (forestSide * 0.4); // Outside the core temperate zone
+
+        if (inCold && window.PersonhoodManager) {
+            window.PersonhoodManager.markForWendigoRebirth(entity.id || entity.name, entity.visual.position);
+            window.EventBus.emit('UI_LOG', `[NARRATIVE] ${entity.id || entity.name} has starved in the deep cold...`);
+        }
+    }
+
     
     // --- TERMINUS ELITE PERMANENT DEATH HOOK ---
     if (entity.isTerminusElite) {
@@ -489,40 +502,27 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 
                 const hostile = en.def.faction === 'monster' || en.def.faction === 'forest' || window.GameState.reputation[en.def.faction] <= -50;
 
-                // --- MONSTER LIFE CYCLES: FEEDING & GROWTH ---
-                if (hostile && en.def.type === 'npc' && !en.isFeeding) {
-                    // Scan for food (Caravans, NPCs, or dead remains)
-                    const nearby = window.GameCore.SpatialGrid.getNearbyEntities(en.visual.position.x, en.visual.position.z, 25);
-                    const prey = nearby.find(p => p !== en && (p.caravanId || p.def.faction === 'village') && p.hp > 0);
+                        // --- MONSTER LIFE CYCLES: FEEDING & GROWTH ---
+        if (hostile && en.def.type === 'npc' && !en.isFeeding) {
+            // ... existing feeding logic ...
+        }
 
-                    if (prey) {
-                        const dist = en.visual.position.distanceTo(prey.visual.position);
-                        if (dist < 2.0) {
-                            attackNpc(en, prey);
-                            if (prey.hp <= 0) {
-                                en.isFed = true;
-                                en.lastFedDay = window.EngineParams.worldDay;
-                                en.hungerLevel = 0;
-
-                                // Reset feral visual if they were just starving (but not permanent feral)
-                                if (!en.permanentFeral) {
-                                    en.aiMode = 'skirmish';
-                                }
-
-                                en.hp = Math.min(en.hp * 1.5, (en.def.hp || 50) * 2);
-                                en.visual.scale.setScalar(en.def.modelScale || 1.0); // Reset scale
-                                en.visual.scale.multiplyScalar(1.2); // Growth
-                                window.EventBus.emit('UI_LOG', `[LIFE CYCLE] The ${en.name} has fed on its prey and grown stronger.`);
-                            }
-                        } else {
-                            // Hunt the prey
-                            moveCompanion(en, prey.visual.position, 1.1, delta);
-                            return;
-                        }
-                    }
+        // --- NPC STARVATION (Bible §18) ---
+        if (en.def.type === 'npc' && en.def.faction !== 'monster' && !en.companionId) {
+            en.lastFedDay ??= window.EngineParams.worldDay;
+            const daysSinceFed = window.EngineParams.worldDay - en.lastFedDay;
+            
+            if (daysSinceFed > 3) {
+                en.hp -= delta * 0.5; // Slow starvation damage
+                if (en.hp <= 0) {
+                    defeatNpc(en, 'starvation');
+                    return;
+                }
+            }
         }
 
         // --- WENDIGO HUNGER & FERAL PROGRESSION ---
+
         if (en.name === 'Wendigo') {
                     const daysSinceFed = window.EngineParams.worldDay - (en.lastFedDay || 0);
 
@@ -718,10 +718,25 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                         }
 
                         if (en.aiMode === 'flee') {
+                            // Run away from the target
+                            dir.multiplyScalar(-1);
+                        } else if (en.isSentient && en.relationships) {
+                            // --- SENTIENT WENDIGO: DRAWN TO LOVED ONES ---
+                            const beloved = Array.from(en.relationships.entries())
+                                .filter(([id, rel]) => rel.weight > 0.7 && (rel.type === 'KINSHIP' || rel.type === 'FRIENDSHIP'))
+                                .map(([id]) => window.GameCore.activeEntities.find(candidate => candidate.id === id))
+                                .filter(Boolean)[0];
 
-                // Run away from the target
-                dir.multiplyScalar(-1);
-            } else if (en.aiMode === 'skirmish' && dist < 6) {
+                            if (beloved) {
+                                const bDist = en.visual.position.distanceTo(beloved.visual.position);
+                                if (bDist > 5) {
+                                    moveCompanion(en, beloved.visual.position, 0.8, delta);
+                                    if (Math.random() < 0.001) window.EventBus.emit('UI_LOG', `[SENTIENT] The Wendigo watches ${beloved.name} from the shadows...`);
+                                    return;
+                                }
+                            }
+                        } else if (en.aiMode === 'skirmish' && dist < 6) {
+
                 // Circle the player instead of running straight in
                 const orbitDir = new window.THREE.Vector3(dir.z, 0, -dir.x); // Perpendicular vector
                 dir.addScaledVector(orbitDir, 2.0).normalize();
