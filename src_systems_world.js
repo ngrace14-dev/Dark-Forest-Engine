@@ -7,9 +7,11 @@ window.createNoise2D = createNoise2D;
 
 window.WorldGenConfig = {
     noiseScale: 0.003,
-    darkForestSideMeters: 575843.2,
+    darkForestSideMeters: 1137800.0, // ~707 miles side length (500,000 sq miles)
     mountainRingWidthMeters: 160934.4,
+    greatLakeDiameterMeters: 402335.0, // 250 miles
     biomes: {
+
         'redwoods': { name: 'NorCal Redwoods', color: 0x1a2f21, prefab: 'Oak Tree', density: 12 },
         'alpine': { name: 'Shasta Alpine', color: 0x363a40, prefab: 'Razor Rock Monolith', density: 6 },
         'valley': { name: 'Central Valley', color: 0x453f2c, prefab: 'Bramble Bush', density: 10 },

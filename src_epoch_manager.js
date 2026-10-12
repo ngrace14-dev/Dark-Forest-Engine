@@ -148,13 +148,37 @@ export class EpochManager {
         return this._calculateNaturalHeight(x, z);
     }
 
-    _calculateNaturalHeight(x, z) {
+        _calculateNaturalHeight(x, z) {
         const halfForestSide = this.config.darkForestSideMeters / 2;
         const mountainWidth = this.config.mountainRingWidthMeters;
         const dist = Math.max(Math.abs(x), Math.abs(z));
 
+        // --- GREAT LAKE CALCULATION (Bible §1, §5) ---
+        // 250 Mile Diameter Lake
+        const lakeRadius = (this.config.greatLakeDiameterMeters || 402335.0) / 2;
+        // The lake is always located relative to the epoch seed (it shifts with the world)
+        // We'll use a fixed offset from the world center that varies per epoch
+        const lakeCenterOff = new alea(this.currentSeed + '_lake')();
+        const lakeAngle = lakeCenterOff * Math.PI * 2;
+        const lakeDistFromCenter = (halfForestSide - lakeRadius) * 0.6; // Keep it in the forest
+        const lakeCenterX = Math.cos(lakeAngle) * lakeDistFromCenter;
+        const lakeCenterZ = Math.sin(lakeAngle) * lakeDistFromCenter;
+
+        const distToLake = Math.hypot(x - lakeCenterX, z - lakeCenterZ);
+        
+        // Lake Mask
+        let isLake = false;
+        let lakeDepth = 0;
+        if (distToLake < lakeRadius) {
+            isLake = true;
+            // Smooth bowl shape for lake depth
+            const lakeT = distToLake / lakeRadius;
+            lakeDepth = (1.0 - Math.pow(lakeT, 2)) * 80.0; // 80m deep center
+        }
+
         // BIOME SPECIFIC HEIGHT MODIFIERS
         const biomeKey = this.getBiome(x, z);
+
 
         // 1. THE REDWOOD BASIN (DISC 1)
         // Slowly sloping upwards towards the mountain ring, with smooth rolling hills.
@@ -173,8 +197,14 @@ export class EpochManager {
             const swell = this.noise2D(x * 0.0002, z * 0.0002); 
             const ripple = this.noise2D(x * 0.001, z * 0.001) * 0.05; // Extremely subtle ripple
             
-            height += (swell + ripple) * varAmp;
+                        height += (swell + ripple) * varAmp;
+
+            // Apply Lake Depth
+            if (isLake) {
+                height -= lakeDepth;
+            }
         }
+
 
         // 2. THE MOUNTAIN RING (100 MILES THICK)
         if (dist > halfForestSide && dist <= halfForestSide + mountainWidth) {

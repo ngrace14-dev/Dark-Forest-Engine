@@ -117,16 +117,39 @@ window.VillageManager = {
         const mountainRadius = (forestSide / 2) - 5000;
         const terminusAngle = prng() * Math.PI * 2;
         
-        const terminus = this.villages[this.villages.length - 1];
+                const terminus = this.villages[this.villages.length - 1];
         terminus.x = Math.cos(terminusAngle) * mountainRadius;
         terminus.z = Math.sin(terminusAngle) * mountainRadius;
+
+        // --- HOUSE WRAITH: GREAT LAKE ANCHORING ---
+        // House Wraith (Index 17) always anchors to the Great Lake
+        const wraithVillage = this.villages.find(v => v.nobleHouse === 'House Wraith');
+        if (wraithVillage && window.EpochManagerInstance) {
+            const lakeRadius = (window.WorldGenConfig?.greatLakeDiameterMeters || 402335.0) / 2;
+            const seed = window.EpochManagerInstance.currentSeed;
+            const lakeCenterOff = new alea(seed + '_lake')();
+            const lakeAngle = lakeCenterOff * Math.PI * 2;
+            const halfForestSide = (window.WorldGenConfig?.darkForestSideMeters || 1137800.0) / 2;
+            const lakeDistFromCenter = (halfForestSide - lakeRadius) * 0.6;
+            const lakeCenterX = Math.cos(lakeAngle) * lakeDistFromCenter;
+            const lakeCenterZ = Math.sin(lakeAngle) * lakeDistFromCenter;
+
+            // Place Wraith Village on the shore (just outside the radius)
+            const shoreAngle = lakeAngle + Math.PI; // Opposite side or just shifted
+            wraithVillage.x = lakeCenterX + Math.cos(shoreAngle) * (lakeRadius + 500);
+            wraithVillage.z = lakeCenterZ + Math.sin(shoreAngle) * (lakeRadius + 500);
+            wraithVillage.isLakeAnchored = true;
+        }
         
-        // 3. Space out the remaining 18 villages (Index 1 to 18) along a jagged path between Capital and Terminus
-        const totalMiddleNodes = this.villages.length - 2;
+        // 3. Space out the remaining villages
+        const middleNodes = this.villages.filter(v => !v.capital && v.nobleHouse !== 'House Terminus' && !v.isLakeAnchored);
+        const totalMiddleNodes = middleNodes.length;
+
         
-        for (let i = 1; i <= totalMiddleNodes; i++) {
-            const village = this.villages[i];
-            const t = i / (totalMiddleNodes + 1);
+                for (let i = 0; i < totalMiddleNodes; i++) {
+            const village = middleNodes[i];
+            const t = (i + 1) / (totalMiddleNodes + 1);
+
             
             const baseX = terminus.x * t;
             const baseZ = terminus.z * t;
