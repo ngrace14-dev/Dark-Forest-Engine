@@ -1,4 +1,6 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import alea from 'alea'; // REPAIR: Explicit dependency import
+
 
 window.VillageManager = {
     villages: [], kingdomPopulation: 250000, capitalPopulationShare: 0.25, names: ["Oakhaven", "Gallows Hill", "Mire's Edge", "Blackwood", "Hollow Creek", "Ashen Hold", "Dire Rest", "Crow's Perch", "Widow's Peak", "Thornbury", "Gloomhaven", "Duskendale", "Grimsby", "Shadowfen", "Blighted Watch", "Bleakmire", "Wraith's End", "Cullfield", "Terminus"],
@@ -102,46 +104,56 @@ window.VillageManager = {
         this.shiftLocations();
     },
     
-        // --- PHASE 1.5: VILLAGE CHAIN REPOSITIONING ---
+            // --- PHASE 1.5: VILLAGE CHAIN REPOSITIONING ---
     shiftLocations: function() {
         if (this.villages.length < 2) return;
         
+        // NULL SAFETY: Verify authorities before proceeding with deterministic logic
+        if (!window.EpochManagerInstance || !window.WorldGenConfig) {
+            console.warn("[VillageManager] Critical Authority Missing: EpochManager or WorldGenConfig. Aborting deterministic shift.");
+            return;
+        }
+
         // 1. Capital (Index 0) is always locked at 0,0
         const capital = this.villages[0];
         capital.x = 0;
         capital.z = 0;
         
         // 2. Terminus (Index 19) is pushed to the edge of the mountain ring
-        const prng = window.EpochManagerInstance ? window.EpochManagerInstance.prng : Math.random;
-        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
+        // Deterministic Authority Integration: Removed Math.random() fallback
+        const prng = window.EpochManagerInstance.prng;
+        const forestSide = window.WorldGenConfig.darkForestSideMeters || 575843.2;
         const mountainRadius = (forestSide / 2) - 5000;
         const terminusAngle = prng() * Math.PI * 2;
         
-                const terminus = this.villages[this.villages.length - 1];
+        const terminus = this.villages[this.villages.length - 1];
         terminus.x = Math.cos(terminusAngle) * mountainRadius;
         terminus.z = Math.sin(terminusAngle) * mountainRadius;
 
         // --- HOUSE WRAITH: GREAT LAKE ANCHORING ---
         // House Wraith (Index 17) always anchors to the Great Lake
         const wraithVillage = this.villages.find(v => v.nobleHouse === 'House Wraith');
-        if (wraithVillage && window.EpochManagerInstance) {
-            const lakeRadius = (window.WorldGenConfig?.greatLakeDiameterMeters || 402335.0) / 2;
+        if (wraithVillage) {
+            const lakeRadius = (window.WorldGenConfig.greatLakeDiameterMeters || 402335.0) / 2;
             const seed = window.EpochManagerInstance.currentSeed;
+            
+            // REPAIR: alea is now available in module scope
             const lakeCenterOff = new alea(seed + '_lake')();
             const lakeAngle = lakeCenterOff * Math.PI * 2;
-            const halfForestSide = (window.WorldGenConfig?.darkForestSideMeters || 1137800.0) / 2;
+            const halfForestSide = (window.WorldGenConfig.darkForestSideMeters || 1137800.0) / 2;
             const lakeDistFromCenter = (halfForestSide - lakeRadius) * 0.6;
             const lakeCenterX = Math.cos(lakeAngle) * lakeDistFromCenter;
             const lakeCenterZ = Math.sin(lakeAngle) * lakeDistFromCenter;
 
             // Place Wraith Village on the shore (just outside the radius)
-            const shoreAngle = lakeAngle + Math.PI; // Opposite side or just shifted
+            const shoreAngle = lakeAngle + Math.PI; 
             wraithVillage.x = lakeCenterX + Math.cos(shoreAngle) * (lakeRadius + 500);
             wraithVillage.z = lakeCenterZ + Math.sin(shoreAngle) * (lakeRadius + 500);
             wraithVillage.isLakeAnchored = true;
         }
         
         // 3. Space out the remaining villages
+
         const middleNodes = this.villages.filter(v => !v.capital && v.nobleHouse !== 'House Terminus' && !v.isLakeAnchored);
         const totalMiddleNodes = middleNodes.length;
 
