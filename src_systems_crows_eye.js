@@ -342,19 +342,19 @@ class CrowsEyeSystem {
         }
 
                 this.overlay.innerHTML = `
-        <div style="max-width: 1600px; margin: 0 auto; display: grid; grid-template-columns: 1fr 400px; gap: 20px; height: 100vh; box-sizing: border-box; padding-bottom: 20px;">
-            <div style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
-                <div style="font-size: 24px; color: #f59e0b; margin-bottom: 10px; flex-shrink: 0;">CROW'S EYE - ${this.currentView}</div>
-                ${navHtml}
-                <div style="flex-grow: 1; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 20px; border: 1px solid #451a03; min-height: 0;">
-                    ${contentHtml}
-                </div>
-            </div>
-            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-left: 1px solid #78350f; overflow-y: auto; height: 100%; box-sizing: border-box;">
-                <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px; flex-shrink: 0;">INSPECTION</div>
-                ${inspectedHtml || 'Select an entity to view deep telemetry.'}
-            </div>
-        </div>`;
+                <div style="max-width: 1600px; margin: 0 auto; display: grid; grid-template-columns: 1fr 400px; gap: 20px; height: 100vh; box-sizing: border-box; padding: 20px; overflow: hidden;">
+                    <div style="display: flex; flex-direction: column; height: 100%; overflow: hidden; min-height: 0;">
+                        <div style="font-size: 24px; color: #f59e0b; margin-bottom: 10px; flex-shrink: 0;">CROW'S EYE - ${this.currentView}</div>
+                        ${navHtml}
+                        <div style="flex-grow: 1; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 20px; border: 1px solid #451a03; min-height: 0; box-sizing: border-box;">
+                            ${contentHtml}
+                        </div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 20px; border-left: 1px solid #78350f; overflow-y: auto; height: 100%; box-sizing: border-box; min-height: 0;">
+                        <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px; flex-shrink: 0;">INSPECTION</div>
+                        ${inspectedHtml || 'Select an entity to view deep telemetry.'}
+                    </div>
+                </div>`;
     }
 
     renderWatchlistView() {
@@ -434,42 +434,73 @@ class CrowsEyeSystem {
         return { gridHtml: healthHtml + gridData.gridHtml, inspectedHtml: gridData.inspectedHtml };
     }
 
-    gatherEntities() {
+        gatherEntities() {
         const entities = [];
         const lod = this.zoom; // 0.1 (far) to 5.0 (close)
         
-        // Settlement/Close LOD (lod > 1.5)
+        // 1. DEEP SETTLEMENT SCALE (lod > 3.5)
+        // Named NPCs, Roles, Building Layouts
+        if (lod > 3.5) {
+            if (window.GameCore?.activeEntities) {
+                window.GameCore.activeEntities.forEach(en => {
+                    const profile = window.PersonhoodManager?.getProfile(en.id);
+                    let type = 'a'; // Default walker
+                    if (profile) {
+                        switch(profile.identity) {
+                            case 'STEWARD': type = '👑'; break;
+                            case 'MERCHANT': type = '🛒'; break;
+                            case 'SKEPTIC': type = '📚'; break;
+                            case 'SURVIVOR': type = '⚒️'; break;
+                            default: type = '🙂'; break;
+                        }
+                    }
+                    entities.push({ type, x: en.visual?.position.x || 0, z: en.visual?.position.z || 0, id: en.id, ref: en });
+                });
+            }
+            // Village Layout Injection (Phase 4)
+            window.VillageManager?.villages.forEach(v => {
+                const distToPan = Math.hypot(v.x - this.pan.x, v.z - this.pan.z);
+                if (distToPan < 500) { // Only if near viewport
+                    v.layout.forEach(item => {
+                        entities.push({ type: 'B', x: v.x + item.ox, z: v.z + item.oz, id: item.id, ref: { name: item.prefab } });
+                    });
+                }
+            });
+        }
+        
+        // 2. SETTLEMENT SCALE (lod > 1.5)
+        // Buildings, Generic NPC Markers, Road Tiles
         if (lod > 1.5) {
             if (window.GameCore?.playerObj?.visual) {
                 entities.push({ type: 'P', x: window.GameCore.playerObj.visual.position.x, z: window.GameCore.playerObj.visual.position.z, id: 'player', ref: window.GameCore.playerObj });
             }
-            if (window.GameCore?.activeEntities) {
-                window.GameCore.activeEntities.forEach(en => {
-                    if (en.def?.faction === 'monster' || en.def?.faction === 'forest') {
-                        if (en.visual) entities.push({ type: 'M', x: en.visual.position.x, z: en.visual.position.z, id: en.id, ref: en });
-                    }
-                });
-            }
+            // Generic Monsters
+            window.GameCore?.activeEntities?.forEach(en => {
+                if (en.def?.faction === 'monster' || en.def?.faction === 'forest') {
+                    entities.push({ type: 'M', x: en.visual?.position.x || 0, z: en.visual?.position.z || 0, id: en.id, ref: en });
+                }
+            });
         }
         
-        // Regional/Mid LOD (lod > 0.4)
+        // 3. REGIONAL SCALE (lod > 0.4)
+        // Road Network, Trade Routes
         if (lod > 0.4) {
-            if (window.AdventurerManager?.records) {
-                window.AdventurerManager.records.forEach(rec => {
-                    if (rec.position) entities.push({ type: 'a', x: rec.position.x, z: rec.position.z, id: rec.id, ref: rec });
-                });
-            }
-            if (window.RoadManager?.pathNodes) {
-                 window.RoadManager.pathNodes.forEach((node, idx) => {
-                     entities.push({ type: '#', x: node.x, z: node.z, id: `road_${idx}`, ref: { name: 'Road Node' } });
+            if (window.RoadManager?.roadNodes) {
+                 window.RoadManager.roadNodes.forEach((node, idx) => {
+                     // Thinning: Only show 1 in 5 nodes at this scale
+                     if (idx % 5 === 0) {
+                         entities.push({ type: '#', x: node.x, z: node.z, id: `road_${idx}`, ref: { name: 'Road' } });
+                     }
                  });
             }
         }
         
-        // World/Far LOD (Always visible)
+        // 4. WORLD SCALE (Always visible)
+        // Villages, Capital, Major Institutions
         if (window.VillageManager?.villages) {
             window.VillageManager.villages.forEach(v => {
-                entities.push({ type: 'V', x: v.x, z: v.z, id: `village_${v.id}`, ref: v });
+                const isCapital = v.id === 'aethelgard' || v.nobleHouse === 'House Sterling'; // Assumption: Aethelgard is capital
+                entities.push({ type: isCapital ? 'C' : 'V', x: v.x, z: v.z, id: `village_${v.id}`, ref: v });
             });
         }
 
@@ -1726,77 +1757,97 @@ class CrowsEyeSystem {
     }
 
         generateAsciiGrid(entities, px, pz) {
-        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
-        const mountainRadius = forestSide / 2;
-        const mountainWidth = window.WorldGenConfig?.mountainRingWidthMeters || 160934.4;
-        const totalRadius = (mountainRadius + mountainWidth);
-        const renderRadius = totalRadius * 1.5; // Include Endless Dunes (§11)
+            const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
+            const mountainRadius = forestSide / 2;
+            const mountainWidth = window.WorldGenConfig?.mountainRingWidthMeters || 160934.4;
+            const totalRadius = (mountainRadius + mountainWidth);
+            const renderRadius = totalRadius * 1.5; // Include Endless Dunes (§11)
         
-        const gridSize = 40; 
-        const worldSpan = (renderRadius * 2) / this.zoom; 
-        const cellSpan = worldSpan / gridSize;
+            const gridSize = 40; 
+            const worldSpan = (renderRadius * 2) / this.zoom; 
+            const cellSpan = worldSpan / gridSize;
         
-        const cellEntities = Array(gridSize).fill().map(() => Array(gridSize).fill(null));
-        const grid = Array(gridSize).fill().map(() => Array(gridSize).fill(' ')); 
+            const cellEntities = Array(gridSize).fill().map(() => Array(gridSize).fill(null));
+            const grid = Array(gridSize).fill().map(() => Array(gridSize).fill(' ')); 
         
-        const typePriority = { 'P': 6, 'T': 5, 'V': 4, 'A': 3, 'M': 2, '#': 1, 'R': 0.5, '.': 0.1, '~': 0.05, ' ': 0 };
+            const typePriority = { 
+                'P': 10, 'C': 9, 'V': 8, 'B': 7, 
+                '👑': 6, '🛒': 6, '📚': 6, '⚒️': 6, '🙂': 6,
+                'M': 5, 'a': 4, '#': 3, 'R': 2, '.': 1, '~': 0.5, ' ': 0 
+            };
         
-        const mapToGrid = (x, z) => {
-            const relativeX = x - this.pan.x + (worldSpan / 2);
-            const relativeZ = z - this.pan.z + (worldSpan / 2);
-            const gx = Math.floor(relativeX / cellSpan);
-            const gz = Math.floor(relativeZ / cellSpan);
-            return { gx, gz };
-        };
+            const mapToGrid = (x, z) => {
+                const relativeX = x - this.pan.x + (worldSpan / 2);
+                const relativeZ = z - this.pan.z + (worldSpan / 2);
+                const gx = Math.floor(relativeX / cellSpan);
+                const gz = Math.floor(relativeZ / cellSpan);
+                return { gx, gz };
+            };
 
-        for (let gz = 0; gz < gridSize; gz++) {
-            for (let gx = 0; gx < gridSize; gx++) {
-                const wx = (gx * cellSpan) - (worldSpan / 2) + this.pan.x;
-                const wz = (gz * cellSpan) - (worldSpan / 2) + this.pan.z;
-                const dist = Math.sqrt(wx*wx + wz*wz); 
+            for (let gz = 0; gz < gridSize; gz++) {
+                for (let gx = 0; gx < gridSize; gx++) {
+                    const wx = (gx * cellSpan) - (worldSpan / 2) + this.pan.x;
+                    const wz = (gz * cellSpan) - (worldSpan / 2) + this.pan.z;
+                    const dist = Math.sqrt(wx*wx + wz*wz); 
                 
-                if (dist <= totalRadius) {
-                    if (dist > mountainRadius) grid[gz][gx] = 'R';
-                    else grid[gz][gx] = '.';
-                } else {
-                    grid[gz][gx] = '~'; // Endless Dunes (§11)
+                    if (dist <= totalRadius) {
+                        if (dist > mountainRadius) grid[gz][gx] = '⛰️'; // R
+                        else grid[gz][gx] = '🌲'; // .
+                    } else {
+                        grid[gz][gx] = '🏜️'; // ~
+                    }
                 }
             }
-        }
 
-        entities.forEach(en => {
-            const { gx, gz } = mapToGrid(en.x, en.z);
-            if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
-                const currentType = grid[gz][gx];
-                if (typePriority[en.type] > typePriority[currentType]) {
-                    grid[gz][gx] = en.type;
-                    cellEntities[gz][gx] = en;
+            entities.forEach(en => {
+                const { gx, gz } = mapToGrid(en.x, en.z);
+                if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
+                    const currentType = grid[gz][gx];
+                    const currentPriority = typePriority[currentType] || 0;
+                    const newPriority = typePriority[en.type] || 0;
+
+                    if (newPriority > currentPriority) {
+                        grid[gz][gx] = en.type;
+                        cellEntities[gz][gx] = en;
+                    }
                 }
-            }
-        });
+            });
         
-        let gridHtml = `<div style="display:flex; justify-content:space-between; font-size:12px; color:#78350f; margin-bottom:10px; flex-shrink: 0;">
-            <div>Zoom: ${this.zoom.toFixed(1)}x</div>
-            <div>Pan: ${Math.round(this.pan.x)}, ${Math.round(this.pan.z)}</div>
-        </div>`;
+            let gridHtml = `<div style="display:flex; justify-content:space-between; font-size:12px; color:#78350f; margin-bottom:10px; flex-shrink: 0;">
+                <div>Zoom: ${this.zoom.toFixed(1)}x</div>
+                <div>Pan: ${Math.round(this.pan.x)}, ${Math.round(this.pan.z)}</div>
+            </div>`;
         
-        gridHtml += `<div style="line-height: 1.1; font-size: 1.8vh; letter-spacing: 2px; font-family: monospace; cursor: move; user-select: none; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;">`;
-        for (let gz = 0; gz < gridSize; gz++) {
-            let line = '';
-            for (let gx = 0; gx < gridSize; gx++) {
-                const en = cellEntities[gz][gx];
-                const char = grid[gz][gx];
-                const isSelected = en && this.selectedEntityId === en.id;
+            gridHtml += `<div style="line-height: 1.1; font-size: 1.8vh; letter-spacing: 2px; font-family: monospace; cursor: move; user-select: none; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 0;">`;
+            for (let gz = 0; gz < gridSize; gz++) {
+                let line = '';
+                for (let gx = 0; gx < gridSize; gx++) {
+                    const en = cellEntities[gz][gx];
+                    let char = grid[gz][gx];
                 
-                const style = isSelected ? 'background-color: #fbbf24; color: #000; font-weight: bold;' : '';
-                const color = char === 'R' ? '#4b5563' : char === 'V' ? '#10b981' : char === 'P' ? '#3b82f6' : char === 'T' ? '#f59e0b' : char === '~' ? '#92400e' : '#94a3b8';
-                const dataId = en && en.id ? `data-id="${en.id}"` : '';
+                    // Visual Remapping
+                    if (char === 'P') char = '👤';
+                    if (char === 'V') char = '🏠';
+                    if (char === 'C') char = '🏰';
+                    if (char === 'M') char = '👾';
+                    if (char === '#') char = '▪';
+                    if (char === 'B') char = '🧱';
+
+                    const isSelected = en && this.selectedEntityId === en.id;
+                    const style = isSelected ? 'background-color: #fbbf24; border-radius: 2px;' : '';
                 
-                line += `<span style="${style} color: ${color};" ${dataId}>${char}</span>`;
+                    // Color mapping for non-emojis or specific highlights
+                    let color = '#94a3b8';
+                    if (char === '▪') color = '#78350f';
+                    if (char === '👤') color = '#3b82f6';
+                    if (char === '🏰') color = '#fbbf24';
+
+                    const dataId = en && en.id ? `data-id="${en.id}"` : '';
+                    line += `<span style="${style} color: ${color};" ${dataId}>${char}</span>`;
+                }
+                gridHtml += `<div style="height: 1.1em; display: flex;">${line}</div>`;
             }
-            gridHtml += `<div>${line}</div>`;
-        }
-        gridHtml += `</div>`;
+            gridHtml += `</div>`;
 
         let inspectedHtml = '';
         if (this.selectedEntityId) {
