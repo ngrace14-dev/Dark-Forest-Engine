@@ -97,13 +97,20 @@ window.AdventurerManager = {
     },
     syncNearby: function() {
         if (!window.GameCore.playerObj || !window.GameCore.instantiatePrefab) return;
-        const playerPosition = window.GameCore.playerObj.visual.position;
+        
+        // --- CROW'S EYE OVERRIDE ---
+        // If the player is in Crow's Eye mode, use the map focus as the spawn center
+        const focusX = window.CrowsEye?.isActive ? window.CrowsEye.pan.x : window.GameCore.playerObj.visual.position.x;
+        const focusZ = window.CrowsEye?.isActive ? window.CrowsEye.pan.z : window.GameCore.playerObj.visual.position.z;
+        
         const activePartyIds = new Set(window.GameCore.activeEntities.filter(entity => entity.adventurerPartyId).map(entity => entity.adventurerPartyId));
         this.records.forEach(record => {
             const existing = window.GameCore.activeEntities.find(entity => entity.adventurerRecordId === record.id);
             if (existing) { record.activeEntityId = existing.id; this.syncParty(record, existing); return; }
-            if (Math.hypot(record.position.x - playerPosition.x, record.position.z - playerPosition.z) > 70) return;
-            if (activePartyIds.size >= 3) return;
+            
+            if (Math.hypot(record.position.x - focusX, record.position.z - focusZ) > 100) return;
+            if (activePartyIds.size >= 5) return; // Increased limit for Crow's Eye visibility
+
             const entity = window.GameCore.instantiatePrefab(record.prefab, record.position.x, window.WorldGenerator.getTerrainHeight(record.position.x, record.position.z), record.position.z, 'persistent');
             if (entity) {
                 entity.adventurerRecordId = record.id;

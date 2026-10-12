@@ -25,6 +25,16 @@ class CrowsEyeSystem {
                 window.EngineConfig.applyQualityPreset('crows_eye');
                 window.EventBus.emit('ENV_UPDATE');
             }
+
+            // --- KEYBOARD NAVIGATION (WASD/Arrows) ---
+            if (this.isActive && this.currentView === 'MAP') {
+                const moveSpeed = 5000 / this.zoom;
+                if (e.key === 'w' || e.key === 'ArrowUp') this.pan.z -= moveSpeed;
+                if (e.key === 's' || e.key === 'ArrowDown') this.pan.z += moveSpeed;
+                if (e.key === 'a' || e.key === 'ArrowLeft') this.pan.x -= moveSpeed;
+                if (e.key === 'd' || e.key === 'ArrowRight') this.pan.x += moveSpeed;
+                this.updateTimer = 1.0;
+            }
         });
         
         window.EventBus.on('ENV_UPDATE', () => {
@@ -70,6 +80,14 @@ class CrowsEyeSystem {
             if (e.target.tagName === 'SPAN' && e.target.dataset.id) {
                 this.selectedEntityId = e.target.dataset.id;
                 this.updateTimer = 1.0; // Force immediate update
+                
+                // --- MAP CLOCK PIVOT: Center view on selected if it has coordinates ---
+                const entities = this.gatherEntities();
+                const selected = entities.find(ent => ent.id === this.selectedEntityId);
+                if (selected) {
+                    this.pan.x = selected.x;
+                    this.pan.z = selected.z;
+                }
             }
             if (e.target.dataset.view) {
                 this.currentView = e.target.dataset.view;
@@ -321,14 +339,22 @@ class CrowsEyeSystem {
                 if (en.def?.faction === 'monster' || en.def?.faction === 'forest') {
                     if (en.visual) entities.push({ type: 'M', x: en.visual.position.x, z: en.visual.position.z, id: en.id, ref: en });
                 }
+                // --- MAP PIVOT: Show Caravans in 3D mode ---
+                if (en.caravanId) {
+                    entities.push({ type: 'C', x: en.visual.position.x, z: en.visual.position.z, id: en.caravanId, ref: en });
+                }
             });
         }
         
+        // --- MAP PIVOT: Abstract Entities (Unloaded) ---
         if (window.AdventurerManager?.records) {
             window.AdventurerManager.records.forEach(rec => {
-                if (rec.position) {
-                    const isTarget = narrator.targetId === rec.id;
-                    entities.push({ type: isTarget ? 'T' : 'A', x: rec.position.x, z: rec.position.z, id: rec.id, ref: rec });
+                // If not active in 3D, show abstract position
+                if (!rec.activeEntityId && rec.position) {
+                    entities.push({ type: 'a', x: rec.position.x, z: rec.position.z, id: rec.id, ref: rec });
+                } else if (rec.activeEntityId) {
+                    const en = window.GameCore.activeEntities.find(e => e.id === rec.activeEntityId);
+                    if (en) entities.push({ type: 'A', x: en.visual.position.x, z: en.visual.position.z, id: rec.id, ref: rec });
                 }
             });
         }
@@ -336,6 +362,13 @@ class CrowsEyeSystem {
         if (window.VillageManager?.villages) {
             window.VillageManager.villages.forEach(v => {
                 entities.push({ type: 'V', x: v.x, z: v.z, id: `village_${v.id}`, ref: v });
+                
+                // Show abstract caravans
+                v.caravans.forEach(car => {
+                    if (car.status === 'traveling' && car.position) {
+                        entities.push({ type: 'c', x: car.position.x, z: car.position.z, id: car.id, ref: car });
+                    }
+                });
             });
         }
 
