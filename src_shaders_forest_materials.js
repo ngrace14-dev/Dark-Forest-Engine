@@ -107,16 +107,11 @@ function assembleShader(shader, snippets) {
         );
     }
 
-                shader.fragmentShader = shader.fragmentShader.replace(
+                                shader.fragmentShader = shader.fragmentShader.replace(
         '#include <fog_fragment>',
-        `
-        #ifdef USE_FOG
-            float fogFactorCustom = smoothstep( fogNear, fogFar, vFogDepth );
-            fogFactorCustom *= uFogIntensity; 
-            gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactorCustom );
-        #endif
-        `
+        ''
     );
+
 
 }
 
