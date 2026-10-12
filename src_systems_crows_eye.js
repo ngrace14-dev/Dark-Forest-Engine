@@ -103,9 +103,9 @@ class CrowsEyeSystem {
             }
         });
 
-        // Dragging & Zooming Logic
+                // Dragging & Zooming Logic
         this.overlay.addEventListener('mousedown', (e) => {
-            if (this.currentView === 'MAP') {
+            if (this.currentView === 'MAP' && e.shiftKey) {
                 this.isDragging = true;
                 this.lastMouse = { x: e.clientX, y: e.clientY };
             }
