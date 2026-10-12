@@ -370,12 +370,14 @@ class CrowsEyeSystem {
                 </div>`;
             });
 
-            html += `</div>`;
+                        html += `</div>`;
             return html;
         }
 
+    renderMapView() {
         const snapshots = Array.from(window.ChronicleManager?.snapshots.keys() || []).sort((a, b) => a - b);
         const currentPlaybackDay = window.PlaybackManager?.currentPlaybackDay;
+
         const isHistory = currentPlaybackDay !== undefined && currentPlaybackDay < (window.EngineParams?.worldDay || 0);
         
         let entities = [];
@@ -672,11 +674,13 @@ class CrowsEyeSystem {
                 </div>`;
             });
 
-            html += `</div></div>`;
-            return html;
-        }
+                    html += `</div></div>`;
+        return html;
+    }
 
+    renderLogisticsView() {
         if (!window.VillageManager) return "Logistics Engine Offline";
+
         
         const villages = window.VillageManager.villages;
         const capital = villages[0];
