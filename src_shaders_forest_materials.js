@@ -47,20 +47,28 @@ function assembleShader(shader, snippets) {
     `;
 
         // 3. Fragment Declarations
-    const fragDecl = `
-        uniform float uFogIntensity;
-        uniform vec3 uForestSunDir;
-        uniform vec3 uForestSunCol;
-        uniform float uRawDebugMode;
+        const fragDecl = `
+            uniform float uFogIntensity;
+            uniform vec3 uForestSunDir;
+            uniform vec3 uForestSunCol;
+            uniform float uRawDebugMode;
         
-        varying vec3 vWorldPos;
-        varying vec3 vColorAttr;
-        varying vec4 vInstanceData;
-        varying vec3 vWorldNormal;
-        varying float vLocalY;
+            #ifdef USE_FOG
+                #ifndef FOG_PARAMS
+                    uniform float fogNear;
+                    uniform float fogFar;
+                #endif
+            #endif
+
+            varying vec3 vWorldPos;
+            varying vec3 vColorAttr;
+            varying vec4 vInstanceData;
+            varying vec3 vWorldNormal;
+            varying float vLocalY;
         
-        ${snippets.FRAG_DECLARATIONS || ''}
-    `;
+            ${snippets.FRAG_DECLARATIONS || ''}
+        `;
+
 
 
 
@@ -99,21 +107,17 @@ function assembleShader(shader, snippets) {
         );
     }
 
-        shader.fragmentShader = shader.fragmentShader.replace(
+                shader.fragmentShader = shader.fragmentShader.replace(
         '#include <fog_fragment>',
         `
         #ifdef USE_FOG
-            // FIX: Ensure fog uniforms are accessible if they aren't provided by the main shader chunk
-            #ifndef FOG_PARAMS
-                uniform float fogNear;
-                uniform float fogFar;
-            #endif
             float fogFactorCustom = smoothstep( fogNear, fogFar, vFogDepth );
             fogFactorCustom *= uFogIntensity; 
             gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactorCustom );
         #endif
         `
     );
+
 }
 
 /**
