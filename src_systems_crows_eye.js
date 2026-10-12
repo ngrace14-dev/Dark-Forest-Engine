@@ -70,9 +70,9 @@ class CrowsEyeSystem {
         this.overlay.style.pointerEvents = 'auto';
         this.overlay.style.display = this.isActive ? 'block' : 'none';
         this.overlay.style.whiteSpace = 'pre';
-        this.overlay.style.backgroundColor = 'rgba(0,0,0,0.95)';
-        this.overlay.style.padding = '40px';
-        this.overlay.style.overflowY = 'auto';
+                this.overlay.style.backgroundColor = 'rgba(0,0,0,0.95)';
+        this.overlay.style.padding = '20px';
+        this.overlay.style.overflow = 'hidden';
         this.overlay.style.backdropFilter = 'blur(10px)';
         
                 this.overlay.addEventListener('click', (e) => {
@@ -341,17 +341,17 @@ class CrowsEyeSystem {
                 break;
         }
 
-        this.overlay.innerHTML = `
-        <div style="max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 1fr 400px; gap: 40px; height: 90vh;">
-            <div style="display: flex; flex-direction: column;">
-                <div style="font-size: 24px; color: #f59e0b; margin-bottom: 10px;">CROW'S EYE - ${this.currentView}</div>
+                this.overlay.innerHTML = `
+        <div style="max-width: 1600px; margin: 0 auto; display: grid; grid-template-columns: 1fr 400px; gap: 20px; height: 100vh; box-sizing: border-box; padding-bottom: 20px;">
+            <div style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+                <div style="font-size: 24px; color: #f59e0b; margin-bottom: 10px; flex-shrink: 0;">CROW'S EYE - ${this.currentView}</div>
                 ${navHtml}
-                <div style="flex-grow: 1; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 20px; border: 1px solid #451a03;">
+                <div style="flex-grow: 1; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 20px; border: 1px solid #451a03; min-height: 0;">
                     ${contentHtml}
                 </div>
             </div>
-            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-left: 1px solid #78350f; overflow-y: auto;">
-                <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px;">INSPECTION</div>
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-left: 1px solid #78350f; overflow-y: auto; height: 100%; box-sizing: border-box;">
+                <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px; flex-shrink: 0;">INSPECTION</div>
                 ${inspectedHtml || 'Select an entity to view deep telemetry.'}
             </div>
         </div>`;
@@ -1725,20 +1725,21 @@ class CrowsEyeSystem {
         return html;
     }
 
-    generateAsciiGrid(entities, px, pz) {
+        generateAsciiGrid(entities, px, pz) {
         const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
         const mountainRadius = forestSide / 2;
         const mountainWidth = window.WorldGenConfig?.mountainRingWidthMeters || 160934.4;
         const totalRadius = (mountainRadius + mountainWidth);
+        const renderRadius = totalRadius * 1.5; // Include Endless Dunes (§11)
         
         const gridSize = 40; 
-        const worldSpan = (totalRadius * 2) / this.zoom; 
+        const worldSpan = (renderRadius * 2) / this.zoom; 
         const cellSpan = worldSpan / gridSize;
         
         const cellEntities = Array(gridSize).fill().map(() => Array(gridSize).fill(null));
         const grid = Array(gridSize).fill().map(() => Array(gridSize).fill(' ')); 
         
-        const typePriority = { 'P': 6, 'T': 5, 'V': 4, 'A': 3, 'M': 2, '#': 1, 'R': 0.5, '.': 0.1, ' ': 0 };
+        const typePriority = { 'P': 6, 'T': 5, 'V': 4, 'A': 3, 'M': 2, '#': 1, 'R': 0.5, '.': 0.1, '~': 0.05, ' ': 0 };
         
         const mapToGrid = (x, z) => {
             const relativeX = x - this.pan.x + (worldSpan / 2);
@@ -1757,6 +1758,8 @@ class CrowsEyeSystem {
                 if (dist <= totalRadius) {
                     if (dist > mountainRadius) grid[gz][gx] = 'R';
                     else grid[gz][gx] = '.';
+                } else {
+                    grid[gz][gx] = '~'; // Endless Dunes (§11)
                 }
             }
         }
@@ -1772,25 +1775,26 @@ class CrowsEyeSystem {
             }
         });
         
-        let gridHtml = `<div style="display:flex; justify-content:space-between; font-size:12px; color:#78350f; margin-bottom:10px;">
+        let gridHtml = `<div style="display:flex; justify-content:space-between; font-size:12px; color:#78350f; margin-bottom:10px; flex-shrink: 0;">
             <div>Zoom: ${this.zoom.toFixed(1)}x</div>
             <div>Pan: ${Math.round(this.pan.x)}, ${Math.round(this.pan.z)}</div>
         </div>`;
         
-        gridHtml += `<div style="line-height: 1.1; font-size: 16px; letter-spacing: 2px; font-family: monospace; cursor: move; user-select: none;">`;
+        gridHtml += `<div style="line-height: 1.1; font-size: 1.8vh; letter-spacing: 2px; font-family: monospace; cursor: move; user-select: none; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;">`;
         for (let gz = 0; gz < gridSize; gz++) {
+            let line = '';
             for (let gx = 0; gx < gridSize; gx++) {
                 const en = cellEntities[gz][gx];
                 const char = grid[gz][gx];
                 const isSelected = en && this.selectedEntityId === en.id;
                 
                 const style = isSelected ? 'background-color: #fbbf24; color: #000; font-weight: bold;' : '';
-                const color = char === 'R' ? '#4b5563' : char === 'V' ? '#10b981' : char === 'P' ? '#3b82f6' : char === 'T' ? '#f59e0b' : '#94a3b8';
+                const color = char === 'R' ? '#4b5563' : char === 'V' ? '#10b981' : char === 'P' ? '#3b82f6' : char === 'T' ? '#f59e0b' : char === '~' ? '#92400e' : '#94a3b8';
                 const dataId = en && en.id ? `data-id="${en.id}"` : '';
                 
-                gridHtml += `<span style="${style} color: ${color};" ${dataId}>${char}</span>`;
+                line += `<span style="${style} color: ${color};" ${dataId}>${char}</span>`;
             }
-            gridHtml += '\n';
+            gridHtml += `<div>${line}</div>`;
         }
         gridHtml += `</div>`;
 
