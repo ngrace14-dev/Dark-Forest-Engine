@@ -264,7 +264,7 @@ window.VillageManager = {
         });
     },
 
-    simulateVillage: function(village) {
+        simulateVillage: function(village) {
         const cal = window.CalibrationFramework?.settings || {};
         const econCal = cal.economy || { consumption: 1.0, scarcity: 1.0, tradeEfficiency: 1.0 };
         const worldCal = cal.world || { growthRate: 1.0, spawnRate: 1.0 };
@@ -284,6 +284,18 @@ window.VillageManager = {
         village.provisionStock ??= { [village.provision.itemId]: 0 };
         village.territory ??= { faction: 'kingdom', radius: village.capital ? 140 : 90, control: 100, underRaid: false };
         village.stats.ap = Math.min(200, (village.stats.ap || 0) + 10);
+
+        // --- CROWN FUEL DISPATCH (STAGE 1: THE POLITICAL HEART) ---
+        if (village.capital) {
+            this.processCrownGovernance(village);
+        } else {
+            // Village Need Detection
+            if (village.stats.essence < 5 && !village.fuelRequested) {
+                village.fuelRequested = true;
+                window.EventBus.emit('UI_LOG', `[FUEL] ${village.name} is running low on essence. The barrier is flickering.`);
+            }
+        }
+
         
         const production = Math.max(1, Math.floor((village.population.current / 1500) * worldCal.growthRate));
         village.stats[village.industry.produces] += production;
@@ -534,7 +546,83 @@ window.VillageManager = {
     spendVillageResources: function(village, cost) {
         Object.entries(cost).forEach(([resource, amount]) => { village.stats[resource] -= amount; });
     },
+        processCrownGovernance: function(capital) {
+        const candidates = this.villages.filter(v => v.id !== 0 && v.fuelRequested);
+        if (candidates.length === 0 || capital.stats.essence < 10) return;
+
+        // 1. Political Priority Scoring (PPS)
+        candidates.forEach(v => {
+            let score = (100 - v.barrierIntegrity) * 2; // Desperation base
+            score += (v.relations[0] || 0); // Loyalty influence
+            if (v.industry?.mountainGatekeeper || v.industry?.martial) score += 50; // Strategic value
+            score += (v.population.current / 500); // Prestige
+            
+            const dist = Math.hypot(v.x - capital.x, v.z - capital.z);
+            score -= (dist / 5000); // Logistics penalty
+            
+            v._lastPPS = score;
+        });
+
+        // 2. Selection & Sanctioning
+        candidates.sort((a, b) => b._lastPPS - a._lastPPS);
+        const target = candidates[0];
+
+        // CHECK FOR SANCTIONS (Relations < -20)
+        if ((target.relations[0] || 0) < -20) {
+            if (target.barrierIntegrity < 25 && !target._wasSanctioned) {
+                window.EventBus.emit('UI_LOG', `[POLITICS] The Crown has denied fuel to ${target.name}. Let the woods teach them loyalty.`);
+                window.ChronicleManager?.recordEvent?.({
+                    actorId: 'The Capital',
+                    type: 'house_sanctioned',
+                    detail: `King Alaric sanctioned House ${target.nobleHouse.replace('House ', '')}, withholding Runic Fuel as their barriers fail.`,
+                    significance: 80,
+                    witnesses: ['The Capital', target.name]
+                });
+                target._wasSanctioned = true;
+            }
+            return; // Skip dispatch to sanctioned target
+        }
+
+        // 3. Dispatch Fuel
+        // Ensure no active fuel caravan to this target
+        const activeDispatch = capital.caravans.some(c => c.targetVillageId === target.id && c.cargo === 'essence');
+        if (activeDispatch) return;
+
+        const amount = 10;
+        capital.stats.essence -= amount;
+        target.fuelRequested = false;
+
+        const caravan = { 
+            id: `crown-fuel-${window.EngineParams.worldDay}-${Date.now()}`, 
+            status: 'traveling', 
+            targetVillageId: target.id, 
+            cargo: 'essence', 
+            amount: amount, 
+            launchedOnDay: window.EngineParams.worldDay,
+            isRoyalShipment: true 
+        };
+        capital.caravans.push(caravan);
+
+        const caravanEntity = window.GameCore.instantiatePrefab('Merchant Caravan', capital.x + 3, window.WorldGenerator.getTerrainHeight(capital.x + 3, capital.z), capital.z, 'persistent');
+        if (caravanEntity) { caravanEntity.caravanId = caravan.id; caravanEntity.villageId = capital.id; }
+
+        // 4. Handle Favor Events
+        if ((target.relations[0] || 0) > 50) {
+            window.EventBus.emit('UI_LOG', `[CROWN] Royal favor shown to ${target.name}. Essence dispatched by decree.`);
+            window.ChronicleManager?.recordEvent?.({
+                actorId: 'The Capital',
+                type: 'house_favored',
+                detail: `The Crown prioritized a fuel shipment to the loyal House ${target.nobleHouse.replace('House ', '')}.`,
+                significance: 60,
+                witnesses: ['The Capital', target.name]
+            });
+        } else {
+            window.EventBus.emit('UI_LOG', `[CROWN] Royal shipment of ${amount} essence dispatched to ${target.name}.`);
+        }
+    },
+
     processVillageCaravans: function(village) {
+
         village.caravans.forEach(caravan => {
             // --- PHASE 2: GHOST CARAVAN TRAVEL ---
             // If the caravan is far away from the player, move it mathematically
