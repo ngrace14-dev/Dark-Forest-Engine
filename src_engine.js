@@ -1,4 +1,6 @@
 ﻿import * as THREE from 'three';
+
+
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import RAPIER from 'rapier';
@@ -26,6 +28,67 @@ let renderer, clock;
 const fixedTimeStep = 1.0 / 60.0;
 let accumulator = 0.0;
 
+// ==========================================
+// OPTIMIZATION: TERRAIN CACHE
+// ==========================================
+const terrainHeightCache = new Map();
+
+// ==========================================
+
+// PHYSICS ISOLATION SYSTEM
+// ==========================================
+const physicsWriteQueue = [];
+const physicsReadCache = new Map();
+let isPhysicsStepping = false;
+
+window.PhysicsQueue = {
+    enqueue: (fn) => physicsWriteQueue.push(fn),
+    flush: () => {
+        if (!window.GameCore?.world) return;
+        while (physicsWriteQueue.length > 0) {
+            const cmd = physicsWriteQueue.shift();
+            try { cmd(); } catch(e) { console.warn("[Physics] Mutation failed", e); }
+        }
+    }
+};
+
+function updatePhysicsReadCache() {
+    if (!window.GameCore?.world) return;
+    physicsReadCache.clear();
+    
+    const entities = window.GameCore.activeEntities || [];
+    for (let i = 0; i < entities.length; i++) {
+        const en = entities[i];
+        if (en.body) {
+            try {
+                const t = en.body.translation();
+                const r = en.body.rotation();
+                const v = en.body.linvel();
+                physicsReadCache.set(en.id, {
+                    translation: { x: t.x, y: t.y, z: t.z },
+                    rotation: { x: r.x, y: r.y, z: r.z, w: r.w },
+                    linvel: { x: v.x, y: v.y, z: v.z }
+                });
+            } catch (e) {}
+        }
+    }
+    
+    const pObj = window.GameCore?.playerObj;
+    if (pObj && pObj.body) {
+        try {
+            const t = pObj.body.translation();
+            const r = pObj.body.rotation();
+            const v = pObj.body.linvel();
+            physicsReadCache.set('player', {
+                translation: { x: t.x, y: t.y, z: t.z },
+                rotation: { x: r.x, y: r.y, z: r.z, w: r.w },
+                linvel: { x: v.x, y: v.y, z: v.z }
+            });
+        } catch (e) {}
+    }
+}
+
+
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
@@ -40,9 +103,17 @@ const _currentCamTarget = new THREE.Vector3();
 
 function safeGetTerrainHeight(x, z) {
     if (!window.WorldGenerator?.getTerrainHeight) return 0;
+    
+    const key = `${x.toFixed(3)},${z.toFixed(3)}`;
+    if (terrainHeightCache.has(key)) return terrainHeightCache.get(key);
+    
     const h = window.WorldGenerator.getTerrainHeight(x, z);
-    return Number.isFinite(h) ? h : 0;
+    const result = Number.isFinite(h) ? h : 0;
+    
+    terrainHeightCache.set(key, result);
+    return result;
 }
+
 
 // ==========================================
 // LIGHT POOL SYSTEM
@@ -246,22 +317,28 @@ function updateEntities(delta) {
         const entity = window.GameCore.activeEntities[i];
         if (!entity || !entity.visual || !entity.body) continue;
         
+        const cached = physicsReadCache.get(entity.id);
+        const eTrans = cached ? cached.translation : entity.body.translation();
+
         try {
-            const eTrans = entity.body.translation();
-            
             const groundY = safeGetTerrainHeight(eTrans.x, eTrans.z);
             if (eTrans.y < groundY - 2.0) {
-                entity.body.setTranslation({ x: eTrans.x, y: groundY + 3.0, z: eTrans.z }, true);
-                entity.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-                eTrans.y = groundY + 3.0; 
+                const targetY = groundY + 3.0;
+                window.PhysicsQueue.enqueue(() => {
+                    if (entity.body) {
+                        entity.body.setTranslation({ x: eTrans.x, y: targetY, z: eTrans.z }, true);
+                        entity.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                    }
+                });
+                eTrans.y = targetY; 
             }
 
             const totalHeight = entity.def?.height || 2.0;
             entity.visual.position.set(eTrans.x, eTrans.y - (totalHeight / 2), eTrans.z);
         } catch (e) {
-            entity.body = null;
             continue;
         }
+
 
         window.GameCore.SpatialGrid?.updateEntity?.(entity);
         window.VATManager?.processLOD?.(entity, camPos);
@@ -319,10 +396,12 @@ if (entity.def?.type === String.fromCharCode(110,112,99) || entity.def?.type ===
         }
     }
     
-    if (playerAlive && window.GameCore.playerObj.body) {
+        if (playerAlive && window.GameCore.playerObj.body) {
         window.EngineParams.isPlayerHidden = isHidden;
+        const cachedP = physicsReadCache.get('player');
+        const p = cachedP ? cachedP.translation : window.GameCore.playerObj.body.translation();
+        
         try {
-            const p = window.GameCore.playerObj.body.translation(); 
             window.EngineParams.isPlayerSafe = window.RoadManager?.isSafeZone?.(p) || window.CapitalCityManager?.isInsideCapital?.(p.x, p.z) || false;
 
             if (!window.EngineParams.isPlayerSafe && !window.EngineParams.isPlayerHidden && hostileNearby && !window.EngineParams.godMode && window.EngineParams.offPathCaptureCooldown <= 0) {
@@ -330,9 +409,13 @@ if (entity.def?.type === String.fromCharCode(110,112,99) || entity.def?.type ===
                 if (pathPoint) {
                     ChunkManager.forceUpdatePosition(new THREE.Vector3(pathPoint.x, 0, pathPoint.z));
                     const safeY = safeGetTerrainHeight(pathPoint.x, pathPoint.z) + 5.0;
-                    window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setTranslation({ x: pathPoint.x, y: safeY, z: pathPoint.z }, true);
+                    window.PhysicsQueue.enqueue(() => {
+                        if (window.GameCore.playerObj.body) {
+                            window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                            window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+                            window.GameCore.playerObj.body.setTranslation({ x: pathPoint.x, y: safeY, z: pathPoint.z }, true);
+                        }
+                    });
                     window.EngineParams.offPathCaptureCooldown = 10;
                     window.EventBus?.emit('UI_LOG', 'The forest caught you off the safe path and dragged you back to the road.');
                 }
@@ -341,6 +424,7 @@ if (entity.def?.type === String.fromCharCode(110,112,99) || entity.def?.type ===
             console.warn("Player translation query skipped.", e);
         }
     }
+
 }
 
 function processEntityStatusEffects(entity, delta) {
@@ -437,15 +521,21 @@ function handleEntityDeath(entity) {
         if (entity.visual && window.GameCore?.scene) {
             window.GameCore.scene.remove(entity.visual);
         }
-        if (entity.body && window.GameCore?.world) {
-            window.GameCore.world.removeRigidBody(entity.body);
+        
+        if (entity.body) {
+            const b = entity.body;
+            window.PhysicsQueue.enqueue(() => {
+                if (window.GameCore?.world) window.GameCore.world.removeRigidBody(b);
+            });
             entity.body = null;
         }
+
         if (window.GameCore?.activeEntities) {
             window.GameCore.activeEntities = window.GameCore.activeEntities.filter(candidate => candidate.id !== entity.id);
         }
     }, 2000);
 }
+
 
 // ==========================================
 // PLAYER MOVEMENT & SPRINT ENGINE
@@ -454,18 +544,19 @@ function handleEntityDeath(entity) {
 function updatePlayerMovement(delta) {
     if (!window.Input || !window.GameCore?.playerObj?.visual || !window.GameCore.playerObj.body) return;
     
-    let p;
-    try {
-        p = window.GameCore.playerObj.body.translation();
-    } catch (e) {
-        return;
-    }
+    const cached = physicsReadCache.get('player');
+    const p = cached ? cached.translation : window.GameCore.playerObj.body.translation();
 
     const groundY = safeGetTerrainHeight(p.x, p.z);
     if (p.y < groundY - 2.0) { 
-        window.GameCore.playerObj.body.setTranslation({ x: p.x, y: groundY + 5.0, z: p.z }, true);
-        window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        p.y = groundY + 5.0;
+        const targetY = groundY + 5.0;
+        window.PhysicsQueue.enqueue(() => {
+            if (window.GameCore.playerObj.body) {
+                window.GameCore.playerObj.body.setTranslation({ x: p.x, y: targetY, z: p.z }, true);
+                window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+            }
+        });
+        p.y = targetY;
     }
 
     const pDef = window.GameCore.playerObj.def || { height: 2 };
@@ -483,7 +574,7 @@ function updatePlayerMovement(delta) {
     window.Input.isBlocking = window.Input.keys?.shift && (window.GameState?.pStats?.stamina || 0) > 0 && performance.now() >= (window.GameState?.pStats?.guardBrokenUntil || 0); 
     window.Input.isMoving = moveDir.lengthSq() > 0;
 
-    const currentVel = window.GameCore.playerObj.body.linvel();
+    const currentVel = cached ? cached.linvel : window.GameCore.playerObj.body.linvel();
 
     if (window.Input.isMoving) {
         moveDir.normalize().applyAxisAngle(_v2.set(0, 1, 0), window.Input.camAngle || Math.PI); 
@@ -516,11 +607,17 @@ function updatePlayerMovement(delta) {
 
         maxSpeed *= (window.GameCore?.getCombatInjuryMultiplier?.() || 1.0);
 
-        window.GameCore.playerObj.body.setLinvel({
+        const targetVel = {
             x: moveDir.x * maxSpeed,
             y: currentVel.y,
             z: moveDir.z * maxSpeed
-        }, true);
+        };
+        window.PhysicsQueue.enqueue(() => {
+            if (window.GameCore.playerObj.body) {
+                window.GameCore.playerObj.body.setLinvel(targetVel, true);
+            }
+        });
+
 
         if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
             if (window.Input.isBlocking) {
@@ -541,15 +638,21 @@ function updatePlayerMovement(delta) {
                 }
             }
         }
-    } else if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
+        } else if (!window.Input.isAttacking && window.GameCore.playerObj.currentAnimState !== 'hit' && window.GameCore.playerObj.currentAnimState !== 'die') { 
         window.Input.isSprinting = false;
-        window.GameCore.playerObj.body.setLinvel({
+        const stopVel = {
             x: currentVel.x * 0.8,
             y: currentVel.y,
             z: currentVel.z * 0.8
-        }, true);
+        };
+        window.PhysicsQueue.enqueue(() => {
+            if (window.GameCore.playerObj.body) {
+                window.GameCore.playerObj.body.setLinvel(stopVel, true);
+            }
+        });
 
         if (window.Input.isBlocking) {
+
             playEntityAnimation(window.GameCore.playerObj, 'block');
         } else {
             playEntityAnimation(window.GameCore.playerObj, 'idle'); 
@@ -664,13 +767,9 @@ function updateCombatHitboxes(delta) {
         return;
     }
 
-    if (sweep.timer <= sweep.activeAt) {
-        let pTrans;
-        try {
-            pTrans = window.GameCore.playerObj.body.translation();
-        } catch (e) {
-            return;
-        }
+        if (sweep.timer <= sweep.activeAt) {
+        const cachedP = physicsReadCache.get('player');
+        const pTrans = cachedP ? cachedP.translation : window.GameCore.playerObj.body.translation();
 
         if (!sweep.playerPos) sweep.playerPos = new THREE.Vector3();
         if (!sweep.playerForward) sweep.playerForward = new THREE.Vector3();
@@ -695,7 +794,8 @@ function updateCombatHitboxes(delta) {
             let ePos = en.visual ? en.visual.position : null;
             if (!ePos && en.body) {
                 try {
-                    const t = en.body.translation();
+                    const cachedE = physicsReadCache.get(en.id);
+                    const t = cachedE ? cachedE.translation : en.body.translation();
                     ePos = _v3.set(t.x, t.y, t.z);
                 } catch(e) { continue; }
             }
@@ -740,9 +840,11 @@ function updateCombatHitboxes(delta) {
                         window.Input.hitPauseTimer = 0.08; 
                         window.Input.camShake = 0.5;
                         const recoilDir = sweep.playerForward.clone().negate();
-                        if (window.GameCore.playerObj.body) {
-                            window.GameCore.playerObj.body.applyImpulse(_v2.set(recoilDir.x * 5, 0, recoilDir.z * 5), true);
-                        }
+                        window.PhysicsQueue.enqueue(() => {
+                            if (window.GameCore.playerObj.body) {
+                                window.GameCore.playerObj.body.applyImpulse(_v2.set(recoilDir.x * 5, 0, recoilDir.z * 5), true);
+                            }
+                        });
                     } else {
                         window.Input.hitPauseTimer = 0.03;
                     }
@@ -756,12 +858,15 @@ function updateCombatHitboxes(delta) {
     }
 }
 
+
 // ==========================================
 // CORE UPDATE LOOP
 // ==========================================
 
 function fixedUpdateLogic(delta) {
+    terrainHeightCache.clear();
     if (window.Heartbeat) window.Heartbeat.update(delta);
+
     
     // Update Regional Relativity State
     if (window.EpochManagerInstance && window.GameCore?.playerObj) {
@@ -811,8 +916,12 @@ function fixedUpdateLogic(delta) {
     window.VATManager?.update?.(delta);
         window.EncounterDirector?.update?.(delta);
     
-    if (window.CrowsEye) {
+        if (window.CrowsEye) {
         window.CrowsEye.update(delta);
+    }
+
+    if (window.ForceManager) {
+        window.ForceManager.update(delta);
     }
     
     if (window.GameCore?.AnimationSystem) {
@@ -1033,26 +1142,25 @@ const ChunkManager = {
                 mesh.userData.chunkKey = key;
                 if (window.GameCore?.scene) window.GameCore.scene.add(mesh);
 
-                let groundBody = null;
-                let collider = null;
-                if (window.GameCore?.world) {
+                                if (window.GameCore?.world) {
                     const indicesU32 = new Uint32Array(gridIndices);
-                    groundBody = window.GameCore.world.createRigidBody(
-
-                        RAPIER.RigidBodyDesc.fixed().setTranslation(chunkX, 0, chunkZ)
-                    );
-                    collider = window.GameCore.world.createCollider(
-                        RAPIER.ColliderDesc.trimesh(positions, indicesU32),
-                        groundBody
-                    );
+                    window.PhysicsQueue.enqueue(() => {
+                        if (!window.GameCore?.world) return;
+                        const groundBody = window.GameCore.world.createRigidBody(
+                            RAPIER.RigidBodyDesc.fixed().setTranslation(chunkX, 0, chunkZ)
+                        );
+                        const collider = window.GameCore.world.createCollider(
+                            RAPIER.ColliderDesc.trimesh(positions, indicesU32),
+                            groundBody
+                        );
+                        const activeRecord = this.activeChunks.get(key);
+                        if (activeRecord) {
+                            activeRecord.body = groundBody;
+                            activeRecord.collider = collider;
+                        }
+                    });
                 }
 
-                const activeRecord = this.activeChunks.get(key);
-                if (activeRecord) {
-                    activeRecord.mesh = mesh;
-                    activeRecord.body = groundBody;
-                    activeRecord.collider = collider;
-                }
 
                 if (window.RoadRenderer && window.GameCore?.scene) {
                     window.RoadRenderer.buildDecorationsForChunk(key, cx, cz, window.GameCore.scene);
@@ -1117,15 +1225,22 @@ const ChunkManager = {
 
                     window.ForestRenderer.setChunkInstances(key, 'Bramble Bush', bushPoints);
 
-                    if (lod === 'A' && window.GameCore?.world && chunkData.tierA) {
+                                        if (lod === 'A' && window.GameCore?.world && chunkData.tierA) {
                         chunkData.tierA.forEach(pt => {
                             const py = safeGetTerrainHeight(pt.x, pt.z);
-                            const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(pt.x, py + 15.0, pt.z));
-                            window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(15.0, 1.8), body);
-                            if (!this.activeChunks.get(key).instanceBodies) this.activeChunks.get(key).instanceBodies = [];
-                            this.activeChunks.get(key).instanceBodies.push(body);
+                            window.PhysicsQueue.enqueue(() => {
+                                if (!window.GameCore?.world) return;
+                                const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(pt.x, py + 15.0, pt.z));
+                                window.GameCore.world.createCollider(RAPIER.ColliderDesc.cylinder(15.0, 1.8), body);
+                                const record = this.activeChunks.get(key);
+                                if (record) {
+                                    if (!record.instanceBodies) record.instanceBodies = [];
+                                    record.instanceBodies.push(body);
+                                }
+                            });
                         });
                     }
+
                 }
 
                                                                                                 const biomeKey = window.WorldGenerator?.getBiome?.(chunkX, chunkZ) || 'redwoods';
@@ -1161,8 +1276,11 @@ const ChunkManager = {
             if (window.GameCore?.scene) window.GameCore.scene.remove(chunk.mesh); 
         }
         
-        if (chunk.body && window.GameCore?.world) {
-            window.GameCore.world.removeRigidBody(chunk.body);
+                if (chunk.body && window.GameCore?.world) {
+            const b = chunk.body;
+            window.PhysicsQueue.enqueue(() => {
+                if (window.GameCore?.world) window.GameCore.world.removeRigidBody(b);
+            });
             chunk.body = null;
         }
 
@@ -1181,11 +1299,16 @@ const ChunkManager = {
         }
         
         if (chunk.instanceBodies && window.GameCore?.world) {
-            chunk.instanceBodies.forEach(body => {
-                if (body) window.GameCore.world.removeRigidBody(body);
+            const bodies = [...chunk.instanceBodies];
+            window.PhysicsQueue.enqueue(() => {
+                if (!window.GameCore?.world) return;
+                bodies.forEach(body => {
+                    if (body) window.GameCore.world.removeRigidBody(body);
+                });
             });
             chunk.instanceBodies = [];
         }
+
 
         if (window.GameCore?.activeEntities) {
             window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => { 
@@ -1194,10 +1317,14 @@ const ChunkManager = {
                     if (window.GameCore.releaseEntityIndex) window.GameCore.releaseEntityIndex(en.memoryIndex);
                     window.GameCore.SpatialGrid?.unregisterEntity?.(en);
                     if (en.visual && window.GameCore.scene) window.GameCore.scene.remove(en.visual); 
-                    if (en.body && window.GameCore.world) {
-                        window.GameCore.world.removeRigidBody(en.body); 
+                                        if (en.body && window.GameCore.world) {
+                        const b = en.body;
+                        window.PhysicsQueue.enqueue(() => {
+                            if (window.GameCore?.world) window.GameCore.world.removeRigidBody(b);
+                        });
                         en.body = null;
                     }
+
                     return false; 
                 } 
                 return true; 
@@ -1443,7 +1570,7 @@ function createBlobShadow(radius) {
 }
 function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     const def = window.AssetManager?.prefabs?.[name]; 
-    if(!def) return;
+    if(!def) return null;
     
     let mesh = getVisualMesh(def);
     
@@ -1461,10 +1588,20 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     }
     
     rigidBodyDesc.setTranslation(x, spawnY, z); 
-    let body = window.GameCore?.world ? window.GameCore.world.createRigidBody(rigidBodyDesc) : null;
     
-    let collider = null;
-    if (def.isObstacle !== false && body && window.GameCore?.world) {
+    const entity = { 
+        id: Math.random().toString(36).substr(2, 9), 
+        name: name, 
+        def: def, 
+        visual: mesh, 
+        body: null, 
+        collider: null, 
+        chunkKey: chunkKey 
+    };
+
+    window.PhysicsQueue.enqueue(() => {
+        if (!window.GameCore?.world) return;
+        
         let colliderDesc; 
         if (['structure', 'hub', 'runeTower', 'powerStone', 'firePit', 'streetLight', 'merchantChest'].includes(def.type)) {
             colliderDesc = RAPIER.ColliderDesc.cuboid(def.radius, def.height/2, def.radius); 
@@ -1473,25 +1610,22 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
         } else {
             colliderDesc = RAPIER.ColliderDesc.capsule(Math.max(0.1, def.height/2 - def.radius), def.radius);
         }
-        collider = window.GameCore.world.createCollider(colliderDesc, body);
-    }
 
-    const entity = { 
-        id: Math.random().toString(36).substr(2, 9), 
-        name: name, 
-        def: def, 
-        visual: mesh, 
-        body: body, 
-        collider: collider, 
-        chunkKey: chunkKey 
-    };
-    
+        try {
+            const body = window.GameCore.world.createRigidBody(rigidBodyDesc);
+            const collider = window.GameCore.world.createCollider(colliderDesc, body);
+            collider.handle = Math.floor(Math.random() * 1000000); 
+            body.userData = { entityId: entity.id };
+            entity.body = body;
+            entity.collider = collider;
+        } catch(e) {
+            console.warn("[Physics] Prefab instantiation failed:", name, e);
+        }
+    });
+
     if (window.GameCore?.bindEntityToBuffer) {
         window.GameCore.bindEntityToBuffer(entity, def.hp || 50, def.poise || 30);
     }
-
-    if(collider) collider.handle = Math.floor(Math.random() * 1000000); 
-    if(body) body.userData = { entityId: entity.id };
     
     if (def.type === 'hub') { 
         activeLightEmitters.push({ mesh, color: def.color || 0xffd700, intensity: 2, distance: 15 });
@@ -1540,6 +1674,7 @@ function instantiatePrefab(name, x, y, z, chunkKey = 'persistent') {
     }
     return entity;
 }
+
 window.GameCore.instantiatePrefab = instantiatePrefab;
 window.GameCore.ChunkManager = ChunkManager;
 
@@ -1576,9 +1711,13 @@ window.ArenaTestManager = {
             mesh.receiveShadow = true; 
             window.GameCore.scene.add(mesh);
             
-            const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(spec.x, groundY + wallHeight / 2, spec.z));
-            window.GameCore.world.createCollider(RAPIER.ColliderDesc.cuboid(spec.width / 2, wallHeight / 2, spec.depth / 2), body);
-            this.walls.push({ mesh, body });
+                        window.PhysicsQueue.enqueue(() => {
+                if (!window.GameCore?.world) return;
+                const body = window.GameCore.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(spec.x, groundY + wallHeight / 2, spec.z));
+                window.GameCore.world.createCollider(RAPIER.ColliderDesc.cuboid(spec.width / 2, wallHeight / 2, spec.depth / 2), body);
+                this.walls.push({ mesh, body });
+            });
+
         });
     },
     
@@ -1689,25 +1828,35 @@ window.ArenaTestManager = {
     },
     
     clear: function() {
-        window.GameCore.activeEntities.filter(entity => entity.arenaEntity).forEach(entity => {
+                window.GameCore.activeEntities.filter(entity => entity.arenaEntity).forEach(entity => {
             if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(entity.id);
             window.GameCore.releaseEntityIndex(entity.memoryIndex); 
             if (entity.visual) window.GameCore.scene.remove(entity.visual); 
             if (entity.body) { 
-                window.GameCore.world.removeRigidBody(entity.body); 
+                const b = entity.body;
+                window.PhysicsQueue.enqueue(() => {
+                    if (window.GameCore?.world) window.GameCore.world.removeRigidBody(b);
+                });
                 entity.body = null; 
             }
         });
+
         window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => !entity.arenaEntity); 
         window.EventBus?.emit('UI_LOG', '[ARENA] Arena monsters cleared.');
     },
     
     exit: function() {
         this.clear(); 
-        this.walls.forEach(wall => { 
+                this.walls.forEach(wall => { 
             window.GameCore.scene.remove(wall.mesh); 
-            if (wall.body) window.GameCore.world.removeRigidBody(wall.body); 
+            if (wall.body) {
+                const b = wall.body;
+                window.PhysicsQueue.enqueue(() => {
+                    if (window.GameCore?.world) window.GameCore.world.removeRigidBody(b);
+                });
+            }
         }); 
+ 
         this.walls = [];
         window.EngineParams.arenaMode = false; 
         window.EngineParams.arenaWave = 0; 
@@ -1734,24 +1883,25 @@ window.EventBus?.on('GUARDBREAKER', performGuardbreaker);
 
 window.EventBus?.on('TOGGLE_STEALTH', () => {
     if (!window.GameCore?.playerObj || !window.Input) return;
-    window.Input.isStealth = !window.Input.isStealth;
+        window.Input.isStealth = !window.Input.isStealth;
     
     const player = window.GameCore.playerObj;
     if (window.Input.isStealth) {
         window.EventBus.emit('UI_LOG', '[STEALTH] You blend into the surroundings.');
         window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'STEALTH', pos: player.visual.position, color: '#94a3b8' });
-        try {
-            const pPos = player.body.translation();
-            const biomeColor = window.WorldGenConfig?.biomes?.[window.WorldGenerator?.getBiome(pPos.x, pPos.z)]?.color || '#94a3b8';
-            player.visual.traverse(child => {
-                if (child.isMesh) {
-                    child.userData.originalColor = child.material.color.clone();
-                    child.material.color.set(biomeColor);
-                    child.material.transparent = true;
-                    child.material.opacity = 0.5;
-                }
-            });
-        } catch(e){}
+        
+        const cached = physicsReadCache.get('player');
+        const pPos = cached ? cached.translation : player.body.translation();
+        const biomeColor = window.WorldGenConfig?.biomes?.[window.WorldGenerator?.getBiome(pPos.x, pPos.z)]?.color || '#94a3b8';
+        player.visual.traverse(child => {
+            if (child.isMesh) {
+                child.userData.originalColor = child.material.color.clone();
+                child.material.color.set(biomeColor);
+                child.material.transparent = true;
+                child.material.opacity = 0.5;
+            }
+        });
+
     } else {
         window.EventBus.emit('UI_LOG', '[STEALTH] You reveal yourself.');
         player.visual.traverse(child => {
@@ -1831,9 +1981,16 @@ window.EventBus?.on('PLAYER_PROJECTILE_HIT', ({ target, damage, damageType, posi
         setTimeout(() => {
             if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(target.id);
             window.GameCore.releaseEntityIndex(target.memoryIndex);
-            if (target.visual) window.GameCore.scene.remove(target.visual);
-            if (target.body) { window.GameCore.world.removeRigidBody(target.body); target.body = null; }
+                        if (target.visual) window.GameCore.scene.remove(target.visual);
+            if (target.body) { 
+                const b = target.body;
+                window.PhysicsQueue.enqueue(() => {
+                    if (window.GameCore?.world) window.GameCore.world.removeRigidBody(b);
+                });
+                target.body = null; 
+            }
             window.GameCore.activeEntities = window.GameCore.activeEntities.filter(entity => entity.id !== target.id);
+
         }, 2000);
     } else if (target.poise <= 0) {
         target.poise = target.maxPoise;
@@ -1868,13 +2025,20 @@ window.EventBus?.on('SPAWN_BLIGHT', () => {
 });
 
 window.EventBus?.on('CLEAR_MAP', () => { 
-    window.GameCore.activeEntities.forEach(en => { 
+        window.GameCore.activeEntities.forEach(en => { 
         if(en.def.faction === 'player') return; 
         if (window.GameCore.AnimationSystem) window.GameCore.AnimationSystem.disposeEntity(en.id);
         window.GameCore.releaseEntityIndex(en.memoryIndex); 
         if (en.visual) window.GameCore.scene.remove(en.visual);
-        if (en.body) { window.GameCore.world.removeRigidBody(en.body); en.body = null; }
+        if (en.body) { 
+            const b = en.body;
+            window.PhysicsQueue.enqueue(() => {
+                if (window.GameCore?.world) window.GameCore.world.removeRigidBody(b);
+            });
+            en.body = null; 
+        }
     }); 
+ 
     window.GameCore.activeEntities = window.GameCore.activeEntities.filter(en => en.def.faction === 'player'); 
     window.GameState.questBoard = []; 
     window.EventBus.emit('UI_LOG', "World Entities Cleared."); 
@@ -1965,13 +2129,20 @@ window.EventBus?.on('WORLD_REGENERATE', () => {
     window.currentPrng = alea(window.EngineParams?.worldSeed ?? 1337); 
     window.currentNoise2D = window.createNoise2D(window.currentPrng);
     
-    if (window.GameCore.playerObj && window.GameCore.playerObj.body) { 
+        if (window.GameCore.playerObj && window.GameCore.playerObj.body) { 
         ChunkManager.forceUpdatePosition(new THREE.Vector3(window.GameCore.playerObj.visual.position.x, 0, window.GameCore.playerObj.visual.position.z));
         const vy = safeGetTerrainHeight(window.GameCore.playerObj.visual.position.x, window.GameCore.playerObj.visual.position.z) + 5.0; 
-        window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true);
-        window.GameCore.playerObj.body.setAngvel({x:0, y:0, z:0}, true);
-        window.GameCore.playerObj.body.setTranslation({x: window.GameCore.playerObj.visual.position.x, y: vy, z: window.GameCore.playerObj.visual.position.z}, true); 
+        const px = window.GameCore.playerObj.visual.position.x;
+        const pz = window.GameCore.playerObj.visual.position.z;
+        window.PhysicsQueue.enqueue(() => {
+            if (window.GameCore.playerObj.body) {
+                window.GameCore.playerObj.body.setLinvel({x:0, y:0, z:0}, true);
+                window.GameCore.playerObj.body.setAngvel({x:0, y:0, z:0}, true);
+                window.GameCore.playerObj.body.setTranslation({x: px, y: vy, z: pz}, true); 
+            }
+        });
         window.spawnPartyMembers?.(); 
+ 
         window.syncCaravanAgents?.(); 
         window.syncPlayerBase?.(); 
     }
@@ -1983,11 +2154,16 @@ window.EventBus?.on('CMD_TELEPORT', (pos) => {
         const groundY = safeGetTerrainHeight(pos.x, pos.z);
         const safeY = (isNaN(groundY) ? 10 : groundY) + 5.0; 
 
-        window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: safeY, z: pos.z }, true);
+        window.PhysicsQueue.enqueue(() => {
+            if (window.GameCore.playerObj.body) {
+                window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+                window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: safeY, z: pos.z }, true);
+            }
+        });
         
         if (window.GameCore.playerObj.visual) {
+
             window.GameCore.playerObj.visual.position.set(pos.x, safeY - 1.0, pos.z);
         }
 
@@ -2009,11 +2185,16 @@ window.EventBus?.on('PLAYER_RESPAWN', () => {
     const respawnY = safeGetTerrainHeight(0, 0) + 5.0; 
  
     
-    if (window.GameCore.playerObj?.body) {
-        window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        window.GameCore.playerObj.body.setTranslation({ x: 0, y: respawnY, z: 0 }, true); 
+        if (window.GameCore.playerObj?.body) {
+        window.PhysicsQueue.enqueue(() => {
+            if (window.GameCore.playerObj.body) {
+                window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+                window.GameCore.playerObj.body.setTranslation({ x: 0, y: respawnY, z: 0 }, true); 
+            }
+        });
     }
+
     
     ChunkManager.forceUpdatePosition(new THREE.Vector3(0, respawnY, 0));
     window.GameState.pStats.hp = window.GameState.pStats.maxHp; 
@@ -2176,224 +2357,49 @@ async function bootEngine() {
 renderer.setAnimationLoop(() => {
     const delta = clock.getDelta();
     accumulator += delta;
+    
     while (accumulator >= fixedTimeStep) {
+        if (window.GameCore?.world && !isPhysicsStepping) {
+            isPhysicsStepping = true;
+            try {
+                window.PhysicsQueue.flush();
+                window.GameCore.world.step();
+                updatePhysicsReadCache();
+            } finally {
+                isPhysicsStepping = false;
+            }
+        }
+        if (window.GameCore?.checkFloatingOrigin) window.GameCore.checkFloatingOrigin();
+        
         fixedUpdateLogic(fixedTimeStep);
         accumulator -= fixedTimeStep;
     }
-        updateCameraAndShadows(delta);
 
-            if (window.EngineConfig?.crowsEyeMode) {
-            if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'hidden';
-            if (window.Tone && window.Tone.Destination) window.Tone.Destination.mute = true;
-            return; 
-        } else {
-            if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'visible';
-            if (window.Tone && window.Tone.Destination) window.Tone.Destination.mute = false;
-        }
+    
+    updateCameraAndShadows(delta);
 
-
-    if (window.RenderPipeline) {
-
-        window.RenderPipeline.render();
+    if (window.EngineConfig?.crowsEyeMode) {
+        if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'hidden';
+        if (window.Tone && window.Tone.Destination) window.Tone.Destination.mute = true;
+        // Logic loop continues even if rendering is hidden
     } else {
-        if (window.Profiler) window.Profiler.begin(String.fromCharCode(82,101,110,100,101,114,101,114));
-        renderer.render(window.GameCore.scene, window.GameCore.camera);
-        if (window.Profiler) window.Profiler.end(String.fromCharCode(82,101,110,100,101,114,101,114));
-        if (window.Profiler) window.Profiler.update(renderer);
-    }
-});
-          
-        clock = new THREE.Clock(); 
-        window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
-  
-        const horizonGeo = new THREE.PlaneGeometry(2000000, 2000000, 512, 512); 
-        horizonGeo.rotateX(-Math.PI / 2);
-          
-        const horizonMat = new THREE.ShaderMaterial({
-            uniforms: {
-                time: { value: 0 },
-                worldSeed: { value: 1337.0 },
-                sunPos: { value: new THREE.Vector3(0, 1, 0) },
-                fogColor: { value: new THREE.Color(0x94a3b8) }
-            },
-            vertexShader: `
-                varying float vHeight;
-                varying vec3 vWorldPos;
-                  
-                float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
-                float noise(vec2 p) {
-                    vec2 i = floor(p); vec2 f = fract(p);
-                    vec2 u = f*f*(3.0-2.0*f);
-                    return mix(mix(hash(i + vec2(0,0)), hash(i + vec2(1,0)), u.x),
-                               mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), u.x), u.y);
-                }
-
-                                void main() {
-                                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-                                    vWorldPos = worldPosition.xyz;
-                      
-                                    float distFromOrigin = max(abs(worldPosition.x), abs(worldPosition.z));
-                                    float mountainMask = smoothstep(290000.0, 345000.0, distFromOrigin); 
-                      
-                                    vec2 p = worldPosition.xz;
-                                    float h = noise(p * 0.000006) * 4500.0;
-                                    h += (1.0 - abs(noise(p * 0.000012) * 2.0 - 1.0)) * 2500.0;
-                                    h += noise(p * 0.00008) * 800.0;
-                      
-                                    float finalHeight = h * mountainMask;
-                                    worldPosition.y += finalHeight;
-                                    vHeight = finalHeight;
-                      
-                                    gl_Position = projectionMatrix * viewMatrix * worldPosition;
-                                }
-            `,
-                        fragmentShader: `
-                varying float vHeight;
-                varying vec3 vWorldPos;
-                uniform vec3 sunPos;
-                uniform vec3 fogColor;
-
-                void main() {
-                    vec3 rockColor = vec3(0.05, 0.07, 0.10);
-                    vec3 peakColor = vec3(0.18, 0.22, 0.28);
-                    vec3 snowColor = vec3(0.85, 0.90, 0.96);
-
-                    vec3 color = mix(rockColor, peakColor, clamp(vHeight / 4000.0, 0.0, 1.0));
-                    
-                    float snowMask = smoothstep(4200.0, 6500.0, vHeight);
-                    color = mix(color, snowColor, snowMask);
-
-                    float dist = length(vWorldPos.xz);
-                    float fogFactor = smoothstep(50000.0, 900000.0, dist);
-                      
-                    gl_FragColor = vec4(mix(color, fogColor, fogFactor * 0.80), 1.0);
-                }
-            `
-        });
-          
-        const horizonMesh = new THREE.Mesh(horizonGeo, horizonMat);
-        horizonMesh.position.y = -5; 
-        window.GameCore.scene.add(horizonMesh);
-        window.GameCore.horizonMaterial = horizonMat;
+        if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'visible';
+        if (window.Tone && window.Tone.Destination) window.Tone.Destination.mute = false;
 
         if (window.RenderPipeline) {
-            window.RenderPipeline.init(renderer, window.GameCore.scene, window.GameCore.pocketScene, window.GameCore.camera);
-            if (window.RenderPipeline.dirLight) {
-                window.RenderPipeline.dirLight.castShadow = true;
-                window.RenderPipeline.dirLight.shadow.bias = -0.0005;
-                window.RenderPipeline.dirLight.shadow.normalBias = 0.03;
-            }
-            window.RenderPipeline.updateEnvironment(window.GameCore.scene, window.GameCore.scene.fog, window.EngineParams, window.GameCore.horizonMaterial);
+            window.RenderPipeline.render();
+        } else {
+            if (window.Profiler) window.Profiler.begin(String.fromCharCode(82, 101, 110, 100, 101, 114, 101, 114));
+            renderer.render(window.GameCore.scene, window.GameCore.camera);
+            if (window.Profiler) window.Profiler.end(String.fromCharCode(82, 101, 110, 100, 101, 114, 101, 114));
+            if (window.Profiler) window.Profiler.update(renderer);
         }
-
-        const startY = safeGetTerrainHeight(0, 0); 
-        const safeY = isNaN(startY) ? 1 : startY;
-        window.spawnPlayer?.(0, safeY + 3.0, 0); 
-        window.spawnPartyMembers?.(); 
-        ChunkManager.forceUpdatePosition(new THREE.Vector3(0, safeY + 3.0, 0));
-
-        window.EventBus?.on('ENV_UPDATE', () => {
-            if (window.RenderPipeline && window.EngineParams) {
-                window.RenderPipeline.updateEnvironment(window.GameCore.scene, window.GameCore.scene.fog, window.EngineParams, window.GameCore.horizonMaterial);
-            }
-        });
-
-        window.EventBus?.on('SCENE_SWAP', ({ target, pos }) => {
-            if (window.RenderPipeline) window.RenderPipeline.swapScene(target);
-
-            if (target === 'establishment') {
-                if (window.GameCore.playerObj && window.GameCore.playerObj.body) {
-                    window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setTranslation({ x: 0, y: 3, z: 0 }, true);
-                    if (window.EngineParams) window.EngineParams.suppressChunkLoading = true;
-                }
-            } else if (target === 'world') {
-                if (window.GameCore.playerObj && window.GameCore.playerObj.body && pos) {
-                    ChunkManager.forceUpdatePosition(new THREE.Vector3(pos.x, 0, pos.z));
-                    const groundY = safeGetTerrainHeight(pos.x, pos.z) + 5.0;
-                    window.GameCore.playerObj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-                    window.GameCore.playerObj.body.setTranslation({ x: pos.x, y: groundY, z: pos.z }, true);
-                    if (window.EngineParams) window.EngineParams.suppressChunkLoading = false;
-                }
-            }
-            window.EventBus?.emit('ENV_UPDATE');
-        });
-
-        window.EventBus?.emit('ENGINE_READY'); 
-        window.EventBus?.emit('ENV_UPDATE');
-    } catch(e) { 
-        console.error("CRITICAL BOOT ERROR", e); 
     }
-}
-
-window.bootEngine = bootEngine;
-
-// ==========================================
-// RENDER LOOP & INPUT BINDING
-// ==========================================
-
-window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('btn-start')?.addEventListener('click', (e) => {
-        document.getElementById('start-screen').classList.add('hidden');
-        document.getElementById('hud').classList.remove('hidden');
-
-        if(window.GameCore) window.GameCore.engineState = 'running';
-
-        window.EventBus?.emit('UI_UPDATE_HUD');
-        window.EventBus?.emit('GAME_STARTED');
-
-        (async () => {
-            try {
-                if (window.Tone) {
-                    await window.Tone.start();
-                    if (window.Tone.Transport.state !== 'started') {
-                        window.Tone.Transport.start();
-                    }
-                    console.log('???? WebAudio Context resumed successfully.');
-                }
-            } catch (err) {
-                console.warn('AudioContext failed to start:', err);
-            }
-        })();
-
-        window.addEventListener('resize', () => { 
-            if(window.GameCore?.camera) {
-                window.GameCore.camera.aspect = window.innerWidth / window.innerHeight; 
-                window.GameCore.camera.updateProjectionMatrix(); 
-            }
-            if(renderer) {
-                renderer.setSize(window.innerWidth, window.innerHeight); 
-                if (window.RenderPipeline) window.RenderPipeline.resize(window.innerWidth, window.innerHeight);
-            }
-        });
-    
-        function animate() { 
-            requestAnimationFrame(animate); 
-            let delta = clock.getDelta(); 
-            if (delta > 0.1) delta = 0.1; 
-            accumulator += delta; 
-        
-            while (accumulator >= fixedTimeStep) { 
-                if (window.GameCore?.world) window.GameCore.world.step(); 
-                if (window.GameCore?.checkFloatingOrigin) window.GameCore.checkFloatingOrigin();
-        
-                fixedUpdateLogic(fixedTimeStep); 
-                accumulator -= fixedTimeStep; 
-            } 
-
-            updateCameraAndShadows(delta);
-
-            if (window.RenderPipeline) window.RenderPipeline.render();
-        }
-    
-        animate();
-    
-        window.EventBus?.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
-    }, { once: true }); 
 });
 
-bootEngine(); 
+clock = new THREE.Clock();
+window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
 
-       
+  
+        const horizonGeo = new THREE.PlaneGeometry(2000000, 2000000, 512, 512); 
+        horizon
