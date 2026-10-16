@@ -307,17 +307,20 @@ window.VillageManager = {
             village.barrierIntegrity = Math.min(100, village.barrierIntegrity + 8);
         } else         if (village.barrierIntegrity === 0) {
             this.postVillageNeed(village, 'essence', essenceCost, 'fueling the rune barrier');
-            if (Math.random() < 0.15 * (cal.monsters?.spawnFrequency || 1.0)) {
+                        if (Math.random() < 0.15 * (cal.monsters?.spawnFrequency || 1.0)) {
                 window.EventBus.emit('UI_LOG', `[BARRIER] ${village.name}'s ward is failing. Hunters must enter the woods.`);
-                window.ChronicleManager.recordEvent({
+                
+                // --- PHASE 1A: CHRONICLE ACTIVATION ---
+                window.ChronicleManager?.recordEvent?.({
                     actorId: `village_${village.id}`,
                     type: 'barrier_failure',
                     detail: `${village.name}'s protective barrier flickered and failed.`,
-                    significance: 40,
-                    historicalWeight: 10,
-                    witnesses: [`village_${village.id}`]
+                    significance: 60,
+                    historicalWeight: 20,
+                    location: { x: village.x, z: village.z }
                 });
             }
+
         }
 
         village.provisionStock[village.provision.itemId] = (village.provisionStock[village.provision.itemId] || 0) + Math.max(1, Math.floor(production / 2));
@@ -367,22 +370,24 @@ window.VillageManager = {
         const tradeDisruption = village.tradeDisruptionUntil > window.EngineParams.worldDay ? 30 : 0;
         village.stats.prosperity = Math.max(0, Math.min(100, 20 + foodSecurity + suppliedImports.length * 15 + (connectedTrade ? 25 : 0) - tradeDisruption));
 
-        if (village.lastGrowthDay !== window.EngineParams.worldDay && village.population.current < village.population.capacity && village.stats.prosperity >= 70 && village.stats.food >= village.population.current * 8) {
+                if (village.lastGrowthDay !== window.EngineParams.worldDay && village.population.current < village.population.capacity && village.stats.prosperity >= 70 && village.stats.food >= village.population.current * 8) {
             const growth = Math.min(village.population.capacity - village.population.current, Math.max(1, Math.floor((village.population.current * village.stats.prosperity / 10000) * worldCal.growthRate)));
             village.population.current += growth;
             village.lastGrowthDay = window.EngineParams.worldDay;
             
-                    if (village.population.current > 10000 && !village.recordedMajorMilestone) {
-            village.recordedMajorMilestone = true;
-            window.ChronicleManager.recordEvent({
-                actorId: `village_${village.id}`,
-                type: 'growth_milestone',
-                detail: `${village.name} has grown into a significant regional hub with ${village.population.current} souls.`,
-                significance: 100,
-                historicalWeight: 50,
-                witnesses: [`village_${village.id}`, 'The Capital']
-            });
-        }
+            // --- PHASE 1A: CHRONICLE ACTIVATION ---
+            if (village.population.current > 10000 && !village.recordedMajorMilestone) {
+                village.recordedMajorMilestone = true;
+                window.ChronicleManager?.recordEvent?.({
+                    actorId: `village_${village.id}`,
+                    type: 'growth_milestone',
+                    detail: `${village.name} has grown into a significant regional hub with ${village.population.current} souls.`,
+                    significance: 100,
+                    historicalWeight: 50,
+                    location: { x: village.x, z: village.z }
+                });
+            }
+
 
 
             window.EventBus.emit('UI_LOG', `[GROWTH] ${village.name} gained ${growth} residents from prosperity.`);
@@ -492,7 +497,7 @@ window.VillageManager = {
         }
     },
 
-    processEconomicCrises: function(village) {
+        processEconomicCrises: function(village) {
         village.crises ??= [];
         
         // 1. Famine Check
@@ -500,21 +505,23 @@ window.VillageManager = {
             if (!village.crises.includes('Famine')) {
                 village.crises.push('Famine');
                 window.EventBus.emit('UI_LOG', `[ECONOMY] ${village.name} is suffering from FAMINE.`);
-                                window.ChronicleManager.recordEvent({
+                
+                // --- PHASE 1A: CHRONICLE ACTIVATION ---
+                window.ChronicleManager?.recordEvent?.({
                     actorId: `village_${village.id}`,
                     type: 'famine_start',
                     detail: `${village.name} has run out of food reserves.`,
-                    significance: 70,
-                    historicalWeight: 30,
-                    witnesses: [`village_${village.id}`, 'The Capital']
+                    significance: 80,
+                    historicalWeight: 40,
+                    location: { x: village.x, z: village.z }
                 });
-
             }
             village.stats.prosperity = Math.max(0, village.stats.prosperity - 2);
             village.population.current = Math.max(10, village.population.current - Math.ceil(village.population.current * 0.01));
         } else {
             village.crises = village.crises.filter(c => c !== 'Famine');
         }
+
 
         // 2. Resource Monopoly Bonus/Malus
         // If a village produces a resource that everyone wants but no one else has
@@ -567,21 +574,25 @@ window.VillageManager = {
         candidates.sort((a, b) => b._lastPPS - a._lastPPS);
         const target = candidates[0];
 
-        // CHECK FOR SANCTIONS (Relations < -20)
+                // CHECK FOR SANCTIONS (Relations < -20)
         if ((target.relations[0] || 0) < -20) {
             if (target.barrierIntegrity < 25 && !target._wasSanctioned) {
                 window.EventBus.emit('UI_LOG', `[POLITICS] The Crown has denied fuel to ${target.name}. Let the woods teach them loyalty.`);
+                
+                // --- PHASE 1A: CHRONICLE ACTIVATION ---
                 window.ChronicleManager?.recordEvent?.({
                     actorId: 'The Capital',
                     type: 'house_sanctioned',
                     detail: `King Alaric sanctioned House ${target.nobleHouse.replace('House ', '')}, withholding Runic Fuel as their barriers fail.`,
-                    significance: 80,
-                    witnesses: ['The Capital', target.name]
+                    significance: 120,
+                    historicalWeight: 60,
+                    location: { x: 0, z: 0 }
                 });
                 target._wasSanctioned = true;
             }
             return; // Skip dispatch to sanctioned target
         }
+
 
         // 3. Dispatch Fuel
         // Ensure no active fuel caravan to this target
@@ -606,19 +617,23 @@ window.VillageManager = {
         const caravanEntity = window.GameCore.instantiatePrefab('Merchant Caravan', capital.x + 3, window.WorldGenerator.getTerrainHeight(capital.x + 3, capital.z), capital.z, 'persistent');
         if (caravanEntity) { caravanEntity.caravanId = caravan.id; caravanEntity.villageId = capital.id; }
 
-        // 4. Handle Favor Events
+                // 4. Handle Favor Events
         if ((target.relations[0] || 0) > 50) {
             window.EventBus.emit('UI_LOG', `[CROWN] Royal favor shown to ${target.name}. Essence dispatched by decree.`);
+            
+            // --- PHASE 1A: CHRONICLE ACTIVATION ---
             window.ChronicleManager?.recordEvent?.({
                 actorId: 'The Capital',
                 type: 'house_favored',
                 detail: `The Crown prioritized a fuel shipment to the loyal House ${target.nobleHouse.replace('House ', '')}.`,
-                significance: 60,
-                witnesses: ['The Capital', target.name]
+                significance: 80,
+                historicalWeight: 30,
+                location: { x: 0, z: 0 }
             });
         } else {
             window.EventBus.emit('UI_LOG', `[CROWN] Royal shipment of ${amount} essence dispatched to ${target.name}.`);
         }
+
     },
 
     processVillageCaravans: function(village) {

@@ -23,11 +23,11 @@ window.ChronicleManager = {
         }
     },
 
-    /**
+        /**
      * Records a significant event into the world's memory.
      * Bible §1: Action -> Intent -> Event -> Chronicle.
      */
-        recordEvent: function(event) {
+    recordEvent: function(event) {
         // 1. Validation & Enrichment
         event.id ??= 'evt_' + Math.random().toString(36).substr(2, 9);
         event.timestamp ??= {
@@ -39,6 +39,7 @@ window.ChronicleManager = {
         event.historicalWeight ??= 5;
         event.participants ??= [];
         event.witnesses ??= [];
+        event.location ??= { x: 0, z: 0 };
 
         // 2. Global Ledger
         this.worldLedger.push(event);
@@ -51,11 +52,10 @@ window.ChronicleManager = {
             this.entityRecords.get(event.actorId).push(event);
         }
 
-        // 4. Witness Logic (Phase 3 Hook)
+        // 4. Witness Logic (Phase 1B: Filtering & Discovery)
         this.generateWitnessIntel(event);
 
         // 5. Weight Accumulation (Bible §1)
-
         if (event.actorId) {
             const currentWeight = this.npcHistoricalWeights.get(event.actorId) || 0;
             const newWeight = currentWeight + (event.historicalWeight || 1);
@@ -66,9 +66,12 @@ window.ChronicleManager = {
                 window.LegacyManager.addSignificance(event.actorId, event.historicalWeight || 1);
             }
 
-            // CROW INTEREST: High weight individuals attract the Crow (Bible §18)
+            // --- PHASE 1C/6: LEGEND GENERATION (REFINED SCORING §1) ---
+            const typeModifier = this.getEventTypeModifier(event.type);
+            const witnessFactor = event.witnesses.length * 10;
+            const legendScore = (newWeight * typeModifier) + witnessFactor;
 
-            if (newWeight > 500 && !event.isLegendary) {
+            if (legendScore > 500 && !event.isLegendary) {
                  this.checkLegendThreshold(event.actorId, newWeight);
             }
         }
@@ -81,9 +84,108 @@ window.ChronicleManager = {
         this.captureSnapshot();
     },
 
+    getEventTypeModifier: function(type) {
+        const modifiers = {
+            'death': 3.0,
+            'famine_start': 2.5,
+            'barrier_failure': 4.0,
+            'growth_milestone': 1.5,
+            'house_sanctioned': 5.0,
+            'house_favored': 2.0,
+            'SHIFT_COMPLETE': 0.5, // Common world event
+            'entity_death': 1.0
+        };
+        return modifiers[type] || 1.0;
+    },
+
     /**
-     * Identifies if an individual has become a Legend.
+     * Phase 1B: Witness Layer & Discovery
+     * Bible §13: Event -> Witness -> Intel
      */
+    generateWitnessIntel: function(event) {
+        if (!window.IntelManager || !window.GameCore?.SpatialGrid) return;
+
+        // 1. Identify Physical Witnesses (Direct & Recorded)
+        let candidates = [];
+        if (window.GameCore.SpatialGrid.getNearbyEntities) {
+            candidates = window.GameCore.SpatialGrid.getNearbyEntities(event.location.x, event.location.z, 30);
+        }
+
+        // 2. Filter & Prioritize (Top 5 §4)
+        const witnesses = [];
+        const seenIds = new Set();
+        
+        // Always include actor if they can witness their own deed
+        if (event.actorId) seenIds.add(event.actorId);
+
+        // Prioritize Named NPCs and Player
+        candidates.sort((a, b) => {
+            const weightA = (a.id === 'player' ? 1000 : (this.npcHistoricalWeights.get(a.id) || 0));
+            const weightB = (b.id === 'player' ? 1000 : (this.npcHistoricalWeights.get(b.id) || 0));
+            return weightB - weightA;
+        });
+
+        for (const cand of candidates) {
+            if (witnesses.length >= 5) break;
+            if (seenIds.has(cand.id)) continue;
+            
+            witnesses.push({
+                id: cand.id,
+                type: cand.id === 'player' ? 'DIRECT' : (cand.def?.type === 'npc' ? 'DIRECT' : 'RECORDED'),
+                significance: cand.id === 'player' ? 100 : (this.npcHistoricalWeights.get(cand.id) || 10)
+            });
+            seenIds.add(cand.id);
+        }
+
+        // 3. Identify Institutional Witnesses (§4)
+        if (window.VillageManager) {
+            window.VillageManager.villages.forEach(v => {
+                const dist = Math.hypot(v.x - event.location.x, v.z - event.location.z);
+                if (dist < (v.territory?.radius || 100)) {
+                    if (!seenIds.has(`village_${v.id}`)) {
+                        witnesses.push({
+                            id: `village_${v.id}`,
+                            type: 'INSTITUTIONAL',
+                            significance: 50
+                        });
+                        seenIds.add(`village_${v.id}`);
+                    }
+                }
+            });
+        }
+
+        // 4. Update Event Record
+        event.witnesses = witnesses.map(w => w.id);
+
+        // 5. Generate Intel Records (Phase 1C: Pipeline Activation)
+        witnesses.forEach(w => {
+            const intelId = window.IntelManager.register({
+                type: event.significance > 50 ? window.IntelEnums.TYPES.FACT : window.IntelEnums.TYPES.RUMOR,
+                payload: {
+                    title: event.type.toUpperCase().replace(/_/g, ' '),
+                    description: event.detail,
+                    timestamp_day: event.timestamp.day,
+                    target_coord: { x: event.location.x, z: event.location.z },
+                    tags: ['CHRONICLE', event.type, w.type]
+                },
+                significance: {
+                    historical: event.historicalWeight,
+                    crow: event.significance
+                },
+                certainty: w.type === 'DIRECT' ? 0.9 : 0.6,
+                source_credibility: w.type === 'DIRECT' ? 0.8 : 0.5,
+                truth_state: window.IntelEnums.TRUTH_STATE.UNKNOWN // Must be verified by TruthSystem (§14)
+            });
+
+            window.IntelManager.grantOwnership(intelId, w.id);
+        });
+
+        // 6. Legend/Folklore Hook (Phase 3)
+        if (event.historicalWeight > 100 || event.significance > 80) {
+            this.evolveNarrative(event);
+        }
+    },
+
     checkLegendThreshold: function(nodeId, weight) {
         const ent = window.GameCore?.activeEntities.find(e => e.id === nodeId);
         if (!ent) return;
@@ -164,11 +266,13 @@ window.ChronicleManager = {
         return this.worldLedger.slice(-limit).reverse();
     },
 
-        /**
+            /**
      * Phase 3 & 4: Witness Layer & Intel Pipeline
      * Bible §13: Event -> Witness -> Intel
+     * (DEPRECATED - Moved to recordEvent in Phase 1B)
      */
-    generateWitnessIntel: function(event) {
+    _generateWitnessIntel_DEPRECATED: function(event) {
+
         if (!window.IntelManager) return;
 
         // 1. Identify Witnesses (Boilerplate: Entities near the event)

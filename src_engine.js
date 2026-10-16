@@ -492,7 +492,18 @@ function handleEntityDeath(entity) {
     playEntityAnimation(entity, 'die');
     window.AdventurerManager?.markDefeated?.(entity);
     
+    // --- PHASE 1A: CHRONICLE ACTIVATION ---
+    window.ChronicleManager?.recordEvent?.({
+        actorId: entity.id,
+        type: 'entity_death',
+        detail: `${entity.name} has perished.`,
+        significance: entity.def?.faction === 'monster' ? 20 : 50,
+        historicalWeight: entity.def?.faction === 'monster' ? 5 : 15,
+        location: { x: entity.visual.position.x, z: entity.visual.position.z }
+    });
+
     if (entity.name === 'Deer') {
+
         window.CareerManager?.addXP?.('hunter', 25);
         window.EventBus?.emit('UI_LOG', `[HUNTER] You have harvested a deer carcass.`);
     }
@@ -867,6 +878,12 @@ function fixedUpdateLogic(delta) {
     terrainHeightCache.clear();
     if (window.Heartbeat) window.Heartbeat.update(delta);
 
+    // --- PHASE 1D: TRUTH ACTIVATION (§14) ---
+    if (window.TruthSystem?.update) {
+        window.TruthSystem.update();
+    }
+
+
     
     // Update Regional Relativity State
     if (window.EpochManagerInstance && window.GameCore?.playerObj) {
@@ -1003,7 +1020,10 @@ function fixedUpdateLogic(delta) {
 // CHUNK & SCENERY MANAGERS
 // ==========================================
 
+const PERSISTENT_REALITY_LAYER = ['mountain', 'archive', 'runeTower', 'guardian_outpost', 'powerStone', 'arcaneDoor', 'firePit', 'streetLight'];
+
 let _lastChunkCheckPos = new THREE.Vector3(Infinity, Infinity, Infinity);
+
 
 const ChunkManager = {
     activeChunks: new Map(), 
@@ -1257,7 +1277,7 @@ const ChunkManager = {
             }
         );
     },
-    unloadChunk: function(key) {
+        unloadChunk: function(key) {
         const chunk = this.activeChunks.get(key); 
 
         if (window.GrassSystem) {
@@ -1269,8 +1289,25 @@ const ChunkManager = {
         }
 
         if(!chunk) return;
+
+        // --- PHASE 2: PERSISTENT REALITY LAYER (§5, §12) ---
+        // Verify if any entity in this chunk belongs to the Persistent Layer before full disposal.
+        if (window.GameCore?.activeEntities) {
+            const hasPersistentEntity = window.GameCore.activeEntities.some(en => 
+                en.chunkKey === key && PERSISTENT_REALITY_LAYER.includes(en.def?.type)
+            );
+            
+            if (hasPersistentEntity && window.EngineParams?.worldDay % 14 === 0) {
+                // During a Shift, we preserve the state of persistent chunks.
+                // We detach from scene to stop rendering, but keep the record.
+                if (chunk.mesh) window.GameCore.scene.remove(chunk.mesh);
+                chunk.state = window.ChunkState.UNLOADING; 
+                return; 
+            }
+        }
         
         if (chunk.mesh) {
+
             chunk.mesh.geometry?.dispose(); 
             chunk.mesh.material?.dispose(); 
             if (window.GameCore?.scene) window.GameCore.scene.remove(chunk.mesh); 
@@ -2080,34 +2117,24 @@ window.EventBus?.on('CLAIM_PLAYER_CAMP', () => {
 
 window.EventBus?.on('BUILD_BASE_STRUCTURE', prefab => {
     const base = window.GameState.base;
-    const blueprints = { 'Camp Storage Cache': { wood: 5, stone: 2 }, 'Camp Farm Plot': { wood: 4, stone: 1 }, 'Rune Tower': { wood: 12, stone: 10, research: 5 } };
-    const cost = blueprints[prefab];
-    if (!base.owned || !cost) return;
-    
-    if ((cost.research && (base.researchPoints || 0) < cost.research) || Object.entries(cost).filter(([resource]) => resource !== 'research').some(([resource, amount]) => base.storage.filter(itemId => itemId === resource).length < amount)) {
-        window.EventBus.emit('UI_LOG', `Camp storage lacks materials for ${prefab}.`);
-        return;
-    }
-    
-    Object.entries(cost).filter(([resource]) => resource !== 'research').forEach(([resource, amount]) => {
-        for (let index = 0; index < amount; index++) base.storage.splice(base.storage.indexOf(resource), 1);
-    });
-    
-    if (cost.research) base.researchPoints -= cost.research;
-    
-    const buildIndex = base.structures.length;
-    const x = base.position.x + 4 + (buildIndex % 3) * 4; 
-    const z = base.position.z + Math.floor(buildIndex / 3) * 4;
-    
-    const entity = instantiatePrefab(prefab, x, safeGetTerrainHeight(x, z), z, 'persistent');
-    if (!entity) return;
-    
+    // ... existing code ...
     entity.playerBase = true;
     base.structures.push({ prefab, x, z });
     if (prefab === 'Camp Farm Plot') base.farms.push({ x, z });
     if (prefab === 'Rune Tower') base.wardRadius = 30;
     
+    // --- PHASE 1A: CHRONICLE ACTIVATION ---
+    window.ChronicleManager?.recordEvent?.({
+        actorId: 'player',
+        type: 'structure_built',
+        detail: `The Player built a ${prefab} at their camp.`,
+        significance: 30,
+        historicalWeight: 10,
+        location: { x, z }
+    });
+
     window.CareerManager?.addXP('builder', 50);
+
     window.EventBus.emit('UI_LOG', `[CAMP] Built ${prefab}.`);
 });
 
@@ -2262,144 +2289,4 @@ async function bootEngine() {
                         // Ensure materials are set for the procedural trees
                         if (!baseTrunkMat || !baseCanopyMat) {
                             console.warn('[Engine] Forest materials not found. Falling back to default impostor system.');
-                            if (window.ForestImpostorSystem) window.ForestImpostorSystem.init(window.GameCore.scene);
-                        } else {
-                            window.ImpostorBaker.initializeBakeSetup(
-                                baseTrunkMat, 
-                                baseCanopyMat, 
-                                window.RenderPipeline?.dirLight?.position?.clone().normalize() || new THREE.Vector3(0.3, 0.6, 0.7),
-                                window.RenderPipeline?.dirLight?.color || new THREE.Color(0xfef3c7)
-                            );
-                    
-                            // Fetch Master Geometry built by the Web Worker (Guaranteeing it exists due to the await above)
-                            const masterGeo = window.RedwoodGenerator.getArchetype('ANCIENT', 0);
-                    
-                            if (!masterGeo) {
-                                throw new Error("Master geometry 'Redwood_ANCIENT_0' not found from generator.");
-                            }
-                    
-                            const bakedAtlas = window.ImpostorBaker.bakeAtlas(masterGeo, masterGeo, 16);
-                    
-                            if (window.ForestImpostorSystem) {
-                                window.ForestImpostorSystem.init(window.GameCore.scene, bakedAtlas, 16);
-                            }
-                    
-                            window.ImpostorBaker.dispose();
-                            console.log('[Engine] Impostor Baker finished and disposed cleanly.');
-                        }
-                    } catch (err) {
-                        console.error('[Engine] Impostor Baker crashed:', err);
-                        if (window.ForestImpostorSystem) window.ForestImpostorSystem.init(window.GameCore.scene); // Fallback init
-                    }
-                } else if (window.ForestImpostorSystem) {
-                    // Fallback initialization if Baker failed or Worker crashed
-                    window.ForestImpostorSystem.init(window.GameCore.scene);
-                }
-
-                // INITIALIZE NEW SYSTEMS
-        if (WetlandsSystem) {
-            window.GameCore.wetlandsSystem = new WetlandsSystem(window.GameCore, 300000);
-            window.GameCore.wetlandsSystem.spawnWetlandsChunk(window.GameCore.scene, 0, 0, 0.0);
-        }
-        
-                if (MountainSystem) {
-            window.GameCore.mountainSystem = new MountainSystem(window.GameCore, 300000);
-            // window.GameCore.mountainSystem.spawnMountainChunk(window.GameCore.scene, 0, 0);
-        }
-
-        if (DunesSystem) {
-            window.GameCore.dunesSystem = new DunesSystem(window.GameCore);
-            window.GameCore.dunesSystem.spawnDuneChunk(window.GameCore.scene, 0, 0);
-        }
-        
-        if (TidewaterSystem && renderer) {
-            window.GameCore.tidewaterSystem = new TidewaterSystem();
-            window.GameCore.tidewaterSystem.init(window.GameCore.scene, renderer);
-        }
-
-                initLightPool(window.GameCore.scene);
-
-        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" }); 
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); 
-        renderer.setSize(window.innerWidth || 800, window.innerHeight || 600); 
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.15;
-        renderer.outputColorSpace = THREE.SRGBColorSpace;
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-        document.body.appendChild(renderer.domElement);
-        window.GameCore.renderer = renderer;
-        
-        if (window.ImpostorBaker) {
-            window.ImpostorBaker.renderer = renderer; // Bind the constructed renderer to the baker
-        }
-
-        if (window.RenderOptimizer?.prewarmShaders) {
-            window.RenderOptimizer.prewarmShaders(renderer, window.GameCore.scene, window.GameCore.camera);
-        }
-
-        window.GameCore.pocketScene = new THREE.Scene();
-        window.GameCore.pocketScene.background = new THREE.Color(0x020617);
-        
-        if (window.BillboardManager) {
-            window.GameCore.scene.add(window.BillboardManager.group);
-        }
-
-        const roomGeo = new THREE.BoxGeometry(20, 10, 20);
-        const roomMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, side: THREE.BackSide });
-        const roomMesh = new THREE.Mesh(roomGeo, roomMat);
-        roomMesh.position.y = 5;
-        window.GameCore.pocketScene.add(roomMesh);
-// ==========================================
-// CORE ANIMATION LOOP
-// ==========================================
-renderer.setAnimationLoop(() => {
-    const delta = clock.getDelta();
-    accumulator += delta;
-    
-    while (accumulator >= fixedTimeStep) {
-        if (window.GameCore?.world && !isPhysicsStepping) {
-            isPhysicsStepping = true;
-            try {
-                window.PhysicsQueue.flush();
-                window.GameCore.world.step();
-                updatePhysicsReadCache();
-            } finally {
-                isPhysicsStepping = false;
-            }
-        }
-        if (window.GameCore?.checkFloatingOrigin) window.GameCore.checkFloatingOrigin();
-        
-        fixedUpdateLogic(fixedTimeStep);
-        accumulator -= fixedTimeStep;
-    }
-
-    
-    updateCameraAndShadows(delta);
-
-    if (window.EngineConfig?.crowsEyeMode) {
-        if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'hidden';
-        if (window.Tone && window.Tone.Destination) window.Tone.Destination.mute = true;
-        // Logic loop continues even if rendering is hidden
-    } else {
-        if (renderer && renderer.domElement) renderer.domElement.style.visibility = 'visible';
-        if (window.Tone && window.Tone.Destination) window.Tone.Destination.mute = false;
-
-        if (window.RenderPipeline) {
-            window.RenderPipeline.render();
-        } else {
-            if (window.Profiler) window.Profiler.begin(String.fromCharCode(82, 101, 110, 100, 101, 114, 101, 114));
-            renderer.render(window.GameCore.scene, window.GameCore.camera);
-            if (window.Profiler) window.Profiler.end(String.fromCharCode(82, 101, 110, 100, 101, 114, 101, 114));
-            if (window.Profiler) window.Profiler.update(renderer);
-        }
-    }
-});
-
-clock = new THREE.Clock();
-window.GameCore.world = new RAPIER.World({ x: 0.0, y: -20.0, z: 0.0 });
-
-  
-        const horizonGeo = new THREE.PlaneGeometry(2000000, 2000000, 512, 512); 
-        horizon
+                            if (window.Fores
