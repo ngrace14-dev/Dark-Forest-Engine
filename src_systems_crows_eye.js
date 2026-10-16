@@ -622,42 +622,43 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderPlaybackView() {
-        if (!window.ChronicleManager) return "Chronicle Offline";
+        renderPlaybackView() {
+        if (!window.ChronicleManager || !window.PlaybackManager) return "Chronicle Offline";
         const snapshots = Array.from(window.ChronicleManager.snapshots.keys()).sort((a, b) => a - b);
         if (snapshots.length === 0) return "No archaeological snapshots captured yet. Wait for a Shift.";
 
-        const currentDay = window.PlaybackManager?.currentPlaybackDay || snapshots[snapshots.length - 1];
+        const currentDay = window.PlaybackManager.currentPlaybackDay || snapshots[snapshots.length - 1];
         const snap = window.ChronicleManager.snapshots.get(currentDay);
         
         let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
         
-        // 1. Archaeology Controls
-        html += `<div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:20px;">
-            <div style="font-weight:bold; color:#fbbf24; margin-bottom:15px; font-size:14px;">ARCHAEOLOGICAL TIMELINE</div>
+        // --- PHASE: TIME GHOST RENDERING (§27) ---
+        html += `<div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:20px; border-left: 4px solid #fbbf24;">
+            <div style="font-weight:bold; color:#fbbf24; margin-bottom:15px; font-size:14px; letter-spacing:1px;">5D TEMPORAL CHANNELS</div>
             <input type="range" min="${snapshots[0]}" max="${snapshots[snapshots.length-1]}" step="5" value="${currentDay}" 
                 style="width:100%; accent-color:#fbbf24; margin-bottom:10px;"
                 oninput="window.PlaybackManager.setPlaybackDay(parseInt(this.value)); window.CrowsEye.updateTimer=1.0;">
             <div style="display:flex; justify-content:space-between; font-size:11px; color:#92400e;">
-                <span>DAY ${snapshots[0]}</span>
-                <span style="color:#fbbf24; font-size:14px; font-weight:bold;">CURRENT OBSERVATION: DAY ${currentDay}</span>
-                <span>DAY ${snapshots[snapshots.length-1]}</span>
+                <span>BEGINNING (DAY ${snapshots[0]})</span>
+                <span style="color:#fbbf24; font-size:14px; font-weight:bold;">TIME GHOST: DAY ${currentDay}</span>
+                <span>PRESENT</span>
             </div>
             <button style="margin-top:15px; background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px 15px; cursor:pointer; width:100%; font-size:10px;"
                 onclick="window.PlaybackManager.resetToPresent(); window.CrowsEye.updateTimer=1.0;">RESET TO PRESENT</button>
         </div>`;
 
         if (snap) {
-            // 2. Comparison Analysis
+            // Comparison Analysis
             const present = window.ChronicleManager.snapshots.get(snapshots[snapshots.length - 1]);
             const popDelta = snap.villages.reduce((s,v) => s + v.pop, 0) - present.villages.reduce((s,v) => s + v.pop, 0);
             const fidelityDelta = (snap.truth - present.truth) * 100;
 
             html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
                 <div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.3);">
-                    <div style="color:#78350f; font-size:10px; margin-bottom:5px;">WORLD POPULATION DELTA</div>
-                    <div style="font-size:18px; color:${popDelta >= 0 ? '#10b981' : '#ef4444'};">${popDelta > 0 ? '+' : ''}${popDelta}</div>
+                    <div style="color:#78350f; font-size:10px; margin-bottom:5px;">ARCHAEOLOGICAL POPULATION</div>
+                    <div style="font-size:18px; color:${popDelta >= 0 ? '#10b981' : '#ef4444'};">${snap.villages.reduce((s,v) => s + v.pop, 0)} <span style="font-size:10px;">(${popDelta > 0 ? '+' : ''}${popDelta})</span></div>
                 </div>
+
                 <div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.3);">
                     <div style="color:#78350f; font-size:10px; margin-bottom:5px;">GLOBAL FIDELITY DELTA</div>
                     <div style="font-size:18px; color:${fidelityDelta >= 0 ? '#10b981' : '#ef4444'};">${fidelityDelta > 0 ? '+' : ''}${fidelityDelta.toFixed(1)}%</div>
@@ -768,7 +769,7 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderMysteriesView() {
+        renderMysteriesView() {
         if (!window.InvestigationManager) return "Investigation System Offline";
         const mysteries = window.InvestigationManager.getMysteries();
         
@@ -777,16 +778,16 @@ class CrowsEyeSystem {
             const progressColor = m.discoveryProgress >= 100 ? '#10b981' : m.discoveryProgress > 0 ? '#f59e0b' : '#92400e';
             const stateLabel = m.state === 'RESOLVED' ? '[RESOLVED]' : m.state === 'INVESTIGATING' ? '[IN PROGRESS]' : '[UNSOLVED]';
             
-            html += `<div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.4);">
+            html += `<div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.4); border-top: 4px solid ${progressColor};">
                 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <span style="font-weight:bold; color:#fbbf24;">${m.title}</span>
+                    <span style="font-weight:bold; color:#fbbf24; font-size:14px;">${m.title}</span>
                     <span style="color:${progressColor}; font-size:10px;">${stateLabel}</span>
                 </div>
                 <div style="font-size:12px; color:#94a3b8; margin-bottom:15px; line-height:1.4;">${m.description}</div>
                 
-                <div style="margin-bottom:10px;">
+                <div style="margin-bottom:15px;">
                     <div style="display:flex; justify-content:space-between; font-size:10px; margin-bottom:3px;">
-                        <span style="color:#78350f;">INVESTIGATION PROGRESS</span>
+                        <span style="color:#78350f;">DISCOVERY PROGRESS</span>
                         <span style="color:#fbbf24;">${m.discoveryProgress}%</span>
                     </div>
                     <div style="height:6px; background:#451a03; width:100%;">
@@ -794,17 +795,38 @@ class CrowsEyeSystem {
                     </div>
                 </div>
 
-                <div style="font-size:11px; border-top:1px solid #451a03; padding-top:10px;">
-                    <div style="color:#fbbf24; margin-bottom:5px;">EVIDENCE (${m.linkedEvidence.size})</div>
-                    ${Array.from(m.linkedEvidence).map(id => {
-                        const intel = window.IntelManager.lookup(id);
-                        return `<div style="color:#94a3b8; margin-bottom:2px;">• ${intel ? intel.payload.title : 'Unknown Record'}</div>`;
-                    }).join('') || '<div style="color:#451a03;">No evidence linked yet.</div>'}
+                <!-- Evidence Chains (§30) -->
+                <div style="font-size:11px; margin-bottom:15px;">
+                    <div style="color:#fbbf24; margin-bottom:5px; border-bottom:1px solid #451a03;">SUPPORTING EVIDENCE</div>
+                    <div style="display:flex; flex-direction:column; gap:4px;">
+                        ${Array.from(m.linkedEvidence).map(id => {
+                            const intel = window.IntelManager.lookup(id);
+                            const day = intel?.payload?.timestamp_day || '?';
+                            return `<div style="color:#94a3b8; display:flex; justify-content:space-between;">
+                                <span>• ${intel ? intel.payload.title : 'Unknown'}</span>
+                                <span style="color:#78350f;">[Day ${day}]</span>
+                            </div>`;
+                        }).join('') || '<div style="color:#451a03;">No evidence linked.</div>'}
+                    </div>
                 </div>
 
+                <!-- Theories & Hypothetical Connections -->
+                ${m.theories?.length > 0 ? `
+                    <div style="font-size:11px; margin-bottom:15px;">
+                        <div style="color:#d97706; margin-bottom:5px; border-bottom:1px solid #78350f;">PROPOSED THEORIES</div>
+                        ${m.theories.map(t => `
+                            <div style="background:rgba(217,119,6,0.05); padding:5px; margin-bottom:4px;">
+                                <div style="color:#fbbf24; font-weight:bold;">${t.title}</div>
+                                <div style="color:#92400e; font-size:9px;">Strength: ${Math.floor(t.strength * 100)}%</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+
+                <!-- Contradiction Grouping (§14) -->
                 ${m.contradictions.length > 0 ? `
-                    <div style="font-size:11px; border-top:1px solid #78350f; padding-top:10px; margin-top:10px;">
-                        <div style="color:#ef4444; margin-bottom:5px;">CONTRADICTIONS (${m.contradictions.length})</div>
+                    <div style="font-size:11px; border-top:1px solid #ef4444; padding-top:10px;">
+                        <div style="color:#ef4444; margin-bottom:5px;">ACTIVE CONTRADICTIONS</div>
                         ${m.contradictions.map(c => `<div style="color:#f87171;">⚠️ ${c.reason}</div>`).join('')}
                     </div>
                 ` : ''}
@@ -813,6 +835,7 @@ class CrowsEyeSystem {
         html += `</div>`;
         return html;
     }
+
 
         renderIntelView() {
         if (!window.IntelManager) return "No Intel Data";

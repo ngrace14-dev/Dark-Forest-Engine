@@ -278,8 +278,45 @@ class InvestigationManagerSystem {
         return found;
     }
 
-    onIntelVerified(intel) {
+        /**
+     * Theory Creation (§30)
+     * Creates a hypothetical connection between clues.
+     */
+    createTheory(title, evidenceIds, mysteryId) {
+        const mystery = this.mysteries.get(mysteryId);
+        if (!mystery) return;
 
+        const theory = {
+            id: 'theory_' + Math.random().toString(36).substr(2, 5),
+            title,
+            evidence: new Set(evidenceIds),
+            strength: this.calculateTheoryStrength(evidenceIds),
+            timestamp: window.EngineParams?.worldDay || 0
+        };
+
+        mystery.theories = mystery.theories || [];
+        mystery.theories.push(theory);
+        
+        evidenceIds.forEach(id => mystery.linkedEvidence.add(id));
+        this.calculateProgress(mysteryId);
+
+        window.EventBus.emit('UI_LOG', `📜 [THEORY] New historical theory proposed: ${title}`);
+        return theory.id;
+    }
+
+    calculateTheoryStrength(evidenceIds) {
+        let weight = 0;
+        evidenceIds.forEach(id => {
+            const intel = window.IntelManager?.lookup(id);
+            if (intel) {
+                weight += (intel.certainty * (intel.significance?.historical || 10));
+            }
+        });
+        return Math.min(1.0, weight / 500);
+    }
+
+
+            onIntelVerified(intel) {
         this.mysteries.forEach(m => {
             if (m.linkedEvidence.has(intel.intel_id)) {
                 this.calculateProgress(m.id);
@@ -287,6 +324,7 @@ class InvestigationManagerSystem {
             }
         });
     }
+
 
     getMysteries() {
         return Array.from(this.mysteries.values());
