@@ -160,24 +160,110 @@ class InvestigationManagerSystem {
     }
 
         findConflict(intelA, intelB) {
-        // Logic 1: Factual Contradiction (Same location/event, different truth claim)
-        if (intelA.payload.target_coord && intelB.payload.target_coord) {
-            const dist = Math.hypot(intelA.payload.target_coord.x - intelB.payload.target_coord.x, 
-                                    intelA.payload.target_coord.z - intelB.payload.target_coord.z);
+            // Logic 1: Factual Contradiction (Same location/event, different truth claim)
+            if (intelA.payload.target_coord && intelB.payload.target_coord) {
+                const dist = Math.hypot(intelA.payload.target_coord.x - intelB.payload.target_coord.x, 
+                                        intelA.payload.target_coord.z - intelB.payload.target_coord.z);
             
-            if (dist < 15) {
-                // If one says TRUE and other says FALSE about the same area/fact
-                if (intelA.truth_state !== intelB.truth_state && intelA.certainty > 0.5 && intelB.certainty > 0.5) {
+                if (dist < 15) {
+                    // If one says TRUE and other says FALSE about the same area/fact
+                    if (intelA.truth_state !== intelB.truth_state && intelA.certainty > 0.5 && intelB.certainty > 0.5) {
+                        return {
+                            ids: [intelA.intel_id, intelB.intel_id],
+                            type: 'FACT_CONFLICT',
+                            reason: `Objective Conflict: ${intelA.payload.title} vs ${intelB.payload.title}`
+                        };
+                    }
+                }
+            }
+
+            // --- PHASE: CONTRADICTION DETECTION (§1, §14) ---
+
+            // Logic 2: Narrative Contradiction (History vs Truth)
+            const tagsA = intelA.payload.tags || [];
+            const tagsB = intelB.payload.tags || [];
+        
+            const isHistory = tagsA.includes('OFFICIAL_HISTORY') || tagsB.includes('OFFICIAL_HISTORY');
+            const isFact = intelA.type === 'FACT' || intelB.type === 'FACT';
+
+            if (isHistory && isFact) {
+                // Check if they describe the same historicalWeight (The unique event ID)
+                if (intelA.significance?.historical === intelB.significance?.historical && 
+                    intelA.significance?.historical > 0) {
+                
+                    // If history detail differs significantly from the Fact detail
+                    if (intelA.payload.description !== intelB.payload.description) {
+                        return {
+                            ids: [intelA.intel_id, intelB.intel_id],
+                            type: 'HISTORY_DISTORTION',
+                            reason: `Historical Revision: Official record differs from verified truth.`
+                        };
+                    }
+                }
+            }
+
+            // Logic 3: Lineage Split (Divergent Rumors)
+            if (intelA.parent_intel_id && intelA.parent_intel_id === intelB.parent_intel_id) {
+                if (intelA.payload.description !== intelB.payload.description) {
                     return {
                         ids: [intelA.intel_id, intelB.intel_id],
-                        type: 'FACT_CONFLICT',
-                        reason: `Conflict: ${intelA.payload.title} vs ${intelB.payload.title}`
+                        type: 'RUMOR_DIVERGENCE',
+                        reason: `Split Lineage: Two rumors from the same source have diverged.`
                     };
                 }
             }
+
+            return null;
         }
-        return null;
-    }
+
+        /**
+         * Automatic Global Scan
+         * Scans all registered intel for new conflicts to generate emergent mysteries.
+         */
+        scanForEmergentMysteries() {
+            if (!window.IntelManager) return;
+            const allIntel = Array.from(window.IntelManager.registry.values());
+        
+            for (let i = 0; i < allIntel.length; i++) {
+                for (let j = i + 1; j < allIntel.length; j++) {
+                    const conflict = this.findConflict(allIntel[i], allIntel[j]);
+                    if (conflict) {
+                        this.generateEmergentMystery(conflict, allIntel[i], allIntel[j]);
+                    }
+                }
+            }
+        }
+
+        generateEmergentMystery(conflict, intelA, intelB) {
+            const id = `mystery_emergent_${intelA.intel_id.split('_')[1]}`;
+            if (this.mysteries.has(id)) return;
+
+            const mystery = {
+                id,
+                title: `Contradiction: ${intelA.payload.title}`,
+                description: `Unresolved conflict between accounts: ${conflict.reason}`,
+                tier: this.calculateMysteryTier(intelA, intelB),
+                category: 'EMERGENT',
+                state: 'UNSOLVED',
+                linkedEvidence: new Set([intelA.intel_id, intelB.intel_id]),
+                contradictions: [conflict],
+                discoveryProgress: 10,
+                emergent: true,
+                relatedPeople: [...(intelA.provenance || []).map(p => p.node_id), ...(intelB.provenance || []).map(p => p.node_id)]
+            };
+
+            this.mysteries.set(id, mystery);
+            window.EventBus.emit('UI_LOG', `🔍 [INVESTIGATION] A new mystery has emerged from conflicting reports.`);
+            window.EventBus.emit('MYSTERY_GENERATED', mystery);
+        }
+
+        calculateMysteryTier(a, b) {
+            const sig = Math.max(a.significance.historical, b.significance.historical);
+            if (sig > 500) return 3; // Contradictions §33
+            if (sig > 100) return 2; // House Secrets
+            return 1; // Rumors
+        }
+
 
     /**
      * Cross-checks if a specific piece of intel is involved in any active contradiction.

@@ -220,10 +220,16 @@ class CrowsEyeSystem {
         return `${dir} ${name}`;
     }
 
-    update(dt) {
+        update(dt) {
         if (!this.isActive || !this.overlay) return;
 
+        // --- PHASE: INVESTIGATION SCAN (§30) ---
+        if (window.Heartbeat?.ticks.t1 && window.InvestigationManager?.scanForEmergentMysteries) {
+            window.InvestigationManager.scanForEmergentMysteries();
+        }
+
         // --- VELOCITY-BASED NAVIGATION ---
+
         if (this.currentView === 'MAP') {
             const accel = 100000 / this.zoom;
             const friction = 0.9;
@@ -808,23 +814,50 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderIntelView() {
+        renderIntelView() {
         if (!window.IntelManager) return "No Intel Data";
         const registry = Array.from(window.IntelManager.registry.values());
-        let html = `<div style="display:flex; flex-direction:column; gap:10px;">`;
-        registry.forEach(i => {
-            const color = i.type === 'FACT' ? '#10b981' : i.type === 'WARNING' ? '#f59e0b' : '#94a3b8';
-            html += `<div style="border-left: 4px solid ${color}; padding:10px; background:rgba(255,255,255,0.05);">
-                <div style="font-weight:bold; color:${color}">${i.payload.title} [${i.type}]</div>
-                <div style="font-size:12px;">${i.payload.description}</div>
-                <div style="font-size:10px; color:#78350f; margin-top:5px;">
-                    Certainty: ${(i.certainty * 100).toFixed(0)}% | Rarity: ${i.rarity} | Gen: ${i.spread_generation}
-                </div>
-            </div>`;
-        });
+        
+        // --- PHASE: LEDGER FILTERS (§29) ---
+        const unverified = registry.filter(i => i.truth_state === 'UNKNOWN');
+        const verified = registry.filter(i => i.truth_state === 'TRUE' || i.truth_state === 'FALSE');
+        
+        let html = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
+        
+        // Left Column: UNVERIFIED RUMORS
+        html += `<div>
+            <div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px; margin-bottom:10px;">UNVERIFIED RUMORS</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                ${unverified.map(i => {
+                    const conflict = window.InvestigationManager?.findContradictionForIntel(i.intel_id);
+                    return `
+                        <div style="border-left: 3px solid #94a3b8; padding:8px; background:rgba(255,255,255,0.03);">
+                            <div style="font-weight:bold; color:#94a3b8; font-size:11px;">${i.payload.title}</div>
+                            <div style="font-size:10px; color:#64748b;">${i.payload.description.substring(0, 100)}...</div>
+                            ${conflict ? `<div style="color:#ef4444; font-size:9px; margin-top:4px;">⚠️ ${conflict.type}</div>` : ''}
+                        </div>
+                    `;
+                }).join('') || '<div style="color:#451a03;">No unverified reports.</div>'}
+            </div>
+        </div>`;
+
+        // Right Column: VERIFIED TRUTH
+        html += `<div>
+            <div style="font-size:14px; color:#10b981; border-bottom:1px solid #064e3b; padding-bottom:5px; margin-bottom:10px;">VERIFIED TRUTH</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                ${verified.map(i => `
+                    <div style="border-left: 3px solid ${i.truth_state === 'TRUE' ? '#10b981' : '#ef4444'}; padding:8px; background:rgba(16,185,129,0.03);">
+                        <div style="font-weight:bold; color:#10b981; font-size:11px;">${i.payload.title} [${i.truth_state}]</div>
+                        <div style="font-size:10px; color:#94a3b8;">${i.payload.description}</div>
+                    </div>
+                `).join('') || '<div style="color:#451a03;">No verified truths.</div>'}
+            </div>
+        </div>`;
+
         html += `</div>`;
         return html;
     }
+
 
     renderTruthView() {
         if (!window.IntelManager) return "No Truth Data";
@@ -1749,262 +1782,4 @@ class CrowsEyeSystem {
         const legendsCount = window.GameState?.legends?.length || 0;
         const poemsCount = window.GameState?.anthology?.length || 0;
         
-        let densityHtml = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:20px; font-size:10px; background:rgba(0,0,0,0.5); padding:15px; border:1px solid #d97706;">
-            <div>EVENTS/DAY: ${eventsPerDay}</div>
-            <div>LEGENDS/TOTAL: ${legendsCount}</div>
-            <div>FOLKLORE ITEMS: ${poemsCount}</div>
-        </div>`;
-
-        let html = densityHtml + `<div style="display:flex; flex-direction:column; gap:20px;">`;
-        Object.entries(window.ForceManager.forces).forEach(([name, data]) => {
-            const percent = (data.strength / 1000) * 100;
-            
-            // Influence mapping
-            let influenceHtml = '';
-            if (name === 'Truth') {
-                const tracker = window.IntelTracker?.stats;
-                if (tracker) {
-                    influenceHtml = `<div style="font-size:10px; color:#10b981; margin-top:5px;">
-                        + ${tracker.trueFacts} Verified Facts<br>
-                        - ${tracker.falseFacts + tracker.distortedRecords} Distortions
-                    </div>`;
-                }
-            } else if (name === 'Houses') {
-                const monopolies = window.VillageManager?.villages.filter(v => v.hasMonopoly).length || 0;
-                influenceHtml = `<div style="font-size:10px; color:#fbbf24; margin-top:5px;">
-                    + ${monopolies} Resource Monopolies<br>
-                    Avg Prosperity: ${this.lastStats?.prosperity.toFixed(1)}%
-                </div>`;
-            } else if (name === 'Crow') {
-                const legends = window.GameState?.legends?.length || 0;
-                influenceHtml = `<div style="font-size:10px; color:#d97706; margin-top:5px;">
-                    + ${legends} Recorded Legends<br>
-                    + ${window.GameState?.anthology?.length || 0} Folktales Written
-                </div>`;
-            }
-
-            html += `<div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                    <span style="font-weight:bold; color:#fbbf24;">${name}</span>
-                    <span style="color:#78350f;">${data.strength} / 1000</span>
-                </div>
-                <div style="font-size:11px; margin-bottom:5px;">${data.description}</div>
-                <div style="height:8px; background:#451a03; width:100%;">
-                    <div style="height:100%; background:#f59e0b; width:${percent}%"></div>
-                </div>
-                <div style="font-size:10px; margin-top:5px; color:#92400e;">Current ${data.metric}: ${data.value}</div>
-                ${influenceHtml}
-            </div>`;
-        });
-        html += `</div>`;
-        return html;
-    }
-
-        renderCosmologicalView() {
-            const forestSide = window.WorldGenConfig?.darkForestSideMeters || 2000;
-            const width = 80;
-            const height = 40;
-            const grid = Array(height).fill(0).map(() => Array(width).fill(' '));
-        
-            // 1. Great Attractor (Center Gold Particles)
-            const centerX = Math.floor(width / 2);
-            const centerY = Math.floor(height / 2);
-            const GA_RADIUS = 3;
-            for (let y = -GA_RADIUS; y <= GA_RADIUS; y++) {
-                for (let x = -GA_RADIUS; x <= GA_RADIUS; x++) {
-                    const d = Math.sqrt(x*x + y*y);
-                    if (d < GA_RADIUS) {
-                        const char = Math.random() > 0.5 ? '*' : '.';
-                        const color = '#fbbf24';
-                        grid[centerY + y][centerX + x] = `<span style="color:${color}; animation: flicker ${1 + Math.random()}s infinite;">${char}</span>`;
-                    }
-                }
-            }
-
-            // 2. Rosen Bridge Network (Cosmic Filaments)
-            const bridges = [
-                { x1: 0.2, y1: 0.2, x2: 0.5, y2: 0.5 },
-                { x1: 0.8, y1: 0.1, x2: 0.5, y2: 0.5 },
-                { x1: 0.1, y1: 0.9, x2: 0.5, y2: 0.5 },
-                { x1: 0.9, y1: 0.8, x2: 0.5, y2: 0.5 },
-                { x1: 0.2, y1: 0.2, x2: 0.1, y2: 0.9 },
-                { x1: 0.8, y1: 0.1, x2: 0.9, y2: 0.8 }
-            ];
-
-            bridges.forEach(b => {
-                const px1 = Math.floor(b.x1 * width);
-                const py1 = Math.floor(b.y1 * height);
-                const px2 = Math.floor(b.x2 * width);
-                const py2 = Math.floor(b.y2 * height);
-            
-                this.drawBresenham(grid, px1, py1, px2, py2, '<span style="color:#1e293b;">·</span>');
-            });
-
-            // 3. World Entities (Ancient Atlas Style)
-            const gaNodes = [
-                { x: 0.5, y: 0.5, label: 'THE GREAT ATTRACTOR', color: '#fbbf24' },
-                { x: 0.3, y: 0.3, label: 'DARK FOREST', color: '#10b981' },
-                { x: 0.7, y: 0.2, label: 'MOUNTAIN RING', color: '#94a3b8' },
-                { x: 0.1, y: 0.8, label: 'ENDLESS DUNES', color: '#f59e0b' },
-                { x: 0.9, y: 0.7, label: 'ROSEN BRIDGE ALPHA', color: '#6366f1' }
-            ];
-
-            gaNodes.forEach(node => {
-                const gx = Math.floor(node.x * width);
-                const gy = Math.floor(node.y * height);
-                if (grid[gy] && grid[gy][gx]) {
-                    grid[gy][gx] = `<span style="color:${node.color}; font-weight:bold; cursor:pointer;" title="${node.label}">◎</span>`;
-                    // Add label if space permits
-                    if (gx + 2 < width) {
-                        const label = node.label.substring(0, 10);
-                        for (let i = 0; i < label.length; i++) {
-                            if (gx + 2 + i < width) {
-                                grid[gy][gx + 2 + i] = `<span style="color:#451a03; font-size:8px;">${label[i]}</span>`;
-                            }
-                        }
-                    }
-                }
-            });
-
-            const gridHtml = `<style>
-                @keyframes flicker { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
-            </style>
-            <div style="font-family:monospace; line-height:1; white-space:pre; background:#000; padding:20px; text-align:center; border:1px double #451a03;">
-                ${grid.map(row => row.join('')).join('\n')}
-            </div>`;
-
-            return { gridHtml, inspectedHtml: 'Cosmological Scale: Observing the Great Attractor and the Rosen Bridge Network.' };
-        }
-
-        drawBresenham(grid, x0, y0, x1, y1, char) {
-            let dx = Math.abs(x1 - x0);
-            let dy = Math.abs(y1 - y0);
-            let sx = (x0 < x1) ? 1 : -1;
-            let sy = (y0 < y1) ? 1 : -1;
-            let err = dx - dy;
-
-            while (true) {
-                if (grid[y0] && grid[y0][x0]) grid[y0][x0] = char;
-                if (x0 === x1 && y0 === y1) break;
-                let e2 = 2 * err;
-                if (e2 > -dy) { err -= dy; x0 += sx; }
-                if (e2 < dx) { err += dx; y0 += sy; }
-            }
-        }
-
-        generateAsciiGrid(entities, px, pz) {
-            const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
-            const mountainWidth = window.WorldGenConfig?.mountainRingWidthMeters || 160934.4;
-            const halfSide = forestSide / 2;
-        
-            const width = 80;
-            const height = 40;
-            const grid = Array(height).fill(0).map(() => Array(width).fill(' '));
-        
-            const worldToGrid = (wx, wz) => {
-                const gx = Math.floor(((wx - this.pan.x) / (forestSide * 2 / this.zoom) + 0.5) * width);
-                const gy = Math.floor(((wz - this.pan.z) / (forestSide * 2 / this.zoom) + 0.5) * height);
-                return { gx, gy };
-            };
-
-            // 1. Geography Layer (Low-Res Background)
-            if (this.zoom < 2.0) {
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        // Reverse map grid to world to check biome
-                        const wx = ((x / width) - 0.5) * (forestSide * 2 / this.zoom) + this.pan.x;
-                        const wz = ((y / height) - 0.5) * (forestSide * 2 / this.zoom) + this.pan.z;
-                    
-                        const dist = Math.max(Math.abs(wx), Math.abs(wz));
-                    
-                        if (dist > halfSide + mountainWidth) {
-                            grid[y][x] = '<span style="color:#2d2016; opacity:0.3;">░</span>'; // Dunes
-                        } else if (dist > halfSide) {
-                            grid[y][x] = '<span style="color:#1e1b4b; opacity:0.4;">▲</span>'; // Mountains
-                        } else {
-                            // In the forest
-                            if (x % 3 === 0 && y % 2 === 0) {
-                                grid[y][x] = '<span style="color:#064e3b; opacity:0.2;">♠</span>'; // Trees
-                            } else {
-                                grid[y][x] = '<span style="color:#022c22; opacity:0.1;">·</span>';
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. Entity Layer
-            entities.forEach(ent => {
-                const { gx, gy } = worldToGrid(ent.x, ent.z);
-                if (gx >= 0 && gx < width && gy >= 0 && gy < height) {
-                    let color = '#fbbf24';
-                    if (ent.type === 'P') color = '#ef4444';
-                    if (ent.type === 'V') color = '#10b981';
-                    if (ent.type === 'C') color = '#fbbf24';
-                    if (ent.type === 'M') color = '#92400e';
-                    if (ent.type === '#') color = '#1e293b';
-                
-                    const isSelected = this.selectedEntityId === ent.id;
-                    const style = isSelected ? `color:#fff; background:${color}; font-weight:bold;` : `color:${color};`;
-                    grid[gy][gx] = `<span style="${style} cursor:pointer;" data-id="${ent.id}">${ent.type}</span>`;
-                }
-            });
-
-            const gridHtml = `<div style="font-family:monospace; line-height:1; white-space:pre; background:#000; padding:10px; text-align:center; border:1px double #451a03; height: 100%; width: 100%; box-sizing: border-box; overflow: hidden; display: flex; align-items: center; justify-content: center;"><div style="display:inline-block; margin: auto;">${grid.map(row => row.join('')).join('\n')}</div></div>`;
-
-
-        let inspectedHtml = '';
-        if (this.selectedEntityId) {
-            const ent = entities.find(e => e.id === this.selectedEntityId);
-            if (ent) {
-                const ref = ent.ref;
-                inspectedHtml = `
-                    <div style="font-size:14px; line-height:1.6;">
-                        <div style="font-weight:bold; color:#fbbf24; font-size:18px; margin-bottom:5px;">${ref.name || 'UNKNOWN ENTITY'}</div>
-                        <div style="color:#78350f; font-size:10px; margin-bottom:15px;">ID: ${ent.id}</div>
-                        
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px; background:rgba(255,255,255,0.05); padding:10px; border:1px solid #451a03;">
-                            <div>COORD X: <span style="color:#fbbf24;">${Math.round(ent.x)}</span></div>
-                            <div>COORD Z: <span style="color:#fbbf24;">${Math.round(ent.z)}</span></div>
-                            <div>FACTION: <span style="color:#10b981;">${ref.def?.faction?.toUpperCase() || 'NEUTRAL'}</span></div>
-                            <div>STATUS: <span style="color:#f59e0b;">${ref.hp > 0 ? 'ACTIVE' : 'DECEASED'}</span></div>
-                        </div>
-
-                        <div style="margin-bottom:15px;">
-                            <div style="font-weight:bold; color:#fbbf24; border-bottom:1px solid #451a03; margin-bottom:5px; padding-bottom:2px;">TELEMETRY</div>
-                            <div style="font-size:12px; color:#94a3b8;">
-                                HP: ${Math.floor(ref.hp || 0)} / ${ref.maxHp || 100}<br>
-                                POISE: ${Math.floor(ref.poise || 0)}<br>
-                                TASK: ${ref.currentTask || 'IDLE'}<br>
-                                TARGET: ${ref.taskTarget || 'NONE'}
-                            </div>
-                        </div>
-
-                        ${ref.industry ? `
-                            <div style="margin-bottom:15px;">
-                                <div style="font-weight:bold; color:#fbbf24; border-bottom:1px solid #451a03; margin-bottom:5px; padding-bottom:2px;">VILLAGE STATS</div>
-                                <div style="font-size:12px; color:#94a3b8;">
-                                    HOUSE: ${ref.nobleHouse}<br>
-                                    PROSPERITY: ${ref.stats.prosperity.toFixed(1)}%<br>
-                                    INDUSTRY: ${ref.industry.industry} (${ref.industry.produces})
-                                </div>
-                            </div>
-                        ` : ''}
-
-                        <div style="display:flex; gap:10px; margin-top:20px;">
-                            <button style="flex:1; background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:8px; cursor:pointer; font-size:11px;"
-                                data-action="follow" data-id="${ent.id}">${this.followedEntityIds.has(ent.id) ? 'UNFOLLOW' : 'FOLLOW'}</button>
-                            <button style="flex:1; background:#1e1b4b; color:#fbbf24; border:1px solid #451a03; padding:8px; cursor:pointer; font-size:11px;"
-                                onclick="window.CrowsEye.pan.x=${ent.x}; window.CrowsEye.pan.z=${ent.z}; window.CrowsEye.updateTimer=1.0;">CENTER</button>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        return { gridHtml, inspectedHtml };
-    }
-}
-
-window.CrowsEye = new CrowsEyeSystem();
-
+        let densityHtml = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin
