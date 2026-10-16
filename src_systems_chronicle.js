@@ -208,7 +208,34 @@ window.ChronicleManager = {
         }
     },
 
-    identifyArchetype: function(ent, weight) {
+        /**
+     * Unified Significance Calculation (§1, §BN)
+     * Consolidates storyDensity, historicalWeight, and Event modifiers.
+     */
+    calculateSignificance: function(nodeId) {
+        // 1. Historical Weight (Chronicle)
+        const weight = this.npcHistoricalWeights.get(nodeId) || 0;
+        
+        // 2. Story Density (Runes §BN)
+        const storyDensity = window.RuneSystem?.getCarvings(nodeId)?.storyDensity || 0;
+        
+        // 3. Mystery Impact (Investigation)
+        let mysteryBonus = 0;
+        if (window.InvestigationManager) {
+            const solved = window.InvestigationManager.getMysteries().filter(m => 
+                m.state === 'RESOLVED' && (m.relatedPeople?.includes(nodeId) || nodeId === 'player')
+            );
+            mysteryBonus = solved.length * 50;
+        }
+
+        // 4. Consolidation
+        const score = (weight * 0.5) + (storyDensity * 1000) + mysteryBonus;
+        
+        // Legend Multiplier
+        const isLegend = window.GameState.legends?.some(l => l.actorId === nodeId);
+        return isLegend ? score * 1.5 : score;
+    },
+
         // Bible §22: Based on Drives and Force influence
         const profile = window.PersonhoodManager?.getProfile(ent.id);
         if (!profile) return 'UNSPECIAL';

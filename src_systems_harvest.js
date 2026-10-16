@@ -43,21 +43,19 @@ class WendigoHarvestSystem {
     }
 
     calculateHarvestPressure(nodeId) {
-        // System 1: Combine metrics into score
-        const weight = window.ChronicleManager.npcHistoricalWeights.get(nodeId) || 0;
-        const runes = window.RuneSystem?.getHarvestPressure(nodeId) || 0;
-        const dream = window.DreamManager?.getNPCState(nodeId);
+        // System 1: Unified Significance Calculation (§1, §BN)
+        if (!window.ChronicleManager?.calculateSignificance) return 0;
         
-        let score = (weight * 0.5) + (runes * 1000);
+        const significance = window.ChronicleManager.calculateSignificance(nodeId);
+        
+        // Add Dream/Corruption modifiers (Physical Influence)
+        let modifier = 1.0;
+        const dream = window.DreamManager?.getNPCState(nodeId);
         if (dream) {
-            score += (dream.intensity * 20) + (dream.corruption * 100);
+            modifier += (dream.intensity * 0.1) + (dream.corruption * 0.5);
         }
 
-        // Legends generate exponentially more pressure
-        const isLegend = window.GameState.legends?.some(l => l.actorId === nodeId);
-        if (isLegend) score *= 2.0;
-
-        return score;
+        return significance * modifier;
     }
 
     updateCandidate(nodeId, score) {
@@ -65,27 +63,41 @@ class WendigoHarvestSystem {
             pressureScore: 0, 
             orbAttention: 0, 
             huntsmanCultivation: 0,
-            status: 'NONE'
+            status: 'CURIOSITY'
         };
 
         candidate.pressureScore = score;
 
-        // System 3: Huntsman Cultivation (Early identification of potential)
-        if (score > 200 && candidate.huntsmanCultivation < 1.0) {
+        // --- PHASE: GRADUAL ESCALATION (§5) ---
+
+        // Stage 1: Curiosity (Low Significance)
+        if (score > 100 && candidate.status === 'NONE') {
+            candidate.status = 'CURIOSITY';
+        }
+
+        // Stage 2: Tracking (Medium Significance / Huntsman identification)
+        if (score > 300 && candidate.huntsmanCultivation < 1.0) {
             candidate.huntsmanCultivation = Math.min(1.0, candidate.huntsmanCultivation + 0.05);
-            if (candidate.huntsmanCultivation > 0.8 && candidate.status === 'NONE') {
-                candidate.status = 'CULTIVATED';
-                window.EventBus.emit('UI_LOG_DEBUG', `[HUNTSMAN] Identifying potential in ${nodeId}...`);
+            if (candidate.huntsmanCultivation > 0.6 && candidate.status === 'CURIOSITY') {
+                candidate.status = 'TRACKING';
+                window.EventBus.emit('UI_LOG_DEBUG', `[HUNTSMAN] Tracking rising significance in ${nodeId}.`);
             }
         }
 
-        // System 2: Orb Recognition (Recognition of greatness)
-        if (score > 500) {
-            candidate.orbAttention = Math.min(1.0, (score - 500) / 500);
-            if (candidate.orbAttention > 0.5 && candidate.status !== 'RECOGNIZED') {
-                candidate.status = 'RECOGNIZED';
-                window.EventBus.emit('UI_LOG', `👁️ [ORB] The Great Eye has turned toward ${nodeId}.`);
+        // Stage 3: Active Pursuit (High Significance / Orb recognition)
+        if (score > 600) {
+            candidate.orbAttention = Math.min(1.0, (score - 600) / 400);
+            if (candidate.orbAttention > 0.4 && candidate.status === 'TRACKING') {
+                candidate.status = 'ACTIVE_PURSUIT';
+                window.EventBus.emit('UI_LOG', `👁️ [ORB] The Great Eye has recognized ${nodeId}.`);
             }
+        }
+
+        // Stage 4: Harvest Beacon (Extreme Significance)
+        if (score > 1000 && candidate.status !== 'HARVEST_BEACON') {
+            candidate.status = 'HARVEST_BEACON';
+            window.EventBus.emit('UI_LOG', `🏮 [HARVEST] ${nodeId} has become a beacon. The woods are closing in.`);
+            this.triggerOrbLament();
         }
 
         this.harvestCandidates.set(nodeId, candidate);

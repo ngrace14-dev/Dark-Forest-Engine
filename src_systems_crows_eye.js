@@ -1772,14 +1772,35 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderForcesView() {
-        if (!window.ForceManager) return "No Force Data";
+        renderForcesView() {
+        if (!window.ForceManager || !window.ChronicleManager || !window.HarvestEngine) return "No Data";
         
-        // Story Density Metrics
         const day = window.EngineParams?.worldDay || 1;
-        const totalEvents = window.ChronicleManager?.worldLedger.length || 0;
-        const eventsPerDay = (totalEvents / day).toFixed(2);
-        const legendsCount = window.GameState?.legends?.length || 0;
-        const poemsCount = window.GameState?.anthology?.length || 0;
         
-        let densityHtml = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin
+        // --- PHASE: HARVEST TELEMETRY (§BN) ---
+        const playerSig = window.ChronicleManager.calculateSignificance('player');
+        const harvestState = window.HarvestEngine.harvestCandidates.get('player') || { status: 'NONE', pressureScore: 0 };
+        const storyDensity = window.RuneSystem?.getCarvings('player')?.storyDensity || 0;
+        const histWeight = window.ChronicleManager.npcHistoricalWeights.get('player') || 0;
+
+        let densityHtml = `<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:20px; background:rgba(0,0,0,0.4); padding:15px; border:1px solid #78350f;">
+            <div>
+                <div style="font-size:9px; color:#78350f;">STORY DENSITY</div>
+                <div style="color:#fbbf24;">${storyDensity.toFixed(2)}</div>
+            </div>
+            <div>
+                <div style="font-size:9px; color:#78350f;">HISTORICAL WEIGHT</div>
+                <div style="color:#fbbf24;">${histWeight}</div>
+            </div>
+            <div>
+                <div style="font-size:9px; color:#78350f;">SIGNIFICANCE</div>
+                <div style="color:#fbbf24; font-weight:bold;">${Math.floor(playerSig)}</div>
+            </div>
+            <div>
+                <div style="font-size:9px; color:#78350f;">HARVEST STATUS</div>
+                <div style="color:${harvestState.pressureScore > 800 ? '#ef4444' : '#fbbf24'};">${harvestState.status}</div>
+            </div>
+        </div>`;
+
+        const forces = window.ForceManager.forces;
+
