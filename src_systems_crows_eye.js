@@ -642,39 +642,46 @@ class CrowsEyeSystem {
     }
 
         renderPlaybackView() {
-        if (!window.ChronicleManager || !window.PlaybackManager) return "Chronicle Offline";
-        const snapshots = Array.from(window.ChronicleManager.snapshots.keys()).sort((a, b) => a - b);
-        if (snapshots.length === 0) return "No archaeological snapshots captured yet. Wait for a Shift.";
+            if (!window.ChronicleManager || !window.PlaybackManager) return "Chronicle Offline";
+            const snapshots = Array.from(window.ChronicleManager.snapshots.keys()).sort((a, b) => a - b);
+            if (snapshots.length === 0) return `<div style="text-align:center; padding:50px; color:#451a03;">
+                <div style="font-size:32px; margin-bottom:15px;">⏳</div>
+                <div>No archaeological snapshots captured yet.</div>
+                <div style="font-size:11px; margin-top:5px;">Snapshots are taken every 5 days or during world-shifting events.</div>
+            </div>`;
 
-        const currentDay = window.PlaybackManager.currentPlaybackDay || snapshots[snapshots.length - 1];
-        const snap = window.ChronicleManager.snapshots.get(currentDay);
+            const currentDay = window.PlaybackManager.currentPlaybackDay || snapshots[snapshots.length - 1];
+            const snap = window.ChronicleManager.snapshots.get(currentDay);
         
-        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
+            let html = `<div style="display:flex; flex-direction:column; gap:25px; height:100%;">`;
         
-        // --- PHASE: TIME GHOST RENDERING (§27) ---
-        html += `<div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:20px; border-left: 4px solid #fbbf24;">
-            <div style="font-weight:bold; color:#fbbf24; margin-bottom:15px; font-size:14px; letter-spacing:1px;">5D TEMPORAL CHANNELS</div>
-            <input type="range" min="${snapshots[0]}" max="${snapshots[snapshots.length-1]}" step="5" value="${currentDay}" 
-                style="width:100%; accent-color:#fbbf24; margin-bottom:10px;"
-                oninput="window.PlaybackManager.setPlaybackDay(parseInt(this.value)); window.CrowsEye.updateTimer=1.0;">
-            <div style="display:flex; justify-content:space-between; font-size:11px; color:#92400e;">
-                <span>BEGINNING (DAY ${snapshots[0]})</span>
-                <span style="color:#fbbf24; font-size:14px; font-weight:bold;">TIME GHOST: DAY ${currentDay}</span>
-                <span>PRESENT</span>
-            </div>
-            <button style="margin-top:15px; background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px 15px; cursor:pointer; width:100%; font-size:10px;"
-                onclick="window.PlaybackManager.resetToPresent(); window.CrowsEye.updateTimer=1.0;">RESET TO PRESENT</button>
-        </div>`;
+            // --- PHASE: TIME GHOST RENDERING (§27) ---
+            html += `<div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:20px; border-left: 4px solid #fbbf24; flex-shrink:0;">
+                <div style="font-weight:bold; color:#fbbf24; margin-bottom:15px; font-size:14px; letter-spacing:1px;">5D TEMPORAL CHANNELS</div>
+                <input type="range" min="${snapshots[0]}" max="${snapshots[snapshots.length-1]}" step="5" value="${currentDay}" 
+                    style="width:100%; accent-color:#fbbf24; margin-bottom:10px;"
+                    oninput="window.PlaybackManager.setPlaybackDay(parseInt(this.value)); window.CrowsEye.updateTimer=1.0;">
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:#92400e;">
+                    <span>BEGINNING (DAY ${snapshots[0]})</span>
+                    <span style="color:#fbbf24; font-size:14px; font-weight:bold;">TIME GHOST: DAY ${currentDay}</span>
+                    <span>PRESENT</span>
+                </div>
+                <div style="margin-top:15px; display:flex; gap:10px;">
+                    <button style="flex:1; background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:8px; cursor:pointer; font-size:10px;"
+                        onclick="window.PlaybackManager.resetToPresent(); window.CrowsEye.updateTimer=1.0;">RESET TO PRESENT</button>
+                </div>
+            </div>`;
 
+
+                // 3. Historical Geography (Bible §27: Observing how villages changed)
         if (snap) {
-            // Comparison Analysis
             const present = window.ChronicleManager.snapshots.get(snapshots[snapshots.length - 1]);
             const popDelta = snap.villages.reduce((s,v) => s + v.pop, 0) - present.villages.reduce((s,v) => s + v.pop, 0);
             const fidelityDelta = (snap.truth - present.truth) * 100;
 
-            html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+            html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; flex-shrink:0;">
                 <div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.3);">
-                    <div style="color:#78350f; font-size:10px; margin-bottom:5px;">ARCHAEOLOGICAL POPULATION</div>
+                    <div style="color:#78350f; font-size:10px; margin-bottom:5px;">HISTORICAL POPULATION</div>
                     <div style="font-size:18px; color:${popDelta >= 0 ? '#10b981' : '#ef4444'};">${snap.villages.reduce((s,v) => s + v.pop, 0)} <span style="font-size:10px;">(${popDelta > 0 ? '+' : ''}${popDelta})</span></div>
                 </div>
 
@@ -685,22 +692,35 @@ class CrowsEyeSystem {
             </div>`;
 
             // 3. Historical Geography (Bible §27: Observing how villages changed)
-            html += `<div>
-                <div style="font-size:12px; color:#fbbf24; border-bottom:1px solid #451a03; padding-bottom:5px; margin-bottom:10px;">HISTORICAL GEOGRAPHY</div>
-                <table style="width:100%; font-size:11px; text-align:left;">
-                    <tr style="color:#78350f;"><th>SETTLEMENT</th><th>HOUSE</th><th>HISTORICAL POS</th><th>STATUS</th></tr>
+            html += `<div style="flex-grow:1; overflow-y:auto; border:1px solid #451a03; background:rgba(0,0,0,0.2); padding:10px;">
+
+                <div style="font-size:12px; color:#fbbf24; border-bottom:1px solid #451a03; padding-bottom:5px; margin-bottom:10px; sticky; top:0; background:inherit;">HISTORICAL GEOGRAPHY & SETTLEMENT DRIFT</div>
+                <table style="width:100%; font-size:11px; text-align:left; border-collapse:collapse;">
+                    <tr style="color:#78350f; border-bottom:1px solid #451a03;">
+                        <th style="padding:5px;">SETTLEMENT</th>
+                        <th>HOUSE</th>
+                        <th>HISTORICAL POS</th>
+                        <th>CURRENT POS</th>
+                        <th>DRIFT</th>
+                    </tr>
                     ${snap.villages.map(v => {
                         const presentV = present.villages.find(pv => pv.id === v.id);
-                        const hasMoved = presentV && (Math.abs(v.x - presentV.x) > 100 || Math.abs(v.z - presentV.z) > 100);
-                        return `<tr>
-                            <td style="color:#fbbf24;">${v.name}</td>
-                            <td>${v.house}</td>
-                            <td>[${Math.round(v.x)}, ${Math.round(v.z)}]</td>
-                            <td style="color:${hasMoved ? '#f59e0b' : '#94a3b8'};">${hasMoved ? 'RECONFIGURED' : 'STABLE'}</td>
+                        const dx = presentV ? presentV.x - v.x : 0;
+                        const dz = presentV ? presentV.z - v.z : 0;
+                        const drift = Math.hypot(dx, dz);
+                        const hasMoved = drift > 50;
+                        
+                        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                            <td style="color:#fbbf24; padding:8px 5px;">${v.name}</td>
+                            <td style="color:#94a3b8;">${v.house}</td>
+                            <td style="color:#78350f;">[${Math.round(v.x)}, ${Math.round(v.z)}]</td>
+                            <td style="color:#94a3b8;">${presentV ? `[${Math.round(presentV.x)}, ${Math.round(presentV.z)}]` : 'LOST'}</td>
+                            <td style="color:${hasMoved ? '#ef4444' : '#10b981'};">${hasMoved ? `${Math.round(drift)}m` : 'STABLE'}</td>
                         </tr>`;
                     }).join('')}
                 </table>
             </div>`;
+
         }
 
         html += `</div>`;
@@ -783,14 +803,32 @@ class CrowsEyeSystem {
         }
 
         flagEvidence(intelId, mysteryId) {
-
-        if (window.InvestigationManager) {
-            window.InvestigationManager.flagEvidence(intelId, mysteryId);
-            this.updateTimer = 1.0;
+            if (window.InvestigationManager) {
+                window.InvestigationManager.flagEvidence(intelId, mysteryId);
+                window.EventBus.emit('UI_LOG', `[INVESTIGATION] Clue linked to: ${window.InvestigationManager.mysteries.get(mysteryId).title}`);
+                this.updateTimer = 1.0;
+            }
         }
+
+
+        createTheory(title, mysteryId) {
+        if (!window.InvestigationManager) return;
+        const mystery = window.InvestigationManager.mysteries.get(mysteryId);
+        if (!mystery) return;
+
+        // Automatically link all evidence currently in the mystery to this theory
+        const evidenceIds = Array.from(mystery.linkedEvidence);
+        if (evidenceIds.length === 0) {
+            window.EventBus.emit('UI_LOG', '[THEORY] Cannot propose theory without evidence.');
+            return;
+        }
+
+        window.InvestigationManager.createTheory(title, evidenceIds, mysteryId);
+        this.updateTimer = 1.0;
     }
 
     renderTrend(key, unit = "") {
+
 
         const delta = this.trends[key] || 0;
         const color = delta > 0 ? '#10b981' : delta < 0 ? '#ef4444' : '#94a3b8';
@@ -868,18 +906,21 @@ class CrowsEyeSystem {
                     </div>
                 </div>
 
-                <!-- Theories & Hypothetical Connections -->
-                ${m.theories?.length > 0 ? `
-                    <div style="font-size:11px; margin-bottom:15px;">
-                        <div style="color:#d97706; margin-bottom:5px; border-bottom:1px solid #78350f;">PROPOSED THEORIES</div>
-                        ${m.theories.map(t => `
-                            <div style="background:rgba(217,119,6,0.05); padding:5px; margin-bottom:4px;">
-                                <div style="color:#fbbf24; font-weight:bold;">${t.title}</div>
-                                <div style="color:#92400e; font-size:9px;">Strength: ${Math.floor(t.strength * 100)}%</div>
-                            </div>
-                        `).join('')}
+                                <!-- Theories & Hypothetical Connections -->
+                <div style="font-size:11px; margin-bottom:15px; border-top: 1px solid #451a03; padding-top:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                        <div style="color:#d97706;">PROPOSED THEORIES</div>
+                        <button style="background:#1e1b4b; color:#fbbf24; border:1px solid #78350f; padding:2px 5px; font-size:9px; cursor:pointer;"
+                            onclick="const t = prompt('Name your theory:'); if(t) window.CrowsEye.createTheory(t, '${m.id}')">PROPOSE THEORY</button>
                     </div>
-                ` : ''}
+                    ${m.theories?.length > 0 ? m.theories.map(t => `
+                        <div style="background:rgba(217,119,6,0.05); padding:5px; margin-bottom:4px; border-left: 2px solid #d97706;">
+                            <div style="color:#fbbf24; font-weight:bold;">${t.title}</div>
+                            <div style="color:#92400e; font-size:9px;">Strength: ${Math.floor(t.strength * 100)}% | Evidence: ${t.evidence.size}</div>
+                        </div>
+                    `).join('') : '<div style="color:#451a03;">No theories proposed.</div>'}
+                </div>
+
 
                 <!-- Contradiction Grouping (§14) -->
                 ${m.contradictions.length > 0 ? `
@@ -923,29 +964,32 @@ class CrowsEyeSystem {
         </div>`;
 
                 // Right Column: VERIFIED TRUTH
-        html += `<div>
-            <div style="font-size:14px; color:#10b981; border-bottom:1px solid #064e3b; padding-bottom:5px; margin-bottom:10px;">VERIFIED TRUTH</div>
-            <div style="display:flex; flex-direction:column; gap:8px;">
-                ${verified.map(i => {
-                    const activeMysteries = window.InvestigationManager?.getMysteries().filter(m => m.state === 'INVESTIGATING') || [];
-                    return `
-                        <div style="border-left: 3px solid ${i.truth_state === 'TRUE' ? '#10b981' : '#ef4444'}; padding:8px; background:rgba(16,185,129,0.03);">
-                            <div style="display:flex; justify-content:space-between;">
-                                <div style="font-weight:bold; color:#10b981; font-size:11px;">${i.payload.title} [${i.truth_state}]</div>
-                                ${activeMysteries.length > 0 ? `
-                                    <select style="font-size:9px; background:#000; color:#fbbf24; border:1px solid #451a03;" 
-                                        onchange="if(this.value) { window.CrowsEye.flagEvidence('${i.intel_id}', this.value); this.value=''; }">
-                                        <option value="">Link to Mystery...</option>
-                                        ${activeMysteries.map(m => `<option value="${m.id}">${m.title}</option>`).join('')}
-                                    </select>
-                                ` : ''}
-                            </div>
-                            <div style="font-size:10px; color:#94a3b8;">${i.payload.description}</div>
-                        </div>
-                    `;
-                }).join('') || '<div style="color:#451a03;">No verified truths.</div>'}
-            </div>
-        </div>`;
+                html += `<div>
+                    <div style="font-size:14px; color:#10b981; border-bottom:1px solid #064e3b; padding-bottom:5px; margin-bottom:10px;">VERIFIED TRUTH & ARTIFACTS</div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        ${verified.map(i => {
+                            const activeMysteries = window.InvestigationManager?.getMysteries().filter(m => m.state !== 'RESOLVED') || [];
+                            const isLinked = activeMysteries.some(m => m.linkedEvidence.has(i.intel_id));
+                            return `
+                                <div style="border-left: 3px solid ${i.truth_state === 'TRUE' ? '#10b981' : '#ef4444'}; padding:8px; background:rgba(16,185,129,0.03); opacity:${isLinked ? 0.7 : 1};">
+                                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                                        <div style="font-weight:bold; color:#10b981; font-size:11px;">${i.payload.title} [${i.truth_state}]</div>
+                                        ${activeMysteries.length > 0 ? `
+                                            <select style="font-size:9px; background:#000; color:#fbbf24; border:1px solid #451a03; max-width:120px;" 
+                                                onchange="if(this.value) { window.CrowsEye.flagEvidence('${i.intel_id}', this.value); this.value=''; }">
+                                                <option value="">${isLinked ? 'Link Again...' : 'Link to Mystery...'}</option>
+                                                ${activeMysteries.map(m => `<option value="${m.id}">${m.title}</option>`).join('')}
+                                            </select>
+                                        ` : ''}
+                                    </div>
+                                    <div style="font-size:10px; color:#94a3b8; margin-top:5px;">${i.payload.description}</div>
+                                    <div style="font-size:9px; color:#78350f; margin-top:5px;">SOURCE: ${i.provenance?.[0]?.node_id || 'System'} | DAY: ${i.payload.timestamp_day || '?'}</div>
+                                </div>
+                            `;
+                        }).join('') || '<div style="color:#451a03;">No verified truths.</div>'}
+                    </div>
+                </div>`;
+
 
 
         html += `</div>`;

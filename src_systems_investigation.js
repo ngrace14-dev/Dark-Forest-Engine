@@ -79,13 +79,15 @@ class InvestigationManagerSystem {
     }
 
     registerMystery(data) {
-        this.mysteries.set(data.id, {
+                this.mysteries.set(data.id, {
             ...data,
             state: 'UNSOLVED', // UNSOLVED, INVESTIGATING, RESOLVED
             linkedEvidence: new Set(),
+            theories: [],
             contradictions: [],
             discoveryProgress: 0 // 0 to 100
         });
+
     }
 
     /**

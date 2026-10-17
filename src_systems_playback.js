@@ -38,7 +38,7 @@ class PlaybackSystem {
         }
     }
 
-    /**
+        /**
      * Resets the Atlas to the objective present.
      */
     resetToPresent() {
@@ -46,7 +46,9 @@ class PlaybackSystem {
         this.currentPlaybackDay = null;
         this.clearGhostMeshes();
         window.EventBus.emit('PLAYBACK_STATE_CHANGED', null);
+        window.EventBus.emit('UI_LOG', '[Playback] Returned to the Objective Present.');
     }
+
 
     updateGhostMeshes(snapshot) {
         this.clearGhostMeshes();
