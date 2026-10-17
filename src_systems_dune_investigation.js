@@ -55,7 +55,7 @@ class DuneInvestigationSystem {
         }
     }
 
-    spawnLostArchive() {
+        spawnLostArchive() {
         const pPos = window.GameCore.playerObj.visual.position;
         const tiers = ['MINOR', 'IMPORTANT', 'LEGENDARY', 'EPOCH'];
         const tier = (Math.random() < 0.1) ? 'EPOCH' : (Math.random() < 0.3) ? 'LEGENDARY' : (Math.random() < 0.6) ? 'IMPORTANT' : 'MINOR';
@@ -69,11 +69,12 @@ class DuneInvestigationSystem {
         };
 
         this.lostArchives.push(archive);
-        window.EventBus.emit('UI_LOG', `✨ [DUNES] A ${tier} structure has emerged from the sands.`);
+        window.EventBus.emit('UI_LOG', `[ORIGIN] Trigger Status → DETECTED: ${tier} ${archive.type}`);
         
         // Recover a fragment
         this.recoverArtifact(archive);
     }
+
 
     /**
      * Directly challenges public history with unfiltered data.

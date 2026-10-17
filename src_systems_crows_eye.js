@@ -41,6 +41,7 @@ class CrowsEyeSystem {
             this.keys[e.key.toLowerCase()] = false;
         });
         
+                window.EventBus.emit('UI_LOG', `[CROWSEYE] Observation Layer Status → ENABLED`);
         window.EventBus.on('ENV_UPDATE', () => {
             const currentMode = window.EngineConfig?.crowsEyeMode || false;
             if (this.isActive !== currentMode) {
@@ -48,16 +49,11 @@ class CrowsEyeSystem {
                 if (this.overlay) {
                     this.overlay.style.display = this.isActive ? 'block' : 'none';
                 }
-                if (this.isActive) {
-                    window.EventBus.emit('UI_LOG', "[CrowEye] Enabled");
-                    console.log("[CrowEye] Enabled");
-                } else {
-                    window.EventBus.emit('UI_LOG', "[CrowEye] Disabled");
-                    console.log("[CrowEye] Disabled");
-                }
+                window.EventBus.emit('UI_LOG', `[CROWSEYE] Observation Layer Status → ${this.isActive ? 'ACTIVE' : 'DORMANT'}`);
             }
         });
     }
+
 
     createOverlay() {
         if (this.overlay) return;

@@ -19,61 +19,77 @@ class PlaybackSystem {
     }
 
         /**
-     * Sets the simulation's visual state to a previous day.
-     * Bible §27: "Supports Historical Playback."
-     */
-    setPlaybackDay(day) {
-        if (!window.ChronicleManager) return;
+         * Sets the simulation's visual state to a previous day.
+         * Bible §27: "Supports Historical Playback."
+         */
+        setPlaybackDay(day) {
+            if (!window.ChronicleManager) return;
         
-        const snapshot = window.ChronicleManager.snapshots.get(day);
-        if (snapshot) {
-            this.currentPlaybackDay = day;
-            this.isPlaybackActive = true;
-            this.updateGhostMeshes(snapshot);
-            window.EventBus.emit('PLAYBACK_STATE_CHANGED', snapshot);
-        } else {
+            const snapshot = window.ChronicleManager.snapshots.get(day);
+            if (snapshot) {
+                this.currentPlaybackDay = day;
+                this.isPlaybackActive = true;
+                const ghostCount = this.updateGhostMeshes(snapshot);
+            
+                // Drift calculation for logging
+                const present = window.ChronicleManager.snapshots.get(Array.from(window.ChronicleManager.snapshots.keys()).sort((a,b)=>a-b).pop());
+                let avgDrift = 0;
+                if (present) {
+                    const drifts = snapshot.villages.map(v => {
+                        const pv = present.villages.find(p => p.id === v.id);
+                        return pv ? Math.hypot(pv.x - v.x, pv.z - v.z) : 0;
+                    });
+                    avgDrift = drifts.reduce((a,b)=>a+b, 0) / (drifts.length || 1);
+                }
+
+                window.EventBus.emit('PLAYBACK_STATE_CHANGED', snapshot);
+                window.EventBus.emit('UI_LOG', `[PLAYBACK] Temporal Scrub → DAY ${day} | Ghost Meshes: ${ghostCount} | Drift: ${avgDrift.toFixed(1)}m`);
+            } else {
+                this.isPlaybackActive = false;
+                this.currentPlaybackDay = null;
+                this.clearGhostMeshes();
+            }
+        }
+
+        /**
+         * Resets the Atlas to the objective present.
+         */
+        resetToPresent() {
             this.isPlaybackActive = false;
             this.currentPlaybackDay = null;
             this.clearGhostMeshes();
+            window.EventBus.emit('PLAYBACK_STATE_CHANGED', null);
+            window.EventBus.emit('UI_LOG', `[PLAYBACK] Temporal Scrub → PRESENT | Ghost Meshes: 0 | Drift: 0m`);
         }
-    }
 
-        /**
-     * Resets the Atlas to the objective present.
-     */
-    resetToPresent() {
-        this.isPlaybackActive = false;
-        this.currentPlaybackDay = null;
-        this.clearGhostMeshes();
-        window.EventBus.emit('PLAYBACK_STATE_CHANGED', null);
-        window.EventBus.emit('UI_LOG', '[Playback] Returned to the Objective Present.');
-    }
+        updateGhostMeshes(snapshot) {
+            this.clearGhostMeshes();
+            if (!window.GameCore?.scene) return 0;
 
-
-    updateGhostMeshes(snapshot) {
-        this.clearGhostMeshes();
-        if (!window.GameCore?.scene) return;
-
-        snapshot.villages.forEach(v => {
-            const geometry = new window.THREE.BoxGeometry(5, 10, 5);
-            const material = new window.THREE.MeshBasicMaterial({ 
-                color: 0xfbbf24, 
-                transparent: true, 
-                opacity: 0.3,
-                wireframe: true 
-            });
-            const ghost = new window.THREE.Mesh(geometry, material);
-            ghost.position.set(v.x, 5, v.z);
-            ghost.name = `ghost_village_${v.id}`;
+            let count = 0;
+            snapshot.villages.forEach(v => {
+                const geometry = new window.THREE.BoxGeometry(5, 10, 5);
+                const material = new window.THREE.MeshBasicMaterial({ 
+                    color: 0xfbbf24, 
+                    transparent: true, 
+                    opacity: 0.3,
+                    wireframe: true 
+                });
+                const ghost = new window.THREE.Mesh(geometry, material);
+                ghost.position.set(v.x, 5, v.z);
+                ghost.name = `ghost_village_${v.id}`;
             
-            this.ghostGroup = this.ghostGroup || new window.THREE.Group();
-            this.ghostGroup.add(ghost);
-        });
+                this.ghostGroup = this.ghostGroup || new window.THREE.Group();
+                this.ghostGroup.add(ghost);
+                count++;
+            });
 
-        if (this.ghostGroup && !this.ghostGroup.parent) {
-            window.GameCore.scene.add(this.ghostGroup);
+            if (this.ghostGroup && !this.ghostGroup.parent) {
+                window.GameCore.scene.add(this.ghostGroup);
+            }
+            return count;
         }
-    }
+
 
     clearGhostMeshes() {
         if (this.ghostGroup && window.GameCore?.scene) {
@@ -87,12 +103,12 @@ class PlaybackSystem {
     }
 
 
-    /**
+        /**
      * Visualizes the "Meaning Network" (Bible §12).
      * Connects unrelated facts into a causal chain.
      */
     getNetworkNodes() {
-        if (!window.InvestigationManager) return [];
+        if (!window.InvestigationManager) return { nodes: [], links: [] };
 
         const mysteries = window.InvestigationManager.getMysteries();
         const nodes = [];
@@ -116,8 +132,14 @@ class PlaybackSystem {
             });
         });
 
+        if (nodes.length !== (this.lastNodeCount || 0)) {
+            window.EventBus.emit('UI_LOG', `[MEANING] Causal Link Update → ${nodes.length} nodes active`);
+            this.lastNodeCount = nodes.length;
+        }
+
         return { nodes, links };
     }
+
 }
 
 window.PlaybackManager = new PlaybackSystem();

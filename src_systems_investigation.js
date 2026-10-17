@@ -90,7 +90,7 @@ class InvestigationManagerSystem {
 
     }
 
-    /**
+        /**
      * Flags a piece of Intel as "Evidence" for a specific Mystery.
      */
     flagEvidence(intelId, mysteryId) {
@@ -102,9 +102,10 @@ class InvestigationManagerSystem {
         this.calculateProgress(mysteryId);
         this.checkContradictions(mysteryId);
         
-        window.EventBus.emit('UI_LOG', `[INVESTIGATION] Linked evidence to ${mystery.title}`);
+        window.EventBus.emit('UI_LOG', `[INVESTIGATION] Evidence Linked → ${mystery.title}`);
         window.EventBus.emit('INVESTIGATION_UPDATED', mysteryId);
     }
+
 
         calculateProgress(mysteryId) {
         const mystery = this.mysteries.get(mysteryId);
@@ -120,17 +121,17 @@ class InvestigationManagerSystem {
         }
     }
 
-    resolveMystery(mysteryId) {
+        resolveMystery(mysteryId) {
         const mystery = this.mysteries.get(mysteryId);
         if (!mystery) return;
 
         mystery.state = 'RESOLVED';
         this.discoveryTier = Math.max(this.discoveryTier, mystery.tier + 1);
 
-        window.EventBus.emit('UI_LOG', `🌟 [DISCOVERY] Mystery Solved: ${mystery.title}`);
-        window.EventBus.emit('UI_LOG', `[DISCOVERY] World Understanding Level: Tier ${this.discoveryTier}`);
+        window.EventBus.emit('UI_LOG', `[LEDGER] Mystery State → RESOLVED: ${mystery.title}`);
         window.EventBus.emit('MYSTERY_RESOLVED', mysteryId);
     }
+
 
 
     /**
@@ -152,11 +153,12 @@ class InvestigationManagerSystem {
                 const a = evidenceNodes[i];
                 const b = evidenceNodes[j];
                 
-                const conflict = this.findConflict(a, b);
+                                const conflict = this.findConflict(a, b);
                 if (conflict) {
                     mystery.contradictions.push(conflict);
-                    window.EventBus.emit('UI_LOG_DEBUG', `[CONTRADICTION] ${conflict.reason}`);
+                    window.EventBus.emit('UI_LOG', `[CONTRADICTION] ${conflict.type}: ${conflict.reason}`);
                 }
+
             }
         }
     }
@@ -236,7 +238,7 @@ class InvestigationManagerSystem {
             }
         }
 
-        generateEmergentMystery(conflict, intelA, intelB) {
+                generateEmergentMystery(conflict, intelA, intelB) {
             const id = `mystery_emergent_${intelA.intel_id.split('_')[1]}`;
             if (this.mysteries.has(id)) return;
 
@@ -255,9 +257,10 @@ class InvestigationManagerSystem {
             };
 
             this.mysteries.set(id, mystery);
-            window.EventBus.emit('UI_LOG', `🔍 [INVESTIGATION] A new mystery has emerged from conflicting reports.`);
+            window.EventBus.emit('UI_LOG', `[LEDGER] Mystery State → EMERGENT: ${mystery.title}`);
             window.EventBus.emit('MYSTERY_GENERATED', mystery);
         }
+
 
         calculateMysteryTier(a, b) {
             const sig = Math.max(a.significance.historical, b.significance.historical);
@@ -280,31 +283,29 @@ class InvestigationManagerSystem {
         return found;
     }
 
-        /**
-     * Theory Creation (§30)
-     * Creates a hypothetical connection between clues.
-     */
-    createTheory(title, evidenceIds, mysteryId) {
-        const mystery = this.mysteries.get(mysteryId);
-        if (!mystery) return;
+        createTheory(title, evidenceIds, mysteryId) {
+            const mystery = this.mysteries.get(mysteryId);
+            if (!mystery) return;
 
-        const theory = {
-            id: 'theory_' + Math.random().toString(36).substr(2, 5),
-            title,
-            evidence: new Set(evidenceIds),
-            strength: this.calculateTheoryStrength(evidenceIds),
-            timestamp: window.EngineParams?.worldDay || 0
-        };
+            const strength = this.calculateTheoryStrength(evidenceIds);
+            const theory = {
+                id: 'theory_' + Math.random().toString(36).substr(2, 5),
+                title,
+                evidence: new Set(evidenceIds),
+                strength,
+                timestamp: window.EngineParams?.worldDay || 0
+            };
 
-        mystery.theories = mystery.theories || [];
-        mystery.theories.push(theory);
+            mystery.theories = mystery.theories || [];
+            mystery.theories.push(theory);
         
-        evidenceIds.forEach(id => mystery.linkedEvidence.add(id));
-        this.calculateProgress(mysteryId);
+            evidenceIds.forEach(id => mystery.linkedEvidence.add(id));
+            this.calculateProgress(mysteryId);
 
-        window.EventBus.emit('UI_LOG', `📜 [THEORY] New historical theory proposed: ${title}`);
-        return theory.id;
-    }
+            window.EventBus.emit('UI_LOG', `[THEORY] Proposed → ${title} (Strength: ${Math.floor(strength * 100)}%)`);
+            return theory.id;
+        }
+
 
     calculateTheoryStrength(evidenceIds) {
         let weight = 0;

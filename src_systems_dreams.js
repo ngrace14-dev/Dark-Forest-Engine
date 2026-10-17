@@ -52,7 +52,7 @@ class DreamManagerSystem {
         window.EventBus.emit('UI_LOG', '[DreamSystem] Divine Influence Channels Open');
     }
 
-    /**
+        /**
      * Sends a symbolic dream to an NPC.
      * Bible §20: "The player does not issue commands... the player influences ambition."
      */
@@ -87,7 +87,7 @@ class DreamManagerSystem {
         }
 
         this.npcDreams.set(npcId, state);
-        window.EventBus.emit('UI_LOG', `[DREAM] Sent the symbol of ${symbol} to ${npcId}.`);
+        window.EventBus.emit('UI_LOG', `[DREAMS] Influence Dispatched → ${symbol}`);
         window.EventBus.emit('DREAM_SENT', { npcId, symbol, intensity: state.intensity });
     }
 
@@ -98,7 +98,7 @@ class DreamManagerSystem {
         
         state.interpretation = type;
         
-        window.EventBus.emit('UI_LOG', `[DREAM] WARNING: ${npcId} is descending into ${type} over ${symbol}.`);
+        window.EventBus.emit('UI_LOG', `[SIMULATION] NPC Response → ${npcId} descending into ${type} over ${symbol}`);
         
         window.ChronicleManager?.recordEvent({
             actorId: npcId,
@@ -108,6 +108,7 @@ class DreamManagerSystem {
             historicalWeight: 50
         });
     }
+
 
     /**
      * Translates the symbolic dream into career-specific probability shifts.
