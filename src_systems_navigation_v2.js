@@ -12,14 +12,45 @@ window.Navigation = {
     ZONE: 'world',
     navMeshGenerated: false,
 
+    // --- PHASE: METAPHYSICAL NAVIGATION (§8, §33) ---
+    referenceFrame: 'RELATIVE', // RELATIVE (standard) or ABSOLUTE (Dunes/Stars)
+    starRotationOffset: 0,
+    
     // Flow Field for large crowd steering (Bannerlord style)
+
     flowFieldGrid: new Map(),
     flowGridSize: 5, // Meters per cell
 
-    init: function() {
+        init: function() {
         window.EventBus.on('CHUNK_GENERATED', () => this.scheduleNavMeshUpdate());
         window.EventBus.on('CHUNK_UNLOADED', () => this.scheduleNavMeshUpdate());
+
+        // --- PHASE: STAR CHART SYNC (§8) ---
+        window.EventBus.on('SHIFT_COMPLETE', () => {
+            if (window.MountainArchives) {
+                const latest = window.MountainArchives.getMeasurements().slice(-1)[0];
+                if (latest) {
+                    this.starRotationOffset = latest.starChart.constellationDelta;
+                    window.EventBus.emit('UI_LOG', `[PLAYBACK] Temporal Snapshot → UPDATED STAR CHART | Offset: ${this.starRotationOffset.toFixed(2)}rad`);
+                }
+            }
+        });
     },
+
+    /**
+     * Converts a coordinate into the Absolute Star-Reference Frame.
+     * Bible §8: "Dunes observed from an external reference point."
+     */
+    convertToStarFrame: function(x, z) {
+        // Rotates the world coordinate against the observed star chart
+        const cos = Math.cos(-this.starRotationOffset);
+        const sin = Math.sin(-this.starRotationOffset);
+        return {
+            x: x * cos - z * sin,
+            z: x * sin + z * cos
+        };
+    },
+
 
     scheduleNavMeshUpdate: function() {
         if (this.updateTimer) clearTimeout(this.updateTimer);
