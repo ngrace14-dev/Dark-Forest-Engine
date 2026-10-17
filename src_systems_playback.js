@@ -18,7 +18,7 @@ class PlaybackSystem {
         window.EventBus.emit('UI_LOG', '[Playback] Time-Scrubbing Channels Synchronized');
     }
 
-    /**
+        /**
      * Sets the simulation's visual state to a previous day.
      * Bible §27: "Supports Historical Playback."
      */
@@ -29,10 +29,12 @@ class PlaybackSystem {
         if (snapshot) {
             this.currentPlaybackDay = day;
             this.isPlaybackActive = true;
+            this.updateGhostMeshes(snapshot);
             window.EventBus.emit('PLAYBACK_STATE_CHANGED', snapshot);
         } else {
             this.isPlaybackActive = false;
             this.currentPlaybackDay = null;
+            this.clearGhostMeshes();
         }
     }
 
@@ -42,8 +44,46 @@ class PlaybackSystem {
     resetToPresent() {
         this.isPlaybackActive = false;
         this.currentPlaybackDay = null;
+        this.clearGhostMeshes();
         window.EventBus.emit('PLAYBACK_STATE_CHANGED', null);
     }
+
+    updateGhostMeshes(snapshot) {
+        this.clearGhostMeshes();
+        if (!window.GameCore?.scene) return;
+
+        snapshot.villages.forEach(v => {
+            const geometry = new window.THREE.BoxGeometry(5, 10, 5);
+            const material = new window.THREE.MeshBasicMaterial({ 
+                color: 0xfbbf24, 
+                transparent: true, 
+                opacity: 0.3,
+                wireframe: true 
+            });
+            const ghost = new window.THREE.Mesh(geometry, material);
+            ghost.position.set(v.x, 5, v.z);
+            ghost.name = `ghost_village_${v.id}`;
+            
+            this.ghostGroup = this.ghostGroup || new window.THREE.Group();
+            this.ghostGroup.add(ghost);
+        });
+
+        if (this.ghostGroup && !this.ghostGroup.parent) {
+            window.GameCore.scene.add(this.ghostGroup);
+        }
+    }
+
+    clearGhostMeshes() {
+        if (this.ghostGroup && window.GameCore?.scene) {
+            window.GameCore.scene.remove(this.ghostGroup);
+            this.ghostGroup.children.forEach(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            });
+            this.ghostGroup.clear();
+        }
+    }
+
 
     /**
      * Visualizes the "Meaning Network" (Bible §12).

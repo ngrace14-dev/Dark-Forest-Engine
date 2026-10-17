@@ -10,6 +10,15 @@ class DreamManagerSystem {
     constructor() {
         // ... previous lexicon ...
 
+        this.lexicon = {
+            'FIRE':  { ambition: 'aggression',   desc: 'Ignites violent drive and territoriality.' },
+            'ROOTS': { ambition: 'fortification', desc: 'Encourages building and defensive stability.' },
+            'EYE':   { ambition: 'investigation', desc: 'Prompts curiosity and discovery of hidden truths.' },
+            'CROWN': { ambition: 'authority',     desc: 'Increases the desire for hierarchy and command.' },
+            'TRUTH': { ambition: 'patience',      desc: 'Fosters long-term planning and deliberate action.' },
+            'VOID':  { ambition: 'stealth',       desc: 'Encourages avoidance and subtle movements.' }
+        };
+
         // --- DIVINE PATRONAGE PATHS (§20, §22) ---
         // Boilerplate for career-specific evolution
         this.patronage = {

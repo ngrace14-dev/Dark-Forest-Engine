@@ -20,12 +20,15 @@ class CrowsEyeSystem {
     }
 
 
-    init() {
+        init() {
         this.isActive = window.EngineConfig?.crowsEyeMode || false;
         this.followedEntityIds = new Set(); // Bible §28
         this.createOverlay();
 
+        window.CrowsEye = this; // Global reference for inline event handlers
+
         window.addEventListener('keydown', (e) => {
+
             this.keys[e.key.toLowerCase()] = true;
             
             if (e.key === 'Escape' && this.isActive) {
@@ -74,16 +77,31 @@ class CrowsEyeSystem {
         this.overlay.style.whiteSpace = 'pre';
                 this.overlay.style.backgroundColor = 'rgba(0,0,0,0.95)';
         this.overlay.style.padding = '20px';
-        this.overlay.style.overflow = 'hidden';
+                this.overlay.style.overflow = 'hidden';
         this.overlay.style.backdropFilter = 'blur(10px)';
         
+        window.EventBus.on('MYSTERY_GENERATED', () => {
+            if (this.currentView !== 'MYSTERY') this.updateTimer = 1.0;
+        });
+
                 this.overlay.addEventListener('click', (e) => {
+
                     if (e.target.dataset.action === 'toggle-inspect') {
                         this.isInspectionExpanded = !this.isInspectionExpanded;
                         this.updateTimer = 1.0;
                         return;
                     }
+                                        if (e.target.dataset.action === 'flag-evidence') {
+                        const intelId = e.target.dataset.intelId;
+                        const mysteryId = e.target.dataset.mysteryId;
+                        if (window.InvestigationManager) {
+                            window.InvestigationManager.flagEvidence(intelId, mysteryId);
+                            this.updateTimer = 1.0;
+                        }
+                        return;
+                    }
                     if (e.target.tagName === 'SPAN' && e.target.dataset.id) {
+
                         this.selectedEntityId = e.target.dataset.id;
                         this.isInspectionExpanded = true;
                         this.updateTimer = 1.0; // Force immediate update
@@ -391,9 +409,10 @@ class CrowsEyeSystem {
                     <!-- INSPECTION PANEL -->
                     <div style="background: rgba(15, 23, 42, 0.95); border-left: 1px solid #78350f; display: ${this.isInspectionExpanded ? 'flex' : 'none'}; flex-direction: column; height: 100%; min-height: 0; transition: width 0.3s ease; position: relative; z-index: 5;">
                         <div style="flex-grow: 1; overflow-y: auto; padding: 20px;">
-                            <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px;">INSPECTION</div>
-                            ${inspectedHtml || '<div style="color: #451a03; text-align: center; margin-top: 50px;">Select an entity to view deep telemetry.</div>'}
-                        </div>
+                                    <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px;">INSPECTION</div>
+                                    ${inspectedHtml || this.renderDefaultInspection()}
+                                </div>
+
                     </div>
 
                     <!-- FOOTER -->
@@ -733,7 +752,46 @@ class CrowsEyeSystem {
         this.lastStats = currentStats;
     }
 
+        renderDefaultInspection() {
+            if (!this.selectedEntityId) return '<div style="color: #451a03; text-align: center; margin-top: 50px;">Select an entity to view deep telemetry.</div>';
+        
+            const ent = window.GameCore?.activeEntities.find(e => e.id === this.selectedEntityId);
+            if (!ent) return '<div style="color: #451a03; text-align: center; margin-top: 50px;">Entity no longer in simulation.</div>';
+
+            const name = ent.name || 'Unknown';
+            const dreams = window.DreamManager?.lexicon || {};
+
+            let html = `
+                <div style="color:#fbbf24; font-size:14px; margin-bottom:15px;">NPID: ${this.selectedEntityId}</div>
+                <div style="font-size:12px; color:#94a3b8; margin-bottom:20px;">
+                    As a 5D Observer, you can influence this mortal's ambition through symbolic dreams.
+                </div>
+                <div style="border-top: 1px solid #451a03; padding-top:15px;">
+                    <div style="font-size:10px; color:#78350f; margin-bottom:10px;">SEND SYMBOLIC DREAM</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        ${Object.entries(dreams).map(([symbol, data]) => `
+                            <button style="background:#1e1b4b; color:#fbbf24; border:1px solid #451a03; padding:8px; font-size:10px; cursor:pointer; text-align:left;"
+                                onclick="window.DreamManager.sendDream('${this.selectedEntityId}', '${symbol}'); window.CrowsEye.updateTimer=1.0;">
+                                <div style="font-weight:bold;">${symbol}</div>
+                                <div style="font-size:8px; color:#94a3b8; margin-top:2px;">+ ${data.ambition}</div>
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            return html;
+        }
+
+        flagEvidence(intelId, mysteryId) {
+
+        if (window.InvestigationManager) {
+            window.InvestigationManager.flagEvidence(intelId, mysteryId);
+            this.updateTimer = 1.0;
+        }
+    }
+
     renderTrend(key, unit = "") {
+
         const delta = this.trends[key] || 0;
         const color = delta > 0 ? '#10b981' : delta < 0 ? '#ef4444' : '#94a3b8';
         const sign = delta > 0 ? '+' : '';
@@ -864,18 +922,31 @@ class CrowsEyeSystem {
             </div>
         </div>`;
 
-        // Right Column: VERIFIED TRUTH
+                // Right Column: VERIFIED TRUTH
         html += `<div>
             <div style="font-size:14px; color:#10b981; border-bottom:1px solid #064e3b; padding-bottom:5px; margin-bottom:10px;">VERIFIED TRUTH</div>
             <div style="display:flex; flex-direction:column; gap:8px;">
-                ${verified.map(i => `
-                    <div style="border-left: 3px solid ${i.truth_state === 'TRUE' ? '#10b981' : '#ef4444'}; padding:8px; background:rgba(16,185,129,0.03);">
-                        <div style="font-weight:bold; color:#10b981; font-size:11px;">${i.payload.title} [${i.truth_state}]</div>
-                        <div style="font-size:10px; color:#94a3b8;">${i.payload.description}</div>
-                    </div>
-                `).join('') || '<div style="color:#451a03;">No verified truths.</div>'}
+                ${verified.map(i => {
+                    const activeMysteries = window.InvestigationManager?.getMysteries().filter(m => m.state === 'INVESTIGATING') || [];
+                    return `
+                        <div style="border-left: 3px solid ${i.truth_state === 'TRUE' ? '#10b981' : '#ef4444'}; padding:8px; background:rgba(16,185,129,0.03);">
+                            <div style="display:flex; justify-content:space-between;">
+                                <div style="font-weight:bold; color:#10b981; font-size:11px;">${i.payload.title} [${i.truth_state}]</div>
+                                ${activeMysteries.length > 0 ? `
+                                    <select style="font-size:9px; background:#000; color:#fbbf24; border:1px solid #451a03;" 
+                                        onchange="if(this.value) { window.CrowsEye.flagEvidence('${i.intel_id}', this.value); this.value=''; }">
+                                        <option value="">Link to Mystery...</option>
+                                        ${activeMysteries.map(m => `<option value="${m.id}">${m.title}</option>`).join('')}
+                                    </select>
+                                ` : ''}
+                            </div>
+                            <div style="font-size:10px; color:#94a3b8;">${i.payload.description}</div>
+                        </div>
+                    `;
+                }).join('') || '<div style="color:#451a03;">No verified truths.</div>'}
             </div>
         </div>`;
+
 
         html += `</div>`;
         return html;
@@ -1748,82 +1819,4 @@ class CrowsEyeSystem {
                 <div style="font-size:10px; color:#78350f; margin-bottom:10px;">ASCENDANTS (PARENTS)</div>
                 ${profile.ancestry.parents.map(p => `
                     <div style="color:#fbbf24; font-size:12px; margin-bottom:5px;">${p}</div>
-                `).join('') || '<div style="color:#451a03; font-size:11px;">Unknown Origin</div>'}
-            </div>
-
-            <!-- Current -->
-            <div style="background:rgba(251,191,36,0.05); border:1px solid #fbbf24; padding:15px;">
-                <div style="font-size:10px; color:#fbbf24; margin-bottom:10px;">CURRENT SUBJECT</div>
-                <div style="font-weight:bold; color:#fbbf24; font-size:14px;">${name.toUpperCase()}</div>
-                <div style="font-size:10px; color:#94a3b8; margin-top:5px;">IDENTITY: ${profile.identity}</div>
-            </div>
-
-            <!-- Children -->
-            <div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:15px;">
-                <div style="font-size:10px; color:#78350f; margin-bottom:10px;">DESCENDANTS (CHILDREN)</div>
-                ${profile.ancestry.children.map(c => `
-                    <div style="color:#fbbf24; font-size:12px; margin-bottom:5px;">${c}</div>
-                `).join('') || '<div style="color:#451a03; font-size:11px;">No heirs identified.</div>'}
-            </div>
-        </div>`;
-
-        // 2. Legacy Flow
-        html += `<div style="background:rgba(255,255,255,0.02); border:1px solid #78350f; padding:20px;">
-            <div style="font-weight:bold; color:#fbbf24; font-size:12px; border-bottom:1px solid #451a03; padding-bottom:5px; margin-bottom:15px;">LEGACY TRANSFER ANALYSIS</div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px;">
-                <div>
-                    <div style="font-size:10px; color:#78350f; margin-bottom:5px;">INHERITED TRAITS (DRIFT)</div>
-                    ${Object.entries(profile.traits).map(([t, v]) => `
-                        <div style="font-size:11px; display:flex; justify-content:space-between; margin-bottom:3px;">
-                            <span style="color:#94a3b8;">${t.toUpperCase()}:</span>
-                            <span style="color:#fbbf24;">${Math.floor(v * 100)}%</span>
-                        </div>
-                    `).join('')}
-                </div>
-                <div>
-                    <div style="font-size:10px; color:#78350f; margin-bottom:5px;">INHERITED RELATIONSHIPS</div>
-                    ${Array.from(profile.relationships.entries()).slice(0, 5).map(([id, rel]) => `
-                        <div style="font-size:11px; margin-bottom:3px;">
-                            <span style="color:#ef4444;">${rel.type}</span>: ${id}
-                        </div>
-                    `).join('') || '<div style="color:#451a03; font-size:11px;">No inherited feuds or alliances.</div>'}
-                </div>
-            </div>
-        </div>`;
-
-        html += `</div>`;
-        return html;
-    }
-
-        renderForcesView() {
-        if (!window.ForceManager || !window.ChronicleManager || !window.HarvestEngine) return "No Data";
-        
-        const day = window.EngineParams?.worldDay || 1;
-        
-        // --- PHASE: HARVEST TELEMETRY (§BN) ---
-        const playerSig = window.ChronicleManager.calculateSignificance('player');
-        const harvestState = window.HarvestEngine.harvestCandidates.get('player') || { status: 'NONE', pressureScore: 0 };
-        const storyDensity = window.RuneSystem?.getCarvings('player')?.storyDensity || 0;
-        const histWeight = window.ChronicleManager.npcHistoricalWeights.get('player') || 0;
-
-        let densityHtml = `<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:20px; background:rgba(0,0,0,0.4); padding:15px; border:1px solid #78350f;">
-            <div>
-                <div style="font-size:9px; color:#78350f;">STORY DENSITY</div>
-                <div style="color:#fbbf24;">${storyDensity.toFixed(2)}</div>
-            </div>
-            <div>
-                <div style="font-size:9px; color:#78350f;">HISTORICAL WEIGHT</div>
-                <div style="color:#fbbf24;">${histWeight}</div>
-            </div>
-            <div>
-                <div style="font-size:9px; color:#78350f;">SIGNIFICANCE</div>
-                <div style="color:#fbbf24; font-weight:bold;">${Math.floor(playerSig)}</div>
-            </div>
-            <div>
-                <div style="font-size:9px; color:#78350f;">HARVEST STATUS</div>
-                <div style="color:${harvestState.pressureScore > 800 ? '#ef4444' : '#fbbf24'};">${harvestState.status}</div>
-            </div>
-        </div>`;
-
-        const forces = window.ForceManager.forces;
-
+                `).join('') || '<div style="color:
