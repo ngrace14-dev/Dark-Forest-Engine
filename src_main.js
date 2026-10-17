@@ -1,6 +1,10 @@
 // File: src_main.js
 
+// --- DIAGNOSTIC VOICE WRAPPER ---
+import './src_systems_diagnostic_wrapper.js';
+
 // 0. Core Registry & State
+
 import './src_systems_profiler.js';
 import './src_core_registry.js';
 import './src_core_state.js';

@@ -35,9 +35,10 @@ export class ForestDebugSystem {
         });
     }
 
-    toggleRawRenderMode() {
+        toggleRawRenderMode() {
         this.rawRenderEnabled = !this.rawRenderEnabled;
-        console.log(`[ForestDebug] Raw Neutral Render Mode: ${this.rawRenderEnabled ? 'ENABLED' : 'DISABLED'}`);
+        console.log(`Observation Layer State: ${this.rawRenderEnabled ? 'RAW_RENDER_ENABLED' : 'STANDARD_OBSERVATION'}`);
+
 
         if (window.VolumetricFogSystem) {
             window.VolumetricFogSystem.enabled = !this.rawRenderEnabled;
@@ -59,10 +60,11 @@ export class ForestDebugSystem {
         }
     }
 
-    cycleDebugMode() {
+        cycleDebugMode() {
         this.activeMode = (this.activeMode + 1) % 8;
         const modeName = Object.keys(this.debugModes).find(k => this.debugModes[k] === this.activeMode);
-        console.log(`[ForestDebug] Active Render Inspection Mode: [${this.activeMode}] ${modeName}`);
+        console.log(`Observation Layer Inspection Mode: [${this.activeMode}] ${modeName}`);
+
 
         const scene = window.GameCore?.scene;
         if (!scene) return;
