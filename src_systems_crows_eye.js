@@ -1150,7 +1150,7 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderHouseHistoryView() {
+        renderHouseHistoryView() {
         if (!window.DynastyManager) return "Dynasty System Offline";
         
         const houses = Array.from(window.DynastyManager.houses.values());
@@ -1162,11 +1162,11 @@ class CrowsEyeSystem {
             if (ent && ent.houseId) selectedHouse = window.DynastyManager.getHouse(ent.houseId);
         }
 
-        let html = `<div style="display:grid; grid-template-columns: 300px 1fr; gap:30px;">`;
+        let html = `<div style="display:grid; grid-template-columns: 300px 1fr; gap:30px; height:100%;">`;
 
         // 1. House Selector
-        html += `<div style="border-right:1px solid #78350f; padding-right:20px;">
-            <div style="font-size:12px; color:#78350f; margin-bottom:15px;">SELECT INSTITUTION</div>
+        html += `<div style="border-right:1px solid #78350f; padding-right:20px; overflow-y:auto;">
+            <div style="font-size:12px; color:#78350f; margin-bottom:15px; sticky; top:0; background:#040608; padding:5px 0;">SELECT INSTITUTION</div>
             ${houses.map(h => `
                 <div style="padding:8px; border:1px solid ${h.id === selectedHouse.id ? '#fbbf24' : '#451a03'}; 
                     background:${h.id === selectedHouse.id ? 'rgba(251,191,36,0.1)' : 'transparent'}; 
@@ -1179,19 +1179,45 @@ class CrowsEyeSystem {
 
         // 2. House Detail
         if (selectedHouse) {
-            html += `<div>
+            const resolvedMysteries = window.InvestigationManager?.getMysteries().filter(m => m.state === 'RESOLVED') || [];
+
+            html += `<div style="overflow-y:auto; padding-right:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:1px solid #78350f; padding-bottom:10px; margin-bottom:20px;">
                     <div>
                         <div style="font-size:24px; color:#fbbf24; font-weight:bold;">${selectedHouse.name.toUpperCase()}</div>
                         <div style="font-size:12px; color:#94a3b8;">Lineage of ${selectedHouse.founder}</div>
                     </div>
                     <div style="text-align:right;">
-                        <div style="font-size:10px; color:#78350f;">HISTORICAL LEGACY</div>
-                        <div style="font-size:20px; color:#fbbf24;">${Math.floor(selectedHouse.legacy)}</div>
+                        <div style="font-size:10px; color:#78350f;">INSTITUTIONAL PRESTIGE</div>
+                        <div style="font-size:20px; color:#fbbf24;">${Math.floor(selectedHouse.prestige)}</div>
                     </div>
                 </div>
 
+                <!-- INSTITUTIONAL LEVERAGE PANEL (§14, §15) -->
+                <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px; margin-bottom:25px;">
+                    <div style="font-size:12px; color:#fbbf24; margin-bottom:10px; border-bottom:1px solid #451a03; padding-bottom:5px;">WEAPONIZED TRUTH: INSTITUTIONAL LEVERAGE</div>
+                    ${resolvedMysteries.length > 0 ? `
+                        <div style="display:flex; flex-direction:column; gap:10px;">
+                            ${resolvedMysteries.map(m => `
+                                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.3); padding:8px; border:1px solid #451a03;">
+                                    <div>
+                                        <div style="font-size:11px; color:#fbbf24; font-weight:bold;">${m.title}</div>
+                                        <div style="font-size:9px; color:#78350f;">Potential Leverage: Tier ${m.tier}</div>
+                                    </div>
+                                    <div style="display:flex; gap:5px;">
+                                        <button style="background:#1e1b4b; color:#fbbf24; border:1px solid #451a03; padding:4px 8px; font-size:9px; cursor:pointer;"
+                                            onclick="window.DynastyManager.applyLeverage('${selectedHouse.id}', '${m.id}', 'TAXATION'); window.CrowsEye.updateTimer=1.0;">LEVY TAX</button>
+                                        <button style="background:#1e1b4b; color:#fbbf24; border:1px solid #451a03; padding:4px 8px; font-size:9px; cursor:pointer;"
+                                            onclick="window.DynastyManager.applyLeverage('${selectedHouse.id}', '${m.id}', 'DIPLOMACY'); window.CrowsEye.updateTimer=1.0;">EXTORT</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<div style="font-size:11px; color:#451a03; text-align:center;">No resolved mysteries available for leverage. Resolve historical truths to pressure this House.</div>'}
+                </div>
+
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+
                     <!-- Beliefs -->
                     <div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:15px;">
                         <div style="color:#fbbf24; font-size:12px; border-bottom:1px solid #451a03; padding-bottom:5px; margin-bottom:10px;">INSTITUTIONAL BELIEFS</div>

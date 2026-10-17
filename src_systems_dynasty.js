@@ -91,7 +91,7 @@ class DynastyManagerSystem {
         house.prestige += Math.floor((event.significance || 10) / 10);
     }
 
-    /**
+        /**
      * Add a secret that only this house knows.
      * Bible: "House Secrets Category"
      */
@@ -102,6 +102,40 @@ class DynastyManagerSystem {
             window.IntelManager?.shareToInstitution(intelId, houseId);
         }
     }
+
+    /**
+     * Weaponize Truth (Bible §14, §15)
+     * Uses verified evidence to apply institutional pressure.
+     */
+    applyLeverage(houseId, mysteryId, type = 'DIPLOMACY') {
+        const house = this.houses.get(houseId);
+        const mystery = window.InvestigationManager?.mysteries.get(mysteryId);
+        
+        if (!house || !mystery || mystery.state !== 'RESOLVED') return false;
+
+        const weight = (mystery.tier * 20);
+        let effect = "";
+
+        switch(type) {
+            case 'TAXATION':
+                house.prestige = Math.max(0, house.prestige - weight);
+                effect = `Taxes lowered in ${house.name} territories.`;
+                break;
+            case 'DIPLOMACY':
+                house.contribution += weight;
+                effect = `${house.name} forced into an alliance.`;
+                break;
+            case 'REPAIR':
+                // Logic to trigger barrier repair in associated villages
+                effect = `${house.name} funds immediate barrier reinforcement.`;
+                break;
+        }
+
+        window.EventBus.emit('UI_LOG', `[LEDGER] Mystery State → LEVERAGED: ${mystery.title} against ${house.name}`);
+        window.EventBus.emit('UI_LOG', `[SIMULATION] NPC Response → ${effect}`);
+        return true;
+    }
+
 
     /**
      * Handles the death of a notable NPC.
