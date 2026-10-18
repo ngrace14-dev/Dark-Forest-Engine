@@ -11,8 +11,68 @@ class PlaybackSystem {
         this.currentPlaybackDay = null;
         this.isPlaybackActive = false;
         
+        // --- PHASE: THE LOOM OF PROPHECY (§24, §25) ---
+        this.predictionWindowDays = 5;
+        this.futureForecasts = []; // Array of { type, actorId, detail, day, probability }
+
         window.EventBus.on('ENGINE_READY', () => this.init());
+        window.EventBus.on('HEARTBEAT_T1', () => this.updateLoom());
     }
+
+    /**
+     * Predictive Simulation (The Loom)
+     * Bible §24: "Predicts probable deaths, famines, and spawns."
+     */
+    updateLoom() {
+        if (!window.VillageManager || !window.InstabilityEngine) return;
+        
+        this.futureForecasts = [];
+        const currentDay = window.EngineParams?.worldDay || 0;
+
+        // 1. Probable Famines
+        window.VillageManager.villages.forEach(v => {
+            if (v.stats.food < (v.population.current * 0.1)) {
+                this.futureForecasts.push({
+                    type: 'FAMINE_PREDICTION',
+                    actorId: v.id,
+                    detail: `Probable famine at ${v.name} in 3 days.`,
+                    day: currentDay + 3,
+                    probability: 0.85
+                });
+            }
+        });
+
+        // 2. Probable Civil Unrest (Pressure Analysis)
+        const crises = window.InstabilityEngine.getCrises();
+        crises.forEach(c => {
+            if (c.intensity > 0.8) {
+                this.futureForecasts.push({
+                    type: 'REVOLT_PREDICTION',
+                    actorId: c.houseId,
+                    detail: `Probable revolt in ${c.houseId} territories.`,
+                    day: currentDay + 2,
+                    probability: 0.9
+                });
+            }
+        });
+
+        // 3. Probable Harvest (Significance Analysis)
+        if (window.HarvestEngine) {
+            const candidates = window.HarvestEngine.getCandidates();
+            candidates.slice(0, 3).forEach(([id, data]) => {
+                if (data.pressureScore > 850) {
+                    this.futureForecasts.push({
+                        type: 'WENDIGO_SPAWN_PREDICTION',
+                        actorId: id,
+                        detail: `Probable Wendigo manifestation targeting high-significance node: ${id}`,
+                        day: currentDay + 1,
+                        probability: 0.95
+                    });
+                }
+            });
+        }
+    }
+
 
     init() {
         window.EventBus.emit('UI_LOG', '[Playback] Time-Scrubbing Channels Synchronized');

@@ -690,88 +690,116 @@ class CrowsEyeSystem {
         renderPlaybackView() {
             if (!window.ChronicleManager || !window.PlaybackManager) return "Chronicle Offline";
             const snapshots = Array.from(window.ChronicleManager.snapshots.keys()).sort((a, b) => a - b);
-            if (snapshots.length === 0) return `<div style="text-align:center; padding:50px; color:#451a03;">
-                <div style="font-size:32px; margin-bottom:15px;">⏳</div>
-                <div>No archaeological snapshots captured yet.</div>
-                <div style="font-size:11px; margin-top:5px;">Snapshots are taken every 5 days or during world-shifting events.</div>
-            </div>`;
+            const currentDay = window.EngineParams?.worldDay || 0;
 
-            const currentDay = window.PlaybackManager.currentPlaybackDay || snapshots[snapshots.length - 1];
-            const snap = window.ChronicleManager.snapshots.get(currentDay);
-        
             let html = `<div style="display:flex; flex-direction:column; gap:25px; height:100%;">`;
         
             // --- PHASE: TIME GHOST RENDERING (§27) ---
             html += `<div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:20px; border-left: 4px solid #fbbf24; flex-shrink:0;">
-                <div style="font-weight:bold; color:#fbbf24; margin-bottom:15px; font-size:14px; letter-spacing:1px;">5D TEMPORAL CHANNELS</div>
-                <input type="range" min="${snapshots[0]}" max="${snapshots[snapshots.length-1]}" step="5" value="${currentDay}" 
-                    style="width:100%; accent-color:#fbbf24; margin-bottom:10px;"
+                <div style="font-weight:bold; color:#fbbf24; margin-bottom:15px; font-size:14px; letter-spacing:1px;">5D TEMPORAL CHANNELS (PAST & FUTURE)</div>
+            
+                <div style="font-size:10px; color:#78350f; margin-bottom:5px;">ARCHAEOLOGICAL PLAYBACK (PAST)</div>
+                <input type="range" min="${snapshots[0] || 0}" max="${currentDay}" step="5" value="${window.PlaybackManager.currentPlaybackDay || currentDay}" 
+                    style="width:100%; accent-color:#fbbf24; margin-bottom:15px;"
                     oninput="window.PlaybackManager.setPlaybackDay(parseInt(this.value)); window.CrowsEye.updateTimer=1.0;">
-                <div style="display:flex; justify-content:space-between; font-size:11px; color:#92400e;">
-                    <span>BEGINNING (DAY ${snapshots[0]})</span>
-                    <span style="color:#fbbf24; font-size:14px; font-weight:bold;">TIME GHOST: DAY ${currentDay}</span>
+            
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:#92400e; margin-bottom:20px;">
+                    <span>BEGINNING (DAY ${snapshots[0] || 0})</span>
+                    <span style="color:#fbbf24; font-size:14px; font-weight:bold;">TIME GHOST: DAY ${window.PlaybackManager.currentPlaybackDay || currentDay}</span>
                     <span>PRESENT</span>
                 </div>
-                <div style="margin-top:15px; display:flex; gap:10px;">
-                    <button style="flex:1; background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:8px; cursor:pointer; font-size:10px;"
-                        onclick="window.PlaybackManager.resetToPresent(); window.CrowsEye.updateTimer=1.0;">RESET TO PRESENT</button>
-                </div>
+
+                <button style="width:100%; background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:8px; cursor:pointer; font-size:10px;"
+                    onclick="window.PlaybackManager.resetToPresent(); window.CrowsEye.updateTimer=1.0;">RESET TO PRESENT</button>
             </div>`;
 
-
-                // 3. Historical Geography (Bible §27: Observing how villages changed)
-        if (snap) {
-            const present = window.ChronicleManager.snapshots.get(snapshots[snapshots.length - 1]);
-            const popDelta = snap.villages.reduce((s,v) => s + v.pop, 0) - present.villages.reduce((s,v) => s + v.pop, 0);
-            const fidelityDelta = (snap.truth - present.truth) * 100;
-
-            html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; flex-shrink:0;">
-                <div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.3);">
-                    <div style="color:#78350f; font-size:10px; margin-bottom:5px;">HISTORICAL POPULATION</div>
-                    <div style="font-size:18px; color:${popDelta >= 0 ? '#10b981' : '#ef4444'};">${snap.villages.reduce((s,v) => s + v.pop, 0)} <span style="font-size:10px;">(${popDelta > 0 ? '+' : ''}${popDelta})</span></div>
+            // --- THE LOOM OF PROPHECY UI (§24) ---
+            const forecasts = window.PlaybackManager.futureForecasts || [];
+            html += `<div style="flex-grow:1; overflow-y:auto; border:1px solid #451a03; background:rgba(0,0,0,0.2); padding:15px;">
+                <div style="font-size:12px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:8px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                    <span>THE LOOM: PROBABILISTIC FORECAST (+5 DAYS)</span>
+                    <span style="color:#78350f; font-size:9px;">INTERVENTION WEIGHT: 0.0</span>
                 </div>
-
-                <div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.3);">
-                    <div style="color:#78350f; font-size:10px; margin-bottom:5px;">GLOBAL FIDELITY DELTA</div>
-                    <div style="font-size:18px; color:${fidelityDelta >= 0 ? '#10b981' : '#ef4444'};">${fidelityDelta > 0 ? '+' : ''}${fidelityDelta.toFixed(1)}%</div>
-                </div>
+            
+                ${forecasts.length > 0 ? `
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        ${forecasts.map(f => `
+                            <div style="background:rgba(168,85,247,0.05); border:1px solid #78350f; padding:12px; border-left: 3px solid #a855f7;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                    <div style="color:#a855f7; font-weight:bold; font-size:11px;">[PROBABLE] ${f.type.replace(/_/g, ' ')}</div>
+                                    <div style="color:#fbbf24; font-size:10px;">Prob: ${Math.floor(f.probability * 100)}%</div>
+                                </div>
+                                <div style="font-size:11px; color:#94a3b8; margin-bottom:10px;">${f.detail}</div>
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span style="font-size:9px; color:#78350f;">PREDICTED DAY: ${f.day}</span>
+                                    <button style="background:#1e1b4b; color:#fbbf24; border:1px solid #451a03; padding:4px 10px; font-size:9px; cursor:pointer;"
+                                        onclick="window.CrowsEye.currentView='WATCHLIST'; window.CrowsEye.selectedEntityId='${f.actorId}'; window.CrowsEye.updateTimer=1.0;">INTERVENE</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : `<div style="text-align:center; padding:50px; color:#451a03;">
+                    <div style="font-size:32px; margin-bottom:15px;">🧶</div>
+                    <div>The Loom is quiet.</div>
+                    <div style="font-size:11px; margin-top:5px;">No high-probability tragedies detected in the near future.</div>
+                </div>`}
             </div>`;
 
-            // 3. Historical Geography (Bible §27: Observing how villages changed)
-            html += `<div style="flex-grow:1; overflow-y:auto; border:1px solid #451a03; background:rgba(0,0,0,0.2); padding:10px;">
+            // Historical Geography comparison follows...
+            const snapshots_sorted = Array.from(window.ChronicleManager.snapshots.keys()).sort((a, b) => a - b);
+            const currentPlaybackDay = window.PlaybackManager.currentPlaybackDay || snapshots_sorted[snapshots_sorted.length - 1];
+            const snap = window.ChronicleManager.snapshots.get(currentPlaybackDay);
 
-                <div style="font-size:12px; color:#fbbf24; border-bottom:1px solid #451a03; padding-bottom:5px; margin-bottom:10px; sticky; top:0; background:inherit;">HISTORICAL GEOGRAPHY & SETTLEMENT DRIFT</div>
-                <table style="width:100%; font-size:11px; text-align:left; border-collapse:collapse;">
-                    <tr style="color:#78350f; border-bottom:1px solid #451a03;">
-                        <th style="padding:5px;">SETTLEMENT</th>
-                        <th>HOUSE</th>
-                        <th>HISTORICAL POS</th>
-                        <th>CURRENT POS</th>
-                        <th>DRIFT</th>
-                    </tr>
-                    ${snap.villages.map(v => {
-                        const presentV = present.villages.find(pv => pv.id === v.id);
-                        const dx = presentV ? presentV.x - v.x : 0;
-                        const dz = presentV ? presentV.z - v.z : 0;
-                        const drift = Math.hypot(dx, dz);
-                        const hasMoved = drift > 50;
+            if (snap) {
+                const present = window.ChronicleManager.snapshots.get(snapshots_sorted[snapshots_sorted.length - 1]);
+                const popDelta = snap.villages.reduce((s,v) => s + v.pop, 0) - present.villages.reduce((s,v) => s + v.pop, 0);
+                const fidelityDelta = (snap.truth - present.truth) * 100;
+
+                html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; flex-shrink:0; margin-top:20px;">
+                    <div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.3);">
+                        <div style="color:#78350f; font-size:10px; margin-bottom:5px;">HISTORICAL POPULATION</div>
+                        <div style="font-size:18px; color:${popDelta >= 0 ? '#10b981' : '#ef4444'};">${snap.villages.reduce((s,v) => s + v.pop, 0)} <span style="font-size:10px;">(${popDelta > 0 ? '+' : ''}${popDelta})</span></div>
+                    </div>
+
+                    <div style="border:1px solid #78350f; padding:15px; background:rgba(0,0,0,0.3);">
+                        <div style="color:#78350f; font-size:10px; margin-bottom:5px;">GLOBAL FIDELITY DELTA</div>
+                        <div style="font-size:18px; color:${fidelityDelta >= 0 ? '#10b981' : '#ef4444'};">${fidelityDelta > 0 ? '+' : ''}${fidelityDelta.toFixed(1)}%</div>
+                    </div>
+                </div>`;
+
+                html += `<div style="flex-grow:1; overflow-y:auto; border:1px solid #451a03; background:rgba(0,0,0,0.2); padding:10px; margin-top:10px;">
+                    <div style="font-size:12px; color:#fbbf24; border-bottom:1px solid #451a03; padding-bottom:5px; margin-bottom:10px; sticky; top:0; background:inherit;">HISTORICAL GEOGRAPHY & SETTLEMENT DRIFT</div>
+                    <table style="width:100%; font-size:11px; text-align:left; border-collapse:collapse;">
+                        <tr style="color:#78350f; border-bottom:1px solid #451a03;">
+                            <th style="padding:5px;">SETTLEMENT</th>
+                            <th>HOUSE</th>
+                            <th>HISTORICAL POS</th>
+                            <th>CURRENT POS</th>
+                            <th>DRIFT</th>
+                        </tr>
+                        ${snap.villages.map(v => {
+                            const presentV = present.villages.find(pv => pv.id === v.id);
+                            const dx = presentV ? presentV.x - v.x : 0;
+                            const dz = presentV ? presentV.z - v.z : 0;
+                            const drift = Math.hypot(dx, dz);
+                            const hasMoved = drift > 50;
                         
-                        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
-                            <td style="color:#fbbf24; padding:8px 5px;">${v.name}</td>
-                            <td style="color:#94a3b8;">${v.house}</td>
-                            <td style="color:#78350f;">[${Math.round(v.x)}, ${Math.round(v.z)}]</td>
-                            <td style="color:#94a3b8;">${presentV ? `[${Math.round(presentV.x)}, ${Math.round(presentV.z)}]` : 'LOST'}</td>
-                            <td style="color:${hasMoved ? '#ef4444' : '#10b981'};">${hasMoved ? `${Math.round(drift)}m` : 'STABLE'}</td>
-                        </tr>`;
-                    }).join('')}
-                </table>
-            </div>`;
+                            return `<tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                                <td style="color:#fbbf24; padding:8px 5px;">${v.name}</td>
+                                <td style="color:#94a3b8;">${v.house}</td>
+                                <td style="color:#78350f;">[${Math.round(v.x)}, ${Math.round(v.z)}]</td>
+                                <td style="color:#94a3b8;">${presentV ? `[${Math.round(presentV.x)}, ${Math.round(presentV.z)}]` : 'LOST'}</td>
+                                <td style="color:${hasMoved ? '#ef4444' : '#10b981'};">${hasMoved ? `${Math.round(drift)}m` : 'STABLE'}</td>
+                            </tr>`;
+                        }).join('')}
+                    </table>
+                </div>`;
+            }
 
+            html += `</div>`;
+            return html;
         }
 
-        html += `</div>`;
-        return html;
-    }
 
     renderActionsView() {
         const entities = this.gatherEntities().filter(e => e.ref && (e.ref.currentTask || e.type === 'V' || e.type === 'A' || e.type === 'T'));
