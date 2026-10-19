@@ -177,8 +177,13 @@ function defeatNpc(entity, cause = 'combat') {
 }
 
 function attackNpc(attacker, target) {
-    if (attacker.npcAttackReadyAt && performance.now() < attacker.npcAttackReadyAt) return;
-    attacker.npcAttackReadyAt = performance.now() + 1000;
+        if (attacker.npcAttackReadyAt && performance.now() < attacker.npcAttackReadyAt) return;
+    
+    // FIRE DREAM: Aggression reduces attack cooldown (Bible §21)
+    const aggression = attacker.ambitions?.aggression || 1.0;
+    const cooldownMod = aggression > 1.0 ? (1.0 / aggression) : 1.0;
+    attacker.npcAttackReadyAt = performance.now() + (1000 * cooldownMod);
+
     if (window.GameCore.forestAttackMisses(target)) {
         window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'MISSED', pos: target.visual.position, color: '#86efac' });
         return;
@@ -231,13 +236,20 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             stealth: 0.1
         };
 
-        // Apply Divine Influence (Bible §21)
+                // Apply Divine Influence (Bible §21)
         if (window.DreamManager) {
             Object.keys(en.ambitions).forEach(key => {
                 const mod = window.DreamManager.getNPCDriveModifier(en.id, key);
                 en.ambitions[key] = Math.min(2.0, (en.ambitions[key] || 0.3) * mod);
             });
         }
+
+        // --- DREAM PHASE 1: FIRE INTEGRATION (Aggression) ---
+        // NPCs with high aggression (FIRE dreams) strike faster and more recklessly
+        const aggression = en.ambitions.aggression || 0.3;
+        const speedBonus = aggression > 1.2 ? 1.2 : 1.0;
+        const cooldownReduction = aggression > 1.2 ? 0.8 : 1.0;
+
 
         // Belief-Based Targeting (Phase 2 Integration)
         // NPCs target based on what they *know*, not just global proximity
@@ -816,11 +828,15 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 if(window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(en, 'walk');
             }
 
-            if(en.visual.position.distanceTo(pPos) < 1.8 && Math.random() < 0.05 && en.currentAnimState !== 'hit' && en.currentAnimState !== 'die' && !en.attackWindupUntil) {
-                en.attackWindupUntil = performance.now() + 350;
+                        if(en.visual.position.distanceTo(pPos) < 1.8 && Math.random() < 0.05 && en.currentAnimState !== 'hit' && en.currentAnimState !== 'die' && !en.attackWindupUntil) {
+                // FIRE DREAM: Aggression speeds up attack windup
+                const aggression = en.ambitions?.aggression || 1.0;
+                const windupMod = aggression > 1.0 ? (1.0 / aggression) : 1.0;
+                en.attackWindupUntil = performance.now() + (350 * windupMod);
                 window.EventBus.emit('SPAWN_FLOATING_TEXT', {text: '!', pos: en.visual.position, color: '#ffcc00'});
                 return;
             }
+
             if (en.def.voidBoltDamage && en.visual.position.distanceTo(pPos) <= en.def.voidBoltRange && en.visual.position.distanceTo(pPos) > 3 && !en.voidBoltWindupUntil && Math.random() < 0.025) {
                 en.voidBoltWindupUntil = performance.now() + 600;
                 window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'VOID BOLT!', pos: en.visual.position, color: '#a855f7' });

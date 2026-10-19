@@ -297,15 +297,27 @@ window.VillageManager = {
         }
 
         
-        const production = Math.max(1, Math.floor((village.population.current / 1500) * worldCal.growthRate));
+                const production = Math.max(1, Math.floor((village.population.current / 1500) * worldCal.growthRate));
         village.stats[village.industry.produces] += production;
         
         const essenceCost = Math.max(1, Math.ceil(village.population.current / 5000));
         village.barrierIntegrity = Math.max(0, (village.barrierIntegrity ?? 100) - essenceCost);
+        
+        // --- DREAM PHASE 1: ROOTS INTEGRATION (Barrier Maintenance) ---
+        // Bible §10, §21: If the village leader has a ROOTS dream, maintenance is more efficient.
+        let maintenanceBonus = 0;
+        if (window.DreamManager && village.nobleLeader) {
+            const mod = window.DreamManager.getNPCDriveModifier(`village_leader_${village.id}`, 'fortification');
+            if (mod > 1.0) {
+                maintenanceBonus = Math.floor(mod * 2);
+            }
+        }
+
         if ((village.stats.essence || 0) >= essenceCost) {
             village.stats.essence -= essenceCost;
-            village.barrierIntegrity = Math.min(100, village.barrierIntegrity + 8);
+            village.barrierIntegrity = Math.min(100, village.barrierIntegrity + 8 + maintenanceBonus);
         } else         if (village.barrierIntegrity === 0) {
+
             this.postVillageNeed(village, 'essence', essenceCost, 'fueling the rune barrier');
                         if (Math.random() < 0.15 * (cal.monsters?.spawnFrequency || 1.0)) {
                 window.EventBus.emit('UI_LOG', `[BARRIER] ${village.name}'s ward is failing. Hunters must enter the woods.`);

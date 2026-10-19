@@ -63,7 +63,20 @@ window.CareerManager = {
         const def = this.definitions[careerId];
         if (!stats || !def) return;
 
-        stats.xp += amount;
+        // --- DREAM PHASE 1: TRUTH INTEGRATION (Archivist/Historian XP) ---
+        // Bible §21: "The player influences probability... dreams amplify ambition."
+        let finalAmount = amount;
+        if (window.DreamManager && (careerId === 'archivist' || careerId === 'chronicler')) {
+            // We use the player's own dream state or a global 'TRUTH' multiplier 
+            // since these are often player-driven career gains.
+            const mod = window.DreamManager.getNPCDriveModifier('player', 'patience'); 
+            if (mod > 1.0) {
+                finalAmount *= mod;
+                if (Math.random() < 0.05) window.EventBus.emit('UI_LOG', `[DREAM] A vision of TRUTH accelerates your studies.`);
+            }
+        }
+
+        stats.xp += finalAmount;
         const nextLevelXP = stats.level * 100 * (def.tier || 1);
         
         if (stats.xp >= nextLevelXP) {
