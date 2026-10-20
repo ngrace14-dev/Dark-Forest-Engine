@@ -52,7 +52,8 @@ class DynastyManagerSystem {
                 secrets: new Set(), // Set of intel_id
                 chronicle: [], // Array of event objects
                 legacy: 0, // Total significance score
-                contribution: 0 // Contribution to civilization
+                                contribution: 0, // Contribution to civilization
+                demandProfile: this.getInitialDemandProfile(name.toLowerCase()) // --- MISSION-DRIVEN DEMAND ---
             });
 
             // Register House as a Bloodline in LegacyManager
@@ -262,6 +263,22 @@ class DynastyManagerSystem {
         if (house) {
             house.archives.push(narrative.id);
         }
+    }
+
+    /**
+     * Defines what each house actively seeks in the information market.
+     */
+    getInitialDemandProfile(houseKey) {
+        const profiles = {
+            'aethel': { 'MONOPOLY': 5.0, 'SOVEREIGNTY': 10.0, 'SUCCESSION': 3.0 },
+            'terminus': { 'LONGITUDINAL': 8.0, 'GEOGRAPHY': 4.0, 'STAR_CHART': 6.0 },
+            'shadowfen': { 'REFINEMENT': 7.0, 'REAGENT': 5.0, 'SYNTHESIS': 6.0 },
+            'gloom': { 'REFRACTION': 6.0, 'GLASS': 4.0 },
+            'oakheart': { 'IRONWOOD': 5.0, 'GATHERING': 3.0 },
+            'crow': { 'SCANDAL': 6.0, 'SECRET': 5.0, 'LEVERAGE': 7.0 }
+        };
+
+        return profiles[houseKey] || { 'COMMON': 1.0, 'RUMOR': 1.1 };
     }
 
     getHouse(id) {

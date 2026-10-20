@@ -599,5 +599,39 @@ window.IntelEconomy = {
         }
 
         return true;
+    },
+
+    /**
+     * Executes a trade transaction for an information asset.
+     * Bible Doctrine: Knowledge is currency.
+     */
+    executeTrade: function(sellerNode, buyerNode, intelId) {
+        const intel = window.IntelManager.lookup(intelId);
+        if (!intel) return false;
+
+        // 1. Valuation (considering Scarcity and Credibility)
+        const price = this.calculateValue(intel, buyerNode, sellerNode);
+        if (price <= 0) return false;
+
+        // 2. Capital Check (Buyer must have gold)
+        if (buyerNode.stats && (buyerNode.stats.gold || 0) < price) return false;
+
+        // 3. Transaction
+        if (buyerNode.stats) buyerNode.stats.gold -= price;
+        if (sellerNode.stats) sellerNode.stats.gold = (sellerNode.stats.gold || 0) + price;
+
+        // 4. Transfer of Title
+        window.IntelManager.grantOwnership(intelId, buyerNode.id);
+        
+        // 5. Receipt (Provenance)
+        intel.provenance.push({
+            node_id: buyerNode.id,
+            timestamp: window.EngineParams?.worldDay || 0,
+            origin_type: 'PURCHASE',
+            source_faction: buyerNode.faction || 'Neutral'
+        });
+
+        window.EventBus.emit('UI_LOG', `[MARKET] ${buyerNode.id} purchased knowledge from ${sellerNode.id} for ${price} gold.`);
+        return true;
     }
 };
