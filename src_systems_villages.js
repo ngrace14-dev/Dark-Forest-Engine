@@ -734,9 +734,76 @@ window.VillageManager = {
             const raider = window.GameCore.instantiatePrefab(isTerminus && index === 0 ? 'Wendigo' : 'Flesh Horror', x, window.WorldGenerator.getTerrainHeight(x, z), z, 'persistent');
             if (raider) { raider.expeditionId = expedition.id; raider.targetVillageId = village.id; }
         }
-        window.EventBus.emit('UI_LOG', isTerminus ? '[MOUNTAIN INCURSION] Terminus calls its martial houses to the gate.' : `[RAID] A forest expedition advances on ${village.name}.`);
+                window.EventBus.emit('UI_LOG', isTerminus ? '[MOUNTAIN INCURSION] Terminus calls its martial houses to the gate.' : `[RAID] A forest expedition advances on ${village.name}.`);
+    },
+
+    /**
+     * Audit Monopoly status across all Houses (Bible §19).
+     * Calculates Institutional Scores and handles Blessed reassignments.
+     * Runs once per 14-day Shift.
+     */
+    auditMonopolies: function() {
+        if (!window.DynastyManager || !window.ChronicleManager) return;
+
+        const houses = Array.from(window.DynastyManager.houses.values());
+        const scores = new Map();
+
+        // 1. Calculate Institutional Scores
+        houses.forEach(h => {
+            // A. Prestige (40%)
+            const prestigeScore = (h.prestige / 1000) * 40;
+
+            // B. Prosperity (30%)
+            // Find villages associated with this house
+            const houseVillages = this.villages.filter(v => v.nobleHouse === h.name);
+            const avgProsperity = houseVillages.length > 0 ? 
+                (houseVillages.reduce((sum, v) => sum + v.stats.prosperity, 0) / houseVillages.length) : 50;
+            const prosperityScore = (avgProsperity / 100) * 30;
+
+            // C. Trade Volume (20%)
+            // Estimate based on active caravans and completed deliveries
+            const tradeCount = houseVillages.reduce((sum, v) => sum + v.caravans.length, 0);
+            const tradeScore = Math.min(20, tradeCount * 2);
+
+            // D. Truth Density (10%)
+            const truthScore = Math.min(10, h.archives.length * 2);
+
+            const totalScore = prestigeScore + prosperityScore + tradeScore + truthScore;
+            scores.set(h.id, totalScore);
+            h._lastInstitutionalScore = totalScore; // For Crow's Eye display
+        });
+
+        // 2. Identify Reassignment Candidates
+        const blessed = houses.filter(h => h.isBlessed).sort((a, b) => scores.get(a.id) - scores.get(b.id));
+        const unblessed = houses.filter(h => !h.isBlessed).sort((a, b) => scores.get(b.id) - scores.get(a.id));
+
+        if (blessed.length === 0 || unblessed.length === 0) return;
+
+        const weakestBlessed = blessed[0];
+        const strongestUnblessed = unblessed[0];
+
+        const weakScore = scores.get(weakestBlessed.id);
+        const strongScore = scores.get(strongestUnblessed.id);
+
+        // 3. Reassign if Candidate > Blessed by 20%
+        if (strongScore > weakScore * 1.20) {
+            window.EventBus.emit('UI_LOG', `[POLITICS] The Crown is reviewing the Blessed Spots...`);
+            
+            // Reassignment (Limit: 1 per Shift)
+            window.DynastyManager.setBlessedStatus(weakestBlessed.id, false);
+            window.DynastyManager.setBlessedStatus(strongestUnblessed.id, true);
+
+            window.ChronicleManager.recordEvent({
+                actorId: 'The Capital',
+                type: 'ROYAL_DECREE',
+                detail: `By Decree of King Alaric, the Blessed Spot held by ${weakestBlessed.name} has been transferred to ${strongestUnblessed.name}.`,
+                significance: 200,
+                historicalWeight: 150
+            });
+        }
     }
 };
+
 
 
 

@@ -9,9 +9,11 @@
 class DynastyManagerSystem {
     constructor() {
         this.houses = new Map(); // Map<house_id, HouseObject>
-        this.feuds = []; // Array of { houseA, houseB, reason, intensity, startDate }
+                this.feuds = []; // Array of { houseA, houseB, reason, intensity, startDate }
+        this.monopolyLog = []; // Record of Blessed status changes
         
         window.EventBus.on('ENGINE_READY', () => this.init());
+
                 window.EventBus.on('ENTITY_DIED', (data) => this.handleDeath(data));
         window.EventBus.on('LEGACY_HARVESTED', (data) => this.handleLegacyHarvest(data));
         window.EventBus.on('HISTORY_PUBLISHED', (narrative) => this.processNarrative(narrative));
@@ -265,10 +267,40 @@ class DynastyManagerSystem {
         return this.houses.get(id);
     }
 
-    getFeuds() {
+        getFeuds() {
         return this.feuds;
     }
+
+    /**
+     * Updates the Blessed status of a House (Bible §19).
+     */
+    setBlessedStatus(houseId, isBlessed) {
+        const house = this.houses.get(houseId);
+        if (!house || house.isBlessed === isBlessed) return;
+
+        house.isBlessed = isBlessed;
+        
+        const eventType = isBlessed ? 'MONOPOLY_ASCENSION' : 'MONOPOLY_REVOCATION';
+        const detail = isBlessed ? 
+            `${house.name} has been granted a Blessed Spot by Royal Decree.` : 
+            `${house.name} has lost its Blessed status. The monopoly is revoked.`;
+
+        const event = {
+            actorId: houseId,
+            type: eventType,
+            detail: detail,
+            significance: 150,
+            historicalWeight: 100
+        };
+
+        window.ChronicleManager?.recordEvent(event);
+        this.recordHouseEvent(houseId, event);
+        
+        window.EventBus.emit('UI_LOG', `[ROYAL DECREE] ${detail}`);
+        window.EventBus.emit('MONOPOLY_UPDATED', { houseId, isBlessed });
+    }
 }
+
 
 window.DynastyManager = new DynastyManagerSystem();
 export default window.DynastyManager;

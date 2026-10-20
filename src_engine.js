@@ -235,9 +235,14 @@ function updateWorldClock(delta) {
                 window.GameState?.processCrowDay?.();
             }
             
-            if (window.EngineParams.worldDay > 0 && window.EngineParams.worldDay % (window.EngineParams.cycleLengthDays || 14) === 0) {
+                        if (window.EngineParams.worldDay > 0 && window.EngineParams.worldDay % (window.EngineParams.cycleLengthDays || 14) === 0) {
+                // --- PHASE 1 MONOPOLY AUDIT (§19) ---
+                if (window.VillageManager?.auditMonopolies) {
+                    window.VillageManager.auditMonopolies();
+                }
                 window.regenerateWorldCycle?.();
             }
+
         }
     }
     window.EventBus?.emit('ENV_UPDATE');

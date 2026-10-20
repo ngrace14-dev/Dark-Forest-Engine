@@ -1337,11 +1337,13 @@ class CrowsEyeSystem {
         return html;
     }
 
-    renderHousesView() {
-        if (!window.VillageManager) return "No House Data";
+        renderHousesView() {
+        if (!window.VillageManager || !window.DynastyManager) return "No House Data";
         
         // Calculate House Metrics
         const villages = window.VillageManager.villages;
+        const houses = Array.from(window.DynastyManager.houses.values());
+
         const mostProsperous = [...villages].sort((a, b) => b.stats.prosperity - a.stats.prosperity)[0];
         const monopolyKing = [...villages].sort((a, b) => (b.hasMonopoly ? 1 : 0) - (a.hasMonopoly ? 1 : 0))[0];
         const mostThreatened = [...villages].sort((a, b) => a.barrierIntegrity - b.barrierIntegrity)[0];
@@ -1354,21 +1356,29 @@ class CrowsEyeSystem {
 
         html += `<table style="width:100%; text-align:left; border-collapse:collapse;">
             <tr style="color:#fbbf24; border-bottom: 1px solid #78350f;">
-                <th>HOUSE</th><th>LEADER</th><th>MONOPOLY</th><th>PROSPERITY</th><th>WARD</th>
+                <th>HOUSE</th><th>LEADER</th><th>STATUS</th><th>INSTITUTIONAL SCORE</th><th>PROSPERITY</th>
             </tr>`;
-        villages.forEach(v => {
-            const wardColor = v.barrierIntegrity < 30 ? '#ef4444' : v.barrierIntegrity < 70 ? '#f59e0b' : '#10b981';
+        
+        houses.sort((a, b) => (b._lastInstitutionalScore || 0) - (a._lastInstitutionalScore || 0));
+
+        houses.forEach(h => {
+            const hVillages = villages.filter(v => v.nobleHouse === h.name);
+            const prosperity = hVillages.length > 0 ? (hVillages.reduce((s, v) => s + v.stats.prosperity, 0) / hVillages.length) : 0;
+            const statusColor = h.isBlessed ? '#fbbf24' : '#92400e';
+            const score = h._lastInstitutionalScore || 0;
+
             html += `<tr style="border-bottom: 1px solid rgba(120,53,15,0.3);">
-                <td style="padding:10px 0;">${v.nobleHouse}</td>
-                <td>${v.nobleLeader}</td>
-                <td style="color:${v.hasMonopoly ? '#fbbf24' : '#92400e'}">${v.hasMonopoly ? v.industry.produces : 'None'}</td>
-                <td>${v.stats.prosperity.toFixed(1)}%</td>
-                <td style="color:${wardColor}">${v.barrierIntegrity}%</td>
+                <td style="padding:10px 0; color:${statusColor}">${h.name} ${h.isBlessed ? '★' : ''}</td>
+                <td>${h.currentLeader}</td>
+                <td style="font-size:9px;">${h.isBlessed ? 'BLESSED' : 'CHALLENGER'}</td>
+                <td style="font-weight:bold;">${score.toFixed(1)}</td>
+                <td>${prosperity.toFixed(1)}%</td>
             </tr>`;
         });
         html += `</table>`;
         return html;
     }
+
 
     renderForceLayer() {
         if (!window.ForceManager) return "Forces Offline";
