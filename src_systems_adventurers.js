@@ -11,6 +11,7 @@ window.AdventurerManager = {
             level: 1 + Math.floor(Math.random() * 3), xp: 0, storyHeat: 8 + Math.floor(Math.random() * 12),
             alive: true, position: { x: (Math.random() - 0.5) * 120, z: (Math.random() - 0.5) * 120 },
             hp: 100, maxHp: 100, morale: 70, supplies: 8, quest: { type: 'hunt', progress: 0, goal: 3 + Math.floor(Math.random() * 5) },
+            materials: { beast_bones: 0, corrupted_resin: 0, flesh_pods: 0 }, // --- MATERIAL OWNERSHIP ---
             party: [{ id: `${name.toLowerCase()}-guardian`, prefab: 'Female Guard', name: `${name}'s companion`, role: 'guardian', level: 1, hp: 90, maxHp: 90 }, { id: `${name.toLowerCase()}-scout`, prefab: 'Adventurer', name: `${name}'s scout`, role: 'scout', level: 1, hp: 80, maxHp: 80 }],
             feats: [], lastUpdateDay: window.EngineParams.worldDay, activeEntityId: null,
             // Action Ledger Requirement
@@ -104,6 +105,58 @@ window.AdventurerManager = {
         return intelId;
     },
 
+    /**
+     * Produces physical materials from successful hunts.
+     * Bible Doctrine: Essence exists because dangerous work is performed.
+     */
+    produceMaterials: function(record) {
+        const questType = record.quest.type;
+        const multiplier = record.level;
+        
+        if (questType === 'hunt') {
+            const bones = 5 + (Math.floor(Math.random() * 5) * multiplier);
+            record.materials.beast_bones += bones;
+            
+            if (Math.random() < 0.2) {
+                record.materials.corrupted_resin += 1 * multiplier;
+            }
+        } else if (questType === 'relic') {
+            record.materials.flesh_pods += 2 * multiplier;
+        }
+        
+        window.EventBus.emit('UI_LOG_DEBUG', `[HUNT] ${record.name} harvested materials from the forest.`);
+    },
+
+    /**
+     * Deposits carried materials into a settlement's storage.
+     */
+    depositMaterials: function(record, village) {
+        const total = record.materials.beast_bones + record.materials.corrupted_resin + record.materials.flesh_pods;
+        if (total === 0) return;
+
+        // Transfer to village stock
+        if (village.stats && village.stats.refinementStock) {
+            village.stats.refinementStock.beast_bones += record.materials.beast_bones;
+            village.stats.refinementStock.corrupted_resin += record.materials.corrupted_resin;
+            village.stats.refinementStock.flesh_pods += record.materials.flesh_pods;
+        }
+
+        // Reward the adventurer (Gold & Credibility)
+        const goldReward = (record.materials.beast_bones * 2) + (record.materials.corrupted_resin * 10) + (record.materials.flesh_pods * 5);
+        
+        // Abstract payment from local economy
+        if (village.stats) village.stats.gold = Math.max(0, village.stats.gold - goldReward);
+        
+        if (window.PersonhoodManager) {
+            window.PersonhoodManager.updateCredibility(record.id, 0.02);
+        }
+
+        window.EventBus.emit('UI_LOG', `[MATERIAL DELIVERY] ${record.name} delivered ${total} materials to ${village.name}.`);
+
+        // Clear adventurer bags
+        record.materials = { beast_bones: 0, corrupted_resin: 0, flesh_pods: 0 };
+    },
+
     advanceDay: function() {
         this.generate();
         const deltaSeconds = 43200 / 24; // 1 in-game hour in real seconds
@@ -161,6 +214,11 @@ window.AdventurerManager = {
                 record.morale = Math.min(100, record.morale + 1);
                 record.quest.progress = Math.min(record.quest.goal, record.quest.progress + 1);
                 
+                // --- PHASE 2: MATERIAL PRODUCTION ---
+                if (Math.random() < 0.5) {
+                    this.produceMaterials(record);
+                }
+
                 // --- PHASE: INTEL PRODUCTION ---
                 // Every time a quest stage is successfully completed, there is a chance to produce intel
                 if (Math.random() < 0.4) {
@@ -171,11 +229,17 @@ window.AdventurerManager = {
                     record.level++;
                     record.supplies += 4;
                     
-                    // Final Quest Completion always produces high-value intel
+                    // Final Quest Completion always produces high-value intel and materials
                     this.produceIntelRecord(record);
+                    this.produceMaterials(record);
                     
                     this.chooseQuest(record);
                 }
+            }
+
+            // --- HUB DEPOSIT CHECK ---
+            if (distance < 10) {
+                this.depositMaterials(record, destination);
             }
         });
         window.GameState.evaluateCrowInterest();

@@ -300,7 +300,7 @@ window.VillageManager = {
         village.territory ??= { faction: 'kingdom', radius: village.capital ? 140 : 90, control: 100, underRaid: false };
         village.stats.ap = Math.min(200, (village.stats.ap || 0) + 10);
 
-        // --- CROWN FUEL DISPATCH (STAGE 1: THE POLITICAL HEART) ---
+                // --- CROWN FUEL DISPATCH (STAGE 1: THE POLITICAL HEART) ---
         if (village.capital) {
             this.processCrownGovernance(village);
         } else {
@@ -308,6 +308,16 @@ window.VillageManager = {
             if (village.stats.essence < 5 && !village.fuelRequested) {
                 village.fuelRequested = true;
                 window.EventBus.emit('UI_LOG', `[FUEL] ${village.name} is running low on essence. The barrier is flickering.`);
+            }
+
+            // --- PHASE 2: HUB MATERIAL COLLECTION ---
+            // If the village has accumulated monster materials, load them into an outbound caravan
+            const totalStock = (village.stats.refinementStock.beast_bones || 0) + 
+                               (village.stats.refinementStock.corrupted_resin || 0) + 
+                               (village.stats.refinementStock.flesh_pods || 0);
+            
+            if (totalStock > 50 && !village.caravans.some(c => c.targetVillageId === 0)) {
+                this.launchRefinementSupplyCaravan(village);
             }
         }
 
@@ -767,7 +777,7 @@ window.VillageManager = {
      * Generates a hunt contract when refinement stock is low.
      * Bible Doctrine: Essence exists because dangerous work is performed.
      */
-    generateHuntContract: function(capital, urgencyBonus) {
+        generateHuntContract: function(capital, urgencyBonus) {
         if (!window.GameState) return;
 
         const existing = window.GameState.questBoard.find(q => q.type === 'hunt' && q.issuer === 'CAPITAL');
@@ -784,6 +794,32 @@ window.VillageManager = {
         });
         
         window.EventBus.emit('UI_LOG_DEBUG', `[ECONOMY] Capital issued high-priority hunt contract.`);
+    },
+
+    /**
+     * Dispatches a caravan from a village to the Capital to deliver raw materials.
+     */
+    launchRefinementSupplyCaravan: function(village) {
+        const stock = village.stats.refinementStock;
+        const cargo = stock.beast_bones > 0 ? 'beast_bones' : (stock.corrupted_resin > 0 ? 'corrupted_resin' : 'flesh_pods');
+        const amount = Math.min(stock[cargo], 50);
+
+        const caravan = { 
+            id: `supply-${village.id}-${window.EngineParams.worldDay}-${Date.now()}`, 
+            status: 'traveling', 
+            targetVillageId: 0, 
+            cargo: cargo, 
+            amount: amount, 
+            launchedOnDay: window.EngineParams.worldDay 
+        };
+        
+        village.caravans.push(caravan);
+        village.stats[cargo] -= amount; // Handled as specific stat in this context
+
+        const caravanEntity = window.GameCore.instantiatePrefab('Merchant Caravan', village.x + 3, window.WorldGenerator.getTerrainHeight(village.x + 3, village.z), village.z, 'persistent');
+        if (caravanEntity) { caravanEntity.caravanId = caravan.id; caravanEntity.villageId = village.id; }
+        
+        window.EventBus.emit('UI_LOG', `[TRADE] ${village.name} dispatched a supply caravan with ${amount} ${cargo} for the Capital.`);
     },
 
     processVillageCaravans: function(village) {
