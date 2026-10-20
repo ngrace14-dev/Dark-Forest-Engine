@@ -408,9 +408,9 @@ window.TruthSystem = {
 window.IntelEconomy = {
     /**
      * Calculates the market value of an Intel_ID in Gold.
-     * Factors in Significance, Rarity, Certainty, Generational Decay, and Suppression.
+     * Factors in Significance, Rarity, Certainty, Generational Decay, Suppression, and Seller Credibility.
      */
-    calculateValue: function(intel, buyerNode) {
+    calculateValue: function(intel, buyerNode, sellerNode = null) {
         if (!intel || intel.persistence !== window.IntelEnums.PERSISTENCE.ACTIVE) return 0;
         
         // 1. Base Significance
@@ -438,11 +438,20 @@ window.IntelEconomy = {
         const decay = 1 / (intel.spread_generation + 1);
 
         // 5. Plausibility & Certainty Penalty
-        // A lie that sounds absurd is worth nothing unless it's certified.
         const confidenceMod = intel.certainty * intel.plausibility_score;
 
+        // 6. SELLER CREDIBILITY (Phase 1: Foundations)
+        let credibilityMod = 1.0;
+        if (sellerNode && window.PersonhoodManager) {
+            const profile = window.PersonhoodManager.getProfile(sellerNode.id);
+            if (profile) {
+                // Map credibility (0-1) to price multiplier (0.1x to 3.0x)
+                credibilityMod = Math.max(0.1, profile.traits.credibility * 3.0);
+            }
+        }
+
         // Final Calculation
-        let price = Math.floor(baseValue * rarityMult * suppressionPremium * decay * confidenceMod);
+        let price = Math.floor(baseValue * rarityMult * suppressionPremium * decay * confidenceMod * credibilityMod);
 
         // Asymmetry Check: If buyer already knows this, it's worth 0
         const buyerIntel = window.IntelManager.getIntelForNode(buyerNode.id);
@@ -491,6 +500,24 @@ window.IntelEconomy = {
             origin_type: 'VERIFIER',
             source_faction: verifierNode.faction || 'Neutral'
         });
+
+        // --- PHASE 1: CREDIBILITY FEEDBACK LOOP ---
+        // Locate original source from provenance[0]
+        const originalSource = intel.provenance[0];
+        if (originalSource && window.PersonhoodManager) {
+            // Reward for truth, 3x penalty for lies
+            const delta = truthConditionMet ? 0.05 : -0.15;
+            window.PersonhoodManager.updateCredibility(originalSource.node_id, delta);
+            
+            // --- PHASE 3: INSTITUTIONAL BLOWBACK ---
+            if (!truthConditionMet && originalSource.source_faction.startsWith('house_') && window.DynastyManager) {
+                const house = window.DynastyManager.getHouse(originalSource.source_faction);
+                if (house) {
+                    house.prestige = Math.max(0, house.prestige - 5);
+                    house.legitimacy = Math.max(0, house.legitimacy - 0.02);
+                }
+            }
+        }
 
         // Grant ownership to the verifier
         window.IntelManager.grantOwnership(verified_intel_id, verifierNode.id);

@@ -40,12 +40,13 @@ class PersonhoodSystem {
      */
     getProfile(nodeId) {
         if (!this.profiles.has(nodeId)) {
-            const traits = {
+                        const traits = {
                 loyalty: Math.random(),
                 fear: Math.random(),
                 ambition: Math.random(),
                 riskTolerance: Math.random(),
-                cynicism: Math.random()
+                cynicism: Math.random(),
+                credibility: 0.3 // DEFAULT: Unknown (0.0 - 1.0)
             };
             
             const archetypeKeys = Object.keys(this.ARCHETYPES);
@@ -98,12 +99,28 @@ class PersonhoodSystem {
             return conclusion;
         }
 
-        // 1. TRUST FILTER (Bible §13)
+                // 1. TRUST FILTER (Bible §13)
+        // Check for Liar status before any calculation
+        if (profile.traits.isKnownFabricator) {
+            conclusion.state = 'REJECTED';
+            conclusion.interpretation = 'DISMISSED';
+            conclusion.reason = 'Individual is a known fabricator.';
+            return conclusion;
+        }
 
         // If the source of the intel is a rival or untrusted, skepticism increases
         const provenance = intel.provenance[0];
         let trust = 0.5;
         if (provenance) {
+            // --- PHASE 2: CREDIBILITY-BASED DEMAND GATING ---
+            const sourceProfile = this.getProfile(provenance.node_id);
+            if (sourceProfile && sourceProfile.traits.credibility < 0.15) {
+                conclusion.state = 'REJECTED';
+                conclusion.interpretation = 'DISMISSED';
+                conclusion.reason = 'Source credibility is too low to be considered.';
+                return conclusion;
+            }
+
             trust = this.getPersonalTrust(nodeId, provenance.node_id, provenance.source_faction);
         }
 
@@ -191,11 +208,34 @@ class PersonhoodSystem {
     }
 
         updateRelationship(nodeId, targetId, delta) {
-        const profile = this.getProfile(nodeId);
-        const current = profile.relationships.get(targetId) || { type: 'NEUTRAL', weight: 0.5 };
-        current.weight = Math.max(0, Math.min(1.0, current.weight + delta));
-        profile.relationships.set(targetId, current);
-    }
+            const profile = this.getProfile(nodeId);
+            const current = profile.relationships.get(targetId) || { type: 'NEUTRAL', weight: 0.5 };
+            current.weight = Math.max(0, Math.min(1.0, current.weight + delta));
+            profile.relationships.set(targetId, current);
+        }
+
+        /**
+         * Updates an NPC's global credibility score.
+         * Bible Doctrine: Built on a lifetime, lost in a day (Loss is 3x faster than gain).
+         */
+        updateCredibility(nodeId, delta) {
+            const profile = this.getProfile(nodeId);
+            if (!profile) return;
+
+            const oldCred = profile.traits.credibility;
+            profile.traits.credibility = Math.max(0, Math.min(1.0, oldCred + delta));
+
+            if (Math.abs(profile.traits.credibility - oldCred) > 0.01) {
+                const direction = delta > 0 ? "risen" : "fallen";
+                window.EventBus.emit('UI_LOG_DEBUG', `[CREDIBILITY] The word of ${nodeId} has ${direction}.`);
+            
+                // Assign Liar tag if they bottom out
+                if (profile.traits.credibility < 0.1 && !profile.traits.isKnownFabricator) {
+                    profile.traits.isKnownFabricator = true;
+                    window.EventBus.emit('UI_LOG', `[SCANDAL] ${nodeId} is now widely regarded as a fabricator.`);
+                }
+            }
+        }
 
     /**
      * Registers an NPC for rebirth as a Wendigo during the next Shift.

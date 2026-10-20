@@ -40,6 +40,7 @@ class DynastyManagerSystem {
                 monopolies: [], // "Blessed Spots"
                 prestige: 100,
                 isBlessed: index < 9, // First 9 are "Blessed" (Bible §19)
+                legitimacy: 0.5, // --- CREDIBILITY PILLAR: Institutional legitimacy (0.0 - 1.0) ---
                 archives: [],
                 // --- PHASE: HOUSE HISTORY ADDITIONS ---
                 beliefs: {
