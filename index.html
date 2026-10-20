@@ -116,8 +116,10 @@
                     <span id="btn-squad" class="px-2 py-1 bg-gray-800 rounded text-xs border border-cyan-700/50 text-cyan-400 hover:bg-cyan-900/30 cursor-pointer block w-max ml-auto transition-colors">G for Squad</span>
                     <span id="btn-map" class="px-2 py-1 bg-gray-800 rounded text-xs border border-indigo-700/50 text-indigo-400 hover:bg-indigo-900/30 cursor-pointer block w-max ml-auto transition-colors">M for Map</span>
                     
-                    <span id="btn-intel-debug" class="px-2 py-1 bg-gray-800 rounded text-xs border border-red-700/50 text-red-400 hover:bg-red-900/30 cursor-pointer block w-max ml-auto transition-colors mt-2">F9 for Intel Debug</span>
+                                        <span id="btn-intel-debug" class="px-2 py-1 bg-gray-800 rounded text-xs border border-red-700/50 text-red-400 hover:bg-red-900/30 cursor-pointer block w-max ml-auto transition-colors mt-2">F9 for Intel Debug</span>
+                    <span id="btn-inst-debug" class="px-2 py-1 bg-gray-800 rounded text-xs border border-amber-700/50 text-amber-400 hover:bg-amber-900/30 cursor-pointer block w-max ml-auto transition-colors mt-2">F10 for Institutional Debug</span>
                     <span id="btn-asset" class="px-2 py-1 bg-gray-800 rounded text-xs border border-indigo-700/50 text-indigo-400 hover:bg-indigo-900/30 cursor-pointer block w-max ml-auto font-bold transition-colors shadow-[0_0_10px_rgba(99,102,241,0.2)]">U for Assets & Quality</span>
+
                 </div>
             </div>
         </div>
@@ -132,10 +134,14 @@
     <div id="inventory-panel" class="absolute right-6 top-32 bottom-32 w-96 bg-gray-900/95 border border-gray-700 rounded-lg shadow-2xl p-6 hidden z-20 flex-col font-mono text-sm text-gray-300 pointer-events-auto">
     </div>
 
-    <div id="intel-bag-panel" class="absolute right-1/2 translate-x-1/2 top-32 bottom-32 w-[600px] bg-gray-900/95 border border-blue-700 rounded-lg shadow-2xl p-6 hidden z-20 flex-col font-mono text-sm text-gray-300 pointer-events-auto backdrop-blur-md">
+        <div id="intel-bag-panel" class="absolute right-1/2 translate-x-1/2 top-32 bottom-32 w-[600px] bg-gray-900/95 border border-blue-700 rounded-lg shadow-2xl p-6 hidden z-20 flex-col font-mono text-sm text-gray-300 pointer-events-auto backdrop-blur-md">
+    </div>
+
+    <div id="institutional-report-panel" class="absolute right-6 top-32 bottom-32 w-80 bg-gray-900/95 border border-amber-700 rounded-lg shadow-2xl p-4 hidden z-20 flex-col font-mono text-[10px] text-gray-300 pointer-events-auto backdrop-blur-md">
     </div>
 
     <div id="squad-manager-panel" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-900/95 border border-cyan-700 rounded-lg p-5 shadow-2xl z-40 hidden flex-col w-[450px] backdrop-blur-md pointer-events-auto">
+
         <button data-action="close" class="absolute top-2 right-2 text-gray-500 hover:text-white font-bold">&times;</button>
         <div id="squad-manager-content"></div>
     </div>

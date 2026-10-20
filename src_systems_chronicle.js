@@ -157,7 +157,7 @@ window.ChronicleManager = {
         // 4. Update Event Record
         event.witnesses = witnesses.map(w => w.id);
 
-        // 5. Generate Intel Records (Phase 1C: Pipeline Activation)
+                // 5. Generate Intel Records (Phase 1C: Pipeline Activation)
         witnesses.forEach(w => {
             const intelId = window.IntelManager.register({
                 type: event.significance > 50 ? window.IntelEnums.TYPES.FACT : window.IntelEnums.TYPES.RUMOR,
@@ -174,11 +174,20 @@ window.ChronicleManager = {
                 },
                 certainty: w.type === 'DIRECT' ? 0.9 : 0.6,
                 source_credibility: w.type === 'DIRECT' ? 0.8 : 0.5,
-                truth_state: window.IntelEnums.TRUTH_STATE.UNKNOWN // Must be verified by TruthSystem (§14)
+                truth_state: window.IntelEnums.TRUTH_STATE.UNKNOWN, // Must be verified by TruthSystem (§14)
+                
+                // --- THE RARE PART: Source Attribution ---
+                provenance: [{
+                    node_id: w.id,
+                    timestamp: window.EngineParams?.worldDay || 0,
+                    origin_type: 'WITNESS',
+                    source_faction: 'Neutral'
+                }]
             });
 
             window.IntelManager.grantOwnership(intelId, w.id);
         });
+
 
         // 6. Legend/Folklore Hook (Phase 3)
         if (event.historicalWeight > 100 || event.significance > 80) {

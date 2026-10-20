@@ -276,7 +276,7 @@ window.VillageManager = {
             });
         });
 
-        // 2. Hub to Outbound (Caravans/Couriers)
+                // 2. Hub to Outbound (Caravans/Couriers)
         // When a caravan is launched, it "loads" current village intel
         village.caravans.forEach(caravan => {
             if (caravan.status === 'traveling' && !caravan.intelLoaded) {
@@ -285,9 +285,20 @@ window.VillageManager = {
                     window.IntelManager.grantOwnership(intel.intel_id, caravan.id);
                 });
                 caravan.intelLoaded = true;
+                
+                // --- THE RARE PART: Institutional Intelligence ---
+                // If the caravan belongs to a specific House, it carries Institutional Intel too
+                const houseId = `house_${village.nobleHouse.toLowerCase().replace('house ', '')}`;
+                const house = window.DynastyManager?.getHouse(houseId);
+                if (house) {
+                    house.archives.forEach(intelId => {
+                        window.IntelManager.grantOwnership(intelId, caravan.id);
+                    });
+                }
             }
         });
     },
+
 
     /**
      * Records a crisis event in institutional memory and adjusts the memory profile.

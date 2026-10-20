@@ -140,6 +140,10 @@ class IntelManagerSystem {
     grantOwnership(intel_id, node_id) {
         if (!this.registry.has(intel_id)) return false;
         this.ownershipRegistry.get(intel_id).add(node_id);
+        
+        // --- THE RARE PART: Propagation Trigger ---
+        window.EventBus.emit('INTEL_GAINED', { intelId: intel_id, nodeId: node_id });
+        
         return true;
     }
 

@@ -854,11 +854,16 @@ document.getElementById('btn-close-asset')?.addEventListener('click', () => { co
 document.getElementById('btn-stats')?.addEventListener('click', () => document.getElementById('stats-panel')?.classList.toggle('hidden'));
 document.getElementById('btn-inv')?.addEventListener('click', () => { const p = document.getElementById('inventory-panel'); if(p) { p.classList.toggle('hidden'); if(!p.classList.contains('hidden')) window.EventBus.emit('RENDER_INVENTORY'); } });
 document.getElementById('btn-intel')?.addEventListener('click', () => window.EventBus.emit('TOGGLE_INTEL_BAG'));
+document.getElementById('btn-intel-debug')?.addEventListener('click', () => window.EventBus.emit('TOGGLE_INTEL_DEBUG'));
+document.getElementById('btn-inst-debug')?.addEventListener('click', () => window.EventBus.emit('TOGGLE_INSTITUTIONAL_REPORT'));
 document.getElementById('btn-asset')?.addEventListener('click', () => window.EventBus.emit('DEV_TOOLS_TOGGLE_ASSETS'));
 
+
 window.addEventListener('keydown', (e) => {
-    if (e.key === 'F9') window.EventBus.emit('TOGGLE_INTEL_DEBUG');
+        if (e.key === 'F9') window.EventBus.emit('TOGGLE_INTEL_DEBUG');
+    if (e.key === 'F10') window.EventBus.emit('TOGGLE_INSTITUTIONAL_REPORT');
     if (e.key === 'k' || e.key === 'K') {
+
         if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
         window.EventBus.emit('TOGGLE_INTEL_BAG');
     }
@@ -870,6 +875,78 @@ window.addEventListener('keydown', (e) => {
 
 
 // ==========================================
+// COMPONENT 5: INSTITUTIONAL REPORT UI
+// ==========================================
+class InstitutionalReportUI {
+    constructor() {
+        this.panel = document.getElementById('institutional-report-panel');
+        if (!this.panel) return;
+        this.bindEvents();
+    }
+
+    bindEvents() {
+        window.EventBus.on('TOGGLE_INSTITUTIONAL_REPORT', () => this.toggle());
+        window.EventBus.on('RENDER_INSTITUTIONAL_REPORT', () => this.render());
+    }
+
+    toggle() {
+        this.panel.classList.toggle('hidden');
+        if (!this.panel.classList.contains('hidden')) this.render();
+    }
+
+    render() {
+        if (!window.DynastyManager) return;
+        
+        let html = `
+            <div class="flex justify-between items-center mb-3 border-b border-amber-700/50 pb-2">
+                <h2 class="text-amber-400 font-bold tracking-widest uppercase">🏛️ Institutional Memory</h2>
+                <button onclick="window.EventBus.emit('TOGGLE_INSTITUTIONAL_REPORT')" class="text-gray-500 hover:text-white">&times;</button>
+            </div>
+            <div class="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-1">
+        `;
+
+        window.DynastyManager.houses.forEach(house => {
+            if (house.reportBuffer.size === 0 && house.archives.length === 0) return;
+
+            html += `
+                <div class="bg-amber-900/10 border border-amber-900/30 rounded p-2">
+                    <div class="flex justify-between items-center mb-2 border-b border-amber-900/20 pb-1">
+                        <span class="font-bold text-amber-200 uppercase">${house.name}</span>
+                        <span class="text-[8px] px-1 bg-amber-950 text-amber-400 rounded">${house.isBlessed ? 'BLESSED' : 'UNBLESSED'}</span>
+                    </div>
+                    <div class="space-y-2">
+            `;
+
+            // Active Reports
+            house.reportBuffer.forEach((buffer, intelId) => {
+                const intel = window.IntelManager.lookup(intelId);
+                const color = buffer.status === 'OFFICIAL' ? 'text-green-400' : 'text-yellow-400';
+                html += `
+                    <div class="flex flex-col gap-1 bg-black/20 p-1 rounded">
+                        <div class="flex justify-between">
+                            <span class="text-gray-300 truncate w-32">${intel?.payload.title || 'Unknown'}</span>
+                            <span class="${color} font-bold">${buffer.status}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-500">Reports: ${buffer.reports.length}</span>
+                            <div class="flex-1 mx-2 h-1 bg-gray-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-amber-500" style="width: ${buffer.aggregateCertainty * 100}%"></div>
+                            </div>
+                            <span class="text-amber-300">${Math.floor(buffer.aggregateCertainty * 100)}%</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div></div>`;
+        });
+
+        html += `</div>`;
+        this.panel.innerHTML = html;
+    }
+}
+
+// ==========================================
 // INITIALIZATION BOOTSTRAP
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
@@ -877,4 +954,6 @@ window.addEventListener('DOMContentLoaded', () => {
     window.UI_SquadManager = new SquadManagerUI();
     window.UI_FactionMap = new FactionMapUI();
     window.UI_WorldOverlay = new WorldOverlayUI();
+    window.UI_InstitutionalReport = new InstitutionalReportUI();
 });
+

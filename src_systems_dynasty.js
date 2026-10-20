@@ -15,9 +15,18 @@ class DynastyManagerSystem {
         window.EventBus.on('ENGINE_READY', () => this.init());
 
                 window.EventBus.on('ENTITY_DIED', (data) => this.handleDeath(data));
-        window.EventBus.on('LEGACY_HARVESTED', (data) => this.handleLegacyHarvest(data));
-        window.EventBus.on('HISTORY_PUBLISHED', (narrative) => this.processNarrative(narrative));
+                window.EventBus.on('LEGACY_HARVESTED', (data) => this.handleLegacyHarvest(data));
+                window.EventBus.on('HISTORY_PUBLISHED', (narrative) => this.processNarrative(narrative));
+        
+                // --- THE RARE PART: Institutional Pipeline Listener ---
+                window.EventBus.on('INTEL_GAINED', (data) => {
+                    const entity = window.GameCore?.activeEntities?.find(e => e.id === data.nodeId);
+                    if (entity && (entity.houseId || entity.institutionId)) {
+                        this.submitReport(entity.houseId || entity.institutionId, data.nodeId, data.intelId);
+                    }
+                });
     }
+
 
     init() {
         // Initialize the 19 Noble Houses (Bible §19)
@@ -30,7 +39,7 @@ class DynastyManagerSystem {
 
         houseNames.forEach((name, index) => {
             const id = `house_${name.toLowerCase()}`;
-            this.houses.set(id, {
+                        this.houses.set(id, {
                 id: id,
                 name: `House ${name}`,
                 founder: `Founder ${name}`,
@@ -42,7 +51,13 @@ class DynastyManagerSystem {
                 isBlessed: index < 9, // First 9 are "Blessed" (Bible §19)
                 legitimacy: 0.5, // --- CREDIBILITY PILLAR: Institutional legitimacy (0.0 - 1.0) ---
                 archives: [],
+                
+                // --- THE RARE PART: Institutional Memory & Action Pipeline ---
+                reportBuffer: new Map(), // intelId -> { reportCount, totalCredibility, aggregateSignificance }
+                actionQueue: [],
+                
                 // --- PHASE: HOUSE HISTORY ADDITIONS ---
+
                 beliefs: {
                     crown: Math.random() > 0.5 ? 'LOYAL' : 'SKEPTICAL',
                     huntsman: 'FEARFUL',
@@ -257,7 +272,110 @@ class DynastyManagerSystem {
         // This is handled by ReputationManager.isRival() which we will hook into
     }
 
+        /**
+     * THE RARE PART (Node 3: Institution)
+     * Receives a report from an individual member.
+     */
+    submitReport(houseId, reporterId, intelId) {
+        const house = this.houses.get(houseId);
+        const profile = window.PersonhoodManager?.getProfile(reporterId);
+        const intel = window.IntelManager?.lookup(intelId);
+        
+        if (!house || !profile || !intel) return;
+
+        // Credibility Filter (Node 2)
+        // Only reports from credible sources or highly certain intel are buffered
+        const reportWeight = profile.traits.credibility * intel.certainty;
+        if (reportWeight < 0.3) {
+            window.EventBus.emit('UI_LOG_DEBUG', `[DYNASTY] ${house.name} dismissed weak report from ${reporterId}.`);
+            return;
+        }
+
+        if (!house.reportBuffer.has(intelId)) {
+            house.reportBuffer.set(intelId, {
+                reports: [],
+                aggregateCertainty: 0,
+                status: 'UNVERIFIED'
+            });
+        }
+
+        const buffer = house.reportBuffer.get(intelId);
+        buffer.reports.push({ reporterId, credibility: profile.traits.credibility, timestamp: Date.now() });
+        buffer.aggregateCertainty = Math.min(1.0, buffer.aggregateCertainty + (reportWeight * 0.4));
+
+        window.EventBus.emit('UI_LOG_DEBUG', `[DYNASTY] ${house.name} received report on ${intel.payload.title}. Certainty: ${buffer.aggregateCertainty.toFixed(2)}`);
+
+        // If certainty passes the Institutional Threshold, it becomes Institutional Knowledge
+        if (buffer.aggregateCertainty > 0.7 && buffer.status === 'UNVERIFIED') {
+            this.institutionalizeIntel(houseId, intelId);
+        }
+    }
+
+    /**
+     * Node 3 -> 4: Institution -> Action
+     * Once the institution "believes" the info, it commits to a world-state change.
+     */
+    institutionalizeIntel(houseId, intelId) {
+        const house = this.houses.get(houseId);
+        const intel = window.IntelManager.lookup(intelId);
+        if (!house || !intel) return;
+
+        const buffer = house.reportBuffer.get(intelId);
+        buffer.status = 'OFFICIAL';
+        
+        // Add to permanent archives
+        house.archives.push(intelId);
+        window.IntelManager.shareToInstitution(intelId, houseId);
+
+        window.EventBus.emit('UI_LOG', `[INSTITUTION] ${house.name} has officially recognized: ${intel.payload.title}`);
+
+        // TRIGGER ACTION (Node 4)
+        this.determineInstitutionalAction(houseId, intel);
+    }
+
+        determineInstitutionalAction(houseId, intel) {
+        const house = this.houses.get(houseId);
+        if (!house || !window.VillageManager) return;
+        
+        const houseVillages = window.VillageManager.villages.filter(v => v.nobleHouse === house.name);
+
+        // Logic: What does the House DO with this information?
+        // 1. If it's a WARNING about a monster -> Fortify/Mobilize
+        if (intel.type === 'WARNING' || intel.payload.tags.includes('THREAT')) {
+            window.EventBus.emit('UI_LOG', `[ACTION] ${house.name} issues Mobilization Decree!`);
+            
+            houseVillages.forEach(v => {
+                // Institutional Action: Fortify the village
+                v.barrierIntegrity = Math.min(100, v.barrierIntegrity + 20);
+                v.memoryProfile.caution = Math.min(1.0, v.memoryProfile.caution + 0.2);
+                
+                // Create a Defense Bounty
+                if (window.VillageManager.generateObjective) {
+                    window.VillageManager.generateObjective(v, 'SUPPRESSION', intel.payload.title);
+                }
+            });
+        }
+
+        // 2. If it's a SCANDAL about a rival house -> Feud/Leverage
+        if (intel.payload.tags.includes('SCANDAL')) {
+            const rivalHouse = intel.provenance[0]?.source_faction;
+            if (rivalHouse && rivalHouse !== houseId) {
+                window.EventBus.emit('UI_LOG', `[ACTION] ${house.name} uses secret intel to leverage ${rivalHouse}!`);
+                this.recordFeudEvent(houseId, rivalHouse, 'POLITICAL_SCANDAL');
+                this.applyLeverage(rivalHouse, intel.intel_id, 'TAXATION');
+            }
+        }
+
+        // 3. If it's ECONOMIC/Blessed Spot -> Monopoly Claim
+        if (intel.significance.economic > 70) {
+            window.EventBus.emit('UI_LOG', `[ACTION] ${house.name} petitioning for Royal Monopoly on local resources.`);
+            this.setBlessedStatus(houseId, true);
+        }
+    }
+
+
     processNarrative(narrative) {
+
         // Record official history into house archives
         const house = this.houses.get(narrative.bias);
         if (house) {
