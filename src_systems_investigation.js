@@ -154,10 +154,29 @@ class InvestigationManagerSystem {
                 const b = evidenceNodes[j];
                 
                                 const conflict = this.findConflict(a, b);
-                if (conflict) {
-                    mystery.contradictions.push(conflict);
-                    window.EventBus.emit('UI_LOG', `[CONTRADICTION] ${conflict.type}: ${conflict.reason}`);
-                }
+                                if (conflict) {
+                                    mystery.contradictions.push(conflict);
+                                    window.EventBus.emit('UI_LOG', `[CONTRADICTION] ${conflict.type}: ${conflict.reason}`);
+                    
+                                    // --- PHASE 3: POLITICAL INTEGRATION (Credibility Penalty) ---
+                                    if (conflict.type === 'HISTORY_DISTORTION') {
+                                        // Locate the source of the distortion
+                                        const distortingIntel = a.payload.tags.includes('OFFICIAL_HISTORY') ? a : b;
+                                        const originalSource = distortingIntel.provenance[0];
+                                        if (originalSource && window.DynastyManager) {
+                                            const houseId = originalSource.source_faction;
+                                            if (houseId.startsWith('house_')) {
+                                                const house = window.DynastyManager.getHouse(houseId);
+                                                if (house) {
+                                                    // High penalty for official revisionism
+                                                    house.prestige = Math.max(0, house.prestige - 20);
+                                                    house.legitimacy = Math.max(0, house.legitimacy - 0.05);
+                                                    window.EventBus.emit('UI_LOG', `[SCANDAL] Official records of ${house.name} have been exposed as revisionist!`);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
 
             }
         }
