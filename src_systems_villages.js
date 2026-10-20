@@ -522,9 +522,29 @@ window.VillageManager = {
     },
 
         processEconomicCrises: function(village) {
-        village.crises ??= [];
+                this.crises = village.crises || [];
         
+        // --- MONOPOLY PHASE 2: BLESSED PAYLOAD (§19) ---
+        // Bible §19: Blessed Houses hold monopolies that generate prosperity.
+        const house = window.DynastyManager?.houses.get(`house_${village.nobleHouse.toLowerCase().replace('house ', '')}`);
+        if (house && house.isBlessed) {
+            village.stats.gold += 100; // Monopoly Gold Payload
+            village.stats.prosperity = Math.min(100, village.stats.prosperity + 2);
+            if (Math.random() < 0.01) {
+                window.EventBus.emit('UI_LOG_DEBUG', `[ECONOMY] ${village.name} prospers under the ${house.name} monopoly.`);
+            }
+        }
+
+        // --- MONOPOLY PHASE 2: AGITATOR RUMORS (§19) ---
+        // Bible §19: Unblessed Houses act as economic agitators.
+        if (house && !house.isBlessed) {
+            if (Math.random() < 0.05) { // 5% chance per tick to generate an agitator rumor
+                this.generateSmugglingRumor(village, house);
+            }
+        }
+
         // 1. Famine Check
+
         if (village.stats.food < village.population.current * 2) {
             if (!village.crises.includes('Famine')) {
                 village.crises.push('Famine');
@@ -574,10 +594,39 @@ window.VillageManager = {
         }
         return true;
     },
-    spendVillageResources: function(village, cost) {
+        spendVillageResources: function(village, cost) {
         Object.entries(cost).forEach(([resource, amount]) => { village.stats[resource] -= amount; });
     },
-        processCrownGovernance: function(capital) {
+
+    /**
+     * Generates a smuggling rumor for Unblessed Houses (Bible §19).
+     * Creates investigation content for the player.
+     */
+    generateSmugglingRumor: function(village, house) {
+        if (!window.IntelManager) return;
+
+        const payload = {
+            title: `Smuggling in ${village.name}`,
+            description: `Rumors suggest ${house.name} is bypassing Royal trade routes to reclaim its lost prosperity.`,
+            tags: ['ECONOMY', 'SMUGGLING', 'UNBLESSED_AGITATION'],
+            target_coord: { x: village.x, z: village.z }
+        };
+
+        const intelId = window.IntelManager.register({
+            type: 'RUMOR',
+            payload: payload,
+            significance: { economic: 2, political: 1 },
+            rarity: 'UNCOMMON',
+            certainty: 0.3
+        });
+
+        // Grant ownership to the local village hub (it starts here)
+        window.IntelManager.grantOwnership(intelId, `village_${village.id}`);
+        window.EventBus.emit('UI_LOG_DEBUG', `[POLITICS] An unblessed rumor has surfaced in ${village.name}.`);
+    },
+
+    processCrownGovernance: function(capital) {
+
         const candidates = this.villages.filter(v => v.id !== 0 && v.fuelRequested);
         if (candidates.length === 0 || capital.stats.essence < 10) return;
 
