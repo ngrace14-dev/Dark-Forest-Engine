@@ -34,8 +34,26 @@ window.ItemDatabase = {
     'clockwork_arm': { id: 'clockwork_arm', name: 'Clockwork Arm', type: 'prosthetic', slot: 'leftArm_prosthetic', stats: { hpBonus: 20, strength: 2 }, icon: '🦾', color: 'text-orange-400' },
     'clockwork_leg': { id: 'clockwork_leg', name: 'Clockwork Leg', type: 'prosthetic', slot: 'leftLeg_prosthetic', stats: { hpBonus: 20, athletics: 2 }, icon: '⚙️', color: 'text-orange-400' },
     'void_arm': { id: 'void_arm', name: 'Void-Infused Arm', type: 'prosthetic', slot: 'rightArm_prosthetic', stats: { hpBonus: 50, strength: 5, resistances: { void: 10 } }, icon: '🟣', color: 'text-purple-500' },
-    'void_leg': { id: 'void_leg', name: 'Void-Infused Leg', type: 'prosthetic', slot: 'rightLeg_prosthetic', stats: { hpBonus: 50, athletics: 5, resistances: { void: 10 } }, icon: '🌑', color: 'text-purple-500' }
+        'void_leg': { id: 'void_leg', name: 'Void-Infused Leg', type: 'prosthetic', slot: 'rightLeg_prosthetic', stats: { hpBonus: 50, athletics: 5, resistances: { void: 10 } }, icon: '🌑', color: 'text-purple-500' },
+
+    // ARTIFACTS (§11)
+    'wendigo_fragment': { 
+        id: 'wendigo_fragment', 
+        name: 'Calcified Wendigo Shard', 
+        type: 'artifact', 
+        isDiscovery: true, 
+        linkedMysteryId: 'first_wendigo',
+        artifactTier: 'ORIGIN',
+        stats: {}, 
+        icon: '🦴', 
+        color: 'text-purple-400',
+        metadata: {
+            source: 'Greater Wendigo',
+            description: 'A shard of bone pulsing with cold hunger. It bears runic markings from before the Fracture.'
+        }
+    }
 };
+
 
 function recalculateStats() {
     if (!window.GameState || !window.GameState.inventory) {
@@ -131,19 +149,24 @@ function renderInventory() {
         <div class="grid grid-cols-5 gap-2 overflow-y-auto flex-1 custom-scrollbar content-start">
     `;
     
-    for(let i=0; i<25; i++) {
+        for(let i=0; i<25; i++) {
         if(i < pack.length && pack[i]) {
             const item = window.ItemDatabase[pack[i]];
-            // Updated tooltip to support healLimb
-            const statText = item.stats.defense ? 'DEF: +'+item.stats.defense : (item.stats.damage ? 'DMG: '+item.stats.damage : (item.stats.healLimb ? 'HEAL LIMB: '+item.stats.healLimb : 'HEAL: '+item.stats.heal));
-            
+            // Updated tooltip to support healLimb and Discovery
+            let statText = item.stats.defense ? 'DEF: +'+item.stats.defense : (item.stats.damage ? 'DMG: '+item.stats.damage : (item.stats.healLimb ? 'HEAL LIMB: '+item.stats.healLimb : (item.stats.heal ? 'HEAL: '+item.stats.heal : '')));
+            if (item.isDiscovery) statText = `TIER: ${item.artifactTier}`;
+
+            const inspectBtn = item.isDiscovery ? `<div class="mt-1 bg-purple-900/50 border border-purple-400 text-[8px] px-1 py-0.5 rounded">CLICK TO INSPECT</div>` : '';
+
             html += `<div class="bg-gray-800 border border-gray-700 aspect-square rounded flex flex-col items-center justify-center text-[10px] ${item.color} hover:bg-gray-700 hover:border-gray-500 cursor-pointer transition-colors relative group shadow-sm" onclick="window.EventBus.emit('INV_USE', ${i})">
                 <span class="text-xl mb-0.5">${item.icon}</span>
+                ${inspectBtn}
                 <div class="absolute bottom-[105%] left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block w-max bg-gray-950 text-gray-300 text-[10px] p-1.5 rounded border border-gray-600 z-10 pointer-events-none shadow-lg">
                     <span class="font-bold block text-white">${item.name}</span><span class="text-gray-500 block">${statText}</span>
                 </div></div>`;
         } else { html += `<div class="bg-gray-800/40 border border-gray-700/50 aspect-square rounded"></div>`; }
     }
+
     html += `</div>`; panel.innerHTML = html;
 }
 
@@ -171,7 +194,7 @@ window.EventBus.on('INV_USE', (packIndex) => {
     const itemId = window.GameState.inventory.backpack[packIndex]; if(!itemId) return;
     const item = window.ItemDatabase[itemId];
     
-    if(item.type === 'consumable') {
+        if(item.type === 'consumable') {
         if(item.id === 'food') {
             if(window.GameState.inventory.food <= 0) {
                 window.EventBus.emit('UI_LOG', 'No food remaining.');
@@ -190,8 +213,38 @@ window.EventBus.on('INV_USE', (packIndex) => {
             if (item.stats.buff) window.EventBus.emit('UI_LOG', `${item.name} grants +${item.stats.amount} ${item.stats.buff} for ${item.stats.duration}s.`);
             window.EventBus.emit('UI_UPDATE_HUD');
         }
-    } 
+    } else if (item.isDiscovery) {
+        // --- ARTIFACT BRIDGE: INSPECTION FLOW ---
+        window.EventBus.emit('UI_LOG', `[ARTIFACT] Inspecting ${item.name}...`);
+        
+        if (window.IntelManager) {
+            const intelId = window.IntelManager.register({
+                type: 'FACT',
+                payload: {
+                    title: `Artifact Analysis: ${item.name}`,
+                    description: item.metadata?.description || `A mysterious artifact of ${item.artifactTier} tier.`,
+                    tags: ['ARTIFACT', item.artifactTier, 'PHYSICAL_EVIDENCE'],
+                    timestamp_day: window.EngineParams?.worldDay || 0
+                },
+                significance: { historical: 100 },
+                certainty: 1.0,
+                isAnchored: true
+            });
+
+            window.EventBus.emit('UI_LOG', `[EVIDENCE] Registered artifact as intellectual fact.`);
+            
+            if (window.InvestigationManager && item.linkedMysteryId) {
+                window.InvestigationManager.flagEvidence(intelId, item.linkedMysteryId);
+                window.EventBus.emit('UI_LOG', `[MYSTERY] Evidence linked to origin dossier.`);
+            }
+        }
+
+        // Consume the physical item once converted to intel
+        window.GameState.inventory.backpack.splice(packIndex, 1);
+        window.EventBus.emit('PLAY_SOUND', {url: 'https://tonejs.github.io/audio/drum-samples/handclap.mp3', pos: window.GameCore?.playerObj ? window.GameCore.playerObj.visual.position : {x:0,y:0,z:0}, vol: -5});
+    }
     // NEW: Medical Item Logic (Heals Limbs)
+
     else if (item.type === 'medical') {
         if (window.playerHealth) {
             let worstLimb = null;

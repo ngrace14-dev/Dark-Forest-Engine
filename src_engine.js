@@ -508,10 +508,20 @@ function handleEntityDeath(entity) {
         window.EventBus?.emit('UI_LOG', `[HUNTER] You have harvested a deer carcass.`);
     }
 
-    if (window.GameCore?.spawnGroundLoot) {
-        const lootType = entity.name === 'Deer' ? 'food' : (entity.def?.faction === 'forest' ? 'corrupted_resin' : 'beast_bones');
+        if (window.GameCore?.spawnGroundLoot) {
+        // --- PHASE 1 ARTIFACT BRIDGE: WENDIGO DISCOVERY ---
+        let lootType = entity.def?.faction === 'forest' ? 'corrupted_resin' : 'beast_bones';
+        
+        if (entity.name === 'Wendigo' || entity.name === 'Greater Wendigo') {
+            lootType = 'wendigo_fragment';
+            window.EventBus?.emit('UI_LOG', `[REVELATION] An ancient fragment has fallen from the horror.`);
+        } else if (entity.name === 'Deer') {
+            lootType = 'food';
+        }
+
         window.GameCore.spawnGroundLoot(lootType, entity.visual.position);
     }
+
 
     window.awardMonsterKill?.(entity);
     
@@ -2280,13 +2290,4 @@ async function bootEngine() {
                 // --- PRE-FLIGHT SYNCHRONIZATION ---
                 // We only proceed to bake and initialize impostors if the Worker successfully returned the geometries.
                 if (window.ImpostorBaker && window.RedwoodGenerator?.isInitialized) {
-                    console.log('[Engine] Initializing LOD Impostor Baker...');
-                    try {
-                        // Initialize Baker isolated scene using the instantiated procedural materials
-                        const baseTrunkMat = window.ForestRenderer.materials.get('Redwood_ANCIENT_0')?.[0];
-                        const baseCanopyMat = window.ForestRenderer.materials.get('Redwood_ANCIENT_0')?.[1];
-                
-                        // Ensure materials are set for the procedural trees
-                        if (!baseTrunkMat || !baseCanopyMat) {
-                            console.warn('[Engine] Forest materials not found. Falling back to default impostor system.');
-                            if (window.Fores
+                    console.log('[Engine] Initia
