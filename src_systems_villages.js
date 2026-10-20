@@ -64,7 +64,7 @@ window.VillageManager = {
             const profile = this.settlementProfiles[i];
             const provision = this.provisionProfiles[i];
             
-            this.villages.push({ 
+                        this.villages.push({ 
                 id: i, 
                 name: i === 0 ? 'The Capital' : this.names[i - 1], 
                 x: 0, z: 0, // Placeholder, set by shiftLocations
@@ -79,7 +79,7 @@ window.VillageManager = {
                 territory: { faction: 'kingdom', radius: i === 0 ? 140 : 90, barrierRadius: i === 0 ? 140 : 90, control: 100, underRaid: false }, 
                 barrierIntegrity: 100, 
                 expeditions: [], 
-                                stats: { 
+                stats: { 
                     ap: 50 + Math.floor(Math.random() * 50), 
                     food: population * 20, 
                     wood: population * 8, 
@@ -87,7 +87,7 @@ window.VillageManager = {
                     gold: population * 4, 
                     essence: 0, 
                     prosperity: 55,
-                                        refinementStock: {
+                    refinementStock: {
                         beast_bones: i === 0 ? 500 : 0,
                         corrupted_resin: 0,
                         flesh_pods: 0
@@ -107,6 +107,7 @@ window.VillageManager = {
                     expansionConfidence: 0.5
                 },
                 fuelNeed: 0, // Projected demand
+                feudalState: i === 19 ? 'PARTIALLY_SOVEREIGN' : 'DEPENDENT', // --- PHASE 11: FEUDAL DEPENDENCY ---
                 // Action Ledger Requirement
                 currentTask: 'Establishing', taskTarget: 'Local Region', taskReason: 'Settlement routine.', taskTimestamp: Date.now()
             });
@@ -359,31 +360,34 @@ window.VillageManager = {
 
                 // --- CROWN FUEL DISPATCH (STAGE 1: THE POLITICAL HEART) ---
                 if (village.capital) {
-            this.processCrownGovernance(village);
-        } else {
-            // Village Need Detection
-            if (village.stats.essence < 5 && !village.fuelRequested) {
-                village.fuelRequested = true;
-                window.EventBus.emit('UI_LOG', `[FUEL] ${village.name} is running low on essence. The barrier is flickering.`);
+                    this.processCrownGovernance(village);
+                } else {
+                    // Village Need Detection
+                    if (village.stats.essence < 5 && !village.fuelRequested) {
+                        village.fuelRequested = true;
+                        window.EventBus.emit('UI_LOG', `[FUEL] ${village.name} is running low on essence. The barrier is flickering.`);
                 
-                // --- PHASE 3: RECORD FUEL SHORTAGE ---
-                this.recordCrisis(village, 'FUEL_SHORTAGE', 0.5);
-            }
+                        // --- PHASE 3: RECORD FUEL SHORTAGE ---
+                        this.recordCrisis(village, 'FUEL_SHORTAGE', 0.5);
+                    }
 
-            // --- PHASE 2: HUB MATERIAL COLLECTION ---
-            // If the village has accumulated monster materials, load them into an outbound caravan
-            const totalStock = (village.stats.refinementStock.beast_bones || 0) + 
-                               (village.stats.refinementStock.corrupted_resin || 0) + 
-                               (village.stats.refinementStock.flesh_pods || 0);
+                    // --- PHASE 2: HUB MATERIAL COLLECTION ---
+                    // If the village has accumulated monster materials, load them into an outbound caravan
+                    const totalStock = (village.stats.refinementStock.beast_bones || 0) + 
+                                       (village.stats.refinementStock.corrupted_resin || 0) + 
+                                       (village.stats.refinementStock.flesh_pods || 0);
             
-            // --- PHASE 3: ADAPTIVE TRADING ---
-            // Cautious villages save materials for themselves or prioritize essence-only trade
-            const launchThreshold = village.memoryProfile.caution > 0.6 ? 100 : 50;
+                    // --- PHASE 3: ADAPTIVE TRADING ---
+                    // Cautious villages save materials for themselves or prioritize essence-only trade
+                    const launchThreshold = village.memoryProfile.caution > 0.6 ? 100 : 50;
 
-            if (totalStock > launchThreshold && !village.caravans.some(c => c.targetVillageId === 0)) {
-                this.launchRefinementSupplyCaravan(village);
-            }
-        }
+                    if (totalStock > launchThreshold && !village.caravans.some(c => c.targetVillageId === 0)) {
+                        this.launchRefinementSupplyCaravan(village);
+                    }
+                }
+
+                // --- PHASE 4: FEUDAL DEPENDENCY & LOYALTY ---
+                this.processFeudalLoyalty(village);
 
         
                 const production = Math.max(1, Math.floor((village.population.current / 1500) * worldCal.growthRate));
@@ -391,7 +395,13 @@ window.VillageManager = {
         
                 // --- PHASE 1: SCALING MAINTENANCE ---
                 // Base cost * (1 + expansionLevel)
-                const baseEssenceCost = Math.max(1, Math.ceil(village.population.current / 5000));
+                let baseEssenceCost = Math.max(1, Math.ceil(village.population.current / 5000));
+        
+                // --- PHASE 11: LORE-DRIVEN EFFICIENCY (House Terminus) ---
+                if (village.nobleHouse === 'House Terminus') {
+                    baseEssenceCost *= 0.5; // 50% reduction for ancient armor and geographic stability
+                }
+        
                 const essenceCost = baseEssenceCost * (1 + (village.expansionLevel || 0));
         
                 village.fuelNeed = essenceCost; // Store for feedback
@@ -891,6 +901,48 @@ window.VillageManager = {
         if (caravanEntity) { caravanEntity.caravanId = caravan.id; caravanEntity.villageId = village.id; }
         
         window.EventBus.emit('UI_LOG', `[TRADE] ${village.name} dispatched a supply caravan with ${amount} ${cargo} for the Capital.`);
+    },
+
+        /**
+     * Logic for local authority and dependency on the Crown.
+     * Bible Doctrine: Information determines who controls physical goods.
+     */
+    processFeudalLoyalty: function(village) {
+        if (village.capital) return;
+        
+        // --- HIDDEN VILLAGE EXCEPTION ---
+        if (village.name === 'Epitaph') {
+            village.feudalState = 'SOVEREIGN';
+            village.stats.essence = 999; // Lore: Runic Sovereignty
+            village.fuelRequested = false;
+            return;
+        }
+
+        const crownRelations = village.relations[0] || 0;
+        const memory = village.memoryProfile;
+
+        // 1. Dependency Calculation
+        // A village is "Independent" if its memoryProfile.trustInCrown is low but ambition is high.
+        if (memory.trustInCrown < 0.3 && memory.ambition > 0.7) {
+            if (village.feudalState !== 'INDEPENDENT') {
+                village.feudalState = 'INDEPENDENT';
+                window.EventBus.emit('UI_LOG', `[POLITICS] ${village.name} has declared economic independence from the Capital.`);
+            }
+        } else if (crownRelations < -20) {
+            village.feudalState = 'SEMI_AUTONOMOUS';
+        } else {
+            // Keep specialized states if they were set (e.g. Terminus)
+            if (village.feudalState !== 'PARTIALLY_SOVEREIGN') {
+                village.feudalState = 'DEPENDENT';
+            }
+        }
+
+        // 2. Strategic Reserves
+        // Independent/Cautious villages try to keep a local reserve of 20 Essence
+        if (village.feudalState !== 'DEPENDENT' && village.stats.essence > 20) {
+            // They stop requesting fuel even if technically "low" by standard rules
+            village.fuelRequested = false; 
+        }
     },
 
     processVillageCaravans: function(village) {
