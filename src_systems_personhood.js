@@ -56,11 +56,13 @@ class PersonhoodSystem {
                 id: nodeId,
                 traits,
                 identity,
-                bias: this.ARCHETYPES[identity].bias,
+                                bias: this.ARCHETYPES[identity].bias,
                 relationships: new Map(), // nodeId -> { type, weight, sinceDay }
                 ancestry: { parents: [], children: [], houseFounderDescent: false }, // --- LINEAGE PIVOT ---
                 beliefState: new Map(), // intelId -> { conviction, interpretation, lastUpdate }
-                beliefHistory: [] // History of conclusions drawn
+                beliefHistory: [], // History of conclusions drawn
+                apprentices: [], // --- PHASE 4: APPRENTICESHIP ---
+                masterId: null
             });
 
             // --- LEGACY REGISTRATION ---
@@ -256,10 +258,36 @@ class PersonhoodSystem {
         window.EventBus.emit('UI_LOG', `[NARRATIVE] The soul of ${profile.id} lingers in the frost...`);
     }
 
-    consumeCandidates() {
+        consumeCandidates() {
         const batch = [...this.wendigoCandidates];
         this.wendigoCandidates = [];
         return batch;
+    }
+
+    /**
+     * Social Knowledge Sync (Nightly Social Sync)
+     * During the simulation, nearby NPCs exchange folklore and traditions.
+     */
+    syncNearbyKnowledge(nodeA, nodeB) {
+        if (!window.IntelManager || !window.IntelPropagation) return;
+
+        // Fetch owned intel for both
+        const intelA = window.IntelManager.getIntelForNode(nodeA.id);
+        const intelB = window.IntelManager.getIntelForNode(nodeB.id);
+
+        // Filter for folklore/traditions
+        const folkA = intelA.filter(i => i.payload.tags.includes('FOLKLORE'));
+        const folkB = intelB.filter(i => i.payload.tags.includes('FOLKLORE'));
+
+        // Exchange one random piece of folklore
+        if (folkA.length > 0) {
+            const pick = folkA[Math.floor(Math.random() * folkA.length)];
+            window.IntelPropagation.sync(nodeA, nodeB, pick.intel_id, window.IntelEnums.VECTORS.GOSSIP);
+        }
+        if (folkB.length > 0) {
+            const pick = folkB[Math.floor(Math.random() * folkB.length)];
+            window.IntelPropagation.sync(nodeB, nodeA, pick.intel_id, window.IntelEnums.VECTORS.GOSSIP);
+        }
     }
 }
 
