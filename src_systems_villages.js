@@ -79,12 +79,27 @@ window.VillageManager = {
                 territory: { faction: 'kingdom', radius: i === 0 ? 140 : 90, barrierRadius: i === 0 ? 140 : 90, control: 100, underRaid: false }, 
                 barrierIntegrity: 100, 
                 expeditions: [], 
-                stats: { ap: 50 + Math.floor(Math.random() * 50), food: population * 20, wood: population * 8, stone: population * 5, gold: population * 4, essence: 0, prosperity: 55 }, 
+                                stats: { 
+                    ap: 50 + Math.floor(Math.random() * 50), 
+                    food: population * 20, 
+                    wood: population * 8, 
+                    stone: population * 5, 
+                    gold: population * 4, 
+                    essence: 0, 
+                    prosperity: 55,
+                    refinementStock: {
+                        beast_bones: i === 0 ? 500 : 0,
+                        corrupted_resin: 0,
+                        flesh_pods: 0
+                    }
+                }, 
                 population: { current: population, capacity: Math.ceil(population * 1.2) }, 
                 expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [],
                 relations: {}, 
                 diplomaticState: {}, 
                 tensions: 0,
+                crisisLog: [], // --- GOVERNANCE MEMORY ---
+                fuelNeed: 0, // Projected demand
                 // Action Ledger Requirement
                 currentTask: 'Establishing', taskTarget: 'Local Region', taskReason: 'Settlement routine.', taskTimestamp: Date.now()
             });
@@ -298,12 +313,17 @@ window.VillageManager = {
 
         
                 const production = Math.max(1, Math.floor((village.population.current / 1500) * worldCal.growthRate));
-        village.stats[village.industry.produces] += production;
+                village.stats[village.industry.produces] += production;
         
-        const essenceCost = Math.max(1, Math.ceil(village.population.current / 5000));
-        village.barrierIntegrity = Math.max(0, (village.barrierIntegrity ?? 100) - essenceCost);
+                // --- PHASE 1: SCALING MAINTENANCE ---
+                // Base cost * (1 + expansionLevel)
+                const baseEssenceCost = Math.max(1, Math.ceil(village.population.current / 5000));
+                const essenceCost = baseEssenceCost * (1 + (village.expansionLevel || 0));
         
-        // --- DREAM PHASE 1: ROOTS INTEGRATION (Barrier Maintenance) ---
+                village.fuelNeed = essenceCost; // Store for feedback
+                village.barrierIntegrity = Math.max(0, (village.barrierIntegrity ?? 100) - essenceCost);
+        
+                // --- DREAM PHASE 1: ROOTS INTEGRATION (Barrier Maintenance) ---
         // Bible §10, §21: If the village leader has a ROOTS dream, maintenance is more efficient.
         let maintenanceBonus = 0;
         if (window.DreamManager && village.nobleLeader) {
@@ -313,10 +333,14 @@ window.VillageManager = {
             }
         }
 
-        if ((village.stats.essence || 0) >= essenceCost) {
+                if ((village.stats.essence || 0) >= essenceCost) {
             village.stats.essence -= essenceCost;
             village.barrierIntegrity = Math.min(100, village.barrierIntegrity + 8 + maintenanceBonus);
-        } else         if (village.barrierIntegrity === 0) {
+        } else if (village.barrierIntegrity === 0) {
+            // --- GOVERNANCE MEMORY: CRISIS RECORD ---
+            if (!village.crisisLog.includes('BARRIER_FAILURE')) {
+                village.crisisLog.push('BARRIER_FAILURE');
+            }
 
             this.postVillageNeed(village, 'essence', essenceCost, 'fueling the rune barrier');
                         if (Math.random() < 0.15 * (cal.monsters?.spawnFrequency || 1.0)) {
@@ -625,7 +649,37 @@ window.VillageManager = {
         window.EventBus.emit('UI_LOG_DEBUG', `[POLITICS] An unblessed rumor has surfaced in ${village.name}.`);
     },
 
-    processCrownGovernance: function(capital) {
+        processCrownGovernance: function(capital) {
+        
+        // --- PHASE 1: CAPITAL REFINEMENT LOOP ---
+        const stock = capital.stats.refinementStock;
+        const totalMaterials = (stock.beast_bones || 0) + (stock.corrupted_resin || 0) + (stock.flesh_pods || 0);
+        const conversionRate = 10;
+        
+        if (totalMaterials >= conversionRate) {
+            // Processing: Priority to Bones, then Resin, then Pods
+            let processed = 0;
+            if (stock.beast_bones >= conversionRate) { stock.beast_bones -= conversionRate; processed = 1; }
+            else if (stock.corrupted_resin >= conversionRate) { stock.corrupted_resin -= conversionRate; processed = 1; }
+            else if (stock.flesh_pods >= conversionRate) { stock.flesh_pods -= conversionRate; processed = 1; }
+            
+            if (processed > 0) {
+                capital.stats.essence += processed;
+                if (Math.random() < 0.1) {
+                    window.EventBus.emit('UI_LOG_DEBUG', `[ESSENCE] Capital refined ${processed} essence from materials.`);
+                }
+            }
+        } else {
+            if (Math.random() < 0.05) {
+                window.EventBus.emit('UI_LOG', `[FUEL WARNING] Capital refinement stock is critical! Hunt contracts required.`);
+            }
+        }
+
+        // --- PHASE 1: HUNT DEMAND TRIGGER ---
+        if (totalMaterials < 100) {
+            const shortageValue = Math.floor((100 - totalMaterials) / 2);
+            this.generateHuntContract(capital, shortageValue);
+        }
 
         const candidates = this.villages.filter(v => v.id !== 0 && v.fuelRequested);
         if (candidates.length === 0 || capital.stats.essence < 10) return;
@@ -707,6 +761,29 @@ window.VillageManager = {
             window.EventBus.emit('UI_LOG', `[CROWN] Royal shipment of ${amount} essence dispatched to ${target.name}.`);
         }
 
+    },
+
+    /**
+     * Generates a hunt contract when refinement stock is low.
+     * Bible Doctrine: Essence exists because dangerous work is performed.
+     */
+    generateHuntContract: function(capital, urgencyBonus) {
+        if (!window.GameState) return;
+
+        const existing = window.GameState.questBoard.find(q => q.type === 'hunt' && q.issuer === 'CAPITAL');
+        if (existing) return;
+
+        window.GameState.questBoard.push({
+            type: 'hunt',
+            issuer: 'CAPITAL',
+            resource: 'beast_bones',
+            amount: 20,
+            purpose: 'fueling civilization',
+            reward: 100 + urgencyBonus,
+            isPriority: urgencyBonus > 25
+        });
+        
+        window.EventBus.emit('UI_LOG_DEBUG', `[ECONOMY] Capital issued high-priority hunt contract.`);
     },
 
     processVillageCaravans: function(village) {
