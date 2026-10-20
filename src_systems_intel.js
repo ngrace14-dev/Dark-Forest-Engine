@@ -560,5 +560,44 @@ window.IntelEconomy = {
         window.EventBus.emit('UI_LOG', `[FABRICATION] Forged report created: ${payload.title}.`);
         
         return fake_id;
+    },
+
+    /**
+     * Strategic Information Deployment (Information Warfare MVP)
+     * Leaks property to a specific house to trigger a reaction.
+     */
+    executeLeak: function(sourceNode, targetHouseId, intelId) {
+        const intel = window.IntelManager.lookup(intelId);
+        if (!intel) return false;
+
+        const targetHouse = window.DynastyManager?.getHouse(targetHouseId);
+        if (!targetHouse) return false;
+
+        // 1. Transfer Title
+        window.IntelManager.grantOwnership(intelId, targetHouseId);
+        window.IntelManager.shareToInstitution(intelId, targetHouseId);
+
+        // 2. Attribution
+        intel.provenance.push({
+            node_id: sourceNode.id,
+            timestamp: window.EngineParams?.worldDay || 0,
+            origin_type: 'LEAK_SOURCE',
+            source_faction: sourceNode.faction || 'Neutral'
+        });
+
+        // 3. Reaction: Feud Intensification
+        // If this intel belongs to House A and we leak it to House B, intensify the feud.
+        const originalOwnerFaction = intel.provenance[0]?.source_faction;
+        if (originalOwnerFaction && originalOwnerFaction.startsWith('house_') && originalOwnerFaction !== targetHouseId) {
+            window.DynastyManager.recordFeudEvent(originalOwnerFaction, targetHouseId, 'INFORMATION_BETRAYAL');
+            window.EventBus.emit('UI_LOG', `[WARFARE] A secret of ${originalOwnerFaction.toUpperCase()} has been leaked to ${targetHouse.name}!`);
+        }
+
+        // 4. Force immediate investigation scan
+        if (window.InvestigationManager) {
+            window.InvestigationManager.scanForEmergentMysteries();
+        }
+
+        return true;
     }
 };
