@@ -14,8 +14,16 @@ class CrowsEyeSystem {
                 this.isDragging = false;
         this.lastStats = null;
         this.trends = {};
-        this.keys = {};
+                this.keys = {};
         this.isInspectionExpanded = false;
+        this.currentFolder = 'WORLD';
+        this.folders = {
+            'WORLD': ['MAP', 'WATCHLIST', 'ACTIONS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE'],
+            'INTEL': ['INTEL', 'TRUTH', 'CHRONICLE', 'ANTHOLOGY', 'LEGENDS', 'OFFICIAL_HISTORY'],
+            'POWER': ['HOUSES', 'HOUSE_HISTORY', 'ECONOMY', 'LINEAGES', 'RELATIONSHIPS'],
+            'BEYOND': ['ORIGIN_DOSSIER', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RECORDED_MEMORY', 'LOST_MEMORY'],
+            'BUREAU': ['PLAYBACK', 'CALIBRATION']
+        };
         window.EventBus.on('ENGINE_READY', () => this.init());
     }
 
@@ -111,8 +119,15 @@ class CrowsEyeSystem {
                     this.pan.z = selected.z;
                 }
             }
-            if (e.target.dataset.view) {
+                        if (e.target.dataset.view) {
                 this.currentView = e.target.dataset.view;
+                this.updateTimer = 1.0;
+            }
+            if (e.target.dataset.folder) {
+                this.currentFolder = e.target.dataset.folder;
+                if (!this.folders[this.currentFolder].includes(this.currentView)) {
+                    this.currentView = this.folders[this.currentFolder][0];
+                }
                 this.updateTimer = 1.0;
             }
             if (e.target.dataset.action === 'follow') {
@@ -270,15 +285,27 @@ class CrowsEyeSystem {
         // Calculate Trends (Delta Analysis)
         this.updateTrends();
 
-        const narrator = window.GameState?.narrator || {};
+                const narrator = window.GameState?.narrator || {};
         const worldDay = window.EngineParams?.worldDay || 0;
         
-                        const views = ['MAP', 'WATCHLIST', 'ACTIONS', 'ECONOMY', 'INTEL', 'TRUTH', 'CHRONICLE', 'OFFICIAL_HISTORY', 'HOUSES', 'HOUSE_HISTORY', 'LINEAGES', 'ANTHOLOGY', 'LEGENDS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RELATIONSHIPS', 'RECORDED_MEMORY', 'LOST_MEMORY', 'ORIGIN_DOSSIER', 'PLAYBACK', 'CALIBRATION'];
-        let navHtml = `<div style="display:flex; gap:10px; margin-bottom:5px; border-bottom:1px solid #78350f; padding-bottom:3px; flex-shrink:0; flex-wrap:wrap; overflow:hidden;">`;
-        views.forEach(v => {
+        // --- PHASE 4: AGENT FOLDERS & TABS ---
+        let navHtml = `<div style="display:flex; flex-direction:column; gap:5px; margin-bottom:10px; border-bottom:1px solid #78350f; padding-bottom:10px;">`;
+        
+        // Tier 1: Folders
+        navHtml += `<div style="display:flex; gap:15px; border-bottom:1px solid #451a03; padding-bottom:5px;">`;
+        Object.keys(this.folders).forEach(f => {
+            const active = this.currentFolder === f;
+            navHtml += `<div data-folder="${f}" style="cursor:pointer; font-size:12px; font-weight:bold; letter-spacing:1px; color:${active ? '#fbbf24' : '#78350f'}; border-bottom:${active ? '2px solid #fbbf24' : 'none'}; padding-bottom:3px;">${f}</div>`;
+        });
+        navHtml += `</div>`;
+
+        // Tier 2: Tabs (Filtered by Folder)
+        navHtml += `<div style="display:flex; gap:10px; flex-wrap:wrap;">`;
+        this.folders[this.currentFolder].forEach(v => {
             const activeStyle = this.currentView === v ? 'color: #fbbf24; border-bottom: 2px solid #fbbf24;' : 'color: #92400e;';
             navHtml += `<div data-view="${v}" style="cursor:pointer; padding:2px 5px; font-weight:bold; font-size:10px; ${activeStyle}">${v}</div>`;
         });
+        navHtml += `</div>`;
         navHtml += `</div>`;
 
 
@@ -846,35 +873,69 @@ class CrowsEyeSystem {
         this.lastStats = currentStats;
     }
 
-        renderDefaultInspection() {
-            if (!this.selectedEntityId) return '<div style="color: #451a03; text-align: center; margin-top: 50px;">Select an entity to view deep telemetry.</div>';
-        
-            const ent = window.GameCore?.activeEntities.find(e => e.id === this.selectedEntityId);
-            if (!ent) return '<div style="color: #451a03; text-align: center; margin-top: 50px;">Entity no longer in simulation.</div>';
+                const ent = window.GameCore?.activeEntities.find(e => e.id === this.selectedEntityId) || 
+                    window.VillageManager?.villages.find(v => `village_${v.id}` === this.selectedEntityId);
+                    
+        if (!ent) return '<div style="color: #451a03; text-align: center; margin-top: 50px;">Entity no longer in simulation.</div>';
 
-            const name = ent.name || 'Unknown';
-            const dreams = window.DreamManager?.lexicon || {};
+        const name = ent.name || 'Unknown';
+        const isVillage = this.selectedEntityId.startsWith('village_');
+        const dreams = window.DreamManager?.lexicon || {};
 
-            let html = `
-                <div style="color:#fbbf24; font-size:14px; margin-bottom:15px;">NPID: ${this.selectedEntityId}</div>
-                <div style="font-size:12px; color:#94a3b8; margin-bottom:20px;">
-                    As a 5D Observer, you can influence this mortal's ambition through symbolic dreams.
+        let html = `
+            <div style="color:#fbbf24; font-size:14px; margin-bottom:5px; font-weight:bold;">${name.toUpperCase()}</div>
+            <div style="color:#78350f; font-size:10px; margin-bottom:15px; font-family:monospace;">ID: ${this.selectedEntityId}</div>
+        `;
+
+        if (isVillage) {
+            const v = ent;
+            html += `
+                <div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:10px; margin-bottom:15px;">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:11px;">
+                        <div><span style="color:#78350f;">POP:</span> <span style="color:#94a3b8;">${v.population.current}</span></div>
+                        <div><span style="color:#78350f;">BARRIER:</span> <span style="color:${v.barrierIntegrity < 25 ? '#ef4444' : '#10b981'}; font-weight:bold;">${v.barrierIntegrity}%</span></div>
+                        <div><span style="color:#78350f;">ESSENCE:</span> <span style="color:#fbbf24;">${v.stats.essence}</span></div>
+                        <div><span style="color:#78350f;">PROSPERITY:</span> <span style="color:#10b981;">${v.stats.prosperity}%</span></div>
+                    </div>
+                    <div style="margin-top:10px; font-size:10px; border-top:1px solid #451a03; padding-top:5px;">
+                        <span style="color:#78350f;">STATE:</span> <span style="color:#fbbf24;">${v.feudalState || 'DEPENDENT'}</span>
+                    </div>
                 </div>
-                <div style="border-top: 1px solid #451a03; padding-top:15px;">
-                    <div style="font-size:10px; color:#78350f; margin-bottom:10px;">SEND SYMBOLIC DREAM</div>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            `;
+        } else {
+            const profile = window.PersonhoodManager?.getProfile(this.selectedEntityId);
+            if (profile) {
+                html += `
+                    <div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:10px; margin-bottom:15px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <span style="color:#fbbf24; font-size:11px; font-weight:bold;">${profile.identity}</span>
+                            <span style="color:#10b981; font-size:10px;">CRED: ${profile.traits.credibility.toFixed(2)}</span>
+                        </div>
+                        <div style="font-size:10px; color:#94a3b8;">BIAS: ${profile.bias}</div>
+                    </div>
+                `;
+            }
+        }
+
+        html += `
+            <div style="border-top: 1px solid #451a03; padding-top:15px;">
+                <div style="font-size:10px; color:#78350f; margin-bottom:10px; letter-spacing:1px;">INFLUENCE OPTIONS</div>
+                <div style="display:grid; grid-template-columns: 1fr; gap:8px;">
+                    <div style="font-size:9px; color:#94a3b8; margin-bottom:5px;">SYMBOLIC DREAMS (7 DAY DURATION)</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
                         ${Object.entries(dreams).map(([symbol, data]) => `
-                            <button style="background:#1e1b4b; color:#fbbf24; border:1px solid #451a03; padding:8px; font-size:10px; cursor:pointer; text-align:left;"
+                            <button style="background:#1e1b4b; color:#fbbf24; border:1px solid #451a03; padding:6px; font-size:9px; cursor:pointer; text-align:left;"
                                 onclick="window.DreamManager.sendDream('${this.selectedEntityId}', '${symbol}'); window.CrowsEye.updateTimer=1.0;">
                                 <div style="font-weight:bold;">${symbol}</div>
-                                <div style="font-size:8px; color:#94a3b8; margin-top:2px;">+ ${data.ambition}</div>
+                                <div style="font-size:7px; color:#94a3b8;">+ ${data.ambition} Amb</div>
                             </button>
                         `).join('')}
                     </div>
                 </div>
-            `;
-            return html;
-        }
+            </div>
+        `;
+        return html;
+    }
 
         flagEvidence(intelId, mysteryId) {
             if (window.InvestigationManager) {
@@ -1694,283 +1755,4 @@ class CrowsEyeSystem {
 
                 <div style="font-size:11px;">
                     <div style="color:#78350f; margin-bottom:5px;">SUPPORTING FRAGMENTS (${cat.evidence.length})</div>
-                    <div style="display:flex; flex-direction:column; gap:5px;">
-                        ${cat.evidence.map(e => `
-                            <div style="color:#94a3b8; border-left:1px solid #451a03; padding-left:10px;">
-                                • ${e.title} <span style="color:#78350f; font-size:9px;">(Tier: ${e.tier})</span>
-                            </div>
-                        `).join('') || '<div style="color:#451a03;">Awaiting evidence from the Endless Dunes.</div>'}
-                    </div>
-                </div>
-            </div>`;
-        });
-
-        html += `</div>`;
-        return html;
-    }
-
-    renderLegendsView() {
-        if (!window.ChronicleManager) return "Chronicle Offline";
-        const legends = window.GameState?.legends || [];
-        const weightMap = window.ChronicleManager.npcHistoricalWeights;
-        
-        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
-        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">LEGEND ENGINE: HISTORICAL INDIVIDUALS</div>`;
-
-        if (legends.length === 0) {
-            return html + `<div style="font-size:11px; color:#451a03;">No individuals have yet crossed the threshold of memory. Observe those of rising Significance.</div>`;
-        }
-
-        html += `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap:20px;">`;
-        
-        legends.forEach(l => {
-            const currentWeight = (weightMap ? weightMap.get(l.actorId) : 0) || l.power;
-            const percentToDeification = Math.min(100, (currentWeight / 1000) * 100);
-
-            html += `<div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:20px; border-top: 4px solid #fbbf24;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                    <div>
-                        <div style="font-weight:bold; color:#fbbf24; font-size:18px;">${l.name.toUpperCase()}</div>
-                        <div style="font-size:10px; color:#78350f;">ARCHETYPE: ${l.archetype || 'HERO'} | ID: ${l.id}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="font-size:10px; color:#78350f;">HISTORICAL WEIGHT</div>
-                        <div style="font-size:16px; color:#fbbf24;">${Math.floor(currentWeight)}</div>
-                    </div>
-                </div>
-
-                <div style="margin-bottom:15px;">
-                    <div style="display:flex; justify-content:space-between; font-size:9px; margin-bottom:3px;">
-                        <span style="color:#78350f;">STORY DENSITY (DEIFICATION)</span>
-                        <span style="color:#fbbf24;">${Math.floor(percentToDeification)}%</span>
-                    </div>
-                    <div style="height:4px; background:#1c1917; width:100%;">
-                        <div style="height:100%; background:#fbbf24; width:${percentToDeification}%;"></div>
-                    </div>
-                </div>
-
-                <div style="font-size:12px; color:#94a3b8; line-height:1.4;">
-                    Known to history as: <span style="color:#fbbf24; font-style:italic;">"${l.title}"</span>
-                </div>
-
-                <div style="margin-top:15px; border-top:1px solid #451a03; padding-top:10px;">
-                    <button style="background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px 10px; font-size:10px; cursor:pointer;"
-                        onclick="window.CrowsEye.selectedEntityId='${l.actorId}'; window.CrowsEye.updateTimer=1.0;">INSPECT LEGACY</button>
-                </div>
-            </div>`;
-        });
-
-        html += `</div></div>`;
-        return html;
-    }
-
-    renderCivPressureView() {
-        if (!window.InstabilityEngine) return "Pressure Engine Offline";
-        const crises = window.InstabilityEngine.getCrises();
-        
-        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
-        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">CIVILIZATION PRESSURE: INSTITUTIONAL INSTABILITY</div>`;
-
-        if (crises.length === 0) {
-            return html + `<div style="font-size:11px; color:#451a03;">Civilization is currently stable. No active schisms or political coverups detected.</div>`;
-        }
-
-        html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
-        
-        crises.forEach(c => {
-            const house = window.DynastyManager?.getHouse(c.houseId);
-            const intensity = c.intensity * 100;
             
-            html += `<div style="background:rgba(239,68,68,0.05); border:1px solid #78350f; padding:20px; border-left: 4px solid #ef4444;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <div>
-                        <div style="font-weight:bold; color:#ef4444; font-size:16px;">${c.type}: ${house ? house.name : 'STATE'}</div>
-                        <div style="font-size:10px; color:#78350f;">START DAY: ${c.startDay}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <span style="color:#78350f; font-size:10px;">INSTABILITY INTENSITY</span>
-                        <div style="font-size:18px; color:#ef4444;">${Math.floor(intensity)}%</div>
-                    </div>
-                </div>
-
-                <div style="font-size:12px; color:#94a3b8; line-height:1.4; margin-bottom:15px;">
-                    ${c.detail || 'Systemic instability caused by internal belief contradictions.'}
-                </div>
-
-                <div style="height:4px; background:#1c1917; width:100%;">
-                    <div style="height:100%; background:#ef4444; width:${intensity}%;"></div>
-                </div>
-            </div>`;
-        });
-
-        html += `</div></div>`;
-        return html;
-    }
-
-    renderRunesView() {
-        if (!window.RuneSystem) return "Rune System Offline";
-        
-        let targetId = this.selectedEntityId;
-        if (!targetId && window.GameCore?.playerObj) targetId = 'player';
-        
-        const state = window.RuneSystem.getCarvings(targetId);
-        const slots = window.RuneSystem.BODY_SLOTS;
-        
-        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
-        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">FLESH AS THE LEDGER: RUNIC CARVINGS</div>`;
-
-        // 1. Harvest & Significance Summary
-        const harvestPressure = (state.storyDensity * 100);
-        html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; background:rgba(255,255,255,0.02); padding:20px; border:1px solid #451a03;">
-            <div>
-                <div style="font-size:10px; color:#78350f; margin-bottom:5px;">STORY DENSITY (HISTORICAL WEIGHT)</div>
-                <div style="font-size:24px; color:#fbbf24;">${Math.floor(state.totalWeight)}</div>
-            </div>
-            <div>
-                <div style="display:flex; justify-content:space-between; font-size:10px; margin-bottom:5px;">
-                    <span style="color:#78350f;">HARVEST VISIBILITY (THE TRAP)</span>
-                    <span style="color:#ef4444;">${Math.floor(harvestPressure)}%</span>
-                </div>
-                <div style="height:8px; background:#1c1917; width:100%;">
-                    <div style="height:100%; background:#ef4444; width:${Math.min(100, harvestPressure)}%;"></div>
-                </div>
-                <div style="font-size:9px; color:#94a3b8; margin-top:5px;">Visibility to cosmological forces that consume greatness.</div>
-            </div>
-        </div>`;
-
-        // 2. Body Map
-        html += `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:15px;">`;
-        Object.entries(slots).forEach(([key, config]) => {
-            const carvings = state.slots[key] || [];
-            
-            html += `<div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:15px; border-top: 2px solid #78350f;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <span style="font-weight:bold; color:#fbbf24; font-size:12px;">${key}</span>
-                    <span style="font-size:9px; color:#78350f;">SPACE: ${carvings.length}/${config.space}</span>
-                </div>
-                <div style="font-size:10px; color:#94a3b8; margin-bottom:10px;">${config.desc}</div>
-                
-                <div style="display:flex; flex-direction:column; gap:5px;">
-                    ${carvings.map(r => `
-                        <div style="font-size:11px; background:#1c1917; padding:5px; border-left:2px solid #fbbf24;">
-                            <div style="color:#fbbf24; font-weight:bold;">ᚱ ${r.force}</div>
-                            <div style="font-size:9px; color:#78350f;">Weight: +${r.weight}</div>
-                        </div>
-                    `).join('') || '<div style="font-size:9px; color:#451a03;">Unmarked skin.</div>'}
-                </div>
-            </div>`;
-        });
-        html += `</div>`;
-
-        // 3. Carving Buttons (For Testing/Player)
-        if (targetId === 'player') {
-             html += `<div style="margin-top:20px; border-top:1px solid #78350f; padding-top:20px;">
-                <div style="font-size:11px; color:#fbbf24; margin-bottom:10px;">INSCRIBE REALITY (BODY CARVING)</div>
-                <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    ${Object.keys(window.RuneSystem.RUNE_TYPES).map(f => `
-                        <button style="background:#451a03; color:#fbbf24; border:1px solid #78350f; padding:5px 10px; font-size:9px; cursor:pointer;"
-                            onclick="window.RuneSystem.carveRune('player', '${f}', 'BACK'); window.CrowsEye.updateTimer=1.0;">
-                            CARVE ${f}
-                        </button>
-                    `).join('')}
-                </div>
-             </div>`;
-        }
-
-        html += `</div>`;
-        return html;
-    }
-
-    renderHarvestView() {
-        if (!window.HarvestEngine) return "Harvest Engine Offline";
-        const candidates = window.HarvestEngine.getCandidates().slice(0, 10);
-        
-        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
-        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">SIGNIFICANCE MONITOR: WENDIGO HARVEST PRESSURE</div>`;
-
-        if (candidates.length === 0) {
-            return html + `<div style="font-size:11px; color:#451a03;">No candidates of sufficient significance detected. Greatness has not yet blossomed in this epoch.</div>`;
-        }
-
-        html += `<div style="display:flex; flex-direction:column; gap:15px;">`;
-        
-        candidates.forEach(([nodeId, data]) => {
-            const ent = window.GameCore?.activeEntities.find(e => e.id === nodeId);
-            const name = ent ? ent.name : nodeId;
-            const pressurePercent = Math.min(100, (data.pressureScore / 1000) * 100);
-
-            html += `<div style="background:rgba(0,0,0,0.3); border:1px solid #78350f; padding:20px; border-left: 4px solid ${data.pressureScore > 800 ? '#ef4444' : '#fbbf24'};">
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <div>
-                        <span style="font-weight:bold; color:#fbbf24; font-size:18px;">${name.toUpperCase()}</span>
-                        <span style="color:#78350f; font-size:10px; margin-left:10px;">[Status: ${data.status}]</span>
-                    </div>
-                    <div style="text-align:right;">
-                        <span style="color:#78350f; font-size:10px;">HARVEST PRESSURE SCORE</span>
-                        <div style="font-size:24px; color:${data.pressureScore > 800 ? '#ef4444' : '#fbbf24'};">${Math.floor(data.pressureScore)}</div>
-                    </div>
-                </div>
-
-                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:20px; margin-bottom:15px;">
-                    <div>
-                        <div style="display:flex; justify-content:space-between; font-size:9px; margin-bottom:3px;">
-                            <span style="color:#78350f;">ORB RECOGNITION</span>
-                            <span style="color:#fbbf24;">${Math.floor(data.orbAttention * 100)}%</span>
-                        </div>
-                        <div style="height:4px; background:#1c1917; width:100%;">
-                            <div style="height:100%; background:#fbbf24; width:${data.orbAttention * 100}%;"></div>
-                        </div>
-                    </div>
-                    <div>
-                        <div style="display:flex; justify-content:space-between; font-size:9px; margin-bottom:3px;">
-                            <span style="color:#78350f;">HUNTSMAN CULTIVATION</span>
-                            <span style="color:#fbbf24;">${Math.floor(data.huntsmanCultivation * 100)}%</span>
-                        </div>
-                        <div style="height:4px; background:#1c1917; width:100%;">
-                            <div style="height:100%; background:#d97706; width:${data.huntsmanCultivation * 100}%;"></div>
-                        </div>
-                    </div>
-                    <div>
-                        <div style="display:flex; justify-content:space-between; font-size:9px; margin-bottom:3px;">
-                            <span style="color:#78350f;">WENDIGO INTEREST</span>
-                            <span style="color:#ef4444;">${Math.floor(pressurePercent)}%</span>
-                        </div>
-                        <div style="height:4px; background:#1c1917; width:100%;">
-                            <div style="height:100%; background:#ef4444; width:${pressurePercent}%;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="font-size:10px; color:#94a3b8; line-height:1.4; background:rgba(0,0,0,0.2); padding:10px; border:1px solid #451a03;">
-                    Greatness is a beacon to those who harvest significance. This entity is currently being monitored by the cosmological forces of the Forest.
-                </div>
-            </div>`;
-        });
-
-        html += `</div></div>`;
-        return html;
-    }
-
-    renderLineageView() {
-        if (!window.PersonhoodManager) return "Lineage Engine Offline";
-        
-        let targetId = this.selectedEntityId;
-        if (!targetId && window.GameCore?.playerObj) targetId = 'player';
-        
-        const profile = window.PersonhoodManager.getProfile(targetId);
-        const ent = window.GameCore?.activeEntities.find(e => e.id === targetId);
-        const name = ent ? ent.name : targetId;
-
-        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
-        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">LINEAGE & INHERITANCE: BLOODLINE OF ${name.toUpperCase()}</div>`;
-
-        if (!profile) return html + `<div style="font-size:11px; color:#451a03;">Select an entity to observe their generational flow.</div>`;
-
-        // 1. Lineage Map
-        html += `<div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:15px; text-align:center;">
-            <!-- Parents -->
-            <div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:15px;">
-                <div style="font-size:10px; color:#78350f; margin-bottom:10px;">ASCENDANTS (PARENTS)</div>
-                ${profile.ancestry.parents.map(p => `
-                    <div style="color:#fbbf24; font-size:12px; margin-bottom:5px;">${p}</div>
-                `).join('') || '<div style="color:
