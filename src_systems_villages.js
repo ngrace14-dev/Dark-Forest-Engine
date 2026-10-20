@@ -108,6 +108,7 @@ window.VillageManager = {
                 },
                 fuelNeed: 0, // Projected demand
                 feudalState: i === 19 ? 'PARTIALLY_SOVEREIGN' : 'DEPENDENT', // --- PHASE 11: FEUDAL DEPENDENCY ---
+                deepReserves: i === 19 ? { food: 500, essence: 100 } : null, // --- TERMINUS DEEP RESERVES ---
                 // Action Ledger Requirement
                 currentTask: 'Establishing', taskTarget: 'Local Region', taskReason: 'Settlement routine.', taskTimestamp: Date.now()
             });
@@ -553,7 +554,18 @@ window.VillageManager = {
             }
         }
 
-        // --- MILITARY MOBILIZATION & HOUSE LEVIES ---
+
+
+
+
+
+
+
+
+
+
+
+                // --- MILITARY MOBILIZATION & HOUSE LEVIES ---
         if (village.capital) {
             // Monarch grows to 10k, starts with 500
             village.royalArmySize = Math.min(10000, (village.royalArmySize || 500) + (village.stats.prosperity / 20));
@@ -563,6 +575,14 @@ window.VillageManager = {
             
             // Special Exception: House Terminus Mountain Guard
             if (village.nobleHouse === 'House Terminus') {
+                // --- TERMINUS DEEP RESERVE CONSUMPTION ---
+                // If village resources are empty, the 300 consume from Deep Reserves
+                if (village.stats.food <= 0 && village.deepReserves.food > 0) {
+                    const consumption = Math.ceil(village.terminusEliteGuard / 100);
+                    village.deepReserves.food = Math.max(0, village.deepReserves.food - consumption);
+                    if (Math.random() < 0.01) window.EventBus.emit('UI_LOG_DEBUG', `[TERMINUS] The 300 are drawing from deep mountain stores.`);
+                }
+
                 // Initialize if needed
                 village.terminusEliteGuard ??= 300;
                 village.terminusRecruits ??= []; // [{ xp: 0, count: 5 }]
