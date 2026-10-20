@@ -87,7 +87,7 @@ window.VillageManager = {
                     gold: population * 4, 
                     essence: 0, 
                     prosperity: 55,
-                    refinementStock: {
+                                        refinementStock: {
                         beast_bones: i === 0 ? 500 : 0,
                         corrupted_resin: 0,
                         flesh_pods: 0
@@ -99,6 +99,13 @@ window.VillageManager = {
                 diplomaticState: {}, 
                 tensions: 0,
                 crisisLog: [], // --- GOVERNANCE MEMORY ---
+                memoryProfile: { // --- PHASE 3: MEMORY PROFILE ---
+                    caution: 0.2,
+                    ambition: 0.5,
+                    trustInCrown: 0.8,
+                    tradeConfidence: 0.5,
+                    expansionConfidence: 0.5
+                },
                 fuelNeed: 0, // Projected demand
                 // Action Ledger Requirement
                 currentTask: 'Establishing', taskTarget: 'Local Region', taskReason: 'Settlement routine.', taskTimestamp: Date.now()
@@ -249,7 +256,7 @@ window.VillageManager = {
         this.simulationIndex = (this.simulationIndex + 1) % this.villages.length;
     },
 
-    processVillageIntelExchange: function(village) {
+        processVillageIntelExchange: function(village) {
         if (!window.IntelPropagation) return;
 
         // 1. Internal Spread (Gossip)
@@ -279,7 +286,57 @@ window.VillageManager = {
         });
     },
 
-        simulateVillage: function(village) {
+    /**
+     * Records a crisis event in institutional memory and adjusts the memory profile.
+     */
+    recordCrisis: function(village, type, severity = 1.0) {
+        const entry = {
+            type: type,
+            day: window.EngineParams?.worldDay || 0,
+            severity: severity
+        };
+        
+        village.crisisLog.push(entry);
+        
+        // LEARNING RULES (§3)
+        const mem = village.memoryProfile;
+        switch(type) {
+            case 'FUEL_SHORTAGE':
+                mem.caution = Math.min(1.0, mem.caution + 0.1 * severity);
+                mem.expansionConfidence = Math.max(0.0, mem.expansionConfidence - 0.15 * severity);
+                window.EventBus.emit('UI_LOG_DEBUG', `[GOVERNANCE] ${village.name} has become more cautious due to fuel shortages.`);
+                break;
+            case 'BARRIER_FAILURE':
+                mem.caution = Math.min(1.0, mem.caution + 0.2 * severity);
+                mem.trustInCrown = Math.max(0.0, mem.trustInCrown - 0.1 * severity);
+                window.EventBus.emit('UI_LOG', `[GOVERNANCE] ${village.name}'s trust in the Crown has fallen after a barrier failure.`);
+                break;
+            case 'CARAVAN_LOSS':
+                mem.tradeConfidence = Math.max(0.0, mem.tradeConfidence - 0.1 * severity);
+                break;
+        }
+    },
+
+    /**
+     * Records successful periods to improve institutional confidence.
+     */
+    recordSuccess: function(village, type) {
+        const mem = village.memoryProfile;
+        switch(type) {
+            case 'PROSPERITY':
+                mem.ambition = Math.min(1.0, mem.ambition + 0.05);
+                mem.expansionConfidence = Math.min(1.0, mem.expansionConfidence + 0.05);
+                if (mem.ambition > 0.8 && Math.random() < 0.1) {
+                    window.EventBus.emit('UI_LOG_DEBUG', `[GOVERNANCE] ${village.name} is seeking expansion after sustained prosperity.`);
+                }
+                break;
+            case 'TRADE':
+                mem.tradeConfidence = Math.min(1.0, mem.tradeConfidence + 0.05);
+                break;
+        }
+    },
+
+    simulateVillage: function(village) {
         const cal = window.CalibrationFramework?.settings || {};
         const econCal = cal.economy || { consumption: 1.0, scarcity: 1.0, tradeEfficiency: 1.0 };
         const worldCal = cal.world || { growthRate: 1.0, spawnRate: 1.0 };
@@ -301,13 +358,16 @@ window.VillageManager = {
         village.stats.ap = Math.min(200, (village.stats.ap || 0) + 10);
 
                 // --- CROWN FUEL DISPATCH (STAGE 1: THE POLITICAL HEART) ---
-        if (village.capital) {
+                if (village.capital) {
             this.processCrownGovernance(village);
         } else {
             // Village Need Detection
             if (village.stats.essence < 5 && !village.fuelRequested) {
                 village.fuelRequested = true;
                 window.EventBus.emit('UI_LOG', `[FUEL] ${village.name} is running low on essence. The barrier is flickering.`);
+                
+                // --- PHASE 3: RECORD FUEL SHORTAGE ---
+                this.recordCrisis(village, 'FUEL_SHORTAGE', 0.5);
             }
 
             // --- PHASE 2: HUB MATERIAL COLLECTION ---
@@ -316,7 +376,11 @@ window.VillageManager = {
                                (village.stats.refinementStock.corrupted_resin || 0) + 
                                (village.stats.refinementStock.flesh_pods || 0);
             
-            if (totalStock > 50 && !village.caravans.some(c => c.targetVillageId === 0)) {
+            // --- PHASE 3: ADAPTIVE TRADING ---
+            // Cautious villages save materials for themselves or prioritize essence-only trade
+            const launchThreshold = village.memoryProfile.caution > 0.6 ? 100 : 50;
+
+            if (totalStock > launchThreshold && !village.caravans.some(c => c.targetVillageId === 0)) {
                 this.launchRefinementSupplyCaravan(village);
             }
         }
@@ -343,14 +407,12 @@ window.VillageManager = {
             }
         }
 
-                if ((village.stats.essence || 0) >= essenceCost) {
+                                if ((village.stats.essence || 0) >= essenceCost) {
             village.stats.essence -= essenceCost;
             village.barrierIntegrity = Math.min(100, village.barrierIntegrity + 8 + maintenanceBonus);
         } else if (village.barrierIntegrity === 0) {
             // --- GOVERNANCE MEMORY: CRISIS RECORD ---
-            if (!village.crisisLog.includes('BARRIER_FAILURE')) {
-                village.crisisLog.push('BARRIER_FAILURE');
-            }
+            this.recordCrisis(village, 'BARRIER_FAILURE', 1.0);
 
             this.postVillageNeed(village, 'essence', essenceCost, 'fueling the rune barrier');
                         if (Math.random() < 0.15 * (cal.monsters?.spawnFrequency || 1.0)) {
@@ -444,12 +506,21 @@ window.VillageManager = {
             return;
         }
 
-        const expansionCost = { ap: 80, wood: 100, stone: 60, food: 30 };
-        if (village.population.current >= village.population.capacity && this.canFundVillageAction(village, expansionCost, 'expansion')) {
+                const expansionCost = { ap: 80, wood: 100, stone: 60, food: 30 };
+        
+        // --- PHASE 3: ADAPTIVE GROWTH ---
+        // Villages only expand if expansionConfidence is high and caution is low
+        const willingnessToExpand = (village.memoryProfile.expansionConfidence * 2.0) - village.memoryProfile.caution;
+
+        if (village.population.current >= village.population.capacity && willingnessToExpand > 0.5 && this.canFundVillageAction(village, expansionCost, 'expansion')) {
             this.spendVillageResources(village, expansionCost);
             village.population.capacity += 6;
             village.expansionLevel = (village.expansionLevel || 0) + 1;
             village.layout.push({ id: `expansion-${village.expansionLevel}`, prefab: 'Watertight Gothic House', ox: 6 + village.expansionLevel * 3, oz: 0 });
+            
+            // --- RECORD SUCCESS ---
+            this.recordSuccess(village, 'PROSPERITY');
+            
             window.EventBus.emit('UI_LOG', `[GROWTH] ${village.name} expanded to house ${village.population.capacity} people.`);
             return;
         }
