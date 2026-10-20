@@ -485,9 +485,21 @@ window.VillageManager = {
             }
         }
 
-        const caravanCost = { ap: 35, food: 15, gold: 20 };
-        if (!village.caravans.some(caravan => caravan.status === 'traveling' || caravan.status === 'arrived') && freePopulation >= 1 && this.canFundVillageAction(village, caravanCost, 'sending a merchant caravan')) {
-            this.spendVillageResources(village, caravanCost);
+                const caravanCost = { ap: 35, food: 15, gold: 20 };
+        
+        // --- DREAM PHASE 2: CROWN INTEGRATION (Leadership Initiative) ---
+        // Bible §20: CROWN dreams reduce AP cost for caravans, allowing more frequent trade.
+        let initiativeDiscount = 0;
+        if (window.DreamManager && village.nobleLeader) {
+            const authorityMod = window.DreamManager.getNPCDriveModifier(`village_leader_${village.id}`, 'authority');
+            if (authorityMod > 1.2) initiativeDiscount = 10;
+        }
+
+        const finalCost = { ...caravanCost, ap: Math.max(10, caravanCost.ap - initiativeDiscount) };
+
+        if (!village.caravans.some(caravan => caravan.status === 'traveling' || caravan.status === 'arrived') && freePopulation >= 1 && this.canFundVillageAction(village, finalCost, 'sending a merchant caravan')) {
+            this.spendVillageResources(village, finalCost);
+
             const destination = this.villages.find(candidate => village.connections.includes(candidate.id) && candidate.industry && candidate.industry.imports.includes(village.industry.produces));
             const targetVillage = destination || this.villages.find(candidate => village.connections.includes(candidate.id));
             

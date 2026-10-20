@@ -126,8 +126,20 @@ class PersonhoodSystem {
             conclusion.reason = 'Steward archetype values high-authority political information.';
         }
 
-        // 3. TRAIT-BASED REVISION
+                // 3. TRAIT-BASED REVISION
+        const stealthAmbition = window.DreamManager?.getNPCDriveModifier(nodeId, 'stealth') || 1.0;
+        
+        // VOID DREAM: Information Siloing (§8, §21)
+        // High stealth ambition increases the chance to suppress information.
+        if (stealthAmbition > 1.5 && Math.random() < 0.3) {
+            conclusion.state = 'SUPPRESSED';
+            conclusion.interpretation = 'FORBIDDEN';
+            conclusion.reason = 'Visions of the VOID compel the preservation of secrets.';
+            return conclusion;
+        }
+
         if (profile.traits.cynicism > 0.8 && trust < 0.4) {
+
             conclusion.state = 'REJECTED';
             conclusion.interpretation = 'DISMISSED';
             conclusion.reason = 'High individual cynicism led to the total rejection of the source.';

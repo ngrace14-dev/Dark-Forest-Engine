@@ -236,7 +236,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             stealth: 0.1
         };
 
-                // Apply Divine Influence (Bible §21)
+                        // Apply Divine Influence (Bible §21)
         if (window.DreamManager) {
             Object.keys(en.ambitions).forEach(key => {
                 const mod = window.DreamManager.getNPCDriveModifier(en.id, key);
@@ -244,24 +244,34 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             });
         }
 
-        // --- DREAM PHASE 1: FIRE INTEGRATION (Aggression) ---
-        // NPCs with high aggression (FIRE dreams) strike faster and more recklessly
-        const aggression = en.ambitions.aggression || 0.3;
-        const speedBonus = aggression > 1.2 ? 1.2 : 1.0;
-        const cooldownReduction = aggression > 1.2 ? 0.8 : 1.0;
-
-
-        // Belief-Based Targeting (Phase 2 Integration)
-        // NPCs target based on what they *know*, not just global proximity
+        // --- DREAM PHASE 2: EYE INTEGRATION (Investigation Hierarchy) ---
+        // Bible §30: EYE dreams influence NPC pursuit of rumors.
         let cognitiveTarget = null;
-        if (window.IntelManager) {
-             const knownIntel = window.IntelManager.getIntelForNode(en.id);
-             // If they know about a rumor at a location, they might investigate it
-             const rumor = knownIntel.find(i => i.type === 'RUMOR' && i.payload.target_coord);
-             if (rumor && en.ambitions.investigation > 0.7) {
-                 cognitiveTarget = new window.THREE.Vector3(rumor.payload.target_coord.x, 0, rumor.payload.target_coord.z);
+        if (window.IntelManager && en.ambitions.investigation > 0.7) {
+             // GATE 0: SURVIVAL
+             const isHealthy = en.hp > (en.def.hp || 50) * 0.5;
+             // GATE 1: DUTY (Is my village safe?)
+             const village = window.VillageManager?.villages.find(v => v.id === en.villageId);
+             const isDutyBound = village?.territory?.underRaid || false;
+             
+             if (isHealthy && !isDutyBound) {
+                const knownIntel = window.IntelManager.getIntelForNode(en.id);
+                const rumor = knownIntel.find(i => i.type === 'RUMOR' && i.payload.target_coord);
+                if (rumor) {
+                    const rPos = rumor.payload.target_coord;
+                    const distToRumor = Math.hypot(en.visual.position.x - rPos.x, en.visual.position.z - rPos.z);
+                    
+                    // GATE 3: FEASIBILITY (Under 1km)
+                    if (distToRumor < 1000) {
+                        cognitiveTarget = new window.THREE.Vector3(rPos.x, 0, rPos.z);
+                        en.currentTask = 'Investigating';
+                        en.taskTarget = rumor.payload.title;
+                        en.taskReason = 'Visions of the EYE reveal hidden paths.';
+                    }
+                }
              }
         }
+
 
         if (en.staggeredUntil && now < en.staggeredUntil) {
             en.body.setLinvel({ x: 0, y: en.body.linvel().y, z: 0 }, true);
