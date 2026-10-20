@@ -30,6 +30,80 @@ window.AdventurerManager = {
         const types = ['hunt', 'relic', 'escort', 'rescue'];
         record.quest = { type: types[Math.floor(Math.random() * types.length)], progress: 0, goal: 3 + Math.floor(Math.random() * 5) };
     },
+    
+    /**
+     * Translates a successful expedition into a tradeable information asset.
+     * Bible Doctrine: Knowledge is currency.
+     */
+    produceIntelRecord: function(record) {
+        if (!window.IntelManager || !window.PersonhoodManager) return;
+
+        const profile = window.PersonhoodManager.getProfile(record.id);
+        const questType = record.quest.type;
+        
+        let significance = { historical: 0, survival: 0, economic: 0, political: 0 };
+        let rarity = window.IntelEnums.RARITY.COMMON;
+        let title = "";
+        let description = "";
+
+        switch(questType) {
+            case 'relic':
+                title = `Discovery: Ancient Fragment`;
+                description = `${record.name} recovered a physical trace of the pre-fracture era.`;
+                significance.historical = 40 + (record.level * 10);
+                significance.political = 20;
+                rarity = window.IntelEnums.RARITY.RARE;
+                break;
+            case 'hunt':
+                title = `Sighting: Forest Horror`;
+                description = `Detailed behavioral patterns of a predator recorded by ${record.name}.`;
+                significance.survival = 50;
+                rarity = window.IntelEnums.RARITY.UNCOMMON;
+                break;
+            case 'rescue':
+                title = `Intel: Lost Survivor Account`;
+                description = `Information extracted from a survivor found by ${record.name}.`;
+                significance.political = 30;
+                significance.historical = 10;
+                rarity = window.IntelEnums.RARITY.UNCOMMON;
+                break;
+            default:
+                title = `Report: Wild Exploration`;
+                description = `Standard terrain and resource survey conducted by ${record.name}.`;
+                significance.economic = 20;
+                rarity = window.IntelEnums.RARITY.COMMON;
+        }
+
+        const intelId = window.IntelManager.register({
+            type: window.IntelEnums.TYPES.FACT,
+            rarity: rarity,
+            payload: {
+                title: title,
+                description: description,
+                target_coord: { x: record.position.x, z: record.position.z },
+                tags: ['EXPEDITION_RESULT', questType.toUpperCase()]
+            },
+            significance: significance,
+            certainty: Math.min(1.0, 0.5 + (profile.traits.credibility || 0.3)),
+            source_credibility: profile.traits.credibility || 0.3
+        });
+
+        // Attribution & Ownership
+        window.IntelManager.grantOwnership(intelId, record.id);
+        
+        // Provenance entry
+        const intel = window.IntelManager.lookup(intelId);
+        intel.provenance.push({
+            node_id: record.id,
+            timestamp: window.EngineParams?.worldDay || 0,
+            origin_type: 'ADVENTURER',
+            source_faction: 'adventurer'
+        });
+
+        window.EventBus.emit('UI_LOG', `[DISCOVERY] ${record.name} has returned with new information from their ${questType} quest.`);
+        return intelId;
+    },
+
     advanceDay: function() {
         this.generate();
         const deltaSeconds = 43200 / 24; // 1 in-game hour in real seconds
@@ -86,9 +160,20 @@ window.AdventurerManager = {
                 record.xp += 20 + record.level * 5;
                 record.morale = Math.min(100, record.morale + 1);
                 record.quest.progress = Math.min(record.quest.goal, record.quest.progress + 1);
+                
+                // --- PHASE: INTEL PRODUCTION ---
+                // Every time a quest stage is successfully completed, there is a chance to produce intel
+                if (Math.random() < 0.4) {
+                    this.produceIntelRecord(record);
+                }
+
                 if (record.quest.progress >= record.quest.goal) {
                     record.level++;
                     record.supplies += 4;
+                    
+                    // Final Quest Completion always produces high-value intel
+                    this.produceIntelRecord(record);
+                    
                     this.chooseQuest(record);
                 }
             }
