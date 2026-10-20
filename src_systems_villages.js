@@ -99,7 +99,7 @@ window.VillageManager = {
                 diplomaticState: {}, 
                 tensions: 0,
                 crisisLog: [], // --- GOVERNANCE MEMORY ---
-                memoryProfile: { // --- PHASE 3: MEMORY PROFILE ---
+                                memoryProfile: { // --- PHASE 3: MEMORY PROFILE ---
                     caution: 0.2,
                     ambition: 0.5,
                     trustInCrown: 0.8,
@@ -109,6 +109,7 @@ window.VillageManager = {
                 fuelNeed: 0, // Projected demand
                 feudalState: i === 19 ? 'PARTIALLY_SOVEREIGN' : 'DEPENDENT', // --- PHASE 11: FEUDAL DEPENDENCY ---
                 deepReserves: i === 19 ? { food: 500, essence: 100 } : null, // --- TERMINUS DEEP RESERVES ---
+                activeObjectives: [], // --- PHASE 5: INSTITUTIONAL AGENCY ---
                 // Action Ledger Requirement
                 currentTask: 'Establishing', taskTarget: 'Local Region', taskReason: 'Settlement routine.', taskTimestamp: Date.now()
             });
@@ -963,6 +964,146 @@ window.VillageManager = {
             // They stop requesting fuel even if technically "low" by standard rules
             village.fuelRequested = false; 
         }
+    },
+
+    processFeudalLoyalty: function(village) {
+        if (village.capital) return;
+        
+        // --- HIDDEN VILLAGE EXCEPTION ---
+        if (village.name === 'Epitaph') {
+            village.feudalState = 'SOVEREIGN';
+            village.stats.essence = 999; // Lore: Runic Sovereignty
+            village.fuelRequested = false;
+            return;
+        }
+
+        const crownRelations = village.relations[0] || 0;
+        const memory = village.memoryProfile;
+
+        // 1. Dependency Calculation
+        // A village is "Independent" if its memoryProfile.trustInCrown is low but ambition is high.
+        if (memory.trustInCrown < 0.3 && memory.ambition > 0.7) {
+            if (village.feudalState !== 'INDEPENDENT') {
+                village.feudalState = 'INDEPENDENT';
+                window.EventBus.emit('UI_LOG', `[POLITICS] ${village.name} has declared economic independence from the Capital.`);
+            }
+        } else if (crownRelations < -20) {
+            village.feudalState = 'SEMI_AUTONOMOUS';
+        } else {
+            // Keep specialized states if they were set (e.g. Terminus)
+            if (village.feudalState !== 'PARTIALLY_SOVEREIGN') {
+                village.feudalState = 'DEPENDENT';
+            }
+        }
+
+        // 2. Strategic Reserves
+        // Independent/Cautious villages try to keep a local reserve of 20 Essence
+        if (village.feudalState !== 'DEPENDENT' && village.stats.essence > 20) {
+            // They stop requesting fuel even if technically "low" by standard rules
+            village.fuelRequested = false; 
+        }
+
+        // --- PHASE 5: OBJECTIVE GENERATION ---
+        this.updateInstitutionalObjectives(village);
+    },
+
+    /**
+     * Institutions generate active objectives based on identity and state.
+     */
+    updateInstitutionalObjectives: function(village) {
+        if (village.activeObjectives.length > 0) return; // limit to one major goal for MVP
+
+        const memory = village.memoryProfile;
+        const stats = village.stats;
+
+        // --- LOGIC: IDENTITY -> THREAT -> OBJECTIVE ---
+
+        // 1. CROWN (House Aethel)
+        if (village.capital) {
+            // If any village is INDEPENDENT, Crown seeks to SUPPRESS
+            const rebels = this.villages.filter(v => v.feudalState === 'INDEPENDENT');
+            if (rebels.length > 0) {
+                this.generateObjective(village, 'SUPPRESSION', rebels[0].id);
+            }
+        }
+        
+        // 2. TERMINUS (World's End)
+        else if (village.nobleHouse === 'House Terminus') {
+            // Always seeks MEASUREMENT (Longitudinal Data)
+            if (Math.random() < 0.1) {
+                this.generateObjective(village, 'INVESTIGATION', 'mountain_rotation');
+            }
+        }
+
+        // 3. ROGUE SETTLEMENTS
+        else if (village.feudalState === 'INDEPENDENT' && stats.essence < 10) {
+            // Independent villages without fuel seek REFINEMENT alternatives
+            this.generateObjective(village, 'RECONSTRUCTION', 'domestic_radiance');
+        }
+        
+        // 4. GENERAL NOBLE HOUSES
+        else if (memory.ambition > 0.8) {
+            // Ambitious houses seek ACQUISITION (Monopoly Assets)
+            this.generateObjective(village, 'ACQUISITION', 'blessed_spot');
+        }
+    },
+
+    generateObjective: function(village, type, target) {
+        const objective = {
+            id: `obj-${village.id}-${Date.now()}`,
+            type: type, // ACQUISITION, SUPPRESSION, RECONSTRUCTION, etc
+            target: target,
+            progress: 0,
+            status: 'ACTIVE'
+        };
+
+        village.activeObjectives.push(objective);
+        
+        // --- ACTION: CREATE BOUNTY ---
+        this.generateBountyFromObjective(village, objective);
+        
+        window.EventBus.emit('UI_LOG_DEBUG', `[GOVERNANCE] ${village.name} initiated ${type} objective.`);
+    },
+
+    generateBountyFromObjective: function(village, objective) {
+        if (!window.GameState) return;
+
+        let category = 'discovery';
+        let title = "";
+        let reward = 200;
+
+        switch(objective.type) {
+            case 'SUPPRESSION':
+                title = `Sanction Enforcement: ${objective.target}`;
+                category = 'political';
+                reward = 500;
+                break;
+            case 'INVESTIGATION':
+                title = `Longitudinal Survey: ${objective.target}`;
+                category = 'discovery';
+                reward = 350;
+                break;
+            case 'RECONSTRUCTION':
+                title = `Syntax Recovery: ${objective.target}`;
+                category = 'research';
+                reward = 600;
+                break;
+            case 'ACQUISITION':
+                title = `Asset Extraction: ${objective.target}`;
+                category = 'mercantile';
+                reward = 400;
+                break;
+        }
+
+        window.GameState.questBoard.push({
+            id: `bounty-${objective.id}`,
+            type: category,
+            issuer: village.nobleHouse,
+            title: title,
+            objectiveId: objective.id,
+            reward: reward,
+            status: 'OPEN'
+        });
     },
 
     processVillageCaravans: function(village) {
