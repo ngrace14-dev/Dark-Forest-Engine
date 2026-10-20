@@ -164,8 +164,11 @@ The Dunes contain Lost Cities, Ancient Archives, Original Histories, Forgotten C
 Represents **Recorded Memory**. Contains Terminus, Archives, Strongholds, and Ancient Roads. The Mountain Ring preserves continuity. Most important historical discoveries originate here before eventually leading toward the Dunes.
 
 # 13. INFORMATION ECONOMY
+Information is a physical asset and strategic property possessing Value, Age, Reliability, Source, and Scarcity.
 
-Information is a resource possessing Value, Age, Reliability, Source, and Scarcity.
+**Acquisition Cost:** Information is never "free." It is acquired through trade, theft, or Adventurer-led extraction. Every fact in the Crow's Eye represents a specific expenditure of gold, rations, or lives.
+
+**Ownership:** Knowledge is held by specific entities (Houses, NPCs, Archives). It does not spread automatically. Public knowledge is a deliberate act of "Publishing" (as defined in the Manifesto).
 
 **Information Lifecycle:**
 Event $\rightarrow$ Witness $\rightarrow$ Intel $\rightarrow$ Rumor $\rightarrow$ Verification $\rightarrow$ Truth $\rightarrow$ History $\rightarrow$ Folklore
@@ -292,14 +295,14 @@ The player's personal notebook, tracking People, Places, Clues, Poems, Contradic
 Major mysteries drive progression (e.g., Terminus Anomaly, Barrier Theory, Mountain Rotation, Missing Histories, Ancient Poems). Players advance through understanding.
 
 # 31. EXPEDITIONS
+Expeditions are high-risk operations to extract Tier 3+ information. They are the **exclusive domain of the Adventurer Class.**
 
-* **Early:** Trade Surveys, Archive Recovery, Barrier Research
-
-* **Middle:** Mountain Surveys, Terminus Investigations
-
-* **Late:** Mountain Crossings
-
-* **Endgame:** Dune Expeditions
+*   **The Labor Divide:** Civilian careers (Scribes, Merchants) may *commission* or *fund* an expedition, but they never participate in the traversal.
+*   **Mechanical Identity:** Adventurer NPCs use the same survival, combat, and discovery mechanics as the player.
+*   **Stages:**
+    *   **Early:** Trade Route Surveys, Archive Recovery (Adventurers retrieving physical records for the Historical Office).
+    *   **Middle:** Mountain Surveys, Terminus Investigations.
+    *   **Endgame:** Dune Expeditions.
 
 # 32. CALIBRATION OBSERVATORY
 
@@ -338,8 +341,24 @@ The simulation owns civilization. NPCs remain autonomous. The Crow remains indep
 Archaeology, Cartography, Academic Institutions, Religious Orders, Dune Civilizations, Lost Epoch Histories, Advanced Truth Systems, Longitudinal Measurement Systems, and World Reinterpretation Events.
 
 # 36. CIVILIZATIONAL INSTITUTIONS
-
 Human structures created to preserve civilization. Distinct from metaphysical forces. Individuals die; institutions persist to carry knowledge, practices, authority, and memory forward. (Houses, Historical Office, Archives, Schools, Guilds, Religious Orders).
+
+# 37. DOCTRINE HIERARCHY & COMPLIANCE
+
+The simulation's systems must strictly adhere to the following hierarchy to maintain narrative and mechanical consistency:
+
+1.  **Survival:** The ultimate priority of all living things. ("The Will To Live")
+2.  **Career Integrity:** Entities remain true to their core functions unless pushed by extraordinary circumstances. Villagers farm, archivists archive. Only Adventurers seek the unknown.
+3.  **Information Ownership:** Information is property with cost and consequence. It does not spread automatically; it must be traded, leaked, published, or sold.
+4.  **Discovery:** Knowledge is dangerous and costly to acquire. ("Hostility of Acquisition")
+5.  **Truth:** Exists independently of consensus, but is a dangerous weapon.
+6.  **Power:** Consumes truth; is the natural enemy of survival if it attracts the Forest's attention.
+
+**System Compliance Guidelines:**
+*   **Archaeology, Survey, Expedition, & Investigation Systems:** These are the exclusive domain of the Player and the Adventurer Class. Civilian NPCs (Archivists, Farmers, Merchants) do not initiate or participate directly in these high-risk activities. They are the *buyers* and *interpreters* of the information Adventurers bring back.
+*   **Dream Systems:** Dreams cannot override "Survival" or "Career Integrity" without immense, corrupting effort. A dream might inspire a Blacksmith to forge a better weapon, but it should not inspire them to abandon the forge to fight the Wendigo.
+*   **Combat Systems:** Must prioritize retreat, recovery, and reassessment. Fighting to the death is a failure state for most entities, reserved only for extreme fanaticism or fundamentally broken creatures.
+*   **Information Systems (Crow's Eye, Rumors):** Knowledge is bottlenecked. The simulation must resist the urge to make discoveries globally known. Every fact needs an owner and a consequence.
 
 *(Addendums A through BI defining global simulation rules remain exactly as provided in earlier iterations).*
 
@@ -533,3 +552,4 @@ The simulation must assume:
 - Self-preservation is natural.
 - Recovery is natural.
 A fight should end when one side no longer believes victory is worth the risk.
+
