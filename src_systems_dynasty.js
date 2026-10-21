@@ -52,18 +52,22 @@ class DynastyManagerSystem {
                 legitimacy: 0.5, // --- CREDIBILITY PILLAR: Institutional legitimacy (0.0 - 1.0) ---
                 archives: [],
                 
-                // --- THE RARE PART: Institutional Memory & Action Pipeline ---
-                reportBuffer: new Map(), // intelId -> { reportCount, totalCredibility, aggregateSignificance }
+                                // --- THE RARE PART: Institutional Memory & Action Pipeline ---
+                reportBuffer: new Map(), // intelId -> { reports, aggregateCertainty, status }
                 actionQueue: [],
                 
-                // --- PHASE: HOUSE HISTORY ADDITIONS ---
+                                // --- INSTITUTIONAL COGNITION PHASE 2: Persistent Beliefs ---
+                beliefs: new Map(), // beliefKey -> { confidence, doubtPressure, evidenceSources, originRecordId, lastUpdated, state, officialPosition, privateConcern }
 
-                beliefs: {
+                
+                // --- PHASE: HOUSE HISTORY ADDITIONS ---
+                culturalValues: {
                     crown: Math.random() > 0.5 ? 'LOYAL' : 'SKEPTICAL',
                     huntsman: 'FEARFUL',
                     orb: 'OBSERVANT',
                     shift: 'NECESSARY_EVIL'
                 },
+
                 secrets: new Set(), // Set of intel_id
                 chronicle: [], // Array of event objects
                 legacy: 0, // Total significance score
@@ -77,8 +81,138 @@ class DynastyManagerSystem {
             }
         });
 
+        // --- INSTITUTIONAL COGNITION PHASE 2: Persistent Beliefs ---
+        this.houses.forEach(house => {
+            this.seedCoreBeliefs(house);
+        });
+
         window.EventBus.emit('UI_LOG', '[Dynasty] Institutional Memory Engaged');
     }
+
+    /**
+     * Seeds initial persistent beliefs for an institution.
+     * Bible §36: Institutions are defined by what they protect.
+     */
+    seedCoreBeliefs(house) {
+        const day = window.EngineParams?.worldDay || 0;
+        
+                // Example: The Mountain Ring is Fixed
+        house.beliefs.set('GEOGRAPHY_STABILITY', {
+            confidence: 0.9,
+            doubtPressure: 0.0,
+            evidenceSources: ['TRADITION', 'ARCHIVE'],
+            originRecordId: 'INIT',
+            lastUpdated: day,
+            state: 'DOGMA', // DOGMA, ESTABLISHED, PRIVATE_DOUBT, DOUBTED, SHATTERED
+            officialPosition: "The Mountain Ring is eternal.",
+            privateConcern: "No immediate concerns.",
+            description: "The Mountain Ring is the eternal, unchanging wall of our world."
+        });
+
+        // Example: Crown Sovereignty
+        const isSkeptical = house.culturalValues.crown === 'SKEPTICAL';
+        house.beliefs.set('CROWN_LEGITIMACY', {
+            confidence: isSkeptical ? 0.4 : 0.8,
+            doubtPressure: isSkeptical ? 0.3 : 0.0,
+            evidenceSources: ['ROYAL_DECREE'],
+            originRecordId: 'INIT',
+            lastUpdated: day,
+            state: isSkeptical ? 'DOUBTED' : 'ESTABLISHED',
+            officialPosition: "The Aethel line is the rightful ruler.",
+            privateConcern: isSkeptical ? "The lineage is fraying." : "Stability is paramount.",
+            description: "The Aethel line is the rightful ruler of the Redwood."
+        });
+
+        // House-specific Beliefs
+        if (house.name.includes('Terminus')) {
+            house.beliefs.set('THE_300_INVINCIBLE', {
+                confidence: 1.0,
+                doubtPressure: 0.0,
+                evidenceSources: ['MILITARY_HISTORY'],
+                originRecordId: 'INIT',
+                lastUpdated: day,
+                state: 'DOGMA',
+                officialPosition: "The Elite 300 cannot fall.",
+                privateConcern: "The Pass is our lifeblood.",
+                description: "The Elite 300 cannot fall as long as the pass remains manned."
+            });
+        }
+    }
+
+
+        /**
+     * Node 2 -> 3: Credibility -> Institution
+     * Updates institutional beliefs based on new reports.
+     */
+    updateInstitutionalBeliefs(houseId, intelId) {
+        const house = this.houses.get(houseId);
+        const intel = window.IntelManager?.lookup(intelId);
+        if (!house || !intel) return;
+
+        const day = window.EngineParams?.worldDay || 0;
+
+        // BELIEF REINFORCEMENT (Node 3)
+        // Check if this intel affects any existing beliefs
+        house.beliefs.forEach((belief, key) => {
+            const relationship = this.getIntelBeliefRelationship(intel, key);
+            
+            if (relationship === 'REINFORCE') {
+                belief.confidence = Math.min(1.0, belief.confidence + (intel.certainty * 0.05));
+                belief.doubtPressure = Math.max(0.0, belief.doubtPressure - (intel.certainty * 0.03));
+                belief.lastUpdated = day;
+                belief.evidenceSources.push(intelId);
+            } else if (relationship === 'CONTRADICT') {
+                // DOUBT ACCUMULATION (Node 3.1)
+                const doubtIncrease = (intel.certainty * 0.15) / (1.0 + house.legitimacy);
+                belief.doubtPressure = Math.min(1.0, belief.doubtPressure + doubtIncrease);
+                
+                // FALLIBILITY AUDIT: Institutions are slow to change their official minds
+                const confidenceErosion = (intel.certainty * 0.05) / (1.0 + house.legitimacy);
+                belief.confidence -= confidenceErosion;
+                belief.lastUpdated = day;
+                belief.evidenceSources.push(intelId);
+
+                // PRIVATE DOUBT STATE (Node 3.2)
+                if (belief.doubtPressure > 0.3 && belief.state === 'ESTABLISHED') {
+                    belief.state = 'PRIVATE_DOUBT';
+                    belief.privateConcern = `Reports of ${intel.payload.title} contradict established dogma.`;
+                    window.EventBus.emit('UI_LOG_DEBUG', `[BELIEF] ${house.name} harbors private doubt regarding ${key}.`);
+                }
+                
+                if (belief.doubtPressure > 0.6 && belief.state !== 'DOUBTED') {
+                    belief.state = 'DOUBTED';
+                    belief.officialPosition = `The status of ${key} is under review.`;
+                    window.EventBus.emit('UI_LOG', `[BELIEF] ${house.name} has begun to officially doubt: ${belief.description}`);
+                }
+                
+                if (belief.confidence < 0.1 && belief.state !== 'SHATTERED') {
+                    belief.state = 'SHATTERED';
+                    belief.officialPosition = "Previous dogmas have been proven false.";
+                    window.EventBus.emit('UI_LOG', `[BELIEF] A core belief of ${house.name} has been SHATTERED: ${belief.description}`);
+                    this.triggerBeliefShatterAction(house, key);
+                }
+            }
+        });
+    }
+
+
+    getIntelBeliefRelationship(intel, beliefKey) {
+        // Logic to determine if intel confirms or challenges a belief
+        if (beliefKey === 'GEOGRAPHY_STABILITY' && intel.payload.tags.includes('POST-SHIFT')) return 'CONTRADICT';
+        if (beliefKey === 'CROWN_LEGITIMACY' && intel.payload.tags.includes('SCANDAL') && intel.payload.tags.includes('CROWN')) return 'CONTRADICT';
+        if (beliefKey === 'THE_300_INVINCIBLE' && intel.payload.tags.includes('THREAT') && intel.significance.historical > 80) return 'CONTRADICT';
+        
+        return 'NEUTRAL';
+    }
+
+    triggerBeliefShatterAction(house, beliefKey) {
+        // Knowledge does not create action. Belief creates action.
+        if (beliefKey === 'GEOGRAPHY_STABILITY') {
+            window.EventBus.emit('UI_LOG', `[ACTION] ${house.name} funds emergency expeditions to map the "new" world.`);
+            // Create discovery objectives
+        }
+    }
+
 
     handleLegacyHarvest(data) {
         const house = this.houses.get(data.bloodlineId);
@@ -305,11 +439,13 @@ class DynastyManagerSystem {
 
         window.EventBus.emit('UI_LOG_DEBUG', `[DYNASTY] ${house.name} received report on ${intel.payload.title}. Certainty: ${buffer.aggregateCertainty.toFixed(2)}`);
 
-        // If certainty passes the Institutional Threshold, it becomes Institutional Knowledge
+                // If certainty passes the Institutional Threshold, it becomes Institutional Knowledge
         if (buffer.aggregateCertainty > 0.7 && buffer.status === 'UNVERIFIED') {
             this.institutionalizeIntel(houseId, intelId);
+            this.updateInstitutionalBeliefs(houseId, intelId);
         }
     }
+
 
     /**
      * Node 3 -> 4: Institution -> Action
@@ -334,27 +470,45 @@ class DynastyManagerSystem {
     }
 
         determineInstitutionalAction(houseId, intel) {
-        const house = this.houses.get(houseId);
-        if (!house || !window.VillageManager) return;
+            const house = this.houses.get(houseId);
+            if (!house || !window.VillageManager) return;
         
-        const houseVillages = window.VillageManager.villages.filter(v => v.nobleHouse === house.name);
+            // --- BEHAVIORAL EFFECTS: HESITATION & DOUBT (Node 4) ---
+            // Bible §36: Knowledge does not create action. Belief creates action.
+            const totalDoubt = Array.from(house.beliefs.values()).reduce((sum, b) => sum + b.doubtPressure, 0) / house.beliefs.size;
+        
+            // High doubt causes hesitation: 50% chance to skip action if doubt > 0.5
+            if (totalDoubt > 0.5 && Math.random() < 0.5) {
+                window.EventBus.emit('UI_LOG_DEBUG', `[ACTION] ${house.name} hesitates due to internal discord.`);
+                return;
+            }
 
-        // Logic: What does the House DO with this information?
-        // 1. If it's a WARNING about a monster -> Fortify/Mobilize
-        if (intel.type === 'WARNING' || intel.payload.tags.includes('THREAT')) {
-            window.EventBus.emit('UI_LOG', `[ACTION] ${house.name} issues Mobilization Decree!`);
-            
-            houseVillages.forEach(v => {
-                // Institutional Action: Fortify the village
-                v.barrierIntegrity = Math.min(100, v.barrierIntegrity + 20);
-                v.memoryProfile.caution = Math.min(1.0, v.memoryProfile.caution + 0.2);
-                
-                // Create a Defense Bounty
-                if (window.VillageManager.generateObjective) {
-                    window.VillageManager.generateObjective(v, 'SUPPRESSION', intel.payload.title);
+            const houseVillages = window.VillageManager.villages.filter(v => v.nobleHouse === house.name);
+
+            // Logic: What does the House DO with this information?
+            // 1. If it's a WARNING about a monster -> Fortify/Mobilize
+            if (intel.type === 'WARNING' || intel.payload.tags.includes('THREAT')) {
+                // Action Certainty check
+                const certaintyModifier = 1.0 - (totalDoubt * 0.5);
+                if (Math.random() > certaintyModifier) {
+                     window.EventBus.emit('UI_LOG', `[ACTION] ${house.name} issuing mobilization, but response is disorganized.`);
+                } else {
+                     window.EventBus.emit('UI_LOG', `[ACTION] ${house.name} issues Mobilization Decree!`);
                 }
-            });
-        }
+            
+                houseVillages.forEach(v => {
+                    // Institutional Action: Fortify the village
+                    const fortificationStrength = 20 * certaintyModifier;
+                    v.barrierIntegrity = Math.min(100, v.barrierIntegrity + fortificationStrength);
+                    v.memoryProfile.caution = Math.min(1.0, v.memoryProfile.caution + (0.2 * certaintyModifier));
+                
+                    // Create a Defense Bounty
+                    if (window.VillageManager.generateObjective) {
+                        window.VillageManager.generateObjective(v, 'SUPPRESSION', intel.payload.title);
+                    }
+                });
+            }
+
 
         // 2. If it's a SCANDAL about a rival house -> Feud/Leverage
         if (intel.payload.tags.includes('SCANDAL')) {
