@@ -120,14 +120,28 @@ class DynastyManagerSystem {
         window.EventBus.emit('UI_LOG', '[Dynasty] Institutional Memory Engaged');
     }
 
-    /**
+        /**
      * Seeds initial persistent beliefs for an institution.
      * Bible §36: Institutions are defined by what they protect.
      */
     seedCoreBeliefs(house) {
         const day = window.EngineParams?.worldDay || 0;
         
-                // Example: The Mountain Ring is Fixed
+        // Example: The Tree is Continuity (Node 3)
+        house.beliefs.set('TREE_CONTINUITY', {
+            confidence: 0.8,
+            doubtPressure: 0.0,
+            evidenceSources: ['TRADITION'],
+            originRecordId: 'INIT',
+            lastUpdated: day,
+            state: 'ESTABLISHED',
+            officialPosition: "The World Tree preserves our legacy.",
+            privateConcern: "The Roots must be protected.",
+            description: "The World Tree is the physical manifestation of our survival."
+        });
+
+        // Example: The Mountain Ring is Fixed
+
         house.beliefs.set('GEOGRAPHY_STABILITY', {
             confidence: 0.9,
             doubtPressure: 0.0,

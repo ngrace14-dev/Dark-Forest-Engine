@@ -124,7 +124,7 @@ window.ForceManager = {
     },
 
 
-    update: function(delta) {
+        update: function(delta) {
         // Recalculate strengths based on world state
         this.recalculateCrow();
         this.recalculateTruth();
@@ -132,7 +132,21 @@ window.ForceManager = {
         this.recalculateForest();
         this.recalculateHouses();
         this.recalculateWendigo();
+        this.recalculateTree();
     },
+
+    recalculateTree: function() {
+        const force = this.forces['Tree'];
+        if (!window.VillageManager?.villages) return;
+
+        // Vitality scales with high-integrity barriers and preserved knowledge
+        const barriers = window.VillageManager.villages.reduce((acc, v) => acc + (v.barrierIntegrity || 0), 0);
+        const archives = Array.from(window.DynastyManager?.houses.values() || []).reduce((acc, h) => acc + h.archives.length, 0);
+
+        force.value = Math.floor(barriers / 10) + archives;
+        force.strength = Math.min(1000, 200 + (barriers / 2) + (archives * 10));
+    },
+
 
     recalculateCrow: function() {
         const force = this.forces['Crow'];
