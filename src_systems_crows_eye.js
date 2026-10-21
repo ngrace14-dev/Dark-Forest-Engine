@@ -2,7 +2,7 @@
  * Crow's Eye System - Phase 2 (Registration & State)
  */
 class CrowsEyeSystem {
-        constructor() {
+    constructor() {
         this.isActive = false;
         this.overlay = null;
         this.updateTimer = 0;
@@ -11,34 +11,35 @@ class CrowsEyeSystem {
         this.zoom = 1.0;
         this.pan = { x: 0, z: 0 };
         this.velocity = { x: 0, z: 0 };
-                this.isDragging = false;
+        this.isDragging = false;
         this.lastStats = null;
         this.trends = {};
-                this.keys = {};
+        this.keys = {};
         this.isInspectionExpanded = false;
         this.currentFolder = 'WORLD';
-                this.folders = {
-                    'WORLD': ['MAP', 'WATCHLIST', 'ACTIONS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE'],
-                    'INTEL': ['INTEL', 'TRUTH', 'CHRONICLE', 'ANTHOLOGY', 'LEGENDS', 'OFFICIAL_HISTORY'],
-                    'POWER': ['HOUSES', 'HOUSE_HISTORY', 'INFLUENCE_MAP', 'CIV_TIMELINE', 'ECONOMY', 'LINEAGES', 'RELATIONSHIPS'],
-                    'BEYOND': ['ORIGIN_DOSSIER', 'IMPACT_ANALYSIS', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RECORDED_MEMORY', 'LOST_MEMORY'],
-                    'BUREAU': ['PLAYBACK', 'CALIBRATION']
-                };
-
+        this.folders = {
+            'WORLD': ['MAP', 'WATCHLIST', 'ACTIONS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE'],
+            'INTEL': ['INTEL', 'TRUTH', 'CHRONICLE', 'ANTHOLOGY', 'LEGENDS', 'OFFICIAL_HISTORY'],
+            'POWER': ['HOUSES', 'HOUSE_HISTORY', 'INFLUENCE_MAP', 'CIV_TIMELINE', 'ECONOMY', 'LINEAGES', 'RELATIONSHIPS'],
+            'BEYOND': ['ORIGIN_DOSSIER', 'IMPACT_ANALYSIS', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RECORDED_MEMORY', 'LOST_MEMORY'],
+            'BUREAU': ['PLAYBACK', 'CALIBRATION']
+        };
 
         window.EventBus.on('ENGINE_READY', () => this.init());
     }
 
-
-        init() {
-        this.isActive = window.EngineConfig?.crowsEyeMode || false;
+    init() {
+        // --- GATING: CROW'S EYE UNLOCK ---
+        // Only allow enabling if the blessing is earned
+        const canEnable = window.GameState?.narrator?.crowsBlessingEarned || false;
+        this.isActive = canEnable && (window.EngineConfig?.crowsEyeMode || false);
+        
         this.followedEntityIds = new Set(); // Bible §28
         this.createOverlay();
 
         window.CrowsEye = this; // Global reference for inline event handlers
 
         window.addEventListener('keydown', (e) => {
-
             this.keys[e.key.toLowerCase()] = true;
             
             if (e.key === 'Escape' && this.isActive) {
@@ -51,18 +52,26 @@ class CrowsEyeSystem {
             this.keys[e.key.toLowerCase()] = false;
         });
         
-                window.EventBus.emit('UI_LOG', `[CROWSEYE] Observation Layer Status → ENABLED`);
+        window.EventBus.emit('UI_LOG', `[CROWSEYE] Observation Layer Status → ${canEnable ? 'AVAILABLE' : 'LOCKED'}`);
+        
         window.EventBus.on('ENV_UPDATE', () => {
             const currentMode = window.EngineConfig?.crowsEyeMode || false;
-            if (this.isActive !== currentMode) {
-                this.isActive = currentMode;
+            const canEnableUpdate = window.GameState?.narrator?.crowsBlessingEarned || false;
+            
+            if (this.isActive !== (currentMode && canEnableUpdate)) {
+                this.isActive = currentMode && canEnableUpdate;
                 if (this.overlay) {
                     this.overlay.style.display = this.isActive ? 'block' : 'none';
                 }
-                window.EventBus.emit('UI_LOG', `[CROWSEYE] Observation Layer Status → ${this.isActive ? 'ACTIVE' : 'DORMANT'}`);
+                if (currentMode && !canEnableUpdate) {
+                    window.EventBus.emit('UI_LOG', `[CROWSEYE] Access Denied: Crow's Blessing not yet earned.`);
+                } else {
+                    window.EventBus.emit('UI_LOG', `[CROWSEYE] Observation Layer Status → ${this.isActive ? 'ACTIVE' : 'DORMANT'}`);
+                }
             }
         });
     }
+
 
 
     createOverlay() {

@@ -224,24 +224,29 @@ function updateWorldClock(delta) {
         const hoursPerSecond = 24 / (window.EngineParams?.dayLengthSeconds || 1200);
         window.EngineParams.timeOfDay += delta * hoursPerSecond;
         if (window.EngineParams.timeOfDay >= 24) {
-            const elapsedDays = Math.floor(window.EngineParams.timeOfDay / 24);
-            window.EngineParams.timeOfDay %= 24;
-            window.EngineParams.worldDay += elapsedDays;
+                const elapsedDays = Math.floor(window.EngineParams.timeOfDay / 24);
+                window.EngineParams.timeOfDay %= 24;
+                window.EngineParams.worldDay += elapsedDays;
             
-            for (let day = 0; day < elapsedDays; day++) {
-                window.processCompanionNeeds?.();
-                window.processBaseJobs?.();
-                window.AdventurerManager?.advanceDay();
-                window.GameState?.processCrowDay?.();
-            }
-            
-                        if (window.EngineParams.worldDay > 0 && window.EngineParams.worldDay % (window.EngineParams.cycleLengthDays || 14) === 0) {
-                // --- PHASE 1 MONOPOLY AUDIT (§19) ---
-                if (window.VillageManager?.auditMonopolies) {
-                    window.VillageManager.auditMonopolies();
+                                for (let day = 0; day < elapsedDays; day++) {
+                    window.processCompanionNeeds?.();
+                    window.processBaseJobs?.();
+                    window.AdventurerManager?.advanceDay();
+                    window.GameCore?.processCrowDay?.();
+                    // --- WENDIGO EVOLUTION TICK ---
+                    window.GameCore?.processMonsterEvolution?.();
                 }
-                window.regenerateWorldCycle?.();
-            }
+
+                // --- PHYSICAL CROW SYNC ---
+                if (window.GameCore?.syncCrowModel && window.GameState?.narrator?.targetId) {
+                    window.GameCore.syncCrowModel(window.GameState.narrator.targetId);
+                }
+            
+                                // --- THE SHIFT SCATTERING ---
+    if (window.EngineParams.worldDay > 0 && window.EngineParams.worldDay % (window.EngineParams.cycleLengthDays || 14) === 0) {
+        window.GameCore?.applyShiftScattering?.();
+    }
+
 
         }
     }
@@ -262,14 +267,20 @@ function updatePlayerStats(delta) {
     window.EngineParams.isPlayerSafe = false;
     window.EngineParams.isPlayerHidden = false;
     
-    const staminaMultiplier = 1 + (window.GameState.forestBlessing?.staminaRegen || 0);
+        const staminaMultiplier = 1 + (window.GameState.forestBlessing?.staminaRegen || 0);
     
-    if (!window.Input.isSprinting && !window.Input.isBlocking) {
-        window.GameState.pStats.stamina = Math.min(
-            window.GameState.pStats.maxStamina, 
-            window.GameState.pStats.stamina + 12 * staminaMultiplier * delta
-        );
-    }
+            // --- NOBLE HOUSE CROW: PASSIVE STAMINA BUFF ---
+            // If the Crow is watching the player, provide an additional stamina regen boost
+            const crowWatchBonus = (window.GameState.narrator?.targetId === 'player') ? 1.5 : 1.0;
+
+            if (!window.Input.isSprinting && !window.Input.isBlocking) {
+                window.GameState.pStats.stamina = Math.min(
+                    window.GameState.pStats.maxStamina, 
+                    window.GameState.pStats.stamina + 12 * staminaMultiplier * crowWatchBonus * delta
+                );
+            }
+
+
 
     if (performance.now() >= (window.GameState.pStats.guardBrokenUntil || 0)) {
         window.GameState.pStats.poise = Math.min(
@@ -2213,8 +2224,25 @@ window.EventBus?.on('CMD_TELEPORT', (pos) => {
     }
 });
 
+window.EventBus?.on('PLAYER_WENDIGO_TRANSFORM', () => {
+    if (window.GameCore.swapPlayerModel) {
+        window.GameCore.swapPlayerModel('Wendigo');
+    }
+    window.GameState.gladiator.objective = 'Hunt and Feed';
+    window.EventBus.emit('UI_UPDATE_HUD');
+});
+
 window.EventBus?.on('PLAYER_RESPAWN', () => { 
+    if (window.GameState.monsterState.isWendigo) {
+        // Bypass normal respawn if rebirth occurred
+        window.GameState.pStats.hp = window.GameState.pStats.maxHp;
+        playEntityAnimation(window.GameCore.playerObj, 'idle');
+        window.EventBus.emit('UI_UPDATE_HUD');
+        return;
+    }
+
     if (!window.EngineParams.arenaMode && window.GameState.pStats.hp <= 0) {
+
         window.GameCore.recordCombatDefeat({ source: 'open-world', injury: `open-world defeat on day ${window.EngineParams.worldDay}` });
         
         // --- RUN SUMMARY EPITAPH (§17) ---

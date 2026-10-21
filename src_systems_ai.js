@@ -119,7 +119,7 @@ function defeatNpc(entity, cause = 'combat') {
     window.AdventurerManager?.markDefeated(entity);
     
     // --- WENDIGO REBIRTH HOOK (Bible §10, §18) ---
-    if (cause === 'starvation' && entity.def.type === 'npc' && entity.def.faction !== 'monster') {
+        if (cause === 'starvation' && entity.def.type === 'npc' && entity.def.faction !== 'monster') {
         const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
         const distFromCenter = Math.hypot(entity.visual.position.x, entity.visual.position.z);
         const inCold = distFromCenter > (forestSide * 0.4); // Outside the core temperate zone
@@ -128,7 +128,17 @@ function defeatNpc(entity, cause = 'combat') {
             window.PersonhoodManager.markForWendigoRebirth(entity.id || entity.name, entity.visual.position);
             window.EventBus.emit('UI_LOG', `[NARRATIVE] ${entity.id || entity.name} has starved in the deep cold...`);
         }
+
+        // --- PLAYER WENDIGO REBIRTH ---
+        if (entity.id === 'player' || entity.def.faction === 'player') {
+            window.GameState.monsterState.isWendigo = true;
+            window.GameState.monsterState.evolutionStage = 'LESSER';
+            window.EventBus.emit('UI_LOG', "❄️ [REBIRTH] You did not die. The hunger has simply taken root.");
+            window.EventBus.emit('PLAYER_WENDIGO_TRANSFORM');
+            return; // Bypass normal death
+        }
     }
+
 
     
     // --- TERMINUS ELITE PERMANENT DEATH HOOK ---
@@ -613,10 +623,17 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         let target = null;
 
                 if (hostile && !onProtectedPath && !inVillageBarrier && !inPlayerWard) {
-            // --- ENHANCED PERCEPTION SYSTEM (Kenshi Style) ---
-            const dist = en.visual.position.distanceTo(pPos);
+                    // --- ENHANCED PERCEPTION SYSTEM (Kenshi Style) ---
+                    const dist = en.visual.position.distanceTo(pPos);
 
-            // --- DD2 FORCED TARGETING (Taunts) ---
+                    // --- HUNTSMAN SCORN: SIGHT PENALTY ---
+                    if (window.ForceManager?.huntsman?.scornedIds?.has('player')) {
+                        // If player is scorned, AI ignores them unless very close
+                        if (dist > 3) return;
+                    }
+
+                    // --- DD2 FORCED TARGETING (Taunts) ---
+
             if (en.forcedTarget && en.forcedTarget.hp > 0) {
                 target = en.forcedTarget.visual.position;
             } else {

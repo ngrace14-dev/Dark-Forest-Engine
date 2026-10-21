@@ -116,7 +116,7 @@ window.GameState = {
         matchState: 'hub',
         objective: 'Awaiting a match'
     },
-    narrator: {
+        narrator: {
         avatar: 'crow',
         targetId: null,
         targetName: 'An unnamed survivor',
@@ -126,7 +126,36 @@ window.GameState = {
         safeDays: 0,
         playerClaimed: false,
         feats: 0,
-        secretProgress: 0
+        secretProgress: 0,
+        // --- NOBLE HOUSE CROW: ENDGAME BLESSING ---
+        crowsBlessingEarned: false 
+    },
+        // --- CULTIVATION & CONSUMPTION: THE MANTLE ---
+    huntsmanMantle: {
+        currentHuntsmanId: 'huntsman_init',
+        lastVictimId: 'none',
+        strengthThreshold: 100,
+        lastInterventionDay: -3,
+        orbMarkedId: null
+    },
+    // --- THE MESSENGER: ORB COMPANION ---
+    orbMessenger: {
+        attachedToId: null,
+        dialoguePool: [
+            "The forest remembers your hunger...",
+            "A shift is coming. The trees are restless.",
+            "You are being watched, little spark.",
+            "The Great Lake is deeper than your history."
+        ]
+    },
+
+    // --- WENDIGO SPECTRUM: EVOLUTION ---
+    monsterState: {
+        isWendigo: false,
+        evolutionStage: 'NONE', // LESSER, VAMPIRE, HIGHER, BERZERKER
+        fleshDensity: 0,
+        yearsLived: 0,
+        fedToday: false
     },
         forestBlessing: {
         active: false,
@@ -549,14 +578,21 @@ window.GameCore = {
             window.EncounterDirector.clearHuntsmanMark();
         }
 
-        // --- PHASE 6: CHRONICLER XP ---
+                // --- PHASE 6: CHRONICLER XP ---
         // Chroniclers gain XP for performing noteworthy deeds that catch the Crow's eye
         if (narrator.playerClaimed) {
             window.CareerManager.addXP('chronicler', impact * 5);
         }
 
+        // --- NOBLE HOUSE CROW: ENDGAME BLESSING TRIGGER ---
+        if (narrator.attention >= 100 && !narrator.crowsBlessingEarned) {
+            narrator.crowsBlessingEarned = true;
+            window.EventBus.emit('UI_LOG', "✨ [REVELATION] Your significance has reached Legendary heights. The Crow's Eye is now open to you.");
+        }
+
         window.EventBus.emit('UI_UPDATE_HUD');
     },
+
     loseCrowInterest: function(amount = 1, reason = 'The story grows quiet.') {
         const narrator = window.GameState.narrator;
         narrator.targetHeat = Math.max(0, narrator.targetHeat - amount);
@@ -564,40 +600,92 @@ window.GameCore = {
         window.EventBus.emit('UI_LOG', `[THE CROW] ${reason}`);
         window.EventBus.emit('UI_UPDATE_HUD');
     },
-    evaluateCrowInterest: function() {
+        evaluateCrowInterest: function() {
         const narrator = window.GameState.narrator;
-        if (!narrator.targetId) return;
-        if (narrator.targetId === 'player' && window.GameState.forestBlessing?.active && narrator.targetHeat <= 0) {
-            delete window.GameState.activeBuffs.athletics;
-            delete window.GameState.activeBuffs.dodge;
-            window.GameState.forestBlessing = { active: false, tier: 'none', name: 'No forest blessing', athletics: 0, dodge: 0, staminaRegen: 0, dangerSense: false, combatLuck: 0, teleportLuck: 0 };
-            window.EventBus.emit('UI_LOG', '[THE CROW] Your story has gone still. The forest mark fades.');
-        }
-        if (narrator.targetHeat > 0) return;
-        const candidate = (window.AdventurerManager?.records || [])
+        
+        // 1. Identify current most significant entities
+        const candidates = (window.AdventurerManager?.records || [])
             .filter(record => record.alive !== false)
-            .sort((a, b) => (b.storyHeat || 0) - (a.storyHeat || 0))[0];
-        if (candidate) {
-            narrator.targetId = candidate.id;
-            narrator.targetName = candidate.name;
-            narrator.targetHeat = Math.max(10, candidate.storyHeat || 10);
-            narrator.playerClaimed = false;
-            window.EventBus.emit('UI_LOG', `[THE CROW] It abandons the quiet tale and follows ${candidate.name}.`);
+            .map(r => ({ id: r.id, name: r.name, heat: r.storyHeat || 0 }));
+            
+        // Include player in the significance check
+        candidates.push({ id: 'player', name: 'The Wanderer', heat: narrator.targetHeat });
+        
+        // Sort by story density / significance
+        candidates.sort((a, b) => b.heat - a.heat);
+        const topHero = candidates[0];
+
+        if (topHero && topHero.id !== narrator.targetId) {
+            const oldTargetId = narrator.targetId;
+            narrator.targetId = topHero.id;
+            narrator.targetName = topHero.name;
+            narrator.playerClaimed = (topHero.id === 'player');
+
+            // --- PHYSICAL MANIFESTATION: THE CROW MODEL ---
+            this.syncCrowModel(topHero.id);
+
+            if (narrator.playerClaimed) {
+                if (window.GameCore.applyForestBlessing) window.GameCore.applyForestBlessing(window.GameCore.playerObj, true);
+                window.EventBus.emit('UI_LOG', `[THE CROW] It abandons the quiet tale and follows you.`);
+            } else {
+                // If it left the player, remove blessing
+                if (oldTargetId === 'player') {
+                    this.loseForestBlessing();
+                }
+                window.EventBus.emit('UI_LOG', `[THE CROW] It abandons the quiet tale and follows ${topHero.name}.`);
+            }
         }
     },
+
+    /**
+     * Spawns/Teleports the physical Crow model to the target.
+     */
+    syncCrowModel: function(targetId) {
+        if (!window.GameCore?.activeEntities) return;
+        
+        let crow = window.GameCore.activeEntities.find(e => e.name === 'Primordial Crow');
+        const targetEnt = (targetId === 'player') ? window.GameCore.playerObj : window.GameCore.activeEntities.find(e => e.id === targetId);
+        
+        if (!targetEnt || !targetEnt.visual) return;
+
+        if (!crow) {
+            // Instantiate physical crow
+            crow = window.GameCore.instantiatePrefab('Primordial Crow', targetEnt.visual.position.x, targetEnt.visual.position.y + 5, targetEnt.visual.position.z);
+            if (crow) crow.name = 'Primordial Crow';
+        } else {
+            // Move crow to target
+            const pos = targetEnt.visual.position;
+            window.PhysicsQueue.enqueue(() => {
+                if (crow.body) {
+                    crow.body.setTranslation({ x: pos.x, y: pos.y + 3, z: pos.z }, true);
+                }
+            });
+        }
+    },
+
+    loseForestBlessing: function() {
+        delete window.GameState.activeBuffs.athletics;
+        delete window.GameState.activeBuffs.dodge;
+        window.GameState.forestBlessing = { active: false, tier: 'none', name: 'No forest blessing', athletics: 0, dodge: 0, staminaRegen: 0, dangerSense: false, combatLuck: 0, teleportLuck: 0 };
+        window.EventBus.emit('UI_LOG', '[THE CROW] Your story has gone still. The forest mark fades.');
+    },
+
     processCrowDay: function() {
         const narrator = window.GameState.narrator;
+        
+        // Decay Heat if idle
         if (narrator.targetId === 'player') {
             const player = window.GameCore.playerObj;
             const sheltered = player && (window.EngineParams.isPlayerSafe || window.RoadManager?.isVillageProtected(player.visual.position));
-            if (sheltered) narrator.safeDays++;
-            else narrator.safeDays = 0;
-            if (sheltered) this.loseCrowInterest(2, 'The crow finds only a sheltered silhouette.');
-            if (window.EngineParams.worldDay - narrator.lastActionDay > 1) this.loseCrowInterest(3, 'The crow grows bored with your silence.');
-        } else {
-            const record = window.AdventurerManager?.records.find(candidate => candidate.id === narrator.targetId);
-            if (record) narrator.targetHeat = record.storyHeat;
+            
+            if (sheltered) {
+                narrator.safeDays++;
+                this.loseCrowInterest(5, 'The crow finds only a sheltered silhouette.');
+            } else if (window.EngineParams.worldDay - narrator.lastActionDay > 1) {
+                this.loseCrowInterest(3, 'The crow grows bored with your silence.');
+            }
         }
+        
         this.evaluateCrowInterest();
     }
 };
@@ -611,6 +699,87 @@ window.GameCore.initializeFreshRunPotential = function() {
         window.GameState.pStats.hp = window.GameState.pStats.maxHp;
     }
 };
+
+window.GameCore.syncCrowModel = function(targetId) {
+    if (!window.GameCore?.activeEntities) return;
+    
+    let crow = window.GameCore.activeEntities.find(e => e.name === 'Primordial Crow');
+    const targetEnt = (targetId === 'player') ? window.GameCore.playerObj : window.GameCore.activeEntities.find(e => e.id === targetId);
+    
+    if (!targetEnt || !targetEnt.visual) return;
+
+    if (!crow) {
+        crow = window.GameCore.instantiatePrefab('Primordial Crow', targetEnt.visual.position.x, targetEnt.visual.position.y + 5, targetEnt.visual.position.z);
+        if (crow) crow.name = 'Primordial Crow';
+    } else {
+        const pos = targetEnt.visual.position;
+        window.PhysicsQueue.enqueue(() => {
+            if (crow.body) {
+                crow.body.setTranslation({ x: pos.x, y: pos.y + 3, z: pos.z }, true);
+            }
+        });
+    }
+};
+
+window.GameCore.processMonsterEvolution = function() {
+    const state = window.GameState.monsterState;
+    if (!state.isWendigo) return;
+
+    state.yearsLived += 1/14; 
+    
+    if (!state.fedToday) {
+        state.fleshDensity = Math.max(0, state.fleshDensity - 5);
+    }
+    state.fedToday = false; 
+
+    if (state.evolutionStage === 'LESSER' && state.fleshDensity > 50) {
+        state.evolutionStage = 'VAMPIRE';
+        window.EventBus.emit('UI_LOG', "🦇 [EVOLUTION] Your feral hunger has sharpened into intellect. You have become a Vampire.");
+    }
+
+        if (state.evolutionStage === 'VAMPIRE' && state.yearsLived >= 1000) {
+        state.evolutionStage = 'HIGHER';
+        window.EventBus.emit('UI_LOG', "🧛 [ASCENSION] A millennium of blood has purified your curse. You are a Higher Vampire.");
+        
+        // --- HIGHER VAMPIRE BUFFS ---
+        window.GameState.pStats.maxHp *= 2;
+        window.GameState.pStats.hp = window.GameState.pStats.maxHp;
+        window.EngineParams.godMode = true; // Temporary/Partial invulnerability? Or just high regen.
+    }
+
+
+    if (state.fleshDensity === 0 && state.evolutionStage !== 'BERZERKER') {
+        state.evolutionStage = 'BERZERKER';
+        window.EventBus.emit('UI_LOG', "🔥 [FORCED EVOLUTION] Starvation has broken your will. You are now a Berzerker under the Sovereign's control.");
+    }
+};
+
+window.GameCore.applyShiftScattering = function() {
+    if (!window.GameCore.activeEntities) return;
+
+    const forestSide = window.WorldGenConfig?.darkForestSideMeters || 1137800.0;
+    const halfSide = forestSide / 2;
+    const lakeRadius = (window.WorldGenConfig?.greatLakeDiameterMeters || 402335.0) / 2;
+
+    window.GameCore.activeEntities.forEach(en => {
+        if (en.chunkKey === 'persistent' && !en.isAnchored && !en.playerBase) {
+            let newX, newZ, dist;
+            do {
+                newX = (Math.random() * 2 - 1) * halfSide;
+                newZ = (Math.random() * 2 - 1) * halfSide;
+                dist = Math.hypot(newX, newZ);
+            } while (dist < lakeRadius); 
+
+            window.PhysicsQueue.enqueue(() => {
+                if (en.body) {
+                    en.body.setTranslation({ x: newX, y: 100, z: newZ }, true);
+                }
+            });
+            window.EventBus.emit('UI_LOG_DEBUG', `[SHIFT] Unanchored entity ${en.name} scattered to deep woods.`);
+        }
+    });
+};
+
 window.GameCore.initializeFreshRunPotential();
 
 window.EventBus.on('GAME_SAVE', () => {

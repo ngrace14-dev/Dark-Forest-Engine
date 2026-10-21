@@ -70,7 +70,7 @@ window.ForceManager = {
             pressure: 'interpretation',
             value: 0
         },
-        'Houses': { 
+                'Houses': { 
             strength: 400, 
             label: 'Prosperity', 
             description: 'Encourages economic growth and resource accumulation.',
@@ -79,6 +79,34 @@ window.ForceManager = {
             value: 0 
         }
     },
+
+    // --- HUNTSMAN REGISTRY: THE MANTLE ---
+    huntsman: {
+        activeHuntsman: null,
+        strengthScore: 100,
+        scornedIds: new Set(),
+        interventionCooldownDays: 3,
+        lastInterventionDay: -3
+    },
+
+    // --- THE MESSENGER: ORB COMPANION ---
+    orbMessenger: {
+        attachedToId: null,
+        lastPosition: { x: 0, y: 0, z: 0 },
+        dialoguePool: [
+            "The forest remembers your hunger...",
+            "A shift is coming. The trees are restless.",
+            "You are being watched, little spark.",
+            "The Great Lake is deeper than your history."
+        ],
+        triggerDialogue: function() {
+            if (Math.random() < 0.1) {
+                const bark = this.dialoguePool[Math.floor(Math.random() * this.dialoguePool.length)];
+                window.EventBus.emit('UI_LOG', `[THE ORB] "${bark}"`);
+            }
+        }
+    },
+
 
 
     /**
@@ -200,7 +228,7 @@ window.ForceManager = {
     },
 
 
-    recalculateWendigo: function() {
+        recalculateWendigo: function() {
         const force = this.forces['Wendigo'];
         // Strength grows with fear (low prosperity) and deaths
         const events = window.ChronicleManager?.worldLedger || [];
@@ -210,9 +238,99 @@ window.ForceManager = {
         force.strength = Math.min(1000, 100 + (deaths * 20));
     },
 
+    // --- HUNTSMAN LOGIC ---
+    applyScorn: function(entityId, durationHours = 12) {
+        this.huntsman.scornedIds.add(entityId);
+        window.EventBus.emit('UI_LOG', `[THE MARK] You are Scorned. The forest ignores your presence.`);
+        
+        // Timer to remove scorn
+        setTimeout(() => {
+            this.huntsman.scornedIds.delete(entityId);
+            window.EventBus.emit('UI_LOG', `[THE MARK] The Huntsman's Scorn has faded.`);
+        }, durationHours * 60 * 1000); // Note: Should probably be tied to world time, but for now...
+    },
+
+    checkIntervention: function(playerHpPercent) {
+        const day = window.EngineParams?.worldDay || 0;
+        if (playerHpPercent < 0.45 && (day - this.huntsman.lastInterventionDay >= this.huntsman.interventionCooldownDays)) {
+            this.executeIntervention();
+        }
+    },
+
+        executeIntervention: function() {
+        this.huntsman.lastInterventionDay = window.EngineParams.worldDay;
+        window.EventBus.emit('HUNTSMAN_INTERVENTION');
+    },
+
+    /**
+     * Physical manifestation of the Huntsman's Rescue
+     */
+    handleInterventionEvent: function() {
+        window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "You are not yet ready to feed the roots."`);
+        
+        // 1. Freeze player controls (simplified)
+        window.Input.frozen = true;
+        
+        // 2. Spawn Huntsman
+        const pPos = window.GameCore.playerObj.visual.position;
+        const spawnPos = pPos.clone().add(new window.THREE.Vector3(5, 0, 5));
+        const huntsman = window.GameCore.instantiatePrefab('Huntsman', spawnPos.x, spawnPos.y, spawnPos.z);
+        
+        if (huntsman) {
+            huntsman.name = 'Huntsman';
+            huntsman.isIntervening = true;
+            huntsman.interventionPhase = 'clearing';
+            
+            // 3. Threat Clear: Kill all hostiles in 30m
+            const nearby = window.GameCore.SpatialGrid.getNearbyEntities(pPos.x, pPos.z, 30);
+            nearby.forEach(en => {
+                if (en !== huntsman && (en.def.faction === 'monster' || en.def.faction === 'forest')) {
+                    en.hp = 0;
+                    if (window.defeatNpc) window.defeatNpc(en, 'huntsman_intervention');
+                }
+            });
+
+            // 4. Execute "Lesson" after a delay
+            setTimeout(() => {
+                if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(huntsman, 'attack');
+                
+                // Set player HP to 5%
+                const limbs = window.playerHealth.limbs;
+                Object.values(limbs).forEach(l => {
+                    l.hp = l.max * 0.05;
+                });
+                window.playerHealth.updateUI();
+                
+                window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "Learn from your weakness."`);
+
+                // 5. Give the Orb
+                this.orbMessenger.attachedToId = 'player';
+                window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "The Messenger will watch your struggle."`);
+
+                // 6. Apply Scorn (12h)
+                this.applyScorn('player', 12);
+
+                // Cleanup
+                window.Input.frozen = false;
+                setTimeout(() => {
+                    window.GameCore.scene.remove(huntsman.visual);
+                    window.GameCore.world.removeRigidBody(huntsman.body);
+                    window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e !== huntsman);
+                }, 5000);
+            }, 3000);
+        }
+    },
+
     getForceStrength: function(name) {
+
+
         return this.forces[name]?.strength || 0;
     }
 };
 
 window.ForceManager.update(0);
+
+window.EventBus.on('HUNTSMAN_INTERVENTION', () => {
+    window.ForceManager.handleInterventionEvent();
+});
+
