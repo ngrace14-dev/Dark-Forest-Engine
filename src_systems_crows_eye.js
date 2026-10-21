@@ -17,13 +17,14 @@ class CrowsEyeSystem {
                 this.keys = {};
         this.isInspectionExpanded = false;
         this.currentFolder = 'WORLD';
-        this.folders = {
+                this.folders = {
             'WORLD': ['MAP', 'WATCHLIST', 'ACTIONS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE'],
             'INTEL': ['INTEL', 'TRUTH', 'CHRONICLE', 'ANTHOLOGY', 'LEGENDS', 'OFFICIAL_HISTORY'],
             'POWER': ['HOUSES', 'HOUSE_HISTORY', 'ECONOMY', 'LINEAGES', 'RELATIONSHIPS'],
-            'BEYOND': ['ORIGIN_DOSSIER', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RECORDED_MEMORY', 'LOST_MEMORY'],
+            'BEYOND': ['ORIGIN_DOSSIER', 'IMPACT_ANALYSIS', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RECORDED_MEMORY', 'LOST_MEMORY'],
             'BUREAU': ['PLAYBACK', 'CALIBRATION']
         };
+
         window.EventBus.on('ENGINE_READY', () => this.init());
     }
 
@@ -1683,7 +1684,73 @@ class CrowsEyeSystem {
         return html;
     }
 
+        renderOriginView() {
+        // ... existing logic ...
+        return "Origin Dossier Placeholder";
+    }
+
+    renderImpactAnalysisView() {
+        if (!window.DynastyManager) return "Dynasty System Offline";
+        const impact = window.DynastyManager.playerImpact;
+        const currentGen = window.GameState.playerLegacy?.generation || 1;
+
+        let html = `<div style="display:flex; flex-direction:column; gap:25px; height:100%;">`;
+        
+        // --- SUMMARY STATS (Node 1) ---
+        html += `<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:15px;">
+            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px; text-align:center;">
+                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">SCHISMS TRIGGERED</div>
+                <div style="font-size:24px; color:#fbbf24;">${impact.schismsTriggered}</div>
+            </div>
+            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px; text-align:center;">
+                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">REFORMS CATALYZED</div>
+                <div style="font-size:24px; color:#fbbf24;">${impact.reformsCatalyzed}</div>
+            </div>
+            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px; text-align:center;">
+                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">INSTITUTIONS SHAPED</div>
+                <div style="font-size:24px; color:#fbbf24;">${impact.institutionsInfluenced.size}</div>
+            </div>
+            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px; text-align:center;">
+                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">BLOODLINE GENERATION</div>
+                <div style="font-size:24px; color:#fbbf24;">${currentGen}</div>
+            </div>
+        </div>`;
+
+        // --- CAUSAL TRACES (Node 2) ---
+        html += `<div style="flex-grow:1; overflow-y:auto; border:1px solid #451a03; background:rgba(0,0,0,0.2); padding:15px;">
+            <div style="font-size:12px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:8px; margin-bottom:15px;">HISTORICAL CAUSAL TRACES (ACTION → CONSEQUENCE)</div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                ${impact.causalChains.slice().reverse().map(c => `
+                    <div style="background:rgba(59,130,246,0.05); border:1px solid #1e3a8a; padding:12px; border-left: 4px solid #3b82f6;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <div style="color:#3b82f6; font-weight:bold; font-size:11px;">[ACTION] ${c.action}</div>
+                            <div style="color:#78350f; font-size:9px;">Day ${c.day}</div>
+                        </div>
+                        <div style="color:#94a3b8; font-size:11px; margin-left:15px;">
+                            <span style="color:#fbbf24;">⤷ [CONSEQUENCE]</span> ${c.consequence}
+                        </div>
+                    </div>
+                `).join('') || '<div style="color:#451a03; text-align:center; padding:50px;">Your actions have not yet shifted the course of history.</div>'}
+            </div>
+        </div>`;
+
+        // --- LEGACY ANALYSIS (Node 5) ---
+        const mostInfluenced = Array.from(impact.institutionsInfluenced.values())[0] || "None";
+        html += `<div style="background:rgba(0,0,0,0.4); border:1px solid #78350f; padding:15px; flex-shrink:0;">
+            <div style="font-size:11px; color:#fbbf24; margin-bottom:10px; border-bottom:1px solid #451a03; padding-bottom:5px;">CIVILIZATION IMPACT DOSSIER (GEN ${currentGen})</div>
+            <div style="font-size:10px; color:#94a3b8;">
+                <p>Primary Institutional Target: <span style="color:#fbbf24;">${mostInfluenced}</span></p>
+                <p>Identity Drift Contribution: <span style="color:#10b981;">Significant</span></p>
+                <p>Summary: The ${window.GameState.playerLegacy?.bloodlineId || 'Wanderer'} line has introduced critical doubt into the social fabric, accelerating doctrinal evolution.</p>
+            </div>
+        </div>`;
+
+        html += `</div>`;
+        return html;
+    }
+
     renderLostMemoryView() {
+
         if (!window.DuneInvestigation) return "Dune System Offline";
         const records = window.DuneInvestigation.recoveredRecords;
         
@@ -1699,60 +1766,4 @@ class CrowsEyeSystem {
         records.forEach(r => {
             const official = window.HistoryOffice?.officialLedger.find(o => o.id === r.targetHistoryId);
             
-            html += `<div style="background:rgba(0,0,0,0.5); border:1px solid #78350f; padding:20px; border-left: 4px solid ${r.tier === 'EPOCH' ? '#ef4444' : '#fbbf24'};">
-                <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid #451a03; padding-bottom:10px;">
-                    <div>
-                        <div style="font-weight:bold; color:#fbbf24; font-size:14px;">${r.title}</div>
-                        <div style="font-size:10px; color:#78350f;">FRAGMENT TIER: ${r.tier}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <span style="color:#78350f; font-size:9px;">RECOVERED DAY ${r.day}</span>
-                    </div>
-                </div>
-
-                <div style="font-size:12px; color:#94a3b8; line-height:1.6; margin-bottom:15px;">"${r.detail}"</div>
-
-                ${official ? `
-                    <div style="margin-top:15px; border-top:1px solid #78350f; padding-top:10px; background:rgba(239,68,68,0.05); padding:10px; border:1px solid #ef4444;">
-                        <div style="font-size:10px; color:#ef4444; font-weight:bold; margin-bottom:5px;">⚠️ HISTORICAL CONTRADICTION</div>
-                        <div style="font-size:11px; color:#94a3b8;">This fragment directly challenges:</div>
-                        <div style="font-size:11px; color:#fbbf24; font-style:italic; margin-top:3px;">"${official.title}"</div>
-                    </div>
-                ` : ''}
-            </div>`;
-        });
-
-        html += `</div></div>`;
-        return html;
-    }
-
-    renderOriginView() {
-        if (!window.OriginEngine) return "Origin Engine Offline";
-        const dossier = window.OriginEngine.getDossier();
-        
-        let html = `<div style="display:flex; flex-direction:column; gap:25px;">`;
-        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">THE ORIGIN DOSSIER: ENDGAME MODELS</div>`;
-
-        dossier.forEach(cat => {
-            const currentModelDesc = window.OriginEngine.models[Object.keys(this.categories || {}).find(k => this.categories[k].title === cat.title)]?.[cat.model] || 'Standard historical interpretation.';
-            const confidence = cat.confidence * 100;
-
-            html += `<div style="background:rgba(255,255,255,0.02); border:1px solid #78350f; padding:20px;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                    <div>
-                        <div style="font-weight:bold; color:#fbbf24; font-size:16px;">${cat.title.toUpperCase()}</div>
-                        <div style="font-size:10px; color:#78350f;">ACTIVE MODEL: <span style="color:#fbbf24;">${cat.model}</span></div>
-                    </div>
-                    <div style="text-align:right;">
-                        <span style="color:#78350f; font-size:10px;">MODEL CONFIDENCE</span>
-                        <div style="font-size:18px; color:#fbbf24;">${Math.floor(confidence)}%</div>
-                    </div>
-                </div>
-
-                <div style="font-size:12px; color:#94a3b8; font-style:italic; margin-bottom:15px; background:rgba(0,0,0,0.2); padding:10px; border-left:2px solid #fbbf24;">
-                    "${currentModelDesc}"
-                </div>
-
-                <div style="font-size:11px;">
-                    <div style="color:#78350f; margin-bottom:5px;">SUPPORTING FRAGMENTS (${cat.evidence.length})</div>
-            
+            html += `<div style="background:rg

@@ -25,7 +25,17 @@ class DynastyManagerSystem {
                         this.submitReport(entity.houseId || entity.institutionId, data.nodeId, data.intelId);
                     }
                 });
+
+                // --- PLAYER INTEGRATION: IMPACT TRACKING (Node 1) ---
+                this.playerImpact = {
+                    institutionsInfluenced: new Set(),
+                    beliefsAltered: 0,
+                    reformsCatalyzed: 0,
+                    schismsTriggered: 0,
+                    causalChains: [] // Array of { action, consequence, day }
+                };
     }
+
 
 
     init() {
@@ -649,7 +659,7 @@ class DynastyManagerSystem {
         }
     }
 
-    /**
+        /**
      * Node 1-4: Faction Victory & Reform (Phase 4)
      */
     resolveSchism(house, winnerId) {
@@ -659,7 +669,13 @@ class DynastyManagerSystem {
 
         window.EventBus.emit('UI_LOG', `[SCHISM RESOLVED] The fracture within ${house.name} has ended. The ${winnerId.toUpperCase()} faction is victorious.`);
         
+        // --- PLAYER IMPACT: CATALYZE REFORM (Node 1) ---
+        if (winnerId === 'reformist' || winnerId === 'radical') {
+            this.playerImpact.reformsCatalyzed++;
+        }
+
         let detail = "";
+
 
         switch(winnerId) {
             case 'reformist':
