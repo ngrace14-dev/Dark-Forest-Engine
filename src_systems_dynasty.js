@@ -57,7 +57,13 @@ class DynastyManagerSystem {
                 actionQueue: [],
                 
                                 // --- INSTITUTIONAL COGNITION PHASE 2: Persistent Beliefs ---
-                beliefs: new Map(), // beliefKey -> { confidence, doubtPressure, evidenceSources, originRecordId, lastUpdated, state, officialPosition, privateConcern }
+                                beliefs: new Map(), // beliefKey -> { confidence, doubtPressure, evidenceSources, originRecordId, lastUpdated, state, officialPosition, privateConcern }
+                
+                                // --- INSTITUTIONAL SCHISMS (Phase 3) ---
+                                factions: new Map(), // factionId -> { type, influence, members, specificBeliefs }
+                                internalConflictLevel: 0.0, // 0.0 to 1.0
+                                activeSchism: null,
+
 
                 
                 // --- PHASE: HOUSE HISTORY ADDITIONS ---
@@ -469,11 +475,30 @@ class DynastyManagerSystem {
         this.determineInstitutionalAction(houseId, intel);
     }
 
-        determineInstitutionalAction(houseId, intel) {
-            const house = this.houses.get(houseId);
-            if (!house || !window.VillageManager) return;
+            /**
+     * Node 4 & 6: Internal Conflict & Objective Competition
+     */
+    determineInstitutionalAction(houseId, intel) {
+        const house = this.houses.get(houseId);
+        if (!house || !window.VillageManager) return;
         
-            // --- BEHAVIORAL EFFECTS: HESITATION & DOUBT (Node 4) ---
+        // CONFLICT MULTIPLIER (Node 4)
+        // High conflict reduces unified action certainty and creates hesitation
+        const conflictMod = 1.0 - (house.internalConflictLevel * 0.7);
+
+        // Competing Objectives (Node 6)
+        if (house.factions.size > 0 && house.internalConflictLevel > 0.4) {
+            this.generateFactionalObjectives(house, intel);
+            
+            // Unified action is suppressed by conflict
+            if (Math.random() > conflictMod) {
+                window.EventBus.emit('UI_LOG_DEBUG', `[ACTION] ${house.name}'s official response is blocked by factional gridlock.`);
+                return;
+            }
+        }
+
+        // --- BEHAVIORAL EFFECTS: HESITATION & DOUBT (Node 4) ---
+
             // Bible §36: Knowledge does not create action. Belief creates action.
             const totalDoubt = Array.from(house.beliefs.values()).reduce((sum, b) => sum + b.doubtPressure, 0) / house.beliefs.size;
         
@@ -528,7 +553,37 @@ class DynastyManagerSystem {
     }
 
 
+        /**
+     * Node 6: Competing Objectives
+     * Factions issue their own decrees when the central authority is weak.
+     */
+    generateFactionalObjectives(house, intel) {
+        const reformist = house.factions.get('reformist');
+        const traditionalist = house.factions.get('traditionalist');
+        
+        // Traditionalists: Defend Doctrine / Suppress News
+        if (traditionalist && traditionalist.influence > 0.3) {
+            window.EventBus.emit('UI_LOG_DEBUG', `[FACTION] ${house.name} Traditionalists are attempting to suppress reports of ${intel.payload.title}.`);
+            // Internal policy resistance: potentially revoke ownership of intel from low-prestige members
+        }
+
+        // Reformists: Launch Investigation
+        if (reformist && reformist.influence > 0.3) {
+            const villages = window.VillageManager.villages.filter(v => v.nobleHouse === house.name);
+            if (villages.length > 0) {
+                const targetVillage = villages[0];
+                window.EventBus.emit('UI_LOG', `[FACTION] ${house.name} Reformists fund independent survey of ${intel.payload.title}.`);
+                
+                // Create a competing objective/bounty
+                if (window.VillageManager.generateObjective) {
+                    window.VillageManager.generateObjective(targetVillage, 'INVESTIGATION', intel.intel_id);
+                }
+            }
+        }
+    }
+
     processNarrative(narrative) {
+
 
         // Record official history into house archives
         const house = this.houses.get(narrative.bias);

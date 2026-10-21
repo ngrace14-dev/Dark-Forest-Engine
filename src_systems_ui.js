@@ -938,40 +938,62 @@ class InstitutionalReportUI {
                 `;
             });
 
-            // Institutional Beliefs (Phase 2)
+                        // Institutional Beliefs & Factions (Phase 3)
             if (house.beliefs.size > 0) {
-                html += `<div class="mt-2 text-[8px] text-amber-500 uppercase font-bold border-t border-amber-900/20 pt-1">Persistent Beliefs</div>`;
+                html += `<div class="mt-2 text-[8px] text-amber-500 uppercase font-bold border-t border-amber-900/20 pt-1">Institutional Mind</div>`;
+                
+                // Schism Indicator
+                if (house.activeSchism) {
+                    html += `<div class="mt-1 p-1 bg-red-950 border border-red-700 rounded text-[7px] text-red-200 font-bold text-center animate-pulse uppercase">⚠️ ACTIVE SCHISM: ${house.activeSchism.type}</div>`;
+                }
+
                 house.beliefs.forEach((belief, key) => {
                     const stateColor = belief.state === 'DOGMA' ? 'text-blue-400' : 
                                        belief.state === 'SHATTERED' ? 'text-red-500' : 
+                                       belief.state === 'PRIVATE_DOUBT' ? 'text-purple-400' :
                                        belief.state === 'DOUBTED' ? 'text-orange-400' : 'text-green-400';
-                                        html += `
+                    html += `
                         <div class="mt-1 p-1 bg-white/5 rounded border border-white/5">
                             <div class="flex justify-between">
                                 <span class="text-gray-400 truncate w-40">${belief.description}</span>
                                 <span class="${stateColor} font-bold">${belief.state}</span>
                             </div>
-                            <div class="text-[7px] text-blue-400 mt-1">Official: "${belief.officialPosition}"</div>
-                            ${belief.state === 'PRIVATE_DOUBT' || belief.doubtPressure > 0.1 ? `<div class="text-[7px] text-red-400 italic">Fear: "${belief.privateConcern}"</div>` : ''}
+                            <div class="text-[7px] text-blue-400 mt-0.5">Official: "${belief.officialPosition}"</div>
+                            ${belief.state === 'PRIVATE_DOUBT' || belief.doubtPressure > 0.1 ? `<div class="text-[7px] text-purple-400 italic">Private Doubt: "${belief.privateConcern}"</div>` : ''}
                             <div class="flex justify-between items-center mt-1">
                                 <div class="flex flex-col">
                                     <span class="text-[6px] text-gray-500 uppercase">Confidence</span>
-                                    <div class="w-20 h-1 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="w-20 h-1 bg-gray-900 rounded-full overflow-hidden">
                                         <div class="h-full bg-blue-500" style="width: ${belief.confidence * 100}%"></div>
                                     </div>
                                 </div>
                                 <div class="flex flex-col items-end">
                                     <span class="text-[6px] text-gray-500 uppercase">Doubt Pressure</span>
-                                    <div class="w-20 h-1 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="w-20 h-1 bg-gray-900 rounded-full overflow-hidden">
                                         <div class="h-full bg-red-500" style="width: ${belief.doubtPressure * 100}%"></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     `;
-
                 });
+
+                // Faction Display
+                if (house.factions.size > 0) {
+                    html += `<div class="mt-2 grid grid-cols-3 gap-1">`;
+                    house.factions.forEach((faction, id) => {
+                        html += `
+                            <div class="p-1 bg-black/40 border border-white/5 rounded flex flex-col items-center">
+                                <span class="text-[6px] text-gray-500 uppercase font-bold">${id}</span>
+                                <span class="text-[8px] text-white font-black">${Math.floor(faction.influence * 100)}%</span>
+                                <div class="w-full h-0.5 bg-gray-800 mt-1"><div class="h-full bg-amber-500" style="width: ${faction.influence * 100}%"></div></div>
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
+                }
             }
+
 
             html += `</div></div>`;
 
