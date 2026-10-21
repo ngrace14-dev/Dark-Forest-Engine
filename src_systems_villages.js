@@ -486,6 +486,9 @@ window.VillageManager = {
                 });
                 // HESITATION: Occasionally slow down village tasks if doubt is high
                 village._taskEfficiency = 0.5;
+
+                // --- DISCOVERY JOURNAL HOOK ---
+                window.DynastyManager?.recordObservation('INSTITUTIONAL', `doubt_${house.id}`, `Public arguments in ${village.name} regarding House doctrine.`);
             } else {
                 village._taskEfficiency = 1.0;
             }
@@ -500,6 +503,9 @@ window.VillageManager = {
                     color: color 
                 });
             
+                // --- DISCOVERY JOURNAL HOOK ---
+                window.DynastyManager?.recordObservation('INSTITUTIONAL', `schism_${house.id}`, `Competing factions recruiting in ${village.name}.`);
+
                 // Manifest split patrols (simulation of split logic)
                 if (village.squads.length > 1) {
                     village.squads[0].factionOverride = 'REFORMIST';
@@ -515,6 +521,9 @@ window.VillageManager = {
                     pos: { x: village.x, y: 6, z: village.z }, 
                     color: '#60a5fa' 
                 });
+            
+                // --- DISCOVERY JOURNAL HOOK ---
+                window.DynastyManager?.recordObservation('TRUST', 'trust_access', `Increased access to restricted areas based on reputation.`);
             }
 
             // 4. CULTURE (Visible World Differences - Physical Activity)
@@ -555,6 +564,9 @@ window.VillageManager = {
                         pos: { x: village.x, y: 12, z: village.z }, 
                         color: color 
                     });
+                
+                    // --- DISCOVERY JOURNAL HOOK ---
+                    window.DynastyManager?.recordObservation('CULTURE', `ethos_${village.id}`, `Visible behavioral shift in ${village.name} toward ${village.culture.dominantTrait}.`);
                 }
             }
 

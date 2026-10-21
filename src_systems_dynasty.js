@@ -26,7 +26,7 @@ class DynastyManagerSystem {
                     }
                 });
 
-                                // --- PLAYER INTEGRATION: IMPACT TRACKING (Node 1) ---
+                                                                // --- PLAYER INTEGRATION: IMPACT TRACKING (Node 1) ---
                 this.playerFootprint = {
                     political: 0,
                     cultural: 0,
@@ -43,8 +43,54 @@ class DynastyManagerSystem {
                     schismsTriggered: 0,
                     causalChains: [], // Array of { action, intermediate, consequence, day, significance }
                     
+                    // --- DISCOVERY JOURNAL (Phase 15) ---
+                    discoveryJournal: new Map(), // observationKey -> { type, observedDay, hypothesis, verifiedCause, status: 'UNSOLVED'|'VERIFIED' }
+                    systemMastery: {
+                        trust: 0.1,
+                        culture: 0.1,
+                        institutions: 0.1,
+                        continuity: 0.1,
+                        folklore: 0.1
+                    },
+                    
                     globalTitle: "The Wanderer"
                 };
+    }
+
+    /**
+     * Records a new observation in the Discovery Journal.
+     * Manifestation Rule: Consequences first.
+     */
+    recordObservation(type, key, description) {
+        if (this.playerFootprint.discoveryJournal.has(key)) return;
+        
+        this.playerFootprint.discoveryJournal.set(key, {
+            type: type,
+            description: description,
+            observedDay: window.EngineParams?.worldDay || 0,
+            hypothesis: null,
+            verifiedCause: null,
+            status: 'UNSOLVED'
+        });
+        
+        window.EventBus.emit('UI_LOG', `🔍 [DISCOVERY] New pattern observed: ${description}`);
+    }
+
+    /**
+     * Verifies a cause for an observation, increasing system mastery.
+     */
+    verifyObservation(key, cause, system) {
+        const obs = this.playerFootprint.discoveryJournal.get(key);
+        if (!obs || obs.status === 'VERIFIED') return;
+
+        obs.verifiedCause = cause;
+        obs.status = 'VERIFIED';
+        
+        if (this.playerFootprint.systemMastery[system] !== undefined) {
+            this.playerFootprint.systemMastery[system] = Math.min(1.0, this.playerFootprint.systemMastery[system] + 0.15);
+        }
+        
+        window.EventBus.emit('UI_LOG', `💡 [VERIFIED] You now understand the cause of: ${obs.description}`);
     }
 
     /**

@@ -1951,77 +1951,92 @@ class CrowsEyeSystem {
     }
 
         renderImpactAnalysisView() {
-        if (!window.DynastyManager) return "Dynasty System Offline";
-        const impact = window.DynastyManager.playerFootprint;
-        const currentGen = window.GameState.playerLegacy?.generation || 1;
+            if (!window.DynastyManager) return "Dynasty System Offline";
+            const impact = window.DynastyManager.playerFootprint;
+            const currentGen = window.GameState.playerLegacy?.generation || 1;
 
-        let html = `<div style="display:flex; flex-direction:column; gap:25px; height:100%;">`;
-        
-        // --- SUMMARY STATS (Node 1) ---
-        html += `<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:15px;">
-            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px; text-align:center;">
-                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">SCHISMS TRIGGERED</div>
-                <div style="font-size:24px; color:#fbbf24;">${impact.schismsTriggered}</div>
-            </div>
-            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px; text-align:center;">
-                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">REFORMS CATALYZED</div>
-                <div style="font-size:24px; color:#fbbf24;">${impact.reformsCatalyzed}</div>
-            </div>
-            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px; text-align:center;">
-                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">INSTITUTIONS SHAPED</div>
-                <div style="font-size:24px; color:#fbbf24;">${impact.institutionsInfluenced.size}</div>
-            </div>
-            <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:15px; text-align:center;">
-                <div style="color:#78350f; font-size:10px; margin-bottom:5px;">BLOODLINE GENERATION</div>
-                <div style="font-size:24px; color:#fbbf24;">${currentGen}</div>
-            </div>
-        </div>`;
+            let html = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; height:100%; overflow:hidden;">`;
 
-        // --- CAUSAL FOOTPRINT SCORES ---
-        html += `<div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:10px;">
-            ${['political', 'cultural', 'knowledge', 'institutional', 'civilizational'].map(key => `
-                <div style="border:1px solid #451a03; padding:10px; background:rgba(0,0,0,0.3);">
-                    <div style="font-size:8px; color:#78350f; text-transform:uppercase;">${key}</div>
-                    <div style="font-size:14px; color:#fbbf24; font-weight:bold;">${impact[key]}</div>
-                </div>
-            `).join('')}
-        </div>`;
-
-        // --- CAUSAL TRACES (Node 2) ---
-        html += `<div style="flex-grow:1; overflow-y:auto; border:1px solid #451a03; background:rgba(0,0,0,0.2); padding:15px;">
-            <div style="font-size:12px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:8px; margin-bottom:15px;">CAUSAL FOOTPRINT (ACTION → INTERMEDIATE → CONSEQUENCE)</div>
-            <div style="display:flex; flex-direction:column; gap:12px;">
-                ${impact.causalChains.slice().reverse().map(c => `
-                    <div style="background:rgba(59,130,246,0.05); border:1px solid #1e3a8a; padding:12px; border-left: 4px solid #3b82f6;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                            <div style="color:#3b82f6; font-weight:bold; font-size:11px;">[ACTION] ${c.action}</div>
-                            <div style="color:#78350f; font-size:9px;">Day ${c.day}</div>
-                        </div>
-                        <div style="color:#94a3b8; font-size:10px; margin-left:15px; margin-bottom:4px;">
-                            <span style="color:#fbbf24;">⤷ [VIA]</span> ${c.intermediate || 'Direct Impact'}
-                        </div>
-                        <div style="color:#fbbf24; font-size:11px; margin-left:15px;">
-                            <span style="color:#10b981;">⤷ [CONSEQUENCE]</span> ${c.consequence}
-                        </div>
+            // Left Column: Causal Footprint & Stats
+            html += `<div style="display:flex; flex-direction:column; gap:20px; overflow-y:auto; padding-right:10px;">
+                <div style="color:#fbbf24; font-size:14px; border-bottom:1px solid #78350f; padding-bottom:5px;">CAUSAL FOOTPRINT</div>
+            
+                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:10px;">
+                    <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:10px; text-align:center;">
+                        <div style="color:#78350f; font-size:8px;">SCHISMS TRIGGERED</div>
+                        <div style="font-size:18px; color:#fbbf24;">${impact.schismsTriggered}</div>
                     </div>
-                `).join('') || '<div style="color:#451a03; text-align:center; padding:50px;">Your actions have not yet shifted the course of history.</div>'}
-            </div>
-        </div>`;
+                    <div style="background:rgba(251,191,36,0.05); border:1px solid #78350f; padding:10px; text-align:center;">
+                        <div style="color:#78350f; font-size:8px;">REFORMS CATALYZED</div>
+                        <div style="font-size:18px; color:#fbbf24;">${impact.reformsCatalyzed}</div>
+                    </div>
+                </div>
 
-        // --- LEGACY ANALYSIS (Node 5) ---
-        const mostInfluenced = Array.from(impact.institutionsInfluenced.values())[0] || "None";
-        html += `<div style="background:rgba(0,0,0,0.4); border:1px solid #78350f; padding:15px; flex-shrink:0;">
-            <div style="font-size:11px; color:#fbbf24; margin-bottom:10px; border-bottom:1px solid #451a03; padding-bottom:5px;">CIVILIZATION IMPACT DOSSIER (GEN ${currentGen})</div>
-            <div style="font-size:10px; color:#94a3b8;">
-                <p>Primary Institutional Target: <span style="color:#fbbf24;">${mostInfluenced}</span></p>
-                <p>Global Title: <span style="color:#fbbf24;">${impact.globalTitle}</span></p>
-                <p>Summary: The ${window.GameState.playerLegacy?.bloodlineId || 'Wanderer'} line has introduced critical shifts into the social fabric, accelerating civilizational evolution.</p>
-            </div>
-        </div>`;
+                <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:5px;">
+                    ${['political', 'cultural', 'knowledge', 'institutional', 'civilizational'].map(key => `
+                        <div style="border:1px solid #451a03; padding:5px; background:rgba(0,0,0,0.3); text-align:center;">
+                            <div style="font-size:6px; color:#78350f; text-transform:uppercase;">${key}</div>
+                            <div style="font-size:10px; color:#fbbf24; font-weight:bold;">${impact[key]}</div>
+                        </div>
+                    `).join('')}
+                </div>
 
-        html += `</div>`;
-        return html;
-    }
+                <div style="flex-grow:1; border:1px solid #451a03; background:rgba(0,0,0,0.2); padding:10px;">
+                    <div style="font-size:10px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px; margin-bottom:10px;">HISTORICAL CAUSAL TRACES</div>
+                    ${impact.causalChains.slice().reverse().map(c => `
+                        <div style="border-left: 2px solid #3b82f6; padding-left:8px; margin-bottom:10px; font-size:9px;">
+                            <div style="color:#3b82f6; font-weight:bold;">[ACTION] ${c.action}</div>
+                            <div style="color:#94a3b8; margin:2px 0;"><span style="color:#fbbf24;">⤷</span> ${c.intermediate || 'Direct Impact'}</div>
+                            <div style="color:#10b981;"><span style="color:#fbbf24;">⤷</span> ${c.consequence}</div>
+                        </div>
+                    `).join('') || '<div style="color:#451a03; text-align:center; padding:20px;">No ripples yet.</div>'}
+                </div>
+            </div>`;
+
+            // Right Column: Discovery Journal (The Understanding Tracker)
+            html += `<div style="display:flex; flex-direction:column; gap:20px; overflow-y:auto; padding-left:10px; border-left:1px solid #451a03;">
+                <div style="color:#fbbf24; font-size:14px; border-bottom:1px solid #78350f; padding-bottom:5px;">DISCOVERY JOURNAL</div>
+            
+                <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:5px; margin-bottom:10px;">
+                    ${Object.entries(impact.systemMastery).map(([key, val]) => `
+                        <div style="text-align:center;">
+                            <div style="font-size:6px; color:#78350f; text-transform:uppercase;">${key}</div>
+                            <div style="height:2px; background:#1c1917; width:100%; margin-top:2px;">
+                                <div style="height:100%; background:#fbbf24; width:${val*100}%;"></div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div style="flex-grow:1; display:flex; flex-direction:column; gap:10px;">
+                    ${Array.from(impact.discoveryJournal.entries()).slice().reverse().map(([key, obs]) => {
+                        const isVerified = obs.status === 'VERIFIED';
+                        return `
+                            <div style="background:rgba(255,255,255,0.02); border:1px solid ${isVerified ? '#10b981' : '#78350f'}; padding:10px; border-left: 3px solid ${isVerified ? '#10b981' : '#78350f'};">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                    <span style="color:${isVerified ? '#10b981' : '#78350f'}; font-size:8px; font-weight:bold;">${obs.type} OBSERVATION</span>
+                                    <span style="color:#78350f; font-size:8px;">Day ${obs.observedDay}</span>
+                                </div>
+                                <div style="font-size:10px; color:#fbbf24; margin-bottom:5px;">"${obs.description}"</div>
+                            
+                                ${isVerified ? `
+                                    <div style="border-top:1px solid #064e3b; padding-top:5px; font-size:9px;">
+                                        <span style="color:#10b981; font-weight:bold;">VERIFIED CAUSE:</span>
+                                        <span style="color:#94a3b8;">${obs.verifiedCause}</span>
+                                    </div>
+                                ` : `
+                                    <button style="width:100%; background:#1e1b4b; color:#fbbf24; border:1px solid #451a03; padding:4px; font-size:8px; cursor:pointer;"
+                                        onclick="const c = prompt('Verify Cause for: ${key}'); if(c) window.DynastyManager.verifyObservation('${key}', c, '${obs.type.toLowerCase()}')">IDENTIFY CAUSE</button>
+                                `}
+                            </div>
+                        `;
+                    }).join('') || '<div style="color:#451a03; text-align:center; padding:50px;">No patterns recorded. Observe the world to begin your journal.</div>'}
+                </div>
+            </div>`;
+
+            html += `</div>`;
+            return html;
+        }
 
     renderLostMemoryView() {
 
