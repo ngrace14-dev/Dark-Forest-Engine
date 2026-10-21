@@ -453,9 +453,17 @@ class DynastyManagerSystem {
             let reputationBonus = 1.0;
             if (reporterId === 'player_node' || reporterId === 'player') {
                  reputationBonus = 0.5 + (profile.traits.credibility * 1.5);
+            } else {
+                 // NPC reports also gain bonuses from their standing
+                 reputationBonus = 0.8 + (profile.traits.credibility * 0.5);
             }
 
+            // --- REPORT IMPACT PREDICTION (Node 3) ---
+            const weightLabel = reportWeight > 0.8 ? 'MAJOR' : reportWeight > 0.5 ? 'HIGH' : reportWeight > 0.3 ? 'MODERATE' : 'LOW';
+            intel.significance.institutionalWeight = weightLabel;
+
             // Credibility Filter (Node 2)
+
             const reportWeight = profile.traits.credibility * intel.certainty * reputationBonus;
 
         if (reportWeight < 0.3) {

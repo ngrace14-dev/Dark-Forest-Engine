@@ -78,12 +78,22 @@ class PersonhoodSystem {
                             beliefHistory: [], // History of conclusions drawn
                             apprentices: [], // --- PHASE 4: APPRENTICESHIP ---
                             masterId: null,
-                            property: {
+                                                        property: {
                                 archives: [], // Intel IDs
                                 homeVillageId: null,
                                 professionalNotes: []
+                            },
+                            // --- PERSONAL AMBITION (Phase 13) ---
+                            ambition: {
+                                lifeGoal: 'NONE', // legendary_hunter, found_dynasty, reform_institution, etc
+                                goalProgress: 0.0,
+                                goalDifficulty: 0.5,
+                                goalImportance: 0.5,
+                                satisfaction: 'UNFULFILLED', // UNFULFILLED, FULFILLED, OBSESSED, FAILED
+                                fear: 'IRRELEVANCE'
                             }
                         });
+
 
 
             // --- LEGACY REGISTRATION ---
@@ -288,7 +298,74 @@ class PersonhoodSystem {
         }
 
         /**
+         * Node 1: Ambition Generation
+         * Triggers as NPCs transition from Adolescent to Adult.
+         */
+        generateAmbition(profile) {
+            const goals = [
+                'LEGENDARY_HUNTER',
+                'FOUND_DYNASTY',
+                'REFORM_INSTITUTION',
+                'DISCOVER_LOST_TRUTH',
+                'PROTECT_VILLAGE',
+                'ACCUMULATE_WEALTH',
+                'COMPILE_RUNIC_THEORY'
+            ];
+        
+            // Influence goal by identity
+            let selection = goals[Math.floor(Math.random() * goals.length)];
+            if (profile.identity === 'STEWARD') selection = 'PROTECT_VILLAGE';
+            if (profile.identity === 'SCHOLAR') selection = 'COMPILE_RUNIC_THEORY';
+            if (profile.identity === 'OPPORTUNIST') selection = 'ACCUMULATE_WEALTH';
+
+            profile.ambition.lifeGoal = selection;
+            profile.ambition.goalImportance = 0.4 + (Math.random() * 0.6);
+            profile.ambition.goalDifficulty = 0.5 + (Math.random() * 0.5);
+
+            window.ChronicleManager?.recordEvent({
+                actorId: profile.id,
+                type: 'AMBITION_SET',
+                detail: `${profile.id} has set a life goal: ${selection.replace(/_/g, ' ')}.`,
+                significance: 20,
+                historicalWeight: 5
+            });
+        }
+
+        /**
+         * Node 2 & 3: Ambition Progress & Satisfaction
+         */
+        updateAmbitionProgress(nodeId, delta) {
+            const profile = this.getProfile(nodeId);
+            if (!profile || profile.ambition.lifeGoal === 'NONE') return;
+
+            profile.ambition.goalProgress = Math.min(1.0, profile.ambition.goalProgress + delta);
+
+            // Update satisfaction state
+            if (profile.ambition.goalProgress >= 1.0 && profile.ambition.satisfaction !== 'FULFILLED') {
+                profile.ambition.satisfaction = 'FULFILLED';
+                window.EventBus.emit('UI_LOG', `[AMBITION] ${profile.id} has fulfilled their life goal: ${profile.ambition.lifeGoal}!`);
+                window.ChronicleManager?.recordEvent({
+                    actorId: profile.id,
+                    type: 'AMBITION_FULFILLED',
+                    detail: `${profile.id} achieved their goal of ${profile.ambition.lifeGoal}.`,
+                    significance: 100,
+                    historicalWeight: 50
+                });
+            }
+
+            // DREAM INTEGRATION (Node 6)
+            if (window.DreamManager) {
+                const dreamMod = window.DreamManager.getNPCDriveModifier(nodeId, 'ambition') || 1.0;
+                if (dreamMod > 1.2) {
+                    profile.ambition.goalImportance = Math.min(1.0, profile.ambition.goalImportance + 0.05);
+                    if (profile.ambition.goalImportance > 0.9) profile.ambition.satisfaction = 'OBSESSED';
+                }
+            }
+        }
+
+        /**
          * Node 1: Aging Logic
+
          */
         getLifeStage(age) {
             if (age < 20) return 'CHILD';
@@ -313,7 +390,13 @@ class PersonhoodSystem {
                     profile.lifeStage = this.getLifeStage(profile.age);
                     profile._lastAgeUpdate = currentDay;
 
+                    // --- AMBITION GENERATION (Node 1) ---
+                    if (profile.lifeStage === 'ADULT' && profile.ambition.lifeGoal === 'NONE') {
+                        this.generateAmbition(profile);
+                    }
+
                     // --- EXTENDED LONGEVITY (300 Year Baseline) ---
+
                     if (profile.age >= 310) {
                         profile.mortalityRisk = 1.0; // 100% chance at 310
                     } else if (profile.age > 300) {
@@ -453,7 +536,25 @@ class PersonhoodSystem {
                 this.updateRelationship(nodeId, successorId, inheritedRel);
             });
 
+            // --- DYNASTIC AMBITION (Node 4) ---
+            // If the successor was an apprentice, they inherit the master's unfulfilled goal
+            if (source.apprentices.includes(successorId) && source.ambition.satisfaction !== 'FULFILLED') {
+                successor.ambition.lifeGoal = source.ambition.lifeGoal;
+                successor.ambition.goalProgress = source.ambition.goalProgress * 0.5; // Some progress is lost
+                successor.ambition.goalImportance = source.ambition.goalImportance;
+            
+                window.EventBus.emit('UI_LOG', `[LEGACY] ${successorId} has inherited the quest: ${successor.ambition.lifeGoal}.`);
+                window.ChronicleManager?.recordEvent({
+                    actorId: successorId,
+                    type: 'AMBITION_INHERITED',
+                    detail: `${successorId} takes up the mantle of ${sourceId}'s goal: ${successor.ambition.lifeGoal}.`,
+                    significance: 60,
+                    historicalWeight: 30
+                });
+            }
+
             window.ChronicleManager?.recordEvent({
+
 
                 actorId: successorId,
                 type: 'SUCCESSION',

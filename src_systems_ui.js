@@ -927,12 +927,16 @@ class InstitutionalReportUI {
                 const intel = window.IntelManager.lookup(intelId);
                 const color = buffer.status === 'OFFICIAL' ? 'text-green-400' : 'text-yellow-400';
                 html += `
-                    <div class="flex flex-col gap-1 bg-black/20 p-1 rounded">
+                                        <div class="flex flex-col gap-1 bg-black/20 p-1 rounded">
                         <div class="flex justify-between">
                             <span class="text-gray-300 truncate w-32">${intel?.payload.title || 'Unknown'}</span>
                             <span class="${color} font-bold">${buffer.status}</span>
                         </div>
+                        <!-- IMPACT PREDICTION (Node 3) -->
+                        <div class="text-[6px] text-amber-500/70 font-bold">EST. WEIGHT: ${intel?.significance.institutionalWeight || 'CALCULATING...'}</div>
+                        
                         <div class="flex justify-between items-center">
+
                             <span class="text-gray-500">Reports: ${buffer.reports.length}</span>
                             <div class="flex-1 mx-2 h-1 bg-gray-800 rounded-full overflow-hidden">
                                 <div class="h-full bg-amber-500" style="width: ${buffer.aggregateCertainty * 100}%"></div>

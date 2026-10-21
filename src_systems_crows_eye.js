@@ -20,7 +20,8 @@ class CrowsEyeSystem {
                 this.folders = {
             'WORLD': ['MAP', 'WATCHLIST', 'ACTIONS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE'],
             'INTEL': ['INTEL', 'TRUTH', 'CHRONICLE', 'ANTHOLOGY', 'LEGENDS', 'OFFICIAL_HISTORY'],
-            'POWER': ['HOUSES', 'HOUSE_HISTORY', 'ECONOMY', 'LINEAGES', 'RELATIONSHIPS'],
+                        'POWER': ['HOUSES', 'HOUSE_HISTORY', 'INFLUENCE_MAP', 'ECONOMY', 'LINEAGES', 'RELATIONSHIPS'],
+
             'BEYOND': ['ORIGIN_DOSSIER', 'IMPACT_ANALYSIS', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RECORDED_MEMORY', 'LOST_MEMORY'],
             'BUREAU': ['PLAYBACK', 'CALIBRATION']
         };
@@ -364,9 +365,10 @@ class CrowsEyeSystem {
             case 'LEGENDS':
                 contentHtml = this.renderLegendsView();
                 break;
-            case 'FORCES':
-                contentHtml = this.renderForcesView();
+                        case 'INFLUENCE_MAP':
+                contentHtml = this.renderInfluenceView();
                 break;
+
                         case 'FORCE_LAYER':
                 contentHtml = this.renderForceLayer();
                 break;
@@ -907,13 +909,38 @@ class CrowsEyeSystem {
             const profile = window.PersonhoodManager?.getProfile(this.selectedEntityId);
             if (profile) {
                 html += `
-                    <div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:10px; margin-bottom:15px;">
+                                        <div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:10px; margin-bottom:15px;">
                         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
                             <span style="color:#fbbf24; font-size:11px; font-weight:bold;">${profile.identity}</span>
                             <span style="color:#10b981; font-size:10px;">CRED: ${profile.traits.credibility.toFixed(2)}</span>
                         </div>
                         <div style="font-size:10px; color:#94a3b8;">BIAS: ${profile.bias}</div>
+                        
+                                                <!-- TRUST PROFILE (Node 1) -->
+                        <div style="margin-top:10px; border-top:1px solid #451a03; padding-top:8px;">
+                            <div style="font-size:8px; color:#78350f; font-weight:bold; margin-bottom:5px;">PERSONAL AMBITION & TRUST</div>
+                            <div style="margin-bottom:8px;">
+                                <div style="display:flex; justify-content:space-between; font-size:9px; margin-bottom:3px;">
+                                    <span style="color:#fbbf24;">GOAL: ${profile.ambition.lifeGoal}</span>
+                                    <span style="color:#d97706;">${Math.floor(profile.ambition.goalProgress * 100)}%</span>
+                                </div>
+                                <div style="height:3px; background:#1c1917; width:100%;">
+                                    <div style="height:100%; background:#fbbf24; width:${profile.ambition.goalProgress * 100}%;"></div>
+                                </div>
+                                <div style="font-size:7px; color:#78350f; margin-top:2px;">STATUS: ${profile.ambition.satisfaction}</div>
+                            </div>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                                ${Array.from(profile.relationships.entries()).slice(0, 4).map(([id, rel]) => `
+
+                                    <div style="background:rgba(255,255,255,0.05); padding:3px; font-size:8px; border-left:1px solid #fbbf24;">
+                                        <span style="color:#94a3b8;">${id.substring(0,8)}</span>: 
+                                        <span style="color:#fbbf24;">T:${rel.trust.toFixed(1)} R:${rel.respect.toFixed(1)}</span>
+                                    </div>
+                                `).join('') || '<div style="font-size:8px; color:#451a03;">No known links.</div>'}
+                            </div>
+                        </div>
                     </div>
+
                 `;
             }
         }
@@ -1442,7 +1469,49 @@ class CrowsEyeSystem {
     }
 
 
+        renderInfluenceView() {
+        if (!window.DynastyManager || !window.PersonhoodManager) return "Influence Matrix Offline";
+        
+        const houses = Array.from(window.DynastyManager.houses.values());
+        let html = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">`;
+
+        houses.forEach(house => {
+            // KEY INFLUENCER DETECTION (Node 2)
+            const houseMembers = Array.from(window.PersonhoodManager.profiles.values())
+                .filter(p => p.houseId === house.id || house.archives.includes(p.id))
+                .sort((a, b) => {
+                    const scoreA = a.traits.credibility + (a.apprentices?.length * 0.1);
+                    const scoreB = b.traits.credibility + (b.apprentices?.length * 0.1);
+                    return scoreB - scoreA;
+                }).slice(0, 5);
+
+            html += `<div style="background:rgba(0,0,0,0.4); border:1px solid #78350f; padding:15px; border-top: 4px solid ${house.isBlessed ? '#fbbf24' : '#78350f'};">
+                <div style="font-weight:bold; color:#fbbf24; font-size:14px; margin-bottom:10px;">${house.name.toUpperCase()} INFLUENCERS</div>
+                
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    ${houseMembers.map(m => `
+                        <div style="background:rgba(255,255,255,0.03); padding:8px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;"
+                             data-id="${m.id}">
+                            <div>
+                                <div style="color:#fbbf24; font-size:11px;">${m.id === house.currentLeader ? '👑 ' : ''}${m.id.substring(0, 15)}</div>
+                                <div style="color:#78350f; font-size:9px;">${m.identity} | G${m.ancestry.parents.length + 1}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="color:#10b981; font-size:10px;">WEIGHT: ${m.traits.credibility.toFixed(2)}</div>
+                                <div style="color:#94a3b8; font-size:8px;">Apprentices: ${m.apprentices.length}</div>
+                            </div>
+                        </div>
+                    `).join('') || '<div style="color:#451a03; font-size:10px;">No high-influence members detected.</div>'}
+                </div>
+            </div>`;
+        });
+
+        html += `</div>`;
+        return html;
+    }
+
     renderForceLayer() {
+
         if (!window.ForceManager) return "Forces Offline";
         const forces = window.ForceManager.forces;
         
