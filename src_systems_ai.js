@@ -38,6 +38,10 @@ function moveCompanion(companion, destination, speedMultiplier = 1, delta = 0) {
     if (direction.lengthSq() < 1) {
         companion.body.setLinvel({ x: 0, y: companion.body.linvel().y, z: 0 }, true);
         if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(companion, 'idle');
+        
+        // --- MANIFESTATION RULE: CROWD GATHERING (Node 4) ---
+        this.processCrowdGathering(companion, delta);
+        
         return;
     }
     direction.normalize();
@@ -67,6 +71,37 @@ function moveCompanion(companion, destination, speedMultiplier = 1, delta = 0) {
     companion.body.setLinvel({ x: direction.x * companion.def.speed * speedMultiplier * conditionMultiplier, y: companion.body.linvel().y, z: direction.z * companion.def.speed * speedMultiplier * conditionMultiplier }, true);
     companion.visual.lookAt(companion.visual.position.clone().add(direction));
     if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(companion, 'walk');
+}
+
+/**
+ * Manifestation Rule: Trust Networks.
+ * NPCs physically cluster around trusted influencers and mentors.
+ */
+function processCrowdGathering(entity, delta) {
+    if (!window.ReputationManager || !window.PersonhoodManager) return;
+    
+    // Only NPCs within villages gather
+    if (!entity.villageId) return;
+
+    const nearby = window.GameCore.SpatialGrid.getNearbyEntities(entity.visual.position.x, entity.visual.position.z, 10);
+    const influencer = nearby.find(n => {
+        const trust = window.ReputationManager.calculateTrust(n, entity);
+        const profile = window.PersonhoodManager.getProfile(n.id);
+        return trust > 0.8 && (profile?.traits.credibility > 0.7 || profile?.apprentices?.length > 0);
+    });
+
+    if (influencer) {
+        // Face the influencer
+        entity.visual.lookAt(influencer.visual.position);
+        if (Math.random() < 0.005) {
+    const bark = window.FolkloreEngine?.getRandomBark('INSTITUTIONAL') || "I am listening...";
+    window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+        text: `[TRUST] "${bark}"`, 
+        pos: { x: entity.visual.position.x, y: 4, z: entity.visual.position.z }, 
+        color: '#60a5fa' 
+    });
+        }
+    }
 }
 
 function isHostileFaction(faction) {

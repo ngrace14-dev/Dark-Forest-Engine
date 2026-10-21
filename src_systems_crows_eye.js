@@ -936,9 +936,15 @@ class CrowsEyeSystem {
                         </div>
                         ` : ''}
                         
-                        <div style="border-left:2px solid #10b981; padding-left:10px;">
+                                                <div style="border-left:2px solid #10b981; padding-left:10px;">
                             <div style="color:#10b981; font-weight:bold; font-size:10px;">Cultural Priority</div>
                             <div style="color:#94a3b8;">${village.culture.dominantTrait}: Resources are being redirected to align with this ethos.</div>
+                        </div>
+
+                        <!-- --- NEW: IDENTITY DRIFT EXPLANATION --- -->
+                        <div style="border-left:2px solid #818cf8; padding-left:10px;">
+                            <div style="color:#818cf8; font-weight:bold; font-size:10px;">Identity Drift</div>
+                            <div style="color:#94a3b8;">${house.name} is evolving away from its founding mission (${house.foundingIdentity.mission}) toward ${house.currentIdentity.mission}.</div>
                         </div>
                     </div>
                 </div>

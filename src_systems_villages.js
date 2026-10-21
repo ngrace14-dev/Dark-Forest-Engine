@@ -455,7 +455,7 @@ window.VillageManager = {
      * Manifestation Rule: The world demonstrates.
      * Converts internal simulation states (Doubt, Schism, Culture) into 3D world consequences.
      */
-    manifestVillageStates: function(village) {
+        manifestVillageStates: function(village) {
         const houseId = `house_${village.nobleHouse.toLowerCase().replace('house ', '')}`;
         const house = window.DynastyManager?.getHouse(houseId);
         if (!house) return;
@@ -480,9 +480,23 @@ window.VillageManager = {
                 pos: { x: village.x, y: 8, z: village.z }, 
                 color: color 
             });
+            
+            // --- MANIFESTATION RULE: COMPETING NOTICES (Node 2) ---
+            if (Math.random() < 0.01) {
+                window.EventBus.emit('UI_LOG', `[SCHISM] ${village.name} has posted conflicting bounties from ${faction} leadership.`);
+            }
         }
 
-        // 3. CULTURE (Visible Priorities)
+        // 3. IDENTITY DRIFT (Physical Signs: Changed Priorities)
+        if (house.identityDrift > 0.4 && Math.random() < 0.02) {
+            window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                text: `[DRIFT] New Doctrine: ${house.currentIdentity.mission}`, 
+                pos: { x: village.x, y: 14, z: village.z }, 
+                color: '#818cf8' 
+            });
+        }
+
+        // 4. CULTURE (Visible Priorities)
         if (village.culture.dominantTrait !== 'NEUTRAL' && Math.random() < 0.02) {
             let message = "";
             let color = "#94a3b8";
@@ -503,6 +517,10 @@ window.VillageManager = {
                     message = "Trade fair preparation."; 
                     color = "#fbbf24"; 
                     break;
+                case 'CAUTIOUS':
+                    message = "Barrier inspection in progress.";
+                    color = "#a855f7";
+                    break;
             }
             if (message) {
                 window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
@@ -511,6 +529,16 @@ window.VillageManager = {
                     color: color 
                 });
             }
+        }
+
+        // 5. LEGACY (Physical Signs: Inherited Workshops & Lineage)
+        const leaderProfile = window.PersonhoodManager?.getProfile(house.currentLeader);
+        if (leaderProfile && leaderProfile.ancestry.parents.length > 0 && Math.random() < 0.01) {
+            window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                text: `[LEGACY] House ${house.name} relic displayed.`, 
+                pos: { x: village.x, y: 16, z: village.z }, 
+                color: '#fbbf24' 
+            });
         }
     },
 
