@@ -343,9 +343,35 @@ window.GameCore = {
         if (index !== null && index !== undefined) this.entityIndexPool.push(index);
     },
     
-    addXP: function(statName, amount) {
+        addXP: function(statName, amount) {
         let stat = window.GameState.pStats[statName]; if(!stat) return;
-        stat.xp += amount;
+        
+        // --- SAFE LIFE PENALTY & ZONE MULTIPLIERS ---
+        // Bible: Growth requires risk.
+        let multiplier = 1.0;
+        
+        const playerPos = this.playerObj?.visual?.position;
+        if (playerPos) {
+            const inVillage = window.RoadManager?.isVillageProtected(playerPos);
+            const inMountain = window.WorldGenerator?.getBiomeAt(playerPos.x, playerPos.z) === 'alpine';
+            const inDesert = window.WorldGenerator?.getBiomeAt(playerPos.x, playerPos.z) === 'desert';
+            const inForest = !inVillage; // Simplified
+
+            if (inVillage) {
+                // NPCs/Players living a "safe life" cannot naturally pass 50% potential (Level 50 baseline)
+                if (stat.level >= 50) multiplier = 0.05; // Extreme crawl
+            } else if (inMountain) {
+                multiplier = 1.5;
+            } else if (inDesert) {
+                multiplier = 2.0;
+            } else if (inForest) {
+                multiplier = 1.2;
+            }
+        }
+
+        const finalAmount = amount * multiplier;
+        stat.xp += finalAmount;
+        
         if(stat.xp >= stat.next) {
             stat.level++; stat.xp -= stat.next; stat.next = Math.floor(stat.next * 1.5); 
             window.EventBus.emit('PLAYER_LEVEL_UP', { statName, level: stat.level });
@@ -353,6 +379,7 @@ window.GameCore = {
         }
         window.EventBus.emit('UI_UPDATE_STATS');
     },
+
     applyBuff: function(statName, amount, duration, name) {
         window.GameState.activeBuffs[statName] = { amount, expiresAt: performance.now() + duration * 1000, name };
         window.EventBus.emit('UI_UPDATE_STATS');

@@ -282,10 +282,10 @@ class PersonhoodSystem {
          * Node 1: Aging Logic
          */
         getLifeStage(age) {
-            if (age < 13) return 'CHILD';
-            if (age < 20) return 'ADOLESCENT';
-            if (age < 50) return 'ADULT';
-            if (age < 70) return 'PRIME_ELDER';
+            if (age < 20) return 'CHILD';
+            if (age < 50) return 'ADOLESCENT';
+            if (age < 250) return 'ADULT';
+            if (age < 300) return 'PRIME_ELDER';
             return 'VENERABLE';
         }
 
@@ -304,11 +304,15 @@ class PersonhoodSystem {
                     profile.lifeStage = this.getLifeStage(profile.age);
                     profile._lastAgeUpdate = currentDay;
 
-                    // Node 2: Mortality Risk Scaling
-                    if (profile.age > 60) {
-                        const baseRisk = 0.01;
-                        const ageOver = profile.age - 60;
-                        profile.mortalityRisk = baseRisk + (ageOver * 0.005);
+                    // --- EXTENDED LONGEVITY (300 Year Baseline) ---
+                    if (profile.age >= 310) {
+                        profile.mortalityRisk = 1.0; // 100% chance at 310
+                    } else if (profile.age > 300) {
+                        // Drastic scaling from 300 to 310
+                        const yearsOver = profile.age - 300;
+                        profile.mortalityRisk = Math.pow(yearsOver / 10, 2); 
+                    } else {
+                        profile.mortalityRisk = 0.0001; // Negligible risk before 300
                     }
 
                     if (Math.random() < profile.mortalityRisk) {
@@ -317,6 +321,7 @@ class PersonhoodSystem {
                 }
             });
         }
+
 
         triggerNaturalDeath(profile) {
             window.EventBus.emit('UI_LOG', `[DEATH] ${profile.id} has passed away of natural causes at age ${profile.age}.`);
@@ -389,7 +394,22 @@ class PersonhoodSystem {
                 successor.bias = source.bias;
             }
 
+            // --- CULTURAL INHERITANCE (Node 3) ---
+            // Successors inherit the behavioral traits and ambitions influenced by local culture
+            const village = window.VillageManager?.villages.find(v => v.id === source.property.homeVillageId);
+            if (village && village.culture.dominantTrait !== 'NEUTRAL') {
+                const culture = village.culture.dominantTrait;
+                if (culture === 'MILITARISTIC') successor.traits.ambition += 0.2;
+                if (culture === 'CAUTIOUS') successor.traits.riskTolerance -= 0.2;
+                if (culture === 'SCHOLARLY') successor.identity = 'SCHOLAR';
+            
+                // Normalize
+                successor.traits.ambition = Math.max(0, Math.min(1, successor.traits.ambition));
+                successor.traits.riskTolerance = Math.max(0, Math.min(1, successor.traits.riskTolerance));
+            }
+
             // 4. Belief Succession with Drift (Node 10)
+
             source.beliefState.forEach((state, intelId) => {
                 const drift = (Math.random() * 0.4 - 0.2); // +/- 20% drift for the next generation
                 successor.beliefState.set(intelId, {

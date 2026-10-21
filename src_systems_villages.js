@@ -109,8 +109,16 @@ window.VillageManager = {
                 fuelNeed: 0, // Projected demand
                 feudalState: i === 19 ? 'PARTIALLY_SOVEREIGN' : 'DEPENDENT', // --- PHASE 11: FEUDAL DEPENDENCY ---
                 deepReserves: i === 19 ? { food: 500, essence: 100 } : null, // --- TERMINUS DEEP RESERVES ---
-                activeObjectives: [], // --- PHASE 5: INSTITUTIONAL AGENCY ---
+                                activeObjectives: [], // --- PHASE 5: INSTITUTIONAL AGENCY ---
+                // --- CULTURAL EVOLUTION (Phase 12) ---
+                culture: {
+                    traits: new Map(), // traitName -> { weight, level, description }
+                    dominantTrait: 'NEUTRAL',
+                    traditions: [],
+                    lastAdaptationDay: 0
+                },
                 // Action Ledger Requirement
+
                 currentTask: 'Establishing', taskTarget: 'Local Region', taskReason: 'Settlement routine.', taskTimestamp: Date.now()
             });
         }
@@ -300,7 +308,7 @@ window.VillageManager = {
     },
 
 
-    /**
+        /**
      * Records a crisis event in institutional memory and adjusts the memory profile.
      */
     recordCrisis: function(village, type, severity = 1.0) {
@@ -312,7 +320,11 @@ window.VillageManager = {
         
         village.crisisLog.push(entry);
         
+        // Node 2: Cultural Memory Transformation
+        this.updateVillageCulture(village, type, severity);
+
         // LEARNING RULES (§3)
+
         const mem = village.memoryProfile;
         switch(type) {
             case 'FUEL_SHORTAGE':
@@ -350,7 +362,74 @@ window.VillageManager = {
         }
     },
 
+        /**
+     * Node 1 & 7: Cultural Adaptation
+     * Culture is inherited memory made habitual.
+     */
+    updateVillageCulture: function(village, eventType, impact) {
+        if (!village.culture) return;
+        
+        const traits = village.culture.traits;
+        
+        // Repeated events reinforce specific traits
+        switch(eventType) {
+            case 'BARRIER_FAILURE':
+                this.reinforceCultureTrait(village, 'SURVIVALIST', impact * 0.2);
+                this.reinforceCultureTrait(village, 'CAUTIOUS', impact * 0.1);
+                break;
+            case 'FUEL_SHORTAGE':
+                this.reinforceCultureTrait(village, 'STOCKPILING', impact * 0.15);
+                break;
+            case 'TRADE_SUCCESS':
+                this.reinforceCultureTrait(village, 'MERCANTILE', impact * 0.1);
+                this.reinforceCultureTrait(village, 'EXPANSIONIST', impact * 0.05);
+                break;
+            case 'RAID_REPELLED':
+                this.reinforceCultureTrait(village, 'MILITARISTIC', impact * 0.15);
+                break;
+        }
+
+        // Re-evaluate dominant trait
+        this.evaluateDominantCulture(village);
+    },
+
+    reinforceCultureTrait: function(village, traitName, delta) {
+        if (!village.culture.traits.has(traitName)) {
+            village.culture.traits.set(traitName, { weight: 0.0, level: 0 });
+        }
+        const trait = village.culture.traits.get(traitName);
+        trait.weight = Math.min(1.0, trait.weight + delta);
+        trait.level = Math.floor(trait.weight * 5); // 0-5 tier system
+    },
+
+    evaluateDominantCulture: function(village) {
+        let maxWeight = 0;
+        let dominant = 'NEUTRAL';
+        
+        village.culture.traits.forEach((trait, name) => {
+            if (trait.weight > maxWeight && trait.weight > 0.4) {
+                maxWeight = trait.weight;
+                dominant = name;
+            }
+        });
+
+        if (village.culture.dominantTrait !== dominant) {
+            village.culture.dominantTrait = dominant;
+            window.EventBus.emit('UI_LOG', `[CULTURE] ${village.name} has developed a ${dominant} culture.`);
+            
+            // Record transition in Chronicle
+            window.ChronicleManager?.recordEvent({
+                actorId: `village_${village.id}`,
+                type: 'CULTURAL_SHIFT',
+                detail: `${village.name} is now defined by its ${dominant} way of life.`,
+                significance: 80,
+                historicalWeight: 40
+            });
+        }
+    },
+
     simulateVillage: function(village) {
+
         const cal = window.CalibrationFramework?.settings || {};
         const econCal = cal.economy || { consumption: 1.0, scarcity: 1.0, tradeEfficiency: 1.0 };
         const worldCal = cal.world || { growthRate: 1.0, spawnRate: 1.0 };
@@ -414,6 +493,16 @@ window.VillageManager = {
                 if (village.nobleHouse === 'House Terminus') {
                     baseEssenceCost *= 0.5; // 50% reduction for ancient armor and geographic stability
                 }
+
+                // Node 2 & 10: Cultural Buffs (Validation Trace)
+                if (village.culture?.dominantTrait === 'SURVIVALIST') {
+                    baseEssenceCost *= 0.8; // Survivalists are efficient with resources
+                }
+                if (village.culture?.dominantTrait === 'STOCKPILING' && village.stats.essence < 5) {
+                    // Stockpiling culture doubles the urgency of requests
+                    village.fuelRequested = true;
+                }
+
         
                 const essenceCost = baseEssenceCost * (1 + (village.expansionLevel || 0));
         

@@ -945,7 +945,15 @@ class InstitutionalReportUI {
                             // Succession Info (Node 12)
                             html += `<div class="mt-1 text-[7px] text-gray-400 uppercase">Current Leader: ${house.currentLeader} (Gen ${house.lineage.length})</div>`;
 
+                            // --- CULTURAL VISIBILITY (Node 9) ---
+                            const houseVillages = window.VillageManager?.villages.filter(v => v.nobleHouse === house.name);
+                            if (houseVillages?.length > 0) {
+                                const dominant = houseVillages[0].culture.dominantTrait;
+                                html += `<div class="text-[7px] text-cyan-400 font-bold uppercase mt-1 italic">Cultural Ethos: ${dominant}</div>`;
+                            }
+
                             // Schism Indicator
+
 
                 if (house.activeSchism) {
                     html += `<div class="mt-1 p-1 bg-red-950 border border-red-700 rounded text-[7px] text-red-200 font-bold text-center animate-pulse uppercase">⚠️ ACTIVE SCHISM: ${house.activeSchism.type}</div>`;
