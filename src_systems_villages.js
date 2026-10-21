@@ -456,91 +456,116 @@ window.VillageManager = {
      * Converts internal simulation states (Doubt, Schism, Culture) into 3D world consequences.
      */
         manifestVillageStates: function(village) {
-        const houseId = `house_${village.nobleHouse.toLowerCase().replace('house ', '')}`;
-        const house = window.DynastyManager?.getHouse(houseId);
-        if (!house) return;
+            const houseId = `house_${village.nobleHouse.toLowerCase().replace('house ', '')}`;
+            const house = window.DynastyManager?.getHouse(houseId);
+            if (!house) return;
 
-        // 1. INSTITUTIONAL DOUBT (Physical Signs: Public Arguments & Conflicting Bark)
-        const hasDoubt = Array.from(house.beliefs.values()).some(b => b.state === 'DOUBTED' || b.state === 'PRIVATE_DOUBT');
-        if (hasDoubt && Math.random() < 0.05) {
-            const bark = window.FolkloreEngine?.getRandomBark('REVISIONAL') || "The old ways are failing...";
-            window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
-                text: `[DOUBT] "${bark}"`, 
-                pos: { x: village.x + (Math.random()-0.5)*10, y: 5, z: village.z + (Math.random()-0.5)*10 }, 
-                color: '#f87171' 
-            });
-        }
+            const day = window.EngineParams?.worldDay || 0;
 
-        // 2. SCHISM (Physical Signs: Split Banners / Rival Bark)
-        if (house.activeSchism && Math.random() < 0.1) {
-            const faction = Math.random() > 0.5 ? 'REFORMIST' : 'TRADITIONALIST';
-            const color = faction === 'REFORMIST' ? '#3b82f6' : '#f59e0b';
-            window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
-                text: `[SCHISM] ${faction} recruiters active.`, 
-                pos: { x: village.x, y: 8, z: village.z }, 
-                color: color 
-            });
-            
-            // --- MANIFESTATION RULE: COMPETING NOTICES (Node 2) ---
-            if (Math.random() < 0.01) {
-                window.EventBus.emit('UI_LOG', `[SCHISM] ${village.name} has posted conflicting bounties from ${faction} leadership.`);
-            }
-        }
-
-        // 3. IDENTITY DRIFT (Physical Signs: Changed Priorities)
-        if (house.identityDrift > 0.4 && Math.random() < 0.02) {
-            window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
-                text: `[DRIFT] New Doctrine: ${house.currentIdentity.mission}`, 
-                pos: { x: village.x, y: 14, z: village.z }, 
-                color: '#818cf8' 
-            });
-        }
-
-        // 4. CULTURE (Visible Priorities)
-        if (village.culture.dominantTrait !== 'NEUTRAL' && Math.random() < 0.02) {
-            let message = "";
-            let color = "#94a3b8";
-            switch(village.culture.dominantTrait) {
-                case 'MILITARISTIC': 
-                    message = "Militia drills in progress."; 
-                    color = "#ef4444"; 
-                    break;
-                case 'STOCKPILING': 
-                    message = "Granary expansion ongoing."; 
-                    color = "#10b981"; 
-                    break;
-                case 'SURVIVALIST': 
-                    message = "Rationing enforced."; 
-                    color = "#d97706"; 
-                    break;
-                case 'MERCANTILE': 
-                    message = "Trade fair preparation."; 
-                    color = "#fbbf24"; 
-                    break;
-                case 'CAUTIOUS':
-                    message = "Barrier inspection in progress.";
-                    color = "#a855f7";
-                    break;
-            }
-            if (message) {
+            // 1. INSTITUTIONAL DOUBT (Physical Signs: Public Arguments & Hesitation)
+            const doubtBeliefs = Array.from(house.beliefs.values()).filter(b => b.state === 'DOUBTED' || b.state === 'PRIVATE_DOUBT');
+            if (doubtBeliefs.length > 0 && Math.random() < 0.05) {
+                const bark = window.FolkloreEngine?.getRandomBark('REVISIONAL') || "The old ways are failing...";
                 window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
-                    text: `[CULTURE] ${message}`, 
-                    pos: { x: village.x, y: 12, z: village.z }, 
+                    text: `⚖️ [ARGUMENT] "${bark}"`, 
+                    pos: { x: village.x + (Math.random()-0.5)*10, y: 5, z: village.z + (Math.random()-0.5)*10 }, 
+                    color: '#f87171' 
+                });
+                // HESITATION: Occasionally slow down village tasks if doubt is high
+                village._taskEfficiency = 0.5;
+            } else {
+                village._taskEfficiency = 1.0;
+            }
+
+            // 2. SCHISMS (Physical Signs: Rival Recruiters & Split Loyalties)
+            if (house.activeSchism && Math.random() < 0.1) {
+                const faction = Math.random() > 0.5 ? 'REFORMIST' : 'TRADITIONALIST';
+                const color = faction === 'REFORMIST' ? '#3b82f6' : '#f59e0b';
+                window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                    text: `🚩 [SCHISM] Join the ${faction} cause!`, 
+                    pos: { x: village.x, y: 8, z: village.z }, 
                     color: color 
                 });
+            
+                // Manifest split patrols (simulation of split logic)
+                if (village.squads.length > 1) {
+                    village.squads[0].factionOverride = 'REFORMIST';
+                    village.squads[1].factionOverride = 'TRADITIONALIST';
+                }
             }
-        }
 
-        // 5. LEGACY (Physical Signs: Inherited Workshops & Lineage)
-        const leaderProfile = window.PersonhoodManager?.getProfile(house.currentLeader);
-        if (leaderProfile && leaderProfile.ancestry.parents.length > 0 && Math.random() < 0.01) {
-            window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
-                text: `[LEGACY] House ${house.name} relic displayed.`, 
-                pos: { x: village.x, y: 16, z: village.z }, 
-                color: '#fbbf24' 
-            });
-        }
-    },
+            // 3. TRUST NETWORKS (Physical Signs: Invitation/Access)
+            const playerRep = window.GameState?.reputation?.village || 0;
+            if (playerRep > 50 && Math.random() < 0.01) {
+                window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                    text: "🤝 [TRUST] You are welcome in our archives.", 
+                    pos: { x: village.x, y: 6, z: village.z }, 
+                    color: '#60a5fa' 
+                });
+            }
+
+            // 4. CULTURE (Visible World Differences - Physical Activity)
+            if (village.culture.dominantTrait !== 'NEUTRAL' && Math.random() < 0.04) {
+                let message = "";
+                let color = "#94a3b8";
+                let icon = "⚙️";
+                switch(village.culture.dominantTrait) {
+                    case 'MILITARISTIC': 
+                        message = "Militia drills in progress."; 
+                        color = "#ef4444"; 
+                        icon = "⚔️";
+                        break;
+                    case 'STOCKPILING': 
+                        message = "Granary expansion ongoing."; 
+                        color = "#10b981"; 
+                        icon = "📦";
+                        break;
+                    case 'SURVIVALIST': 
+                        message = "Rationing enforced."; 
+                        color = "#d97706"; 
+                        icon = "🍖";
+                        break;
+                    case 'MERCANTILE': 
+                        message = "Trade fair preparation."; 
+                        color = "#fbbf24"; 
+                        icon = "💰";
+                        break;
+                    case 'CAUTIOUS':
+                        message = "Barrier inspection in progress.";
+                        color = "#a855f7";
+                        icon = "🛡️";
+                        break;
+                }
+                if (message) {
+                    window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                        text: `${icon} [${village.culture.dominantTrait}] ${message}`, 
+                        pos: { x: village.x, y: 12, z: village.z }, 
+                        color: color 
+                    });
+                }
+            }
+
+            // 5. LEGACY & GENERATIONAL MEMORY (Physical Signs: Heritage Barks)
+            const leaderProfile = window.PersonhoodManager?.getProfile(house.currentLeader);
+            if (leaderProfile && leaderProfile.ancestry.parents.length > 0 && Math.random() < 0.01) {
+                const gen = leaderProfile.ancestry.parents.length + 1;
+                window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                    text: `🏺 [LEGACY] A Generation ${gen} Heir leads us.`, 
+                    pos: { x: village.x, y: 16, z: village.z }, 
+                    color: '#fbbf24' 
+                });
+            }
+        
+            // 6. CONTINUITY (Physical Signs: Ritual Preservation)
+            const root = window.WorldTree?.rootNodes.get(`village_${village.id}`);
+            if (root && root.health > 0.7 && Math.random() < 0.02) {
+                 window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                    text: "📖 [CONTINUITY] The scrolls are being copied.", 
+                    pos: { x: village.x, y: 18, z: village.z }, 
+                    color: '#34d399' 
+                });
+            }
+        },
 
     simulateVillage: function(village) {
 

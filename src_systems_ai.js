@@ -85,6 +85,7 @@ function processCrowdGathering(entity, delta) {
 
     const nearby = window.GameCore.SpatialGrid.getNearbyEntities(entity.visual.position.x, entity.visual.position.z, 10);
     const influencer = nearby.find(n => {
+        if (n === entity) return false;
         const trust = window.ReputationManager.calculateTrust(n, entity);
         const profile = window.PersonhoodManager.getProfile(n.id);
         return trust > 0.8 && (profile?.traits.credibility > 0.7 || profile?.apprentices?.length > 0);
@@ -93,13 +94,15 @@ function processCrowdGathering(entity, delta) {
     if (influencer) {
         // Face the influencer
         entity.visual.lookAt(influencer.visual.position);
+        
+        // --- MANIFESTATION RULE: FOLKLORE ENCOUNTER (Node 7) ---
         if (Math.random() < 0.005) {
-    const bark = window.FolkloreEngine?.getRandomBark('INSTITUTIONAL') || "I am listening...";
-    window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
-        text: `[TRUST] "${bark}"`, 
-        pos: { x: entity.visual.position.x, y: 4, z: entity.visual.position.z }, 
-        color: '#60a5fa' 
-    });
+            const bark = window.FolkloreEngine?.getRandomBark('MYTHIC') || "Listen to the tales of old...";
+            window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                text: `🎶 [SONG] "${bark}"`, 
+                pos: { x: entity.visual.position.x, y: 4, z: entity.visual.position.z }, 
+                color: '#a855f7' 
+            });
         }
     }
 }
