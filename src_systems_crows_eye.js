@@ -860,6 +860,44 @@ class CrowsEyeSystem {
     }
 
     /**
+     * Bureau Explanation Layer for Physical Legacy & Property.
+     */
+    renderPropertyDossier(village) {
+                if (!village.propertyRegistry) return "";
+
+                let html = `
+                    <div style="margin-top:15px; border-top:1px solid #78350f; padding-top:10px;">
+                        <div style="font-size:11px; color:#fbbf24; font-weight:bold; margin-bottom:5px;">PHYSICAL PROPERTY DOSSIER</div>
+                        <div style="background:rgba(0,0,0,0.4); border:1px solid #78350f; padding:8px; font-size:10px; max-height:200px; overflow-y:auto;">
+                `;
+
+                village.propertyRegistry.forEach((prop, id) => {
+                    const ownerName = prop.ownerId ? prop.ownerId.substring(0, 12) : "ABANDONED";
+                    const color = prop.ownerId ? "#94a3b8" : "#ef4444";
+            
+                    html += `
+                        <div style="border-bottom:1px solid rgba(255,255,255,0.05); padding:5px 0;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <span style="color:#fbbf24; font-weight:bold;">${prop.type}: ${id}</span>
+                                <span style="color:#78350f;">G${prop.genCount}</span>
+                            </div>
+                            <div style="font-size:9px;">
+                                <span style="color:${color};">OWNER: ${ownerName}</span>
+                                <span style="color:#78350f; margin-left:10px;">HIST: ${prop.history.length} events</span>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                if (village.propertyRegistry.size === 0) {
+                    html += `<div style="color:#451a03; text-align:center;">No registered property found in this settlement.</div>`;
+                }
+
+                html += `</div></div>`;
+                return html;
+    }
+
+    /**
      * Bureau Explanation Layer for Tree vs Wendigo Conflict.
      */
     renderTreeConflictLayer(village) {
@@ -1002,8 +1040,9 @@ class CrowsEyeSystem {
                         <span style="color:#78350f;">STATE:</span> <span style="color:#fbbf24;">${v.feudalState || 'DEPENDENT'}</span>
                     </div>
                 </div>
-                ${this.renderContinuityDiagnostic(v)}
+                                ${this.renderContinuityDiagnostic(v)}
                 ${this.renderTreeConflictLayer(v)}
+                ${this.renderPropertyDossier(v)}
             `;
         } else {
             const profile = window.PersonhoodManager?.getProfile(this.selectedEntityId);

@@ -371,7 +371,7 @@ class DynastyManagerSystem {
     }
 
 
-    /**
+        /**
      * Handles the death of a notable NPC.
      * Bible §36: "Individuals die; institutions persist."
      */
@@ -380,6 +380,9 @@ class DynastyManagerSystem {
 
         const house = this.houses.get(entity.houseId);
         if (!house) return;
+
+        // --- PHYSICAL LEGACY: PROPERTY INHERITANCE ---
+        this.processPropertyInheritance(entity);
 
         // If the leader died, trigger succession
         if (house.currentLeader === entity.id) {
@@ -390,6 +393,48 @@ class DynastyManagerSystem {
         if (entity.lastAttacker?.houseId && entity.lastAttacker.houseId !== entity.houseId) {
             this.recordFeudEvent(entity.houseId, entity.lastAttacker.houseId, 'BLOODSHED');
         }
+    }
+
+    /**
+     * Determines who inherits the physical anchors of the deceased.
+     * Hierarchy: Child -> Apprentice -> Institutional Repo -> Abandonment.
+     */
+    processPropertyInheritance(entity) {
+        if (!window.VillageManager || !window.PersonhoodManager) return;
+
+        const profile = window.PersonhoodManager.getProfile(entity.id);
+        if (!profile) return;
+
+        const village = window.VillageManager.villages.find(v => v.id === entity.villageId);
+        if (!village) return;
+
+        // Find all properties owned by this entity
+        village.propertyRegistry.forEach((prop, id) => {
+            if (prop.ownerId === entity.id) {
+                let heirId = null;
+
+                // 1. Family Inheritance
+                if (profile.ancestry.children.length > 0) {
+                    heirId = profile.ancestry.children[0];
+                } 
+                // 2. Apprentice Inheritance (Workshops/Archives)
+                else if ((prop.type === 'WORKSHOP' || prop.type === 'ARCHIVE') && profile.apprentices.length > 0) {
+                    heirId = profile.apprentices[0];
+                }
+                // 3. Institutional Inheritance
+                else {
+                    heirId = this.houses.get(entity.houseId)?.currentLeader || null;
+                }
+
+                if (heirId) {
+                    window.VillageManager.transferProperty(village, id, heirId, 'INHERITANCE');
+                } else {
+                    prop.ownerId = null; // ABANDONED
+                    prop.history.push({ day: window.EngineParams?.worldDay || 0, event: 'ABANDONED' });
+                    window.EventBus.emit('UI_LOG', `[LEGACY] ${prop.type} ${id} has been abandoned.`);
+                }
+            }
+        });
     }
 
     triggerSuccession(house) {

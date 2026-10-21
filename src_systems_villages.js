@@ -94,7 +94,9 @@ window.VillageManager = {
                     }
                 }, 
                 population: { current: population, capacity: Math.ceil(population * 1.2) }, 
-                expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [],
+                                expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [],
+                // --- PHYSICAL LEGACY: PROPERTY REGISTRY (Phase 14) ---
+                propertyRegistry: new Map(), // id -> { type, ownerId, occupantId, houseId, genCount, history: [], anchoredKnowledge: [] }
                 relations: {}, 
                 diplomaticState: {}, 
                 tensions: 0,
@@ -577,6 +579,54 @@ window.VillageManager = {
                 });
             }
         },
+
+    /**
+     * Initializes property ownership for a new layout item.
+     * Manifestation Rule: Property survives individuals.
+     */
+    registerProperty: function(village, buildingId, type, ownerId = null) {
+        const property = {
+            id: buildingId,
+            type: type, // HOME, WORKSHOP, ARCHIVE, etc.
+            ownerId: ownerId,
+            occupantId: ownerId,
+            houseId: ownerId ? (window.PersonhoodManager?.getProfile(ownerId)?.houseId || null) : null,
+            genCount: 1,
+            history: ownerId ? [{ day: window.EngineParams?.worldDay || 0, event: 'ESTABLISHED', actor: ownerId }] : [],
+            anchoredKnowledge: []
+        };
+        village.propertyRegistry.set(buildingId, property);
+        return property;
+    },
+
+    /**
+     * Handles inheritance of physical property.
+     * Logic: Family -> Apprentice -> Institution -> Abandonment.
+     */
+    transferProperty: function(village, propertyId, newOwnerId, reason = 'INHERITANCE') {
+        const prop = village.propertyRegistry.get(propertyId);
+        if (!prop) return;
+
+        const oldOwner = prop.ownerId;
+        prop.ownerId = newOwnerId;
+        prop.occupantId = newOwnerId;
+        prop.genCount++;
+        
+        prop.history.push({
+            day: window.EngineParams?.worldDay || 0,
+            event: reason,
+            prevOwner: oldOwner,
+            newOwner: newOwnerId
+        });
+
+        // Continuity Bonus
+        if (window.WorldTree) {
+            const root = window.WorldTree.rootNodes.get(`village_${village.id}`);
+            if (root) root.health = Math.min(1.0, root.health + 0.05);
+        }
+
+        window.EventBus.emit('UI_LOG', `[LEGACY] ${prop.type} ${prop.id} inherited by ${newOwnerId}.`);
+    },
 
     simulateVillage: function(village) {
 
