@@ -624,7 +624,7 @@ window.GameCore = {
                 'none': 0.5
             };
 
-            // 1. Identify current most significant entities and calculate Velocity
+            // 1. Identify current most significant entities and calculate Velocity & Inertia
             const candidates = (window.AdventurerManager?.records || [])
                 .filter(record => record.alive !== false)
                 .map(r => {
@@ -634,8 +634,13 @@ window.GameCore = {
                     const role = r.role || 'none';
                     const roleMult = affinity[role] || 0.5;
                 
-                    // CrowInterestScore = Velocity * CareerAffinity
-                    const score = (velocity + (heat * 0.05)) * roleMult; 
+                    // --- PHASE 3: CROW INERTIA ---
+                    // CrowInterestScore = Velocity + (Significance * InertiaWeight)
+                    // This ensures the Crow respects rapidly emerging stories, but will not
+                    // abandon a massive, sustained climax (e.g. a siege) for trivial noise.
+                    const inertiaWeight = 0.2; 
+                    const score = (velocity + (heat * inertiaWeight)) * roleMult; 
+                
                     return { id: r.id, name: r.name, score: score, heat: heat };
                 });
             
@@ -644,21 +649,28 @@ window.GameCore = {
             const pPrevHeat = narrator.previousHeat;
             const pVelocity = Math.max(0, pHeat - pPrevHeat);
             const pRole = window.GameState.gladiator.role || 'adventurer'; // Fallback to adventurer
-            const pScore = (pVelocity + (pHeat * 0.05)) * (affinity[pRole] || 1.0);
+            const pInertiaWeight = 0.2;
+            const pScore = (pVelocity + (pHeat * pInertiaWeight)) * (affinity[pRole] || 1.0);
         
             candidates.push({ id: 'player', name: 'The Wanderer', score: pScore, heat: pHeat });
         
-            // Sort by CrowInterestScore (Significance Velocity)
+            // Sort by CrowInterestScore
             candidates.sort((a, b) => b.score - a.score);
             const topHero = candidates[0];
 
-            if (topHero && topHero.id !== narrator.targetId && topHero.score > 0) {
+            // --- CROW COOLDOWN (Prevent rapid flickering) ---
+            // The Crow will only shift focus if at least a day has passed since its last shift
+            const daysSinceLastShift = window.EngineParams.worldDay - (narrator.lastShiftDay || 0);
+
+            if (topHero && topHero.id !== narrator.targetId && topHero.score > 0 && daysSinceLastShift >= 1) {
                 const oldTargetId = narrator.targetId;
                 narrator.targetId = topHero.id;
                 narrator.targetName = topHero.name;
                 narrator.playerClaimed = (topHero.id === 'player');
+                narrator.lastShiftDay = window.EngineParams.worldDay;
 
                 // --- PHYSICAL MANIFESTATION: THE CROW MODEL ---
+
                 this.syncCrowModel(topHero.id);
 
                 if (narrator.playerClaimed) {
