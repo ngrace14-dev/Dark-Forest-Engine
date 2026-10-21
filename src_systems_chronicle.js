@@ -185,7 +185,14 @@ window.ChronicleManager = {
                 }]
             });
 
-            window.IntelManager.grantOwnership(intelId, w.id);
+                    // --- PLAYER INTEGRATION: INFORMATION PIPELINE (Node 8) ---
+        if (w.id === 'player') {
+             // The player's specific witness event is automatically registered
+             window.IntelManager.grantOwnership(intelId, 'player_node');
+        } else {
+             window.IntelManager.grantOwnership(intelId, w.id);
+        }
+
         });
 
 

@@ -117,5 +117,29 @@ if (typeof window !== 'undefined' && !window.ImpostorBaker) {
     window.ImpostorBaker = new ImpostorBaker(null, 2048); 
 }
 
+window.EventBus.on('PLAYER_DEATH', (data) => {
+    window.EventBus.emit('UI_LOG', `💀 [LEGACY] Your story as the Wanderer has ended at age ${data.age}.`);
+    
+    // Node 4 & 9: Player Succession Path
+    // 1. Knowledge Retained: Handed to recruited companions or apprentices
+    const party = window.GameState.party.members.filter(m => m.recruited);
+    if (party.length > 0) {
+        const primarySuccessor = party[0];
+        window.EventBus.emit('UI_LOG', `[SUCCESSION] Your apprentice, ${primarySuccessor.name}, inherits your archives.`);
+        
+        const playerIntel = window.IntelManager.getIntelForNode('player_node');
+        playerIntel.forEach(intel => {
+            window.IntelManager.grantOwnership(intel.intel_id, primarySuccessor.id);
+        });
+    }
+
+    // 2. Property Retained: Base structures are owned by the bloodline
+    if (window.GameState.playerLegacy) {
+        window.GameState.playerLegacy.generation += 1;
+        window.EventBus.emit('UI_LOG', `[LINEAGE] Beginning Generation ${window.GameState.playerLegacy.generation}.`);
+    }
+});
+
 // 6. Main Engine Entry Point
 import './src_engine.js';
+

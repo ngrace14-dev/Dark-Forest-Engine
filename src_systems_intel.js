@@ -570,12 +570,20 @@ window.IntelEconomy = {
     },
 
     /**
-     * Strategic Information Deployment (Information Warfare MVP)
+     *Strategic Information Deployment (Information Warfare MVP)
      * Leaks property to a specific house to trigger a reaction.
      */
     executeLeak: function(sourceNode, targetHouseId, intelId) {
-        const intel = window.IntelManager.lookup(intelId);
+        const intel = this.lookup(intelId);
         if (!intel) return false;
+
+        // --- PLAYER INTEGRATION: CREDIBILITY IMPACT (Node 1 & 7) ---
+        if (sourceNode.id === 'player_node' || sourceNode.id === 'player') {
+             // Reporting to an institution counts as an Official Report
+             if (window.DynastyManager) {
+                 window.DynastyManager.submitReport(targetHouseId, 'player_node', intelId);
+             }
+        }
 
         const targetHouse = window.DynastyManager?.getHouse(targetHouseId);
         if (!targetHouse) return false;

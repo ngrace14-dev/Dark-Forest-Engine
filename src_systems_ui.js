@@ -37,20 +37,25 @@ class IntelBagUI {
     }
 
         render() {
-        if (!this.panel || !window.IntelManager) return;
-        const playerIntel = window.IntelManager.getIntelForNode('player_node');
+            if (!this.panel || !window.IntelManager) return;
+            const playerIntel = window.IntelManager.getIntelForNode('player_node');
+            const playerProfile = window.PersonhoodManager?.getProfile('player_node');
         
-        let html = `
-            <div class="flex justify-between items-center mb-4 border-b border-blue-700 pb-2">
-                <h2 class="text-blue-400 font-bold tracking-widest text-sm uppercase">📜 Personal Ledger</h2>
-                <div class="text-[10px] text-gray-400">Total Records: ${playerIntel.length}</div>
-            </div>
-            <div class="flex items-center gap-2 mb-4 p-2 bg-blue-900/20 border border-blue-800/50 rounded">
-                <input type="checkbox" id="toggle-crows-eye" ${window.EngineConfig.crowsEyeMode ? 'checked' : ''} class="accent-blue-500">
-                <label for="toggle-crows-eye" class="text-[10px] text-blue-200 uppercase font-bold cursor-pointer">Enable Crow's Eye View</label>
-            </div>
-            <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-2">
-        `;
+            let html = `
+                <div class="flex justify-between items-center mb-4 border-b border-blue-700 pb-2">
+                    <h2 class="text-blue-400 font-bold tracking-widest text-sm uppercase">📜 Personal Ledger</h2>
+                    <div class="flex items-center gap-3">
+                        <div class="text-[9px] text-gray-500 uppercase font-bold">Credibility: <span class="text-white">${Math.floor((playerProfile?.traits.credibility || 0.3) * 100)}%</span></div>
+                        <div class="text-[10px] text-gray-400 font-bold">Gen: ${window.GameState.playerLegacy?.generation || 1}</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 mb-4 p-2 bg-blue-900/20 border border-blue-800/50 rounded">
+                    <input type="checkbox" id="toggle-crows-eye" ${window.EngineConfig.crowsEyeMode ? 'checked' : ''} class="accent-blue-500">
+                    <label for="toggle-crows-eye" class="text-[10px] text-blue-200 uppercase font-bold cursor-pointer">Enable Crow's Eye View</label>
+                </div>
+                <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-2">
+            `;
+
 
         if (playerIntel.length === 0) {
             html += `<div class="text-gray-500 text-center text-xs py-4">Your ledger is empty. Speak to the world.</div>`;

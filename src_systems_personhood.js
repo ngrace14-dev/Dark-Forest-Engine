@@ -31,9 +31,14 @@ class PersonhoodSystem {
     }
 
 
-    init() {
+        init() {
+        // --- PLAYER INTEGRATION (Node 0) ---
+        // Ensure the player has a profile in the Personhood System
+        this.getProfile('player_node');
+        
         window.EventBus.emit('UI_LOG', '[Personhood] Cognitive Filters Active');
     }
+
 
     /**
      * Generates or retrieves a unique personality for an entity.
@@ -326,7 +331,14 @@ class PersonhoodSystem {
         triggerNaturalDeath(profile) {
             window.EventBus.emit('UI_LOG', `[DEATH] ${profile.id} has passed away of natural causes at age ${profile.age}.`);
         
+            // --- PLAYER INTEGRATION: LEGACY (Node 4 & 9) ---
+            if (profile.id === 'player_node') {
+                window.EventBus.emit('PLAYER_DEATH', { cause: 'NATURAL_CAUSES', age: profile.age });
+                // Logic handled by specialized player succession hook
+            }
+
             // Find successors (Node 3 & 4)
+
             const successorId = this.findSuccessor(profile);
         
             if (successorId) {

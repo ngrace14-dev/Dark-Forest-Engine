@@ -558,12 +558,25 @@ window.VillageManager = {
 
         village.territory.underRaid = localRaiders.length > 0;
 
-        // --- DIPLOMATIC IMPACT OF RAIDS (Shared Defense) ---
+                // --- DIPLOMATIC IMPACT OF RAIDS (Shared Defense) ---
         if (village.territory.underRaid) {
             village.currentTask = 'Defending';
             village.taskTarget = 'City Walls';
             village.taskReason = 'Repelling forest incursions.';
+            
+            // --- PLAYER INTEGRATION: CULTURAL IMPACT (Node 6) ---
+            const playerNear = window.GameCore.playerObj && 
+                               Math.hypot(window.GameCore.playerObj.visual.position.x - village.x, 
+                                          window.GameCore.playerObj.visual.position.z - village.z) < 100;
+            
+            if (playerNear) {
+                // Repeated monster defense reinforces MILITARISTIC culture
+                this.updateVillageCulture(village, 'RAID_REPELLED', 0.5);
+                window.EventBus.emit('UI_LOG_DEBUG', `[CULTURE] Player's defense of ${village.name} is reshaping its ethos.`);
+            }
+
             // Impact is scaled: Only a "Walking Calamity" (Renown > 500) has Monarch-level impact
+
             const playerImpactScale = (window.GameState.renown.score > 500) ? 5.0 : 1.0;
 
             // Nearby houses grow closer when defending against the forest
