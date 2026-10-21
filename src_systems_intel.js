@@ -87,8 +87,12 @@ class IntelManagerSystem {
             },
             
             // --- MEMORY NODE PROVENANCE (§Information Ownership) ---
-            // [{ node_id, timestamp, origin_type, source_faction, witness_type, certainty_at_source }]
-            provenance: data.provenance ? [...data.provenance] : [],
+            provenance: {
+                origin: data.provenance?.origin || null,
+                last_source: data.provenance?.last_source || null,
+                transmission_count: data.provenance?.transmission_count || 0,
+                recent_sources: data.provenance?.recent_sources ? [...data.provenance.recent_sources] : []
+            },
             
             certainty: data.certainty ?? 0.1, 
             truth_state: data.truth_state || window.IntelEnums.TRUTH_STATE.UNKNOWN,
@@ -120,7 +124,7 @@ class IntelManagerSystem {
      * Physical Witness Hook: Only entities present at an event gain the knowledge.
      * Bible §Information Ownership
      */
-    recordWitnessedEvent(eventData, radius = 50) {
+    recordWitnessedEvent(eventData, radius = 15) {
         const truthId = this.register({
             ...eventData,
             truth_state: window.IntelEnums.TRUTH_STATE.TRUE,
@@ -133,20 +137,35 @@ class IntelManagerSystem {
 
         const witnesses = window.GameCore.SpatialGrid.getNearbyEntities(pos.x, pos.z, radius);
         
+        // Basic Zone Abstraction (Future: True Line of Sight)
+        // Cell-based isolation: If an entity is in a different 20x20 cell, it represents being 
+        // behind walls/basements/vaults unless the event is extremely loud/bright (radius > 20).
+        const eventGridKey = window.GameCore.SpatialGrid.getGridKey(pos.x, pos.z);
+
         witnesses.forEach(w => {
             if (w.def?.type === 'npc' || w.id === 'player') {
+                
+                // Zone check: Disallow seeing through walls / across cell boundaries implicitly
+                if (w.currentGridKey && w.currentGridKey !== eventGridKey && radius <= 20) {
+                    return; // LoS implicitly blocked by zone/room barrier
+                }
+
                 this.grantOwnership(truthId, w.id);
                 
                 // Add initial provenance for the witness
                 const record = this.registry.get(truthId);
-                record.provenance.push({
+                const sourceData = {
                     node_id: w.id,
-                    timestamp: window.EngineParams.worldDay,
+                    timestamp: window.EngineParams?.worldDay || 0,
                     origin_type: 'DIRECT_WITNESS',
                     witness_type: 'EYE_WITNESS',
                     certainty_at_source: 1.0,
                     source_faction: w.def?.faction || 'player'
-                });
+                };
+                
+                record.provenance.origin = sourceData;
+                record.provenance.last_source = sourceData;
+                record.provenance.transmission_count = 0;
             }
         });
 
@@ -298,13 +317,24 @@ window.IntelPropagation = {
         const intel = window.IntelManager.lookup(intel_id);
         if (!intel || intel.persistence !== window.IntelEnums.PERSISTENCE.ACTIVE) return;
 
+        // --- GOSSIP BUDGET (Information as a Resource) ---
+        targetNode.gossip_budget = targetNode.gossip_budget || { day: 0, count: 0 };
+        if (targetNode.gossip_budget.day !== (window.EngineParams?.worldDay || 0)) {
+            targetNode.gossip_budget.day = window.EngineParams?.worldDay || 0;
+            targetNode.gossip_budget.count = 0;
+        }
+        if (targetNode.gossip_budget.count >= 5) return; // Exhausted daily conversation limit
+
         // STEP A: Echo-Chamber / Provenance Check
         // If the target already held this exact record in the past, reject to prevent infinite loops.
-        if (intel.provenance.some(p => p.node_id === targetNode.id)) return;
+        if (intel.provenance.origin?.node_id === targetNode.id || 
+            intel.provenance.recent_sources.some(p => p.node_id === targetNode.id)) return;
         
         // Target also checks if they currently hold a newer/better version of this lineage
         const targetKnown = window.IntelManager.getIntelForNode(targetNode.id);
         if (targetKnown.some(k => k.parent_intel_id === intel_id || k.supersedes_intel_id === intel_id)) return;
+
+        targetNode.gossip_budget.count++; // Consume budget
 
         // STEP B: Information Fidelity (Distortion Check)
         let resulting_intel_id = intel_id;
@@ -312,6 +342,24 @@ window.IntelPropagation = {
         const cal = window.CalibrationFramework?.settings?.intel || { distortionRate: 0.1 };
         const distortionChance = (1.0 - vectorFidelity) * cal.distortionRate * 10; // Scaling for effect
         
+        const newSourceData = {
+            node_id: targetNode.id,
+            timestamp: window.EngineParams?.worldDay || 0,
+            origin_type: 'HEARSAY',
+            witness_type: 'REPORTER',
+            source_faction: targetNode.faction || 'Neutral'
+        };
+
+        const nextRecent = [...intel.provenance.recent_sources, newSourceData];
+        if (nextRecent.length > 5) nextRecent.shift(); // Keep bounded!
+
+        const newProvenance = {
+            origin: intel.provenance.origin,
+            last_source: newSourceData,
+            transmission_count: intel.provenance.transmission_count + 1,
+            recent_sources: nextRecent
+        };
+
         if (Math.random() < distortionChance) {
             // FAILED FIDELITY: Information Distorts!
             const newCertainty = Math.max(0.1, intel.certainty * 0.5);
@@ -323,14 +371,7 @@ window.IntelPropagation = {
                 certainty: newCertainty,
                 type: window.IntelEnums.TYPES.RUMOR, // Degrades to rumor
                 spread_generation: intel.spread_generation + 1,
-                provenance: [...intel.provenance, {
-                    node_id: targetNode.id,
-                    timestamp: window.EngineParams?.worldDay || 0,
-                    origin_type: 'HEARSAY',
-                    witness_type: 'REPORTER',
-                    transmission_count: (intel.provenance[intel.provenance.length - 1]?.transmission_count || 0) + 1,
-                    source_faction: targetNode.faction || 'Neutral'
-                }]
+                provenance: newProvenance
             });
             window.EventBus.emit('UI_LOG_DEBUG', `[INTEL] Information distorted upon reaching ${targetNode.id}.`);
         } else {
@@ -340,18 +381,12 @@ window.IntelPropagation = {
                 parent_intel_id: intel_id,
                 version: intel.version + 1,
                 spread_generation: intel.spread_generation + 1,
-                provenance: [...intel.provenance, {
-                    node_id: targetNode.id,
-                    timestamp: window.EngineParams?.worldDay || 0,
-                    origin_type: 'PROPAGATION',
-                    witness_type: 'REPORTER',
-                    transmission_count: (intel.provenance[intel.provenance.length - 1]?.transmission_count || 0) + 1,
-                    source_faction: targetNode.faction || 'Neutral'
-                }]
+                provenance: newProvenance
             });
         }
 
         const newIntel = window.IntelManager.lookup(resulting_intel_id);
+
 
         // STEP C: Trust Verification & Plausibility Check (Phase 6.3 Hardening)
         // REPUTATION PIVOT: Use the new ReputationManager to calculate trust
@@ -375,12 +410,7 @@ window.IntelPropagation = {
 
         // STEP E: Apply Ownership & Provenance
         window.IntelManager.grantOwnership(resulting_intel_id, targetNode.id);
-        newIntel.provenance.push({
-            node_id: targetNode.id,
-            timestamp: window.EngineParams?.worldDay || 0,
-            origin_type: targetNode.type || 'NPC',
-            source_faction: targetNode.faction || 'Neutral'
-        });
+        // (Provenance was already handled natively via the register function above)
     },
 
     /**
@@ -556,16 +586,21 @@ window.IntelEconomy = {
         const newIntel = window.IntelManager.lookup(verified_intel_id);
         
         // Update provenance
-        newIntel.provenance.push({
+        const verifierData = {
             node_id: verifierNode.id,
             timestamp: window.EngineParams?.worldDay || 0,
             origin_type: 'VERIFIER',
             source_faction: verifierNode.faction || 'Neutral'
-        });
+        };
+        newIntel.provenance.last_source = verifierData;
+        newIntel.provenance.recent_sources.push(verifierData);
+        if (newIntel.provenance.recent_sources.length > 5) newIntel.provenance.recent_sources.shift();
+        newIntel.provenance.transmission_count++;
 
         // --- PHASE 1: CREDIBILITY FEEDBACK LOOP ---
-        // Locate original source from provenance[0]
-        const originalSource = intel.provenance[0];
+        // Locate original source from origin
+        const originalSource = intel.provenance.origin;
+
         if (originalSource && window.PersonhoodManager) {
             // Reward for truth, 3x penalty for lies
             const delta = truthConditionMet ? 0.05 : -0.15;
@@ -611,12 +646,15 @@ window.IntelEconomy = {
 
         const fakeIntel = window.IntelManager.lookup(fake_id);
         // Provenance explicitly starts with the creator
-        fakeIntel.provenance.push({
+        const sourceData = {
             node_id: creatorNode.id,
             timestamp: window.EngineParams?.worldDay || 0,
             origin_type: 'FABRICATOR',
             source_faction: creatorNode.faction || 'Neutral'
-        });
+        };
+        fakeIntel.provenance.origin = sourceData;
+        fakeIntel.provenance.last_source = sourceData;
+        fakeIntel.provenance.transmission_count = 0;
 
         window.IntelManager.grantOwnership(fake_id, creatorNode.id);
         window.EventBus.emit('UI_LOG', `[FABRICATION] Forged report created: ${payload.title}.`);
@@ -648,16 +686,21 @@ window.IntelEconomy = {
         window.IntelManager.shareToInstitution(intelId, targetHouseId);
 
         // 2. Attribution
-        intel.provenance.push({
+        const leakData = {
             node_id: sourceNode.id,
             timestamp: window.EngineParams?.worldDay || 0,
             origin_type: 'LEAK_SOURCE',
             source_faction: sourceNode.faction || 'Neutral'
-        });
+        };
+        intel.provenance.last_source = leakData;
+        intel.provenance.recent_sources.push(leakData);
+        if (intel.provenance.recent_sources.length > 5) intel.provenance.recent_sources.shift();
+        intel.provenance.transmission_count++;
 
         // 3. Reaction: Feud Intensification
         // If this intel belongs to House A and we leak it to House B, intensify the feud.
-        const originalOwnerFaction = intel.provenance[0]?.source_faction;
+        const originalOwnerFaction = intel.provenance.origin?.source_faction;
+
         if (originalOwnerFaction && originalOwnerFaction.startsWith('house_') && originalOwnerFaction !== targetHouseId) {
             window.DynastyManager.recordFeudEvent(originalOwnerFaction, targetHouseId, 'INFORMATION_BETRAYAL');
             window.EventBus.emit('UI_LOG', `[WARFARE] A secret of ${originalOwnerFaction.toUpperCase()} has been leaked to ${targetHouse.name}!`);
@@ -694,12 +737,16 @@ window.IntelEconomy = {
         window.IntelManager.grantOwnership(intelId, buyerNode.id);
         
         // 5. Receipt (Provenance)
-        intel.provenance.push({
+        const buyerData = {
             node_id: buyerNode.id,
             timestamp: window.EngineParams?.worldDay || 0,
             origin_type: 'PURCHASE',
             source_faction: buyerNode.faction || 'Neutral'
-        });
+        };
+        intel.provenance.last_source = buyerData;
+        intel.provenance.recent_sources.push(buyerData);
+        if (intel.provenance.recent_sources.length > 5) intel.provenance.recent_sources.shift();
+        intel.provenance.transmission_count++;
 
         window.EventBus.emit('UI_LOG', `[MARKET] ${buyerNode.id} purchased knowledge from ${sellerNode.id} for ${price} gold.`);
         return true;
