@@ -16,12 +16,44 @@ window.ChronicleManager = {
     // LEGEND ENGINE: Tracking weight for individuals (Bible §1)
     npcHistoricalWeights: new Map(), // nodeId -> totalWeight
 
-    init: function() {
+        init: function() {
         // Hydrate from existing worldEvents if they exist
         if (window.GameState?.worldEvents) {
             window.GameState.worldEvents.forEach(e => this.recordEvent(e));
         }
+
+        // --- HISTORICAL SIGNIFICANCE: FORGETTING LOOP (Node 7) ---
+        // Periodically run a purge of insignificant memories
+        window.EventBus.on('HEARTBEAT_T1', () => {
+            if (window.EngineParams?.worldDay % 14 === 0) {
+                this.purgeInsignificantMemories();
+            }
+        });
     },
+
+    purgeInsignificantMemories: function() {
+        const threshold = 20; // Events below 20 significance score fade
+        const oldLength = this.worldLedger.length;
+
+        // Filter the ledger
+        this.worldLedger = this.worldLedger.filter(e => {
+            // Keep if Legendary, Recent (last 14 days), or Significant
+            const isRecent = (window.EngineParams?.worldDay || 0) - e.timestamp.day < 14;
+            const isSignificant = (e.significance + e.historicalWeight) > threshold;
+            const isLegendary = e.legendId || e.isLegendary;
+
+            if (!isRecent && !isSignificant && !isLegendary) {
+                window.EventBus.emit('UI_LOG_DEBUG', `[FORGETTING] Event "${e.type}" faded from history.`);
+                return false;
+            }
+            return true;
+        });
+
+        if (this.worldLedger.length < oldLength) {
+            window.EventBus.emit('UI_LOG', `[HISTORY] ${oldLength - this.worldLedger.length} minor events have been forgotten by time.`);
+        }
+    },
+
 
         /**
      * Records a significant event into the world's memory.

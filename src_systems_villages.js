@@ -363,35 +363,42 @@ window.VillageManager = {
     },
 
         /**
-     * Node 1 & 7: Cultural Adaptation
-     * Culture is inherited memory made habitual.
-     */
-    updateVillageCulture: function(village, eventType, impact) {
-        if (!village.culture) return;
+         * Node 1 & 7: Cultural Adaptation
+         * Culture is inherited memory made habitual.
+         */
+        updateVillageCulture: function(village, eventType, impact) {
+            if (!village.culture) return;
         
-        const traits = village.culture.traits;
+            const traits = village.culture.traits;
         
-        // Repeated events reinforce specific traits
-        switch(eventType) {
-            case 'BARRIER_FAILURE':
-                this.reinforceCultureTrait(village, 'SURVIVALIST', impact * 0.2);
-                this.reinforceCultureTrait(village, 'CAUTIOUS', impact * 0.1);
-                break;
-            case 'FUEL_SHORTAGE':
-                this.reinforceCultureTrait(village, 'STOCKPILING', impact * 0.15);
-                break;
-            case 'TRADE_SUCCESS':
-                this.reinforceCultureTrait(village, 'MERCANTILE', impact * 0.1);
-                this.reinforceCultureTrait(village, 'EXPANSIONIST', impact * 0.05);
-                break;
-            case 'RAID_REPELLED':
-                this.reinforceCultureTrait(village, 'MILITARISTIC', impact * 0.15);
-                break;
-        }
+            // --- CULTURAL MEMORY: PREFERENTIAL REMEMBERING (Node 4) ---
+            // Events aligned with ethos get 2x cultural impact
+            let ethosMultiplier = 1.0;
+            if (village.culture.dominantTrait === 'MILITARISTIC' && eventType === 'RAID_REPELLED') ethosMultiplier = 2.0;
+            if (village.culture.dominantTrait === 'STOCKPILING' && eventType === 'FUEL_SHORTAGE') ethosMultiplier = 2.0;
 
-        // Re-evaluate dominant trait
-        this.evaluateDominantCulture(village);
-    },
+            // Repeated events reinforce specific traits
+            switch(eventType) {
+                case 'BARRIER_FAILURE':
+                    this.reinforceCultureTrait(village, 'SURVIVALIST', impact * 0.2 * ethosMultiplier);
+                    this.reinforceCultureTrait(village, 'CAUTIOUS', impact * 0.1 * ethosMultiplier);
+                    break;
+                case 'FUEL_SHORTAGE':
+                    this.reinforceCultureTrait(village, 'STOCKPILING', impact * 0.15 * ethosMultiplier);
+                    break;
+                case 'TRADE_SUCCESS':
+                    this.reinforceCultureTrait(village, 'MERCANTILE', impact * 0.1 * ethosMultiplier);
+                    this.reinforceCultureTrait(village, 'EXPANSIONIST', impact * 0.05 * ethosMultiplier);
+                    break;
+                case 'RAID_REPELLED':
+                    this.reinforceCultureTrait(village, 'MILITARISTIC', impact * 0.15 * ethosMultiplier);
+                    break;
+            }
+
+            // Re-evaluate dominant trait
+            this.evaluateDominantCulture(village);
+        },
+
 
     reinforceCultureTrait: function(village, traitName, delta) {
         if (!village.culture.traits.has(traitName)) {

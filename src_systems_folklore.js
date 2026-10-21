@@ -80,19 +80,29 @@ class FolkloreEngineSystem {
     }
 
 
-    /**
+        /**
      * Historical Compression Logic
      * Bible §1: Chronicle -> Truth -> History -> Folklore -> Poem
      */
     generatePoem(legend, options = {}) {
-        // Select Class based on Forces and Significance
+        // --- CULTURAL FILTERS (Node 3) ---
+        // Cultures preferentially remember events aligned with their ethos.
+        const originEntity = window.GameCore?.activeEntities.find(e => e.id === legend.actorId);
+        let cultureBias = 'NEUTRAL';
+        if (originEntity && originEntity.villageId) {
+             const village = window.VillageManager?.villages.find(v => v.id === originEntity.villageId);
+             cultureBias = village?.culture.dominantTrait || 'NEUTRAL';
+        }
+
+        // Select Class based on Forces, Significance and Culture
         let poemClass = 'OBSERVATIONAL';
         if (legend.forces?.includes('Crown')) poemClass = 'INSTITUTIONAL';
         if (legend.power > 300) poemClass = 'MYTHIC';
-        if (legend.forces?.includes('Wendigo') || legend.forces?.includes('Huntsman')) poemClass = 'WARNING';
+        if (legend.forces?.includes('Wendigo') || legend.forces?.includes('Huntsman') || cultureBias === 'SURVIVALIST') poemClass = 'WARNING';
         
         // PIVOT: Identify if this is revisional history (Bible §17)
-        if (legend.type === 'SUCCESSION' || legend.type === 'FEUD') poemClass = 'REVISIONAL';
+        if (legend.type === 'SUCCESSION' || legend.type === 'FEUD' || cultureBias === 'MILITARISTIC') poemClass = 'REVISIONAL';
+
 
         const stanzas = this.dna[poemClass];
         const baseStanza = stanzas[Math.floor(Math.random() * stanzas.length)];
@@ -142,9 +152,24 @@ class FolkloreEngineSystem {
     }
 
         applyDistortion(text, pClass, level) {
-        let result = text;
+            let result = text;
         
-        // --- POEM TRAP: CIPHER DISTORTION (Bible §17, Addendum BJ) ---
+            // --- MEMORY DECAY: ARCHEТYPAL SHIFT (Node 4) ---
+            // Details fade, Archetypes remain. Names disappear.
+            if (level > 0.4) {
+                result = result.replace(/lord_\w+_\d+/g, "The Great Leader");
+                result = result.replace(/res_\d+_\d+_\d+/g, "The Commoner");
+                result = result.replace(/intel_\w+/g, "The Secret");
+            }
+
+            if (level > 0.7) {
+                result = result.replace(/The Great Leader/g, "The One Who Led");
+                result = result.replace(/The Commoner/g, "The Lost Soul");
+                result = result.replace(/The Secret/g, "The Light");
+            }
+
+            // --- POEM TRAP: CIPHER DISTORTION (Bible §17, Addendum BJ) ---
+
         // 20 = Administrative Truth (1 Capital + 19 Villages)
         // 40 = Narrative Noise / Confusion
         if (level > 0.5) {

@@ -1266,15 +1266,20 @@ class CrowsEyeSystem {
                         `).join('') || '<div style="font-size:11px; color:#451a03;">No official record published.</div>'}
                     </div>
 
-                    <!-- Layer 4: Folklore -->
+                                        <!-- Layer 4: Folklore -->
                     <div style="border-left:2px solid #a855f7; padding-left:10px;">
                         <div style="font-size:10px; color:#a855f7; font-weight:bold; margin-bottom:5px;">[4] FOLKLORE (What is Remembered)</div>
                         ${layers.folklore.map(p => `
-                            <div style="font-size:11px; color:#94a3b8; line-height:1.4;">"${p.text.substring(0, 100)}..."</div>
+                            <div style="margin-bottom:8px;">
+                                <div style="font-size:9px; color:#fbbf24; font-weight:bold;">${p.title}</div>
+                                <div style="font-size:11px; color:#94a3b8; line-height:1.4; font-style:italic;">"${p.text}"</div>
+                                <div style="font-size:8px; color:#78350f; margin-top:2px;">Fidelity: ${Math.floor(p.fidelity * 100)}% | Dist: ${Math.floor(p.distortionLevel * 100)}%</div>
+                            </div>
                         `).join('') || '<div style="font-size:11px; color:#451a03;">No folklore yet.</div>'}
                     </div>
                 </div>
             </div>`;
+
         });
 
         html += `</div>`;

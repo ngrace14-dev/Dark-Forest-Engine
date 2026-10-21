@@ -951,7 +951,12 @@ class InstitutionalReportUI {
                         if (house.beliefs.size > 0) {
                             html += `<div class="mt-2 text-[8px] text-amber-500 uppercase font-bold border-t border-amber-900/20 pt-1">Institutional Mind</div>`;
                 
+                            // --- HISTORICAL SIGNIFICANCE: MEMORY STRENGTH (Node 8) ---
+                            const memoryStrength = house.archives.length > 20 ? 'CHRONICLED' : house.archives.length > 5 ? 'SELECTIVE' : 'FRAGMENTED';
+                            html += `<div class="mt-1 text-[7px] text-gray-500 uppercase">Memory State: ${memoryStrength}</div>`;
+
                             // Succession Info (Node 12)
+
                             html += `<div class="mt-1 text-[7px] text-gray-400 uppercase">Current Leader: ${house.currentLeader} (Gen ${house.lineage.length})</div>`;
 
                             // --- CULTURAL VISIBILITY (Node 9) ---
