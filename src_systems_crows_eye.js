@@ -856,7 +856,50 @@ class CrowsEyeSystem {
             </tr>`;
         });
                 html += `</table>`;
-        return html;
+                return html;
+    }
+
+    /**
+     * Bureau Explanation Layer for Tree vs Wendigo Conflict.
+     */
+    renderTreeConflictLayer(village) {
+                if (!window.WorldTree || !window.ForceManager) return "";
+
+                const treeStrength = window.ForceManager.getForceStrength('Tree');
+                const wendigoStrength = window.ForceManager.getForceStrength('Wendigo');
+                const continuity = window.WorldTree.continuityRating;
+
+                return `
+                    <div style="margin-top:15px; border-top:1px solid #78350f; padding-top:10px;">
+                        <div style="font-size:11px; color:#10b981; font-weight:bold; margin-bottom:5px;">TREE VS WENDIGO ANALYSIS</div>
+                        <div style="background:rgba(0,0,0,0.4); border:1px solid #065f46; padding:8px; font-size:10px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                <span style="color:#78350f;">GLOBAL CONTINUITY:</span>
+                                <span style="color:#10b981;">${continuity}/1000</span>
+                            </div>
+                            <div style="height:4px; background:#1c1917; width:100%; margin-bottom:10px;">
+                                <div style="height:100%; background:#10b981; width:${(continuity/1000)*100}%;"></div>
+                            </div>
+                    
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                                <div style="border-left:2px solid #10b981; padding-left:5px;">
+                                    <div style="color:#10b981; font-size:8px;">TREE (PRESERVATION)</div>
+                                    <div style="color:#fbbf24; font-size:12px; font-weight:bold;">${treeStrength}</div>
+                                </div>
+                                <div style="border-left:2px solid #ef4444; padding-left:5px;">
+                                    <div style="color:#ef4444; font-size:8px;">WENDIGO (CONSUMPTION)</div>
+                                    <div style="color:#fbbf24; font-size:12px; font-weight:bold;">${wendigoStrength}</div>
+                                </div>
+                            </div>
+                    
+                            <div style="margin-top:8px; color:#94a3b8; font-size:9px; font-style:italic;">
+                                Analysis: ${continuity > 700 ? "Roots are deepening. The Wendigo is starving." : 
+                                          continuity < 300 ? "Continuity is fraying. The Hunger is rising." : 
+                                          "The struggle for memory is balanced."}
+                            </div>
+                        </div>
+                    </div>
+                `;
     }
 
     /**
@@ -949,11 +992,12 @@ class CrowsEyeSystem {
                         <div><span style="color:#78350f;">ESSENCE:</span> <span style="color:#fbbf24;">${v.stats.essence}</span></div>
                         <div><span style="color:#78350f;">PROSPERITY:</span> <span style="color:#10b981;">${v.stats.prosperity}%</span></div>
                     </div>
-                    <div style="margin-top:10px; font-size:10px; border-top:1px solid #451a03; padding-top:5px;">
+                                        <div style="margin-top:10px; font-size:10px; border-top:1px solid #451a03; padding-top:5px;">
                         <span style="color:#78350f;">STATE:</span> <span style="color:#fbbf24;">${v.feudalState || 'DEPENDENT'}</span>
                     </div>
                 </div>
                 ${this.renderContinuityDiagnostic(v)}
+                ${this.renderTreeConflictLayer(v)}
             `;
         } else {
             const profile = window.PersonhoodManager?.getProfile(this.selectedEntityId);

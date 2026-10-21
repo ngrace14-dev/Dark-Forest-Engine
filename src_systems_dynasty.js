@@ -669,11 +669,14 @@ class DynastyManagerSystem {
         }
 
         // SCHISM RESOLUTION CHECK (Phase 4)
-        if (house.activeSchism) {
+                if (house.activeSchism) {
             if (reformist.influence > 0.6) this.resolveSchism(house, 'reformist');
             else if (traditionalist.influence > 0.7 && house.internalConflictLevel < 0.3) this.resolveSchism(house, 'traditionalist');
             else if (radical.influence > 0.4 && house.internalConflictLevel > 0.9) this.resolveSchism(house, 'radical');
         }
+
+        // --- MANIFESTATION TRIGGER: HERALDS OF THE SEED ---
+        this.updateInstitutionalHeralds(house, intel);
 
         // Extreme conflict triggers Belief Civil War
         if (house.internalConflictLevel > 0.8 && !house.activeSchism) {
@@ -809,7 +812,7 @@ class DynastyManagerSystem {
      * Node 5: Belief Civil War
      */
 
-    triggerInstitutionalCrisis(house) {
+        triggerInstitutionalCrisis(house) {
         house.activeSchism = {
             id: `schism_${Date.now()}`,
             type: 'DOCTRINAL_CIVIL_WAR',
@@ -819,6 +822,9 @@ class DynastyManagerSystem {
         window.EventBus.emit('UI_LOG', `[CRISIS] ${house.name.toUpperCase()} HAS ENTERED A STATE OF SCHISM! Internal conflict is paralyzing policy.`);
         window.EventBus.emit('UI_LOG', `[ACTION] Traditionalists and Reformists are issuing competing decrees.`);
         
+        // Manifest physical schism signs
+        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: `🚨 INSTITUTIONAL SCHISM: ${house.name}`, pos: { x: 0, y: 30, z: 0 }, color: '#ef4444' });
+
         // Record in House Memory (Node 8)
         this.recordHouseEvent(house.id, {
             type: 'SCHISM_START',
@@ -826,6 +832,22 @@ class DynastyManagerSystem {
             significance: 100,
             historicalWeight: 50
         });
+    }
+
+    /**
+     * Manifestation Rule: Heralds of the Seed.
+     * Naturally emerging NPCs who prioritize preservation.
+     */
+    updateInstitutionalHeralds(house, intel) {
+        if (house.archives.length > 10 && Math.random() < 0.05) {
+            // Find a village member and promote them to Archivist/Herald
+            const villages = window.VillageManager?.villages.filter(v => v.nobleHouse === house.name);
+            if (villages && villages.length > 0) {
+                const village = villages[0];
+                window.EventBus.emit('UI_LOG', `[CONTINUITY] ${village.name} has appointed a new Master Archivist.`);
+                window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: "📜 New Herald of the Seed Appointed", pos: { x: village.x, y: 10, z: village.z }, color: '#3b82f6' });
+            }
+        }
     }
 
 
