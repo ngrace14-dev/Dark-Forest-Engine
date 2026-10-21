@@ -194,6 +194,9 @@ class IntelManagerSystem {
                 } else {
                     // Forget Low-Value Info
                     record.persistence = window.IntelEnums.PERSISTENCE.FORGOTTEN;
+                    
+                    // Node 6: Knowledge Extinction
+                    window.EventBus.emit('UI_LOG_DEBUG', `[EXTINCTION] Information lost to history: ${record.payload.title}`);
                 }
                 shouldEvict = true;
             }

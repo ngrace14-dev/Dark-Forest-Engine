@@ -939,10 +939,14 @@ class InstitutionalReportUI {
             });
 
                         // Institutional Beliefs & Factions (Phase 3)
-            if (house.beliefs.size > 0) {
-                html += `<div class="mt-2 text-[8px] text-amber-500 uppercase font-bold border-t border-amber-900/20 pt-1">Institutional Mind</div>`;
+                        if (house.beliefs.size > 0) {
+                            html += `<div class="mt-2 text-[8px] text-amber-500 uppercase font-bold border-t border-amber-900/20 pt-1">Institutional Mind</div>`;
                 
-                // Schism Indicator
+                            // Succession Info (Node 12)
+                            html += `<div class="mt-1 text-[7px] text-gray-400 uppercase">Current Leader: ${house.currentLeader} (Gen ${house.lineage.length})</div>`;
+
+                            // Schism Indicator
+
                 if (house.activeSchism) {
                     html += `<div class="mt-1 p-1 bg-red-950 border border-red-700 rounded text-[7px] text-red-200 font-bold text-center animate-pulse uppercase">⚠️ ACTIVE SCHISM: ${house.activeSchism.type}</div>`;
                 }

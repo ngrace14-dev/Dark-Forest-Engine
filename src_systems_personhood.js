@@ -41,29 +41,43 @@ class PersonhoodSystem {
     getProfile(nodeId) {
         if (!this.profiles.has(nodeId)) {
                         const traits = {
-                loyalty: Math.random(),
-                fear: Math.random(),
-                ambition: Math.random(),
-                riskTolerance: Math.random(),
-                cynicism: Math.random(),
-                credibility: 0.3 // DEFAULT: Unknown (0.0 - 1.0)
-            };
+                            loyalty: Math.random(),
+                            fear: Math.random(),
+                            ambition: Math.random(),
+                            riskTolerance: Math.random(),
+                            cynicism: Math.random(),
+                            credibility: 0.3 // DEFAULT: Unknown (0.0 - 1.0)
+                        };
             
-            const archetypeKeys = Object.keys(this.ARCHETYPES);
-            const identity = archetypeKeys[Math.floor(Math.random() * archetypeKeys.length)];
+                        const archetypeKeys = Object.keys(this.ARCHETYPES);
+                        const identity = archetypeKeys[Math.floor(Math.random() * archetypeKeys.length)];
+
+                        // --- GENERATIONAL CIVILIZATION: BIOLOGICAL AGING (Node 1) ---
+                        const initialAge = 18 + Math.floor(Math.random() * 40); // Initial NPCs start as adults
+                        const lifeStage = this.getLifeStage(initialAge);
 
                         this.profiles.set(nodeId, {
-                id: nodeId,
-                traits,
-                identity,
-                                bias: this.ARCHETYPES[identity].bias,
-                relationships: new Map(), // nodeId -> { type, weight, sinceDay }
-                ancestry: { parents: [], children: [], houseFounderDescent: false }, // --- LINEAGE PIVOT ---
-                beliefState: new Map(), // intelId -> { conviction, interpretation, lastUpdate }
-                beliefHistory: [], // History of conclusions drawn
-                apprentices: [], // --- PHASE 4: APPRENTICESHIP ---
-                masterId: null
-            });
+                            id: nodeId,
+                            traits,
+                            identity,
+                            age: initialAge,
+                            lifeStage,
+                            birthDay: window.EngineParams?.worldDay || 0,
+                            mortalityRisk: 0.0,
+                            bias: this.ARCHETYPES[identity].bias,
+                            relationships: new Map(), // nodeId -> { type, weight, sinceDay }
+                            ancestry: { parents: [], children: [], houseFounderDescent: false }, // --- LINEAGE PIVOT ---
+                            beliefState: new Map(), // intelId -> { conviction, interpretation, lastUpdate }
+                            beliefHistory: [], // History of conclusions drawn
+                            apprentices: [], // --- PHASE 4: APPRENTICESHIP ---
+                            masterId: null,
+                            property: {
+                                archives: [], // Intel IDs
+                                homeVillageId: null,
+                                professionalNotes: []
+                            }
+                        });
+
 
             // --- LEGACY REGISTRATION ---
             if (window.LegacyManager) {
@@ -259,13 +273,144 @@ class PersonhoodSystem {
     }
 
         consumeCandidates() {
-        const batch = [...this.wendigoCandidates];
-        this.wendigoCandidates = [];
-        return batch;
-    }
+            const batch = [...this.wendigoCandidates];
+            this.wendigoCandidates = [];
+            return batch;
+        }
 
-    /**
-     * Social Knowledge Sync (Nightly Social Sync)
+        /**
+         * Node 1: Aging Logic
+         */
+        getLifeStage(age) {
+            if (age < 13) return 'CHILD';
+            if (age < 20) return 'ADOLESCENT';
+            if (age < 50) return 'ADULT';
+            if (age < 70) return 'PRIME_ELDER';
+            return 'VENERABLE';
+        }
+
+        /**
+         * Periodically advances ages of all profiles.
+         * Bible: Time is the ultimate filter.
+         */
+        simulateAging() {
+            const currentDay = window.EngineParams?.worldDay || 0;
+        
+            this.profiles.forEach(profile => {
+                // One year passes every 14 days (One Shift cycle = One Season)
+                // Scaling: 1 year per 14 game days
+                if (currentDay % 14 === 0 && currentDay !== profile._lastAgeUpdate) {
+                    profile.age += 1;
+                    profile.lifeStage = this.getLifeStage(profile.age);
+                    profile._lastAgeUpdate = currentDay;
+
+                    // Node 2: Mortality Risk Scaling
+                    if (profile.age > 60) {
+                        const baseRisk = 0.01;
+                        const ageOver = profile.age - 60;
+                        profile.mortalityRisk = baseRisk + (ageOver * 0.005);
+                    }
+
+                    if (Math.random() < profile.mortalityRisk) {
+                        this.triggerNaturalDeath(profile);
+                    }
+                }
+            });
+        }
+
+        triggerNaturalDeath(profile) {
+            window.EventBus.emit('UI_LOG', `[DEATH] ${profile.id} has passed away of natural causes at age ${profile.age}.`);
+        
+            // Find successors (Node 3 & 4)
+            const successorId = this.findSuccessor(profile);
+        
+            if (successorId) {
+                this.transferLegacy(profile.id, successorId);
+            } else {
+                window.EventBus.emit('UI_LOG', `[LOSS] The unique knowledge of ${profile.id} was buried with them.`);
+                window.ChronicleManager?.recordEvent({
+                    actorId: profile.id,
+                    type: 'KNOWLEDGE_LOSS',
+                    detail: `A master of ${profile.identity} died without a successor.`,
+                    significance: 50,
+                    historicalWeight: 20
+                });
+            }
+
+            // Remove from simulation (House handling logic triggers on ENTITY_DIED usually)
+            window.EventBus.emit('ENTITY_DIED', { id: profile.id, cause: 'NATURAL_CAUSES', houseId: profile.houseId });
+        }
+
+        findSuccessor(profile) {
+            // Priority 1: Apprentice
+            if (profile.apprentices.length > 0) {
+                return profile.apprentices[0];
+            }
+            // Priority 2: Eldest Child
+            if (profile.ancestry.children.length > 0) {
+                return profile.ancestry.children[0];
+            }
+            // Priority 3: House Leader (Property goes to the state)
+            if (profile.houseId) {
+                const house = window.DynastyManager?.getHouse(profile.houseId);
+                return house?.currentLeader;
+            }
+            return null;
+        }
+
+        /**
+         * Node 3, 8, 9, 10: Succession Implementation
+         */
+        transferLegacy(sourceId, successorId) {
+            const source = this.profiles.get(sourceId);
+            const successor = this.profiles.get(successorId);
+            if (!source || !successor) return;
+
+            window.EventBus.emit('UI_LOG', `[SUCCESSION] ${successorId} has inherited the legacy of ${sourceId}.`);
+
+            // 1. Property Succession (Node 9)
+            if (window.IntelManager) {
+                const inheritedIntel = window.IntelManager.getIntelForNode(sourceId);
+                inheritedIntel.forEach(intel => {
+                    window.IntelManager.grantOwnership(intel.intel_id, successorId);
+                    successor.property.archives.push(intel.intel_id);
+                });
+            }
+
+            // 2. Credibility Succession (Node 8)
+            // Inheritance of prestige: successor gets 40% of master's credibility as "Starting Reputation"
+            const credibilityBoost = source.traits.credibility * 0.4;
+            successor.traits.credibility = Math.min(1.0, successor.traits.credibility + credibilityBoost);
+
+            // 3. Skill/Knowledge Transfer (Node 4)
+            // Apprentices inherit the identity/bias of their masters
+            if (source.apprentices.includes(successorId)) {
+                successor.identity = source.identity;
+                successor.bias = source.bias;
+            }
+
+            // 4. Belief Succession with Drift (Node 10)
+            source.beliefState.forEach((state, intelId) => {
+                const drift = (Math.random() * 0.4 - 0.2); // +/- 20% drift for the next generation
+                successor.beliefState.set(intelId, {
+                    conviction: Math.max(0, Math.min(1.0, state.conviction + drift)),
+                    interpretation: state.interpretation,
+                    lastUpdate: Date.now()
+                });
+            });
+
+            window.ChronicleManager?.recordEvent({
+                actorId: successorId,
+                type: 'SUCCESSION',
+                detail: `${successorId} succeeded ${sourceId}, inheriting ${inheritedIntel?.length || 0} archives.`,
+                significance: 80,
+                historicalWeight: 40
+            });
+        }
+
+        /**
+         * Social Knowledge Sync (Nightly Social Sync)
+
      * During the simulation, nearby NPCs exchange folklore and traditions.
      */
     syncNearbyKnowledge(nodeA, nodeB) {
