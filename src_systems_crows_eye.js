@@ -855,7 +855,52 @@ class CrowsEyeSystem {
                 <td style="font-size:10px;">${Math.round(e.x)},${Math.round(e.z)}</td>
             </tr>`;
         });
-        html += `</table>`;
+                html += `</table>`;
+        return html;
+    }
+
+    /**
+     * Manifestation Rule: Crow's Eye explains.
+     * Generates a structural explanation of WHY a village is acting the way it is.
+     */
+    renderContinuityDiagnostic(village) {
+        const houseId = `house_${village.nobleHouse.toLowerCase().replace('house ', '')}`;
+        const house = window.DynastyManager?.getHouse(houseId);
+        if (!house) return "";
+
+        const doubtBeliefs = Array.from(house.beliefs.values()).filter(b => b.state === 'DOUBTED' || b.state === 'PRIVATE_DOUBT');
+        
+        let html = `
+            <div style="margin-top:20px; border-top:1px solid #78350f; padding-top:15px;">
+                <div style="font-size:12px; color:#fbbf24; font-weight:bold; margin-bottom:10px;">BUREAU EXPLANATORY LAYER</div>
+                
+                <div style="background:rgba(0,0,0,0.4); border:1px solid #451a03; padding:12px; font-size:11px;">
+                    <div style="margin-bottom:8px;">
+                        <span style="color:#78350f;">MANIFESTATION:</span> 
+                        <span style="color:#fbbf24;">${village.name} behaving inconsistently.</span>
+                    </div>
+                    
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                        <div style="border-left:2px solid #fbbf24; padding-left:10px;">
+                            <div style="color:#fbbf24; font-weight:bold; font-size:10px;">Institutional Doubt</div>
+                            <div style="color:#94a3b8;">${doubtBeliefs.length > 0 ? `Contradictions in ${doubtBeliefs.length} dogmas have triggered local unrest.` : 'Internal policy discord detected.'}</div>
+                        </div>
+                        
+                        ${house.activeSchism ? `
+                        <div style="border-left:2px solid #ef4444; padding-left:10px;">
+                            <div style="color:#ef4444; font-weight:bold; font-size:10px;">Active Schism</div>
+                            <div style="color:#94a3b8;">${house.activeSchism.type}: The institutional core is fractured.</div>
+                        </div>
+                        ` : ''}
+                        
+                        <div style="border-left:2px solid #10b981; padding-left:10px;">
+                            <div style="color:#10b981; font-weight:bold; font-size:10px;">Cultural Priority</div>
+                            <div style="color:#94a3b8;">${village.culture.dominantTrait}: Resources are being redirected to align with this ethos.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
         return html;
     }
 
@@ -894,7 +939,7 @@ class CrowsEyeSystem {
             <div style="color:#78350f; font-size:10px; margin-bottom:15px; font-family:monospace;">ID: ${this.selectedEntityId}</div>
         `;
 
-        if (isVillage) {
+                if (isVillage) {
             const v = ent;
             html += `
                 <div style="background:rgba(0,0,0,0.3); border:1px solid #451a03; padding:10px; margin-bottom:15px;">
@@ -908,6 +953,7 @@ class CrowsEyeSystem {
                         <span style="color:#78350f;">STATE:</span> <span style="color:#fbbf24;">${v.feudalState || 'DEPENDENT'}</span>
                     </div>
                 </div>
+                ${this.renderContinuityDiagnostic(v)}
             `;
         } else {
             const profile = window.PersonhoodManager?.getProfile(this.selectedEntityId);

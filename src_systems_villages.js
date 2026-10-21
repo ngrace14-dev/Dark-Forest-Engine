@@ -419,7 +419,7 @@ window.VillageManager = {
         trait.level = Math.floor(trait.weight * 5); // 0-5 tier system
     },
 
-    evaluateDominantCulture: function(village) {
+        evaluateDominantCulture: function(village) {
         let maxWeight = 0;
         let dominant = 'NEUTRAL';
         
@@ -431,9 +431,15 @@ window.VillageManager = {
         });
 
         if (village.culture.dominantTrait !== dominant) {
+            const oldDominant = village.culture.dominantTrait;
             village.culture.dominantTrait = dominant;
             window.EventBus.emit('UI_LOG', `[CULTURE] ${village.name} has developed a ${dominant} culture.`);
             
+            // Manifest Change
+            if (oldDominant !== 'NEUTRAL') {
+                window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: `CULTURE SHIFT: ${dominant}`, pos: { x: village.x, y: 10, z: village.z }, color: '#fbbf24' });
+            }
+
             // Record transition in Chronicle
             window.ChronicleManager?.recordEvent({
                 actorId: `village_${village.id}`,
@@ -442,6 +448,69 @@ window.VillageManager = {
                 significance: 80,
                 historicalWeight: 40
             });
+        }
+    },
+
+    /**
+     * Manifestation Rule: The world demonstrates.
+     * Converts internal simulation states (Doubt, Schism, Culture) into 3D world consequences.
+     */
+    manifestVillageStates: function(village) {
+        const houseId = `house_${village.nobleHouse.toLowerCase().replace('house ', '')}`;
+        const house = window.DynastyManager?.getHouse(houseId);
+        if (!house) return;
+
+        // 1. INSTITUTIONAL DOUBT (Physical Signs: Public Arguments & Conflicting Bark)
+        const hasDoubt = Array.from(house.beliefs.values()).some(b => b.state === 'DOUBTED' || b.state === 'PRIVATE_DOUBT');
+        if (hasDoubt && Math.random() < 0.05) {
+            const bark = window.FolkloreEngine?.getRandomBark('REVISIONAL') || "The old ways are failing...";
+            window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                text: `[DOUBT] "${bark}"`, 
+                pos: { x: village.x + (Math.random()-0.5)*10, y: 5, z: village.z + (Math.random()-0.5)*10 }, 
+                color: '#f87171' 
+            });
+        }
+
+        // 2. SCHISM (Physical Signs: Split Banners / Rival Bark)
+        if (house.activeSchism && Math.random() < 0.1) {
+            const faction = Math.random() > 0.5 ? 'REFORMIST' : 'TRADITIONALIST';
+            const color = faction === 'REFORMIST' ? '#3b82f6' : '#f59e0b';
+            window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                text: `[SCHISM] ${faction} recruiters active.`, 
+                pos: { x: village.x, y: 8, z: village.z }, 
+                color: color 
+            });
+        }
+
+        // 3. CULTURE (Visible Priorities)
+        if (village.culture.dominantTrait !== 'NEUTRAL' && Math.random() < 0.02) {
+            let message = "";
+            let color = "#94a3b8";
+            switch(village.culture.dominantTrait) {
+                case 'MILITARISTIC': 
+                    message = "Militia drills in progress."; 
+                    color = "#ef4444"; 
+                    break;
+                case 'STOCKPILING': 
+                    message = "Granary expansion ongoing."; 
+                    color = "#10b981"; 
+                    break;
+                case 'SURVIVALIST': 
+                    message = "Rationing enforced."; 
+                    color = "#d97706"; 
+                    break;
+                case 'MERCANTILE': 
+                    message = "Trade fair preparation."; 
+                    color = "#fbbf24"; 
+                    break;
+            }
+            if (message) {
+                window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                    text: `[CULTURE] ${message}`, 
+                    pos: { x: village.x, y: 12, z: village.z }, 
+                    color: color 
+                });
+            }
         }
     },
 
@@ -607,6 +676,10 @@ window.VillageManager = {
         }
 
         village.territory.control = Math.max(0, Math.min(100, village.territory.control + (village.territory.underRaid ? -localRaiders.length * 2 : 1)));
+        
+        // --- PHYSICAL MANIFESTATIONS (Phase 6: Manifestations) ---
+        this.manifestVillageStates(village);
+
         // --- PHASE 6: ECONOMIC CRISES ---
         this.processEconomicCrises(village);
 

@@ -52,7 +52,18 @@ class FolkloreEngineSystem {
         init() {
         this.persistentAnthology = this.loadCrossRunFolklore();
         this.anthology = [...this.persistentAnthology];
-        window.EventBus.emit('UI_LOG', '[Folklore] Poem DNA Engine Active');
+                window.EventBus.emit('UI_LOG', '[Folklore] Poem DNA Engine Active');
+    }
+
+    /**
+     * Retrieves a random stanza for NPC barks based on context.
+     * Manifestation Layer Rule: Folklore is encountered physically first.
+     */
+    getRandomBark(pClass = 'OBSERVATIONAL') {
+        const stanzas = this.dna[pClass] || this.dna['OBSERVATIONAL'];
+        const stanza = stanzas[Math.floor(Math.random() * stanzas.length)];
+        // Take just the first line for a bark
+        return stanza.split(' / ')[0];
     }
 
     /**

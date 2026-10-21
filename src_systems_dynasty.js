@@ -830,6 +830,7 @@ class DynastyManagerSystem {
 
 
 
+            processNarrative(narrative) {
         // Record official history into house archives
         const house = this.houses.get(narrative.bias);
         if (house) {
@@ -838,6 +839,7 @@ class DynastyManagerSystem {
     }
 
     /**
+
      * Defines what each house actively seeks in the information market.
      */
     getInitialDemandProfile(houseKey) {
