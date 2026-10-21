@@ -440,7 +440,7 @@ window.VillageManager = {
                 window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: `CULTURE SHIFT: ${dominant}`, pos: { x: village.x, y: 10, z: village.z }, color: '#fbbf24' });
             }
 
-            // Record transition in Chronicle
+                        // Record transition in Chronicle
             window.ChronicleManager?.recordEvent({
                 actorId: `village_${village.id}`,
                 type: 'CULTURAL_SHIFT',
@@ -448,6 +448,17 @@ window.VillageManager = {
                 significance: 80,
                 historicalWeight: 40
             });
+            
+            // --- PLAYER FOOTPRINT: CULTURE SHIFT ---
+            if (window.DynastyManager) {
+                window.DynastyManager.playerFootprint.civilizational += 5;
+                window.DynastyManager.recordCausalLink(
+                    `Defense of ${village.name}`,
+                    `Cultural Shift to ${dominant}`,
+                    100,
+                    "Institutional Pressure"
+                );
+            }
         }
     },
 

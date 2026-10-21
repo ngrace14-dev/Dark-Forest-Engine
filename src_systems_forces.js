@@ -135,7 +135,7 @@ window.ForceManager = {
         this.recalculateTree();
     },
 
-    recalculateTree: function() {
+        recalculateTree: function() {
         const force = this.forces['Tree'];
         if (!window.VillageManager?.villages) return;
 
@@ -143,8 +143,11 @@ window.ForceManager = {
         const barriers = window.VillageManager.villages.reduce((acc, v) => acc + (v.barrierIntegrity || 0), 0);
         const archives = Array.from(window.DynastyManager?.houses.values() || []).reduce((acc, h) => acc + h.archives.length, 0);
 
-        force.value = Math.floor(barriers / 10) + archives;
-        force.strength = Math.min(1000, 200 + (barriers / 2) + (archives * 10));
+        // --- PLAYER FOOTPRINT INTEGRATION ---
+        const playerBonus = (window.DynastyManager?.playerFootprint?.civilizational || 0);
+
+        force.value = Math.floor(barriers / 10) + archives + playerBonus;
+        force.strength = Math.min(1000, 200 + (barriers / 2) + (archives * 10) + (playerBonus * 5));
     },
 
 

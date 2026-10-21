@@ -26,14 +26,50 @@ class DynastyManagerSystem {
                     }
                 });
 
-                // --- PLAYER INTEGRATION: IMPACT TRACKING (Node 1) ---
-                this.playerImpact = {
+                                // --- PLAYER INTEGRATION: IMPACT TRACKING (Node 1) ---
+                this.playerFootprint = {
+                    political: 0,
+                    cultural: 0,
+                    knowledge: 0,
+                    institutional: 0,
+                    civilizational: 0,
+                    
+                    epithets: new Map(), // house/villageId -> Epithet (e.g. "The Fire-Bringer")
+                    legacyMarkers: new Map(), // nodeId -> [markers]
+                    
                     institutionsInfluenced: new Set(),
                     beliefsAltered: 0,
                     reformsCatalyzed: 0,
                     schismsTriggered: 0,
-                    causalChains: [] // Array of { action, consequence, day }
+                    causalChains: [], // Array of { action, intermediate, consequence, day, significance }
+                    
+                    globalTitle: "The Wanderer"
                 };
+    }
+
+    /**
+     * Records a causal chain starting from a player action.
+     * Bible §1: Action -> Legend -> History.
+     */
+    recordCausalLink(action, consequence, significance = 50, intermediate = null) {
+        const day = window.EngineParams?.worldDay || 0;
+        const chain = { action, intermediate, consequence, day, significance };
+        this.playerFootprint.causalChains.push(chain);
+        
+        // Update Footprint Scores
+        if (action.includes('Report') || action.includes('Intel')) this.playerFootprint.knowledge += 5;
+        if (consequence.includes('Schism') || consequence.includes('Reform')) this.playerFootprint.institutional += 10;
+        if (consequence.includes('Culture')) this.playerFootprint.cultural += 10;
+        
+        window.EventBus.emit('UI_LOG_DEBUG', `[FOOTPRINT] Causal chain recorded: ${action} -> ${consequence}`);
+    }
+
+    /**
+     * Assigns a player epithet to a node based on behavior.
+     */
+    assignEpithet(nodeId, epithet) {
+        this.playerFootprint.epithets.set(nodeId, epithet);
+        window.EventBus.emit('UI_LOG', `[LEGACY] You are now remembered in ${nodeId} as "${epithet}".`);
     }
 
 
@@ -694,9 +730,19 @@ class DynastyManagerSystem {
 
         window.EventBus.emit('UI_LOG', `[SCHISM RESOLVED] The fracture within ${house.name} has ended. The ${winnerId.toUpperCase()} faction is victorious.`);
         
-        // --- PLAYER IMPACT: CATALYZE REFORM (Node 1) ---
+                // --- PLAYER IMPACT: CATALYZE REFORM (Node 1) ---
         if (winnerId === 'reformist' || winnerId === 'radical') {
-            this.playerImpact.reformsCatalyzed++;
+            this.playerFootprint.reformsCatalyzed++;
+            this.playerFootprint.institutional += 20;
+            
+            // Link to causal chain if player influenced this house recently
+            const lastPlayerAction = this.playerFootprint.causalChains.find(c => c.consequence.includes(house.id));
+            this.recordCausalLink(
+                lastPlayerAction ? lastPlayerAction.action : "General Influence",
+                `Victory of ${winnerId} in ${house.name}`,
+                150,
+                "Schism Resolution"
+            );
         }
 
         let detail = "";
@@ -813,17 +859,22 @@ class DynastyManagerSystem {
      */
 
         triggerInstitutionalCrisis(house) {
-        house.activeSchism = {
-            id: `schism_${Date.now()}`,
-            type: 'DOCTRINAL_CIVIL_WAR',
-            startDay: window.EngineParams?.worldDay || 0
-        };
+            house.activeSchism = {
+                id: `schism_${Date.now()}`,
+                type: 'DOCTRINAL_CIVIL_WAR',
+                startDay: window.EngineParams?.worldDay || 0
+            };
 
-        window.EventBus.emit('UI_LOG', `[CRISIS] ${house.name.toUpperCase()} HAS ENTERED A STATE OF SCHISM! Internal conflict is paralyzing policy.`);
-        window.EventBus.emit('UI_LOG', `[ACTION] Traditionalists and Reformists are issuing competing decrees.`);
+            window.EventBus.emit('UI_LOG', `[CRISIS] ${house.name.toUpperCase()} HAS ENTERED A STATE OF SCHISM! Internal conflict is paralyzing policy.`);
+            window.EventBus.emit('UI_LOG', `[ACTION] Traditionalists and Reformists are issuing competing decrees.`);
         
-        // Manifest physical schism signs
-        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: `🚨 INSTITUTIONAL SCHISM: ${house.name}`, pos: { x: 0, y: 30, z: 0 }, color: '#ef4444' });
+            // Update Player Footprint if they caused this
+            this.playerFootprint.schismsTriggered++;
+            this.playerFootprint.institutional += 15;
+            this.playerFootprint.institutionsInfluenced.add(house.id);
+        
+            // Manifest physical schism signs
+            window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: `🚨 INSTITUTIONAL SCHISM: ${house.name}`, pos: { x: 0, y: 30, z: 0 }, color: '#ef4444' });
 
         // Record in House Memory (Node 8)
         this.recordHouseEvent(house.id, {

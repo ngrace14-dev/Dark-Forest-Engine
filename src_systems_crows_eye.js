@@ -1911,9 +1911,9 @@ class CrowsEyeSystem {
         return "Origin Dossier Placeholder";
     }
 
-    renderImpactAnalysisView() {
+        renderImpactAnalysisView() {
         if (!window.DynastyManager) return "Dynasty System Offline";
-        const impact = window.DynastyManager.playerImpact;
+        const impact = window.DynastyManager.playerFootprint;
         const currentGen = window.GameState.playerLegacy?.generation || 1;
 
         let html = `<div style="display:flex; flex-direction:column; gap:25px; height:100%;">`;
@@ -1938,9 +1938,19 @@ class CrowsEyeSystem {
             </div>
         </div>`;
 
+        // --- CAUSAL FOOTPRINT SCORES ---
+        html += `<div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:10px;">
+            ${['political', 'cultural', 'knowledge', 'institutional', 'civilizational'].map(key => `
+                <div style="border:1px solid #451a03; padding:10px; background:rgba(0,0,0,0.3);">
+                    <div style="font-size:8px; color:#78350f; text-transform:uppercase;">${key}</div>
+                    <div style="font-size:14px; color:#fbbf24; font-weight:bold;">${impact[key]}</div>
+                </div>
+            `).join('')}
+        </div>`;
+
         // --- CAUSAL TRACES (Node 2) ---
         html += `<div style="flex-grow:1; overflow-y:auto; border:1px solid #451a03; background:rgba(0,0,0,0.2); padding:15px;">
-            <div style="font-size:12px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:8px; margin-bottom:15px;">HISTORICAL CAUSAL TRACES (ACTION → CONSEQUENCE)</div>
+            <div style="font-size:12px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:8px; margin-bottom:15px;">CAUSAL FOOTPRINT (ACTION → INTERMEDIATE → CONSEQUENCE)</div>
             <div style="display:flex; flex-direction:column; gap:12px;">
                 ${impact.causalChains.slice().reverse().map(c => `
                     <div style="background:rgba(59,130,246,0.05); border:1px solid #1e3a8a; padding:12px; border-left: 4px solid #3b82f6;">
@@ -1948,8 +1958,11 @@ class CrowsEyeSystem {
                             <div style="color:#3b82f6; font-weight:bold; font-size:11px;">[ACTION] ${c.action}</div>
                             <div style="color:#78350f; font-size:9px;">Day ${c.day}</div>
                         </div>
-                        <div style="color:#94a3b8; font-size:11px; margin-left:15px;">
-                            <span style="color:#fbbf24;">⤷ [CONSEQUENCE]</span> ${c.consequence}
+                        <div style="color:#94a3b8; font-size:10px; margin-left:15px; margin-bottom:4px;">
+                            <span style="color:#fbbf24;">⤷ [VIA]</span> ${c.intermediate || 'Direct Impact'}
+                        </div>
+                        <div style="color:#fbbf24; font-size:11px; margin-left:15px;">
+                            <span style="color:#10b981;">⤷ [CONSEQUENCE]</span> ${c.consequence}
                         </div>
                     </div>
                 `).join('') || '<div style="color:#451a03; text-align:center; padding:50px;">Your actions have not yet shifted the course of history.</div>'}
@@ -1962,8 +1975,8 @@ class CrowsEyeSystem {
             <div style="font-size:11px; color:#fbbf24; margin-bottom:10px; border-bottom:1px solid #451a03; padding-bottom:5px;">CIVILIZATION IMPACT DOSSIER (GEN ${currentGen})</div>
             <div style="font-size:10px; color:#94a3b8;">
                 <p>Primary Institutional Target: <span style="color:#fbbf24;">${mostInfluenced}</span></p>
-                <p>Identity Drift Contribution: <span style="color:#10b981;">Significant</span></p>
-                <p>Summary: The ${window.GameState.playerLegacy?.bloodlineId || 'Wanderer'} line has introduced critical doubt into the social fabric, accelerating doctrinal evolution.</p>
+                <p>Global Title: <span style="color:#fbbf24;">${impact.globalTitle}</span></p>
+                <p>Summary: The ${window.GameState.playerLegacy?.bloodlineId || 'Wanderer'} line has introduced critical shifts into the social fabric, accelerating civilizational evolution.</p>
             </div>
         </div>`;
 
