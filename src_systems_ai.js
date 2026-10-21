@@ -583,7 +583,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 en.feedingTimer = 5.0;
                 window.EventBus.emit('UI_LOG_DEBUG', `[STALKER] ${en.name} has begun feeding on ${food.name}.`);
                 
-                // --- WENDIGO FEEDING: ABSORB SIGNIFICANCE ---
+                                // --- WENDIGO FEEDING: ABSORB SIGNIFICANCE ---
                 if (en.name === 'Wendigo' && window.GameState.monsterState.isWendigo && food.id === 'player') {
                      // This case is special - player is fed upon
                 } else if (en.id === 'player' && window.GameState.monsterState.isWendigo) {
@@ -592,10 +592,27 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                     window.GameState.monsterState.consumedSignificance += sig;
                     window.GameState.monsterState.fleshDensity = Math.min(100, window.GameState.monsterState.fleshDensity + 20);
                     window.GameState.monsterState.fedToday = true;
-                    window.EventBus.emit('UI_LOG', `[FEEDING] You consume the flesh of ${food.name}. Its significance flows into you.`);
+
+                    // --- EVOLUTION GATES: VICTIM TIER TRACKING ---
+                    let victimTier = 'COMMON';
+                    if (sig > 50 || food.isTerminusElite || food.role === 'commander') {
+                        victimTier = 'SIGNIFICANT';
+                    }
+                    if (sig >= 100 || food.name === 'Primordial Crow' || food.name === 'Huntsman' || food.name === 'Greater Wendigo') {
+                        victimTier = 'LEGENDARY';
+                    }
+
+                    // Upgrade highest tier if applicable
+                    const tierValues = { 'NONE': 0, 'COMMON': 1, 'SIGNIFICANT': 2, 'LEGENDARY': 3 };
+                    if (tierValues[victimTier] > tierValues[window.GameState.monsterState.highestConsumedTier]) {
+                        window.GameState.monsterState.highestConsumedTier = victimTier;
+                    }
+
+                    window.EventBus.emit('UI_LOG', `[FEEDING] You consume the flesh of ${food.name}. Its significance flows into you. [Tier: ${victimTier}]`);
                 }
             }
         }
+
 
 
         // --- NPC STARVATION (Bible §18) ---

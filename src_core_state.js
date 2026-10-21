@@ -152,18 +152,20 @@ window.GameState = {
     },
 
         // --- WENDIGO SPECTRUM: EVOLUTION ---
-    monsterState: {
-        isWendigo: false,
-        evolutionStage: 'NONE', // LESSER, VAMPIRE, HIGHER, BERZERKER
-        fleshDensity: 0,
-        evolutionPoints: 0,    // --- CONTEXTUAL EVOLUTION: CORE PROGRESSION ---
-        starvationDays: 0,
-        deepColdExposure: 0,
-        isolationWeight: 0,
-        consumedSignificance: 0,
-        yearsLived: 0,
-        fedToday: false
-    },
+        monsterState: {
+            isWendigo: false,
+            evolutionStage: 'NONE', // LESSER, VAMPIRE, HIGHER, BERZERKER, HERALD
+            fleshDensity: 0,
+            evolutionPoints: 0,    // --- CONTEXTUAL EVOLUTION: CORE PROGRESSION ---
+            starvationDays: 0,
+            deepColdExposure: 0,
+            isolationWeight: 0,
+            consumedSignificance: 0,
+            yearsLived: 0,
+            fedToday: false,
+            highestConsumedTier: 'NONE' // Tracks the highest 'class' of victim consumed
+        },
+
 
         forestBlessing: {
         active: false,
@@ -797,19 +799,31 @@ window.GameCore.processMonsterEvolution = function() {
     );
     if (!nearVillage) state.isolationWeight += 0.2;
 
-    // Recalculate evolution points
+        // Recalculate evolution points (Passive accumulation)
+    // NOTE: This score alone can no longer break the Vampire threshold.
     state.evolutionPoints = state.fleshDensity + (state.starvationDays * 2) + state.deepColdExposure + state.isolationWeight + (state.consumedSignificance * 0.1);
 
     state.fedToday = false; 
 
-    if (state.evolutionStage === 'LESSER' && state.evolutionPoints > 100) {
-        state.evolutionStage = 'VAMPIRE';
-        window.EventBus.emit('UI_LOG', "🦇 [EVOLUTION] Your feral hunger has sharpened into intellect. You have become a Vampire.");
+    // --- PHASE 2: EVOLUTION GATES ---
+    // Lesser Wendigo: Requires basic survival stress (points > 100) and some form of starvation/death.
+    if (state.evolutionStage === 'NONE' && state.evolutionPoints > 100 && state.starvationDays > 5) {
+        state.evolutionStage = 'LESSER';
+        window.EventBus.emit('UI_LOG', "🦴 [EVOLUTION] The cold has claimed your humanity. You are a Lesser Wendigo.");
     }
 
-    if (state.evolutionStage === 'VAMPIRE' && state.evolutionPoints > 500) {
+    // Vampire: Requires Points AND consuming a Significant Target
+    const hasSignificantKill = state.highestConsumedTier === 'SIGNIFICANT' || state.highestConsumedTier === 'LEGENDARY';
+    if (state.evolutionStage === 'LESSER' && state.evolutionPoints > 300 && hasSignificantKill) {
+        state.evolutionStage = 'VAMPIRE';
+        window.EventBus.emit('UI_LOG', "🦇 [EVOLUTION] The blood of the worthy has sharpened your feral hunger. You have become a Vampire.");
+    }
+
+    // Higher Vampire: Requires Points AND consuming a Legendary Target (e.g. an Ancient/Force avatar)
+    const hasLegendaryKill = state.highestConsumedTier === 'LEGENDARY';
+    if (state.evolutionStage === 'VAMPIRE' && state.evolutionPoints > 800 && hasLegendaryKill) {
         state.evolutionStage = 'HIGHER';
-        window.EventBus.emit('UI_LOG', "🧛 [ASCENSION] A millennium of blood has purified your curse. You are a Higher Vampire.");
+        window.EventBus.emit('UI_LOG', "🧛 [ASCENSION] You have consumed a Legend. The curse is purified. You are a Higher Vampire.");
         
         // --- HIGHER VAMPIRE BUFFS ---
         window.GameState.pStats.maxHp *= 2;
@@ -817,11 +831,13 @@ window.GameCore.processMonsterEvolution = function() {
         window.EngineParams.godMode = true; 
     }
 
-    if (state.fleshDensity === 0 && state.evolutionStage !== 'BERZERKER' && state.evolutionStage !== 'HIGHER') {
+    // Berzerker: Fallback state for entities that starve too long without evolving
+    if (state.fleshDensity === 0 && state.starvationDays > 30 && state.evolutionStage !== 'BERZERKER' && state.evolutionStage !== 'HIGHER') {
         state.evolutionStage = 'BERZERKER';
         window.EventBus.emit('UI_LOG', "🔥 [FORCED EVOLUTION] Starvation has broken your will. You are now a Berzerker under the Sovereign's control.");
     }
 };
+
 
 
 window.GameCore.applyShiftScattering = function() {
