@@ -572,10 +572,31 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 
                 const hostile = en.def.faction === 'monster' || en.def.faction === 'forest' || window.GameState.reputation[en.def.faction] <= -50;
 
-                        // --- MONSTER LIFE CYCLES: FEEDING & GROWTH ---
+                                // --- MONSTER LIFE CYCLES: FEEDING & GROWTH ---
         if (hostile && en.def.type === 'npc' && !en.isFeeding) {
-            // ... existing feeding logic ...
+            // Check for nearby corpses or downed entities
+            const nearby = window.GameCore.SpatialGrid.getNearbyEntities(en.visual.position.x, en.visual.position.z, 5);
+            const food = nearby.find(f => (f.currentAnimState === 'die' || f.downed) && f.hp <= 0 && f !== en);
+            
+            if (food) {
+                en.isFeeding = true;
+                en.feedingTimer = 5.0;
+                window.EventBus.emit('UI_LOG_DEBUG', `[STALKER] ${en.name} has begun feeding on ${food.name}.`);
+                
+                // --- WENDIGO FEEDING: ABSORB SIGNIFICANCE ---
+                if (en.name === 'Wendigo' && window.GameState.monsterState.isWendigo && food.id === 'player') {
+                     // This case is special - player is fed upon
+                } else if (en.id === 'player' && window.GameState.monsterState.isWendigo) {
+                    // Player Wendigo feeding
+                    const sig = food.significance || (food.def?.faction === 'monster' ? 5 : 20);
+                    window.GameState.monsterState.consumedSignificance += sig;
+                    window.GameState.monsterState.fleshDensity = Math.min(100, window.GameState.monsterState.fleshDensity + 20);
+                    window.GameState.monsterState.fedToday = true;
+                    window.EventBus.emit('UI_LOG', `[FEEDING] You consume the flesh of ${food.name}. Its significance flows into you.`);
+                }
+            }
         }
+
 
         // --- NPC STARVATION (Bible §18) ---
         if (en.def.type === 'npc' && en.def.faction !== 'monster' && !en.companionId) {

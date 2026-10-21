@@ -1,5 +1,5 @@
 /**
- * File: src_systems_intel.js
+ * File: sdurc_systems_intel.js
  * Phase 6.1 & 6.2 - World Intelligence Architecture
  * 
  * Implements the Core Ledger (IntelManager) and Information Logistics (Propagation).
@@ -63,6 +63,11 @@ class IntelManagerSystem {
     register(data) {
         const id = this._generateId();
         
+        // --- TRUTH / KNOWLEDGE / BELIEF SEPARATION ---
+        // Truth exists objectively (data.truth_state).
+        // Knowledge is possessed (ownershipRegistry).
+        // Belief is interpreted (data.certainty / data.plausibility).
+
         const record = {
             intel_id: id,
             parent_intel_id: data.parent_intel_id || null,
@@ -77,20 +82,18 @@ class IntelManagerSystem {
                 title: data.payload?.title || "Unknown Event",
                 description: data.payload?.description || "",
                 tags: data.payload?.tags || [],
-                target_coord: data.payload?.target_coord || { x: 0, z: 0 }
+                target_coord: data.payload?.target_coord || { x: 0, z: 0 },
+                timestamp_day: data.payload?.timestamp_day || window.EngineParams?.worldDay || 0
             },
             
-            // [{ node_id, timestamp, origin_type, source_faction }]
+            // --- MEMORY NODE PROVENANCE (§Information Ownership) ---
+            // [{ node_id, timestamp, origin_type, source_faction, witness_type, certainty_at_source }]
             provenance: data.provenance ? [...data.provenance] : [],
             
-            // Phase 6.3 Hardening Additions
-            certainty: data.certainty ?? 0.1, // 0.0 - 1.0 (Subjective belief)
-            truth_state: data.truth_state || window.IntelEnums.TRUTH_STATE.UNKNOWN, // (Objective reality)
-            plausibility_score: data.plausibility_score ?? 0.5, // How believable is this on its face?
-            source_credibility: data.source_credibility ?? 0.5, // Reputation of the original creator
-            verification_complexity: data.verification_complexity || 'MODERATE',
-            dispute_state: data.dispute_state || 'NONE',
-            redundancy_requirement: data.redundancy_requirement || 'NONE',
+            certainty: data.certainty ?? 0.1, 
+            truth_state: data.truth_state || window.IntelEnums.TRUTH_STATE.UNKNOWN,
+            plausibility_score: data.plausibility_score ?? 0.5,
+            source_credibility: data.source_credibility ?? 0.5,
             
             significance: {
                 historical: data.significance?.historical || 0,
@@ -100,7 +103,6 @@ class IntelManagerSystem {
                 crow: data.significance?.crow || 0
             },
 
-            // --- PHASE 5: FORCE ALIGNMENT ---
             associatedForces: data.associatedForces || [],
             
             suppression_level: data.suppression_level || 0,
@@ -112,6 +114,43 @@ class IntelManagerSystem {
         this.ownershipRegistry.set(id, new Set());
         window.EventBus.emit('INTEL_REGISTERED', record);
         return id;
+    }
+
+    /**
+     * Physical Witness Hook: Only entities present at an event gain the knowledge.
+     * Bible §Information Ownership
+     */
+    recordWitnessedEvent(eventData, radius = 50) {
+        const truthId = this.register({
+            ...eventData,
+            truth_state: window.IntelEnums.TRUTH_STATE.TRUE,
+            certainty: 1.0,
+            type: window.IntelEnums.TYPES.FACT
+        });
+
+        const pos = eventData.payload.target_coord;
+        if (!pos) return truthId;
+
+        const witnesses = window.GameCore.SpatialGrid.getNearbyEntities(pos.x, pos.z, radius);
+        
+        witnesses.forEach(w => {
+            if (w.def?.type === 'npc' || w.id === 'player') {
+                this.grantOwnership(truthId, w.id);
+                
+                // Add initial provenance for the witness
+                const record = this.registry.get(truthId);
+                record.provenance.push({
+                    node_id: w.id,
+                    timestamp: window.EngineParams.worldDay,
+                    origin_type: 'DIRECT_WITNESS',
+                    witness_type: 'EYE_WITNESS',
+                    certainty_at_source: 1.0,
+                    source_faction: w.def?.faction || 'player'
+                });
+            }
+        });
+
+        return truthId;
     }
 
     lookup(intel_id) {
@@ -283,7 +322,15 @@ window.IntelPropagation = {
                 version: intel.version + 1,
                 certainty: newCertainty,
                 type: window.IntelEnums.TYPES.RUMOR, // Degrades to rumor
-                spread_generation: intel.spread_generation + 1
+                spread_generation: intel.spread_generation + 1,
+                provenance: [...intel.provenance, {
+                    node_id: targetNode.id,
+                    timestamp: window.EngineParams?.worldDay || 0,
+                    origin_type: 'HEARSAY',
+                    witness_type: 'REPORTER',
+                    transmission_count: (intel.provenance[intel.provenance.length - 1]?.transmission_count || 0) + 1,
+                    source_faction: targetNode.faction || 'Neutral'
+                }]
             });
             window.EventBus.emit('UI_LOG_DEBUG', `[INTEL] Information distorted upon reaching ${targetNode.id}.`);
         } else {
@@ -292,7 +339,15 @@ window.IntelPropagation = {
                 ...intel,
                 parent_intel_id: intel_id,
                 version: intel.version + 1,
-                spread_generation: intel.spread_generation + 1
+                spread_generation: intel.spread_generation + 1,
+                provenance: [...intel.provenance, {
+                    node_id: targetNode.id,
+                    timestamp: window.EngineParams?.worldDay || 0,
+                    origin_type: 'PROPAGATION',
+                    witness_type: 'REPORTER',
+                    transmission_count: (intel.provenance[intel.provenance.length - 1]?.transmission_count || 0) + 1,
+                    source_faction: targetNode.faction || 'Neutral'
+                }]
             });
         }
 

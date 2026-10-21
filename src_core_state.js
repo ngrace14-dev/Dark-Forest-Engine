@@ -116,12 +116,13 @@ window.GameState = {
         matchState: 'hub',
         objective: 'Awaiting a match'
     },
-        narrator: {
+                narrator: {
         avatar: 'crow',
         targetId: null,
         targetName: 'An unnamed survivor',
         attention: 0,
         targetHeat: 0,
+        previousHeat: 0, // --- CROW VELOCITY: TRACKING DELTA ---
         lastActionDay: 0,
         safeDays: 0,
         playerClaimed: false,
@@ -130,6 +131,7 @@ window.GameState = {
         // --- NOBLE HOUSE CROW: ENDGAME BLESSING ---
         crowsBlessingEarned: false 
     },
+
         // --- CULTIVATION & CONSUMPTION: THE MANTLE ---
     huntsmanMantle: {
         currentHuntsmanId: 'huntsman_init',
@@ -149,14 +151,20 @@ window.GameState = {
         ]
     },
 
-    // --- WENDIGO SPECTRUM: EVOLUTION ---
+        // --- WENDIGO SPECTRUM: EVOLUTION ---
     monsterState: {
         isWendigo: false,
         evolutionStage: 'NONE', // LESSER, VAMPIRE, HIGHER, BERZERKER
         fleshDensity: 0,
+        evolutionPoints: 0,    // --- CONTEXTUAL EVOLUTION: CORE PROGRESSION ---
+        starvationDays: 0,
+        deepColdExposure: 0,
+        isolationWeight: 0,
+        consumedSignificance: 0,
         yearsLived: 0,
         fedToday: false
     },
+
         forestBlessing: {
         active: false,
         tier: 'none',
@@ -601,41 +609,68 @@ window.GameCore = {
         window.EventBus.emit('UI_UPDATE_HUD');
     },
         evaluateCrowInterest: function() {
-        const narrator = window.GameState.narrator;
+            const narrator = window.GameState.narrator;
         
-        // 1. Identify current most significant entities
-        const candidates = (window.AdventurerManager?.records || [])
-            .filter(record => record.alive !== false)
-            .map(r => ({ id: r.id, name: r.name, heat: r.storyHeat || 0 }));
+            // --- CROW AFFINITY TABLE (Bible §Force) ---
+            const affinity = {
+                'adventurer': 1.0,
+                'explorer': 0.9,
+                'scholar': 0.8,
+                'soldier': 0.7,
+                'noble': 0.4,
+                'laborer': 0.2,
+                'none': 0.5
+            };
+
+            // 1. Identify current most significant entities and calculate Velocity
+            const candidates = (window.AdventurerManager?.records || [])
+                .filter(record => record.alive !== false)
+                .map(r => {
+                    const heat = r.storyHeat || 0;
+                    const prevHeat = r.previousHeat || 0;
+                    const velocity = Math.max(0, heat - prevHeat);
+                    const role = r.role || 'none';
+                    const roleMult = affinity[role] || 0.5;
+                
+                    // CrowInterestScore = Velocity * CareerAffinity
+                    const score = (velocity + (heat * 0.05)) * roleMult; 
+                    return { id: r.id, name: r.name, score: score, heat: heat };
+                });
             
-        // Include player in the significance check
-        candidates.push({ id: 'player', name: 'The Wanderer', heat: narrator.targetHeat });
+            // Include player in the velocity check
+            const pHeat = narrator.targetHeat;
+            const pPrevHeat = narrator.previousHeat;
+            const pVelocity = Math.max(0, pHeat - pPrevHeat);
+            const pRole = window.GameState.gladiator.role || 'adventurer'; // Fallback to adventurer
+            const pScore = (pVelocity + (pHeat * 0.05)) * (affinity[pRole] || 1.0);
         
-        // Sort by story density / significance
-        candidates.sort((a, b) => b.heat - a.heat);
-        const topHero = candidates[0];
+            candidates.push({ id: 'player', name: 'The Wanderer', score: pScore, heat: pHeat });
+        
+            // Sort by CrowInterestScore (Significance Velocity)
+            candidates.sort((a, b) => b.score - a.score);
+            const topHero = candidates[0];
 
-        if (topHero && topHero.id !== narrator.targetId) {
-            const oldTargetId = narrator.targetId;
-            narrator.targetId = topHero.id;
-            narrator.targetName = topHero.name;
-            narrator.playerClaimed = (topHero.id === 'player');
+            if (topHero && topHero.id !== narrator.targetId && topHero.score > 0) {
+                const oldTargetId = narrator.targetId;
+                narrator.targetId = topHero.id;
+                narrator.targetName = topHero.name;
+                narrator.playerClaimed = (topHero.id === 'player');
 
-            // --- PHYSICAL MANIFESTATION: THE CROW MODEL ---
-            this.syncCrowModel(topHero.id);
+                // --- PHYSICAL MANIFESTATION: THE CROW MODEL ---
+                this.syncCrowModel(topHero.id);
 
-            if (narrator.playerClaimed) {
-                if (window.GameCore.applyForestBlessing) window.GameCore.applyForestBlessing(window.GameCore.playerObj, true);
-                window.EventBus.emit('UI_LOG', `[THE CROW] It abandons the quiet tale and follows you.`);
-            } else {
-                // If it left the player, remove blessing
-                if (oldTargetId === 'player') {
-                    this.loseForestBlessing();
+                if (narrator.playerClaimed) {
+                    if (window.GameCore.applyForestBlessing) window.GameCore.applyForestBlessing(window.GameCore.playerObj, true);
+                    window.EventBus.emit('UI_LOG', `[THE CROW] A story of high velocity catches its eye. It follows you.`);
+                } else {
+                    if (oldTargetId === 'player') {
+                        this.loseForestBlessing();
+                    }
+                    window.EventBus.emit('UI_LOG', `[THE CROW] It abandons the quiet tale for the emerging legend of ${topHero.name}.`);
                 }
-                window.EventBus.emit('UI_LOG', `[THE CROW] It abandons the quiet tale and follows ${topHero.name}.`);
             }
-        }
-    },
+        },
+
 
     /**
      * Spawns/Teleports the physical Crow model to the target.
@@ -670,11 +705,20 @@ window.GameCore = {
         window.EventBus.emit('UI_LOG', '[THE CROW] Your story has gone still. The forest mark fades.');
     },
 
-    processCrowDay: function() {
+        processCrowDay: function() {
         const narrator = window.GameState.narrator;
         
+        // Save previous heat for velocity calculation
+        if (window.AdventurerManager?.records) {
+            window.AdventurerManager.records.forEach(r => {
+                r.previousHeat = r.storyHeat || 0;
+            });
+        }
+        narrator.previousHeat = narrator.targetHeat;
+
         // Decay Heat if idle
         if (narrator.targetId === 'player') {
+
             const player = window.GameCore.playerObj;
             const sheltered = player && (window.EngineParams.isPlayerSafe || window.RoadManager?.isVillageProtected(player.visual.position));
             
@@ -727,32 +771,58 @@ window.GameCore.processMonsterEvolution = function() {
 
     state.yearsLived += 1/14; 
     
+    // --- CONTEXTUAL EVOLUTION MATH ---
+    // EvolutionPoints = Consumption + Starvation Duration + Deep Cold Exposure + Isolation Weight + Consumed Significance
+    
     if (!state.fedToday) {
         state.fleshDensity = Math.max(0, state.fleshDensity - 5);
+        state.starvationDays++;
+    } else {
+        state.starvationDays = 0;
     }
+    
+    // Deep Cold Exposure (Check if player is in cold biome)
+    if (window.GameCore.playerObj) {
+        const pos = window.GameCore.playerObj.visual.position;
+        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
+        const distFromCenter = Math.hypot(pos.x, pos.z);
+        if (distFromCenter > (forestSide * 0.4)) {
+            state.deepColdExposure += 0.5;
+        }
+    }
+
+    // Isolation Weight (Check proximity to villages)
+    const nearVillage = window.VillageManager?.villages.some(v => 
+        Math.hypot(v.x - window.GameCore.playerObj.visual.position.x, v.z - window.GameCore.playerObj.visual.position.z) < 1000
+    );
+    if (!nearVillage) state.isolationWeight += 0.2;
+
+    // Recalculate evolution points
+    state.evolutionPoints = state.fleshDensity + (state.starvationDays * 2) + state.deepColdExposure + state.isolationWeight + (state.consumedSignificance * 0.1);
+
     state.fedToday = false; 
 
-    if (state.evolutionStage === 'LESSER' && state.fleshDensity > 50) {
+    if (state.evolutionStage === 'LESSER' && state.evolutionPoints > 100) {
         state.evolutionStage = 'VAMPIRE';
         window.EventBus.emit('UI_LOG', "🦇 [EVOLUTION] Your feral hunger has sharpened into intellect. You have become a Vampire.");
     }
 
-        if (state.evolutionStage === 'VAMPIRE' && state.yearsLived >= 1000) {
+    if (state.evolutionStage === 'VAMPIRE' && state.evolutionPoints > 500) {
         state.evolutionStage = 'HIGHER';
         window.EventBus.emit('UI_LOG', "🧛 [ASCENSION] A millennium of blood has purified your curse. You are a Higher Vampire.");
         
         // --- HIGHER VAMPIRE BUFFS ---
         window.GameState.pStats.maxHp *= 2;
         window.GameState.pStats.hp = window.GameState.pStats.maxHp;
-        window.EngineParams.godMode = true; // Temporary/Partial invulnerability? Or just high regen.
+        window.EngineParams.godMode = true; 
     }
 
-
-    if (state.fleshDensity === 0 && state.evolutionStage !== 'BERZERKER') {
+    if (state.fleshDensity === 0 && state.evolutionStage !== 'BERZERKER' && state.evolutionStage !== 'HIGHER') {
         state.evolutionStage = 'BERZERKER';
         window.EventBus.emit('UI_LOG', "🔥 [FORCED EVOLUTION] Starvation has broken your will. You are now a Berzerker under the Sovereign's control.");
     }
 };
+
 
 window.GameCore.applyShiftScattering = function() {
     if (!window.GameCore.activeEntities) return;
