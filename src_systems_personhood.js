@@ -70,8 +70,10 @@ class PersonhoodSystem {
                             birthDay: window.EngineParams?.worldDay || 0,
                             mortalityRisk: 0.0,
                             bias: this.ARCHETYPES[identity].bias,
-                            relationships: new Map(), // nodeId -> { type, weight, sinceDay }
+                            // --- SOCIAL TRUST NETWORKS (Node 1) ---
+                            relationships: new Map(), // nodeId -> { trust, respect, loyalty, suspicion, fear, sinceDay }
                             ancestry: { parents: [], children: [], houseFounderDescent: false }, // --- LINEAGE PIVOT ---
+
                             beliefState: new Map(), // intelId -> { conviction, interpretation, lastUpdate }
                             beliefHistory: [], // History of conclusions drawn
                             apprentices: [], // --- PHASE 4: APPRENTICESHIP ---
@@ -192,26 +194,18 @@ class PersonhoodSystem {
         return conclusion;
     }
 
-    getPersonalTrust(nodeId, sourceId, faction) {
+        getPersonalTrust(nodeId, sourceId, faction) {
         const profile = this.getProfile(nodeId);
         
-        // RELATIONSHIP PIVOT: Check for specific social bonds
+        // --- SOCIAL TRUST NETWORKS: SELECTIVE TRUST (Node 2) ---
         if (profile.relationships.has(sourceId)) {
-            const link = profile.relationships.get(sourceId);
-            const multipliers = {
-                'KINSHIP': 1.8,    // Family is absolute (Bible)
-                'LOYALTY': 1.5,
-                'FRIENDSHIP': 1.4,
-                'MENTORSHIP': 1.3,
-                'OBLIGATION': 1.1,
-                'ADMIRATION': 1.2,
-                'DISTRUST': 0.3,
-                'RIVALRY': 0.2     // Rivals reject truth from each other
-            };
-            return Math.min(1.0, (link.weight || 0.5) * (multipliers[link.type] || 1.0));
+            const rel = profile.relationships.get(sourceId);
+            // Compound Trust score from multiple dimensions
+            const socialWeight = (rel.trust * 1.5 + rel.respect * 1.0 + rel.loyalty * 2.0) - (rel.suspicion * 1.5 + rel.fear * 0.5);
+            return Math.max(0.1, Math.min(1.0, 0.5 + (socialWeight * 0.1)));
         }
 
-        // Fallback to Institutional Trust (Phase 3 Integration)
+        // Fallback to Institutional Trust
         if (window.ReputationManager) {
             return window.ReputationManager.calculateTrust({ id: sourceId, faction }, { id: nodeId, faction: profile.bias });
         }
@@ -219,21 +213,31 @@ class PersonhoodSystem {
         return 0.5;
     }
 
-    setRelationship(nodeId, targetId, type, weight = 0.5) {
+    setRelationship(nodeId, targetId, type, values = {}) {
         const profile = this.getProfile(nodeId);
         profile.relationships.set(targetId, {
-            type: type,
-            weight: weight,
+            trust: values.trust ?? 0.5,
+            respect: values.respect ?? 0.5,
+            loyalty: values.loyalty ?? 0.0,
+            suspicion: values.suspicion ?? 0.0,
+            fear: values.fear ?? 0.0,
             sinceDay: window.EngineParams?.worldDay || 0
         });
     }
 
-        updateRelationship(nodeId, targetId, delta) {
-            const profile = this.getProfile(nodeId);
-            const current = profile.relationships.get(targetId) || { type: 'NEUTRAL', weight: 0.5 };
-            current.weight = Math.max(0, Math.min(1.0, current.weight + delta));
-            profile.relationships.set(targetId, current);
-        }
+    updateRelationship(nodeId, targetId, deltas) {
+        const profile = this.getProfile(nodeId);
+        const rel = profile.relationships.get(targetId) || { trust: 0.5, respect: 0.5, loyalty: 0.0, suspicion: 0.0, fear: 0.0 };
+        
+        if (deltas.trust) rel.trust = Math.max(0, Math.min(1.0, rel.trust + deltas.trust));
+        if (deltas.respect) rel.respect = Math.max(0, Math.min(1.0, rel.respect + deltas.respect));
+        if (deltas.loyalty) rel.loyalty = Math.max(0, Math.min(1.0, rel.loyalty + deltas.loyalty));
+        if (deltas.suspicion) rel.suspicion = Math.max(0, Math.min(1.0, rel.suspicion + deltas.suspicion));
+        if (deltas.fear) rel.fear = Math.max(0, Math.min(1.0, rel.fear + deltas.fear));
+        
+        profile.relationships.set(targetId, rel);
+    }
+
 
         /**
          * Updates an NPC's global credibility score.
@@ -404,9 +408,15 @@ class PersonhoodSystem {
             if (source.apprentices.includes(successorId)) {
                 successor.identity = source.identity;
                 successor.bias = source.bias;
+            
+                // --- APPRENTICESHIP TRUST (Node 3) ---
+                // Masters grant high initial trust and respect to their apprentices
+                this.setRelationship(sourceId, successorId, 'MENTORSHIP', { trust: 0.9, respect: 0.8, loyalty: 1.0 });
+                this.setRelationship(successorId, sourceId, 'MENTORSHIP', { trust: 0.9, respect: 1.0, loyalty: 1.0 });
             }
 
             // --- CULTURAL INHERITANCE (Node 3) ---
+
             // Successors inherit the behavioral traits and ambitions influenced by local culture
             const village = window.VillageManager?.villages.find(v => v.id === source.property.homeVillageId);
             if (village && village.culture.dominantTrait !== 'NEUTRAL') {
@@ -421,7 +431,6 @@ class PersonhoodSystem {
             }
 
             // 4. Belief Succession with Drift (Node 10)
-
             source.beliefState.forEach((state, intelId) => {
                 const drift = (Math.random() * 0.4 - 0.2); // +/- 20% drift for the next generation
                 successor.beliefState.set(intelId, {
@@ -431,7 +440,21 @@ class PersonhoodSystem {
                 });
             });
 
+            // --- INHERITED TRUST (Node 5) ---
+            // Successors inherit 50% of the source's social trust and respect from their networks
+            source.relationships.forEach((rel, nodeId) => {
+                const inheritedRel = {
+                    trust: rel.trust * 0.5,
+                    respect: rel.respect * 0.5,
+                    loyalty: 0.0,
+                    suspicion: rel.suspicion * 0.5,
+                    fear: rel.fear * 0.5
+                };
+                this.updateRelationship(nodeId, successorId, inheritedRel);
+            });
+
             window.ChronicleManager?.recordEvent({
+
                 actorId: successorId,
                 type: 'SUCCESSION',
                 detail: `${successorId} succeeded ${sourceId}, inheriting ${inheritedIntel?.length || 0} archives.`,

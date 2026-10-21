@@ -428,19 +428,26 @@ class DynastyManagerSystem {
     }
 
         /**
-     * THE RARE PART (Node 3: Institution)
-     * Receives a report from an individual member.
-     */
-    submitReport(houseId, reporterId, intelId) {
-        const house = this.houses.get(houseId);
-        const profile = window.PersonhoodManager?.getProfile(reporterId);
-        const intel = window.IntelManager?.lookup(intelId);
+         * THE RARE PART (Node 3: Institution)
+         * Receives a report from an individual member.
+         */
+        submitReport(houseId, reporterId, intelId) {
+            const house = this.houses.get(houseId);
+            const profile = window.PersonhoodManager?.getProfile(reporterId);
+            const intel = window.IntelManager?.lookup(intelId);
         
-        if (!house || !profile || !intel) return;
+            if (!house || !profile || !intel) return;
 
-        // Credibility Filter (Node 2)
-        // Only reports from credible sources or highly certain intel are buffered
-        const reportWeight = profile.traits.credibility * intel.certainty;
+            // --- SOCIAL TRUST NETWORKS: REPUTATION WEIGHT (Node 2 & 6) ---
+            // A report from a highly trusted/respected member is institutionalized faster
+            let reputationBonus = 1.0;
+            if (reporterId === 'player_node' || reporterId === 'player') {
+                 reputationBonus = 0.5 + (profile.traits.credibility * 1.5);
+            }
+
+            // Credibility Filter (Node 2)
+            const reportWeight = profile.traits.credibility * intel.certainty * reputationBonus;
+
         if (reportWeight < 0.3) {
             window.EventBus.emit('UI_LOG_DEBUG', `[DYNASTY] ${house.name} dismissed weak report from ${reporterId}.`);
             return;
