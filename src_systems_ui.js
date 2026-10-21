@@ -978,12 +978,29 @@ class InstitutionalReportUI {
                     `;
                 });
 
-                // Faction Display
+                                // Faction Display
                 if (house.factions.size > 0) {
+                                        html += `
+                        <div class="mt-1 p-1 bg-white/5 rounded border border-white/5">
+                            <div class="flex justify-between items-center mb-1 border-b border-white/5 pb-1">
+                                <span class="text-[6px] text-amber-500 uppercase font-bold">Identity</span>
+                                <span class="text-[6px] text-gray-500 italic">Drift: ${Math.floor(house.identityDrift * 100)}%</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-[7px]">
+                                <div><span class="text-gray-500">Mission:</span> <span class="text-blue-300">${house.currentIdentity.mission}</span></div>
+                                <div><span class="text-gray-500">Fear:</span> <span class="text-red-300">${house.currentIdentity.fear}</span></div>
+                            </div>
+                            <div class="mt-1 text-[6px] text-gray-500 uppercase font-bold">Reforms: ${house.reformHistory.length}</div>
+                        </div>
+                    `;
+                    
                     html += `<div class="mt-2 grid grid-cols-3 gap-1">`;
+
                     house.factions.forEach((faction, id) => {
+                        const isWinner = faction.influence > 0.8 && !house.activeSchism;
+                        const bgColor = isWinner ? 'bg-green-900/40' : 'bg-black/40';
                         html += `
-                            <div class="p-1 bg-black/40 border border-white/5 rounded flex flex-col items-center">
+                            <div class="p-1 ${bgColor} border border-white/5 rounded flex flex-col items-center">
                                 <span class="text-[6px] text-gray-500 uppercase font-bold">${id}</span>
                                 <span class="text-[8px] text-white font-black">${Math.floor(faction.influence * 100)}%</span>
                                 <div class="w-full h-0.5 bg-gray-800 mt-1"><div class="h-full bg-amber-500" style="width: ${faction.influence * 100}%"></div></div>
@@ -992,6 +1009,7 @@ class InstitutionalReportUI {
                     });
                     html += `</div>`;
                 }
+
             }
 
 

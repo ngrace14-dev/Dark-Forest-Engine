@@ -63,6 +63,21 @@ class DynastyManagerSystem {
                                 factions: new Map(), // factionId -> { type, influence, members, specificBeliefs }
                                 internalConflictLevel: 0.0, // 0.0 to 1.0
                                 activeSchism: null,
+                
+                                // --- INSTITUTIONAL EVOLUTION (Phase 4) ---
+                                reformHistory: [], // Array of { winnerId, day, doctrineShift }
+                                foundingIdentity: { 
+                                    mission: 'PRESERVE_ORDER', 
+                                    fear: 'INSTABILITY', 
+                                    priorities: ['TRADITION', 'LOYALTY'] 
+                                },
+                                currentIdentity: { 
+                                    mission: 'PRESERVE_ORDER', 
+                                    fear: 'INSTABILITY', 
+                                    priorities: ['TRADITION', 'LOYALTY'] 
+                                },
+                                identityDrift: 0.0,
+
 
 
                 
@@ -582,7 +597,192 @@ class DynastyManagerSystem {
         }
     }
 
-    processNarrative(narrative) {
+        /**
+     * Node 3: Faction Strength & Influence
+     */
+    updateFactionInfluence(house, intel) {
+        const reformist = house.factions.get('reformist');
+        const traditionalist = house.factions.get('traditionalist');
+        const radical = house.factions.get('radical');
+        
+        if (!reformist || !traditionalist || !radical) return;
+
+        // Contradictory intel empowers Reformists/Radicals
+        const contradictions = Array.from(house.beliefs.keys()).filter(k => this.getIntelBeliefRelationship(intel, k) === 'CONTRADICT');
+        
+        if (contradictions.length > 0) {
+            const shift = 0.05 * intel.certainty;
+            reformist.influence = Math.min(0.9, reformist.influence + shift);
+            radical.influence = Math.min(0.5, radical.influence + (shift * 0.5));
+            traditionalist.influence = Math.max(0.1, traditionalist.influence - (shift * 1.5));
+            
+            house.internalConflictLevel = Math.min(1.0, house.internalConflictLevel + 0.1);
+        } else {
+            // Reinforcing intel empowers Traditionalists
+            const reinforcements = Array.from(house.beliefs.keys()).filter(k => this.getIntelBeliefRelationship(intel, k) === 'REINFORCE');
+            if (reinforcements.length > 0) {
+                const shift = 0.03 * intel.certainty;
+                traditionalist.influence = Math.min(1.0, traditionalist.influence + shift);
+                reformist.influence = Math.max(0.0, reformist.influence - (shift * 0.5));
+                radical.influence = Math.max(0.0, radical.influence - (shift * 0.8));
+                house.internalConflictLevel = Math.max(0.0, house.internalConflictLevel - 0.05);
+            }
+        }
+
+        // SCHISM RESOLUTION CHECK (Phase 4)
+        if (house.activeSchism) {
+            if (reformist.influence > 0.6) this.resolveSchism(house, 'reformist');
+            else if (traditionalist.influence > 0.7 && house.internalConflictLevel < 0.3) this.resolveSchism(house, 'traditionalist');
+            else if (radical.influence > 0.4 && house.internalConflictLevel > 0.9) this.resolveSchism(house, 'radical');
+        }
+
+        // Extreme conflict triggers Belief Civil War
+        if (house.internalConflictLevel > 0.8 && !house.activeSchism) {
+            this.triggerInstitutionalCrisis(house);
+        }
+    }
+
+    /**
+     * Node 1-4: Faction Victory & Reform (Phase 4)
+     */
+    resolveSchism(house, winnerId) {
+        const schism = house.activeSchism;
+        const winner = house.factions.get(winnerId);
+        if (!schism || !winner) return;
+
+        window.EventBus.emit('UI_LOG', `[SCHISM RESOLVED] The fracture within ${house.name} has ended. The ${winnerId.toUpperCase()} faction is victorious.`);
+        
+        let detail = "";
+
+        switch(winnerId) {
+            case 'reformist':
+                detail = this.applyReformVictory(house);
+                break;
+            case 'traditionalist':
+                detail = this.applyTraditionalistVictory(house);
+                break;
+            case 'radical':
+                detail = this.applyRadicalVictory(house);
+                break;
+        }
+
+                // PURGE: Losing factions lose influence
+        house.factions.forEach((f, id) => {
+            if (id !== winnerId) f.influence *= 0.1;
+        });
+        winner.influence = 0.9;
+        house.internalConflictLevel = 0.1;
+        house.activeSchism = null;
+
+        // IDENTITY PRESSURE (Node 2)
+        this.applyIdentityShift(house, winnerId);
+
+        // INSTITUTIONAL MEMORY (Node 5/8)
+
+        this.recordHouseEvent(house.id, {
+            type: `SCHISM_END_${winnerId.toUpperCase()}`,
+            detail: `The ${winnerId} victory has reshaped ${house.name}. ${detail}`,
+            significance: 150,
+            historicalWeight: 100
+        });
+    }
+
+    applyReformVictory(house) {
+        // Update beliefs based on accumulated contradictions
+        let updatedCount = 0;
+        house.beliefs.forEach((belief, key) => {
+            if (belief.state === 'DOUBTED' || belief.state === 'PRIVATE_DOUBT') {
+                belief.state = 'ESTABLISHED';
+                belief.confidence = 0.5; // New doctrine starts with cautious confidence
+                belief.doubtPressure = 0.1;
+                belief.officialPosition = `Doctrine updated to reflect observed evidence for ${key}.`;
+                updatedCount++;
+            }
+        });
+        return `${updatedCount} dogmas have been reformed.`;
+    }
+
+    applyTraditionalistVictory(house) {
+        house.beliefs.forEach((belief) => {
+            belief.state = 'DOGMA';
+            belief.confidence = Math.min(1.0, belief.confidence + 0.3);
+            belief.doubtPressure = 0.0;
+            belief.officialPosition = belief.description; // Revert to original
+        });
+        return "Traditional dogma has been forcefully re-established.";
+    }
+
+    applyRadicalVictory(house) {
+        house.beliefs.forEach((belief, key) => {
+            belief.state = 'SHATTERED';
+            belief.confidence = 0.1;
+            belief.officialPosition = "ALL OLD DOGMA IS VOID.";
+        });
+        // Create major institutional chaos objective
+        return "The institutional foundation has been dismantled.";
+    }
+
+        /**
+     * Node 2: Identity Pressure
+     * Shifts the core "who we are" of the House based on which ideology won the Schism.
+     */
+    applyIdentityShift(house, winnerId) {
+        const day = window.EngineParams?.worldDay || 0;
+        
+        const shift = {
+            winnerId,
+            day,
+            previousMission: house.currentIdentity.mission
+        };
+
+        // Update Identity based on ideology
+        if (winnerId === 'reformist') {
+            house.currentIdentity.mission = 'ADAPT_AND_SURVIVE';
+            house.currentIdentity.priorities.push('EVIDENCE');
+            house.currentIdentity.fear = 'OBSOLESCENCE';
+        } else if (winnerId === 'radical') {
+            house.currentIdentity.mission = 'OVERTURN_THE_OLD';
+            house.currentIdentity.priorities = ['TRUTH', 'DESTRUCTION'];
+            house.currentIdentity.fear = 'COMPROMISE';
+        } else if (winnerId === 'traditionalist') {
+            // Traditionalist victories reduce drift and reinforce founding mission
+            house.currentIdentity.mission = house.foundingIdentity.mission;
+            house.identityDrift = Math.max(0, house.identityDrift - 0.1);
+        }
+
+        // Increment Identity Drift (Node 4)
+        if (winnerId !== 'traditionalist') {
+            house.identityDrift += 0.15;
+        }
+
+        house.reformHistory.push(shift);
+        
+        window.EventBus.emit('UI_LOG', `[EVOLUTION] ${house.name}'s institutional identity has drifted. New Mission: ${house.currentIdentity.mission}.`);
+    }
+
+    /**
+     * Node 5: Belief Civil War
+     */
+
+    triggerInstitutionalCrisis(house) {
+        house.activeSchism = {
+            id: `schism_${Date.now()}`,
+            type: 'DOCTRINAL_CIVIL_WAR',
+            startDay: window.EngineParams?.worldDay || 0
+        };
+
+        window.EventBus.emit('UI_LOG', `[CRISIS] ${house.name.toUpperCase()} HAS ENTERED A STATE OF SCHISM! Internal conflict is paralyzing policy.`);
+        window.EventBus.emit('UI_LOG', `[ACTION] Traditionalists and Reformists are issuing competing decrees.`);
+        
+        // Record in House Memory (Node 8)
+        this.recordHouseEvent(house.id, {
+            type: 'SCHISM_START',
+            detail: `A deep doctrinal divide has fractured the leadership of ${house.name}.`,
+            significance: 100,
+            historicalWeight: 50
+        });
+    }
+
 
 
         // Record official history into house archives
