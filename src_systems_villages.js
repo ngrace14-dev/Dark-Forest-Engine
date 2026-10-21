@@ -371,7 +371,17 @@ window.VillageManager = {
         
             const traits = village.culture.traits;
         
+            // --- CULTURAL MEMORY: EVENT PERSISTENCE (Node 2) ---
+            // Villages remember events that align with their local trauma/success
+            if (!village.memory) village.memory = [];
+            if (impact > 0.6) {
+                village.memory.push({ eventType, day: window.EngineParams?.worldDay || 0, impact });
+                // Prune to last 10 major memories
+                if (village.memory.length > 10) village.memory.shift();
+            }
+
             // --- CULTURAL MEMORY: PREFERENTIAL REMEMBERING (Node 4) ---
+
             // Events aligned with ethos get 2x cultural impact
             let ethosMultiplier = 1.0;
             if (village.culture.dominantTrait === 'MILITARISTIC' && eventType === 'RAID_REPELLED') ethosMultiplier = 2.0;

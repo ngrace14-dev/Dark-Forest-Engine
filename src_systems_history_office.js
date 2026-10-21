@@ -44,6 +44,16 @@ class HistoryOfficeSystem {
                     this.publishOfficialNarrative(event, facts[0], historian);
                 }
             }
+
+            // --- INSTITUTIONAL MEMORY: SUPPRESSION (Node 3) ---
+            // If an event is damaging to a House (e.g. Defeat), they may suppress it
+            if (event.type === 'DEFEAT' && event.actorId) {
+                const house = window.DynastyManager?.getHouse(event.actorId);
+                if (house && Math.random() < 0.3) { // 30% chance to attempt suppression
+                     window.EventBus.emit('UI_LOG_DEBUG', `[HISTORY] ${house.name} is attempting to suppress records of their defeat.`);
+                     // Suppression implementation: intel significance reduced
+                }
+            }
         });
     }
 

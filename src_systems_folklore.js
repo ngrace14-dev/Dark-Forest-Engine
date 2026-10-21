@@ -84,8 +84,16 @@ class FolkloreEngineSystem {
      * Historical Compression Logic
      * Bible §1: Chronicle -> Truth -> History -> Folklore -> Poem
      */
-    generatePoem(legend, options = {}) {
+        generatePoem(legend, options = {}) {
+        // --- FUNCTIONAL MEMORY: PURPOSE CLASSIFICATION (Node 1) ---
+        let purpose = 'MEMORIALIZATION';
+        if (legend.type === 'RAID_REPELLED' || legend.type === 'THREAT') purpose = 'WARNING';
+        if (legend.type === 'SUCCESSION') purpose = 'LEGITIMIZATION';
+        if (legend.type === 'AMBITION_FULFILLED') purpose = 'IDENTITY';
+        if (legend.power > 700) purpose = 'MYTHIC_TRUTH';
+
         // --- CULTURAL FILTERS (Node 3) ---
+
         // Cultures preferentially remember events aligned with their ethos.
         const originEntity = window.GameCore?.activeEntities.find(e => e.id === legend.actorId);
         let cultureBias = 'NEUTRAL';
@@ -116,11 +124,12 @@ class FolkloreEngineSystem {
         const title = this.generateSymbolicTitle(legend);
         const verse = this.generateContextualVerse(legend);
 
-        const poem = {
+                const poem = {
             id: 'poem_' + Math.random().toString(36).substr(2, 9),
             title: title,
             text: `${distortedText}\n${verse}`,
             class: poemClass,
+            purpose: purpose, // Added Purpose
             originId: legend.id,
             historicalWeight: legend.power,
             distortionLevel: distortionLevel,
@@ -129,22 +138,24 @@ class FolkloreEngineSystem {
             fidelity: 0.2 + (Math.random() * 0.5) 
         };
 
+
         this.anthology.push(poem);
 
-        // Register as Evidence/Intel (Bible §17)
+                // Register as Evidence/Intel (Bible §17)
         if (window.IntelManager) {
             window.IntelManager.register({
                 type: 'RUMOR',
                 payload: {
                     title: poem.title,
                     description: poem.text,
-                    tags: ['FOLKLORE', poemClass, 'POEM_TRAP']
+                    tags: ['FOLKLORE', poemClass, purpose, 'POEM_TRAP']
                 },
                 significance: { historical: legend.power, crow: poem.storyStrength },
                 rarity: legend.power > 500 ? 'LEGENDARY' : 'RARE',
                 certainty: poem.fidelity
             });
         }
+
 
         window.GameState.anthology = this.anthology;
         window.EventBus.emit('UI_LOG', `[FOLKLORE] A new ${poemClass.toLowerCase()} poem has crystallized: ${poem.title}`);

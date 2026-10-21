@@ -1271,8 +1271,10 @@ class CrowsEyeSystem {
                         <div style="font-size:10px; color:#a855f7; font-weight:bold; margin-bottom:5px;">[4] FOLKLORE (What is Remembered)</div>
                         ${layers.folklore.map(p => `
                             <div style="margin-bottom:8px;">
-                                <div style="font-size:9px; color:#fbbf24; font-weight:bold;">${p.title}</div>
+                                                                <div style="font-size:11px; color:#fbbf24; font-weight:bold;">${p.title}</div>
+                                <div style="font-size:9px; color:#d97706; uppercase; margin-bottom:3px;">PURPOSE: ${p.purpose || 'MEMORIAL'}</div>
                                 <div style="font-size:11px; color:#94a3b8; line-height:1.4; font-style:italic;">"${p.text}"</div>
+
                                 <div style="font-size:8px; color:#78350f; margin-top:2px;">Fidelity: ${Math.floor(p.fidelity * 100)}% | Dist: ${Math.floor(p.distortionLevel * 100)}%</div>
                             </div>
                         `).join('') || '<div style="font-size:11px; color:#451a03;">No folklore yet.</div>'}
@@ -1539,19 +1541,25 @@ class CrowsEyeSystem {
             if (e.type.includes('CULTURAL')) { color = '#3b82f6'; icon = '🏮'; }
             if (e.type.includes('SUCCESSION')) { color = '#fbbf24'; icon = '👑'; }
 
-            // Check if player Author this event
-            const isPlayerEvent = impact.causalChains.some(c => c.day === e.timestamp.day);
+                        // Check if player Author this event
+                        const isPlayerEvent = impact.causalChains.some(c => c.day === e.timestamp.day);
 
-            html += `
-                <div style="background:rgba(255,255,255,0.03); border:1px solid ${isPlayerEvent ? '#fbbf24' : '#451a03'}; padding:12px; border-left: 4px solid ${color};">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                        <div style="color:${color}; font-weight:bold; font-size:11px;">${icon} ${e.type.replace(/_/g, ' ')}</div>
-                        <div style="color:#78350f; font-size:9px;">Day ${e.timestamp.day} | Sig: ${e.significance}</div>
-                    </div>
-                    <div style="font-size:11px; color:#94a3b8;">${e.detail}</div>
-                    ${isPlayerEvent ? `<div style="margin-top:5px; font-size:9px; color:#fbbf24; font-weight:bold;">[PLAYER LEGACY IMPACT]</div>` : ''}
-                </div>
-            `;
+                        html += `
+                            <div style="background:rgba(255,255,255,0.03); border:1px solid ${isPlayerEvent ? '#fbbf24' : '#451a03'}; padding:12px; border-left: 4px solid ${color};">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                    <div style="color:${color}; font-weight:bold; font-size:11px;">${icon} ${e.type.replace(/_/g, ' ')}</div>
+                                    <div style="color:#78350f; font-size:9px;">Day ${e.timestamp.day} | Sig: ${e.significance}</div>
+                                </div>
+                                <div style="font-size:11px; color:#94a3b8;">${e.detail}</div>
+                    
+                                <!-- --- PLAYER LEGACY: FUTURE MEMORY (Node 7) --- -->
+                                ${isPlayerEvent ? `
+                                    <div style="margin-top:5px; font-size:9px; color:#fbbf24; font-weight:bold;">[PLAYER LEGACY IMPACT - Generation ${window.GameState.playerLegacy?.generation || 1}]</div>
+                                ` : ''}
+                            </div>
+                        `;
+
+
         });
 
         html += `</div></div>`;
