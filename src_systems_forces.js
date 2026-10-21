@@ -80,14 +80,16 @@ window.ForceManager = {
         }
     },
 
-    // --- HUNTSMAN REGISTRY: THE MANTLE ---
+        // --- HUNTSMAN REGISTRY: THE MANTLE ---
     huntsman: {
         activeHuntsman: null,
         strengthScore: 100,
         scornedIds: new Set(),
         interventionCooldownDays: 3,
-        lastInterventionDay: -3
+        lastInterventionDay: -3,
+        activeIntervention: false // Force Budget Lock
     },
+
 
     // --- THE MESSENGER: ORB COMPANION ---
     orbMessenger: {
@@ -258,68 +260,102 @@ window.ForceManager = {
     },
 
         executeIntervention: function() {
-        this.huntsman.lastInterventionDay = window.EngineParams.worldDay;
-        window.EventBus.emit('HUNTSMAN_INTERVENTION');
-    },
+            this.huntsman.lastInterventionDay = window.EngineParams.worldDay;
+            window.EventBus.emit('HUNTSMAN_INTERVENTION');
+        },
 
-    /**
-     * Physical manifestation of the Huntsman's Rescue
-     */
-    handleInterventionEvent: function() {
-        window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "You are not yet ready to feed the roots."`);
+        /**
+         * Physical manifestation of the Huntsman's Rescue
+         */
+        handleInterventionEvent: function() {
+            // --- PHASE 1: FORCE BUDGET & TIMEOUT FAILSAFE ---
+            if (this.huntsman.activeIntervention) {
+                window.EventBus.emit('UI_LOG_DEBUG', `[FORCE BUDGET] Huntsman is already deployed. Intervention aborted.`);
+                return;
+            }
+
+            window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "You are not yet ready to feed the roots."`);
         
-        // 1. Freeze player controls (simplified)
-        window.Input.frozen = true;
+            // 1. Freeze player controls (simplified)
+            window.Input.frozen = true;
         
-        // 2. Spawn Huntsman
-        const pPos = window.GameCore.playerObj.visual.position;
-        const spawnPos = pPos.clone().add(new window.THREE.Vector3(5, 0, 5));
-        const huntsman = window.GameCore.instantiatePrefab('Huntsman', spawnPos.x, spawnPos.y, spawnPos.z);
+            // 2. Spawn Huntsman
+            const pPos = window.GameCore.playerObj.visual.position;
+            const spawnPos = pPos.clone().add(new window.THREE.Vector3(5, 0, 5));
+            const huntsman = window.GameCore.instantiatePrefab('Huntsman', spawnPos.x, spawnPos.y, spawnPos.z);
         
-        if (huntsman) {
-            huntsman.name = 'Huntsman';
-            huntsman.isIntervening = true;
-            huntsman.interventionPhase = 'clearing';
+            if (huntsman) {
+                huntsman.name = 'Huntsman';
+                huntsman.isIntervening = true;
+                huntsman.interventionPhase = 'clearing';
+                this.huntsman.activeIntervention = true;
             
-            // 3. Threat Clear: Kill all hostiles in 30m
-            const nearby = window.GameCore.SpatialGrid.getNearbyEntities(pPos.x, pPos.z, 30);
-            nearby.forEach(en => {
-                if (en !== huntsman && (en.def.faction === 'monster' || en.def.faction === 'forest')) {
-                    en.hp = 0;
-                    if (window.defeatNpc) window.defeatNpc(en, 'huntsman_intervention');
-                }
-            });
+                // --- FAILSAFE: 60 SECOND HARD RESET ---
+                this.huntsman.timeoutId = setTimeout(() => {
+                    if (this.huntsman.activeIntervention) {
+                        this.huntsman.activeIntervention = false;
+                        window.Input.frozen = false;
+                    
+                        if (window.GameCore?.scene && huntsman.visual) window.GameCore.scene.remove(huntsman.visual);
+                        if (window.GameCore?.world && huntsman.body) {
+                            window.PhysicsQueue.enqueue(() => window.GameCore.world.removeRigidBody(huntsman.body));
+                        }
+                        if (window.GameCore?.activeEntities) {
+                            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e !== huntsman);
+                        }
+                        window.EventBus.emit('UI_LOG_DEBUG', `[FORCE FAILSAFE] Huntsman timeout triggered. Budget restored.`);
+                    }
+                }, 60000);
 
-            // 4. Execute "Lesson" after a delay
-            setTimeout(() => {
-                if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(huntsman, 'attack');
-                
-                // Set player HP to 5%
-                const limbs = window.playerHealth.limbs;
-                Object.values(limbs).forEach(l => {
-                    l.hp = l.max * 0.05;
+                // 3. Threat Clear: Kill all hostiles in 30m
+                const nearby = window.GameCore.SpatialGrid.getNearbyEntities(pPos.x, pPos.z, 30);
+                nearby.forEach(en => {
+                    if (en !== huntsman && (en.def.faction === 'monster' || en.def.faction === 'forest')) {
+                        en.hp = 0;
+                        if (window.defeatNpc) window.defeatNpc(en, 'huntsman_intervention');
+                    }
                 });
-                window.playerHealth.updateUI();
-                
-                window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "Learn from your weakness."`);
 
-                // 5. Give the Orb
-                this.orbMessenger.attachedToId = 'player';
-                window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "The Messenger will watch your struggle."`);
-
-                // 6. Apply Scorn (12h)
-                this.applyScorn('player', 12);
-
-                // Cleanup
-                window.Input.frozen = false;
+                // 4. Execute "Lesson" after a delay
                 setTimeout(() => {
-                    window.GameCore.scene.remove(huntsman.visual);
-                    window.GameCore.world.removeRigidBody(huntsman.body);
-                    window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e !== huntsman);
-                }, 5000);
-            }, 3000);
-        }
-    },
+                    if (!this.huntsman.activeIntervention) return; // Abort if timeout hit
+
+                    if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(huntsman, 'attack');
+                
+                    // Set player HP to 5%
+                    const limbs = window.playerHealth.limbs;
+                    Object.values(limbs).forEach(l => {
+                        l.hp = l.max * 0.05;
+                    });
+                    window.playerHealth.updateUI();
+                
+                    window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "Learn from your weakness."`);
+
+                    // 5. Give the Orb
+                    this.orbMessenger.attachedToId = 'player';
+                    window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "The Messenger will watch your struggle."`);
+
+                    // 6. Apply Scorn (12h)
+                    this.applyScorn('player', 12);
+
+                    // Cleanup
+                    window.Input.frozen = false;
+                    setTimeout(() => {
+                        clearTimeout(this.huntsman.timeoutId);
+                        this.huntsman.activeIntervention = false;
+
+                        if (window.GameCore?.scene && huntsman.visual) window.GameCore.scene.remove(huntsman.visual);
+                        if (window.GameCore?.world && huntsman.body) {
+                            window.PhysicsQueue.enqueue(() => window.GameCore.world.removeRigidBody(huntsman.body));
+                        }
+                        if (window.GameCore?.activeEntities) {
+                            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e !== huntsman);
+                        }
+                    }, 5000);
+                }, 3000);
+            }
+        },
+
 
     getForceStrength: function(name) {
 

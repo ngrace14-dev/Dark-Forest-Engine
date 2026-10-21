@@ -183,11 +183,21 @@ class IntelManagerSystem {
         const lineage = [];
         let currentId = intel_id;
         let currentRecord = this.lookup(currentId);
+        let depth = 0;
+
+        // --- PRIORITY 3: LINEAGE RESOLUTION DEPTH LIMIT ---
+        const MAX_DEPTH = 20;
 
         while (currentRecord) {
             lineage.push(currentRecord);
             currentId = currentRecord.parent_intel_id;
             currentRecord = currentId ? this.lookup(currentId) : null;
+            
+            depth++;
+            if (depth >= MAX_DEPTH) {
+                window.EventBus.emit('UI_LOG_DEBUG', `[INTEL] Deep lineage detected. Trace truncated at depth 20.`);
+                break;
+            }
         }
         return lineage.reverse(); // Returns [Original Rumor, ..., Current Version]
     }
