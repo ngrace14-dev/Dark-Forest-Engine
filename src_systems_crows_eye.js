@@ -18,13 +18,13 @@ class CrowsEyeSystem {
         this.isInspectionExpanded = false;
         this.currentFolder = 'WORLD';
                 this.folders = {
-            'WORLD': ['MAP', 'WATCHLIST', 'ACTIONS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE'],
-            'INTEL': ['INTEL', 'TRUTH', 'CHRONICLE', 'ANTHOLOGY', 'LEGENDS', 'OFFICIAL_HISTORY'],
-                        'POWER': ['HOUSES', 'HOUSE_HISTORY', 'INFLUENCE_MAP', 'ECONOMY', 'LINEAGES', 'RELATIONSHIPS'],
+                    'WORLD': ['MAP', 'WATCHLIST', 'ACTIONS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE'],
+                    'INTEL': ['INTEL', 'TRUTH', 'CHRONICLE', 'ANTHOLOGY', 'LEGENDS', 'OFFICIAL_HISTORY'],
+                    'POWER': ['HOUSES', 'HOUSE_HISTORY', 'INFLUENCE_MAP', 'CIV_TIMELINE', 'ECONOMY', 'LINEAGES', 'RELATIONSHIPS'],
+                    'BEYOND': ['ORIGIN_DOSSIER', 'IMPACT_ANALYSIS', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RECORDED_MEMORY', 'LOST_MEMORY'],
+                    'BUREAU': ['PLAYBACK', 'CALIBRATION']
+                };
 
-            'BEYOND': ['ORIGIN_DOSSIER', 'IMPACT_ANALYSIS', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RECORDED_MEMORY', 'LOST_MEMORY'],
-            'BUREAU': ['PLAYBACK', 'CALIBRATION']
-        };
 
         window.EventBus.on('ENGINE_READY', () => this.init());
     }
@@ -366,8 +366,12 @@ class CrowsEyeSystem {
                 contentHtml = this.renderLegendsView();
                 break;
                         case 'INFLUENCE_MAP':
-                contentHtml = this.renderInfluenceView();
-                break;
+                            contentHtml = this.renderInfluenceView();
+                            break;
+                        case 'CIV_TIMELINE':
+                            contentHtml = this.renderCivilizationTimelineView();
+                            break;
+
 
                         case 'FORCE_LAYER':
                 contentHtml = this.renderForceLayer();
@@ -1510,7 +1514,47 @@ class CrowsEyeSystem {
         return html;
     }
 
+        renderCivilizationTimelineView() {
+        if (!window.ChronicleManager || !window.DynastyManager) return "History Matrix Offline";
+        
+        const events = window.ChronicleManager.worldLedger.slice().reverse();
+        const impact = window.DynastyManager.playerImpact;
+
+        let html = `<div style="display:flex; flex-direction:column; gap:20px; height:100%;">`;
+        html += `<div style="font-size:14px; color:#fbbf24; border-bottom:1px solid #78350f; padding-bottom:5px;">CIVILIZATION CAUSAL TIMELINE (UNIFIED HISTORY)</div>`;
+
+        html += `<div style="flex-grow:1; overflow-y:auto; padding-right:10px; display:flex; flex-direction:column; gap:12px;">`;
+        
+        events.forEach(e => {
+            // Determine Color & Category
+            let color = '#94a3b8';
+            let icon = '•';
+            if (e.type.includes('SCHISM')) { color = '#ef4444'; icon = '⚡'; }
+            if (e.type.includes('REFORM') || e.type.includes('IDENTITY')) { color = '#10b981'; icon = '⚙️'; }
+            if (e.type.includes('CULTURAL')) { color = '#3b82f6'; icon = '🏮'; }
+            if (e.type.includes('SUCCESSION')) { color = '#fbbf24'; icon = '👑'; }
+
+            // Check if player Author this event
+            const isPlayerEvent = impact.causalChains.some(c => c.day === e.timestamp.day);
+
+            html += `
+                <div style="background:rgba(255,255,255,0.03); border:1px solid ${isPlayerEvent ? '#fbbf24' : '#451a03'}; padding:12px; border-left: 4px solid ${color};">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <div style="color:${color}; font-weight:bold; font-size:11px;">${icon} ${e.type.replace(/_/g, ' ')}</div>
+                        <div style="color:#78350f; font-size:9px;">Day ${e.timestamp.day} | Sig: ${e.significance}</div>
+                    </div>
+                    <div style="font-size:11px; color:#94a3b8;">${e.detail}</div>
+                    ${isPlayerEvent ? `<div style="margin-top:5px; font-size:9px; color:#fbbf24; font-weight:bold;">[PLAYER LEGACY IMPACT]</div>` : ''}
+                </div>
+            `;
+        });
+
+        html += `</div></div>`;
+        return html;
+    }
+
     renderForceLayer() {
+
 
         if (!window.ForceManager) return "Forces Offline";
         const forces = window.ForceManager.forces;
