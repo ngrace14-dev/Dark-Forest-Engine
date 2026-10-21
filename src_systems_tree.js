@@ -12,6 +12,7 @@ class WorldTreeSystem {
         this.rootNodes = new Map(); // nodeId -> { type, health, chains: [] }
         this.activeChains = new Map(); // chainId -> { type, nodes: [], depth, status }
         this.continuityRating = 500; // 0-1000
+        this.civilizationProjects = new Map(); // projectId -> { type, ownerId, progress, status, contributors, startDay, risk }
         
         window.EventBus.on('ENGINE_READY', () => this.init());
         window.EventBus.on('ENTITY_DIED', (data) => this.handleContinuityLoss(data));
@@ -24,6 +25,69 @@ class WorldTreeSystem {
         
         // Heartbeat for Continuity Manifestation
         window.EventBus.on('HEARTBEAT_T3', () => this.updateContinuity());
+    }
+
+    /**
+     * Initializes a long-term civilizational project.
+     * Manifestation Rule: Projects outlive individuals.
+     */
+    startProject(id, type, ownerId) {
+        if (this.civilizationProjects.has(id)) return;
+
+        const project = {
+            id,
+            type, // GREAT_ARCHIVE, LONGITUDINAL_SURVEY, RUNIC_RECONSTRUCTION, etc.
+            ownerId,
+            progress: 0,
+            status: 'ACTIVE',
+            contributors: new Set(),
+            startDay: window.EngineParams?.worldDay || 0,
+            risk: 0.1
+        };
+
+        this.civilizationProjects.set(id, project);
+        window.EventBus.emit('UI_LOG', `🏗️ [PROJECT] ${ownerId} has initiated: ${type.replace(/_/g, ' ')}`);
+        
+        // Manifest physical project start
+        const owner = this.rootNodes.get(ownerId);
+        if (owner && owner.type === 'VILLAGE') {
+             const village = window.VillageManager?.villages.find(v => `village_${v.id}` === ownerId);
+             if (village) {
+                 window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: `🏗️ Project Started: ${type}`, pos: { x: village.x, y: 25, z: village.z }, color: '#fbbf24' });
+             }
+        }
+    }
+
+    /**
+     * Contributes work/intel to a project.
+     */
+    contributeToProject(projectId, contributorId, amount) {
+        const project = this.civilizationProjects.get(projectId);
+        if (!project || project.status !== 'ACTIVE') return;
+
+        project.progress = Math.min(100, project.progress + amount);
+        project.contributors.add(contributorId);
+
+        if (project.progress >= 100) {
+            this.completeProject(projectId);
+        }
+    }
+
+    completeProject(projectId) {
+        const project = this.civilizationProjects.get(projectId);
+        project.status = 'COMPLETED';
+        window.EventBus.emit('UI_LOG', `🌟 [HISTORY] Project COMPLETED: ${project.type}`);
+        
+        // Record as Civilizational Milestone
+        window.ChronicleManager?.recordEvent({
+            type: 'PROJECT_COMPLETED',
+            detail: `The great work of ${project.type} has been finished by generations of contributors.`,
+            significance: 500,
+            historicalWeight: 300
+        });
+
+        // Continuity Bonus
+        this.continuityRating = Math.min(1000, this.continuityRating + 100);
     }
 
     /**

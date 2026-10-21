@@ -477,6 +477,22 @@ window.VillageManager = {
 
             // 1. INSTITUTIONAL DOUBT (Physical Signs: Public Arguments & Hesitation)
             const doubtBeliefs = Array.from(house.beliefs.values()).filter(b => b.state === 'DOUBTED' || b.state === 'PRIVATE_DOUBT');
+        
+            // --- CIVILIZATIONAL PROJECT MAINTENANCE ---
+            if (window.WorldTree) {
+                window.WorldTree.civilizationProjects.forEach(p => {
+                    if (p.ownerId === `village_${village.id}` && p.status === 'ACTIVE') {
+                        // Cautious/Stockpiling cultures contribute faster
+                        const culturalBonus = (village.culture.dominantTrait === 'CAUTIOUS' || village.culture.dominantTrait === 'STOCKPILING') ? 0.2 : 0.1;
+                        window.WorldTree.contributeToProject(p.id, `village_${village.id}`, culturalBonus * village._taskEfficiency);
+                    
+                        if (Math.random() < 0.01) {
+                             window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: `🏗️ Work on ${p.id} continues...`, pos: { x: village.x, y: 22, z: village.z }, color: '#94a3b8' });
+                        }
+                    }
+                });
+            }
+
             if (doubtBeliefs.length > 0 && Math.random() < 0.05) {
                 const bark = window.FolkloreEngine?.getRandomBark('REVISIONAL') || "The old ways are failing...";
                 window.EventBus.emit('SPAWN_FLOATING_TEXT', { 

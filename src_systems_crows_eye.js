@@ -860,6 +860,47 @@ class CrowsEyeSystem {
     }
 
     /**
+     * Bureau Explanation Layer for Civilizational Projects.
+     */
+    renderCivilizationProjects(village) {
+                if (!window.WorldTree) return "";
+
+                const projects = Array.from(window.WorldTree.civilizationProjects.values())
+                    .filter(p => p.ownerId === `village_${village.id}`);
+
+                if (projects.length === 0) return "";
+
+                let html = `
+                    <div style="margin-top:15px; border-top:1px solid #78350f; padding-top:10px;">
+                        <div style="font-size:11px; color:#fbbf24; font-weight:bold; margin-bottom:5px;">CIVILIZATIONAL PROJECTS</div>
+                        <div style="background:rgba(0,0,0,0.4); border:1px solid #78350f; padding:8px; font-size:10px;">
+                `;
+
+                projects.forEach(p => {
+                    const riskColor = p.risk > 0.5 ? "#ef4444" : "#f59e0b";
+                    html += `
+                        <div style="margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:5px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+                                <span style="color:#fbbf24; font-weight:bold;">${p.type.replace(/_/g, ' ')}</span>
+                                <span style="color:#10b981;">${Math.floor(p.progress)}%</span>
+                            </div>
+                            <div style="height:4px; background:#1c1917; width:100%; margin-bottom:5px;">
+                                <div style="height:100%; background:#10b981; width:${p.progress}%;"></div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; font-size:8px;">
+                                <span style="color:#78350f;">START: Day ${p.startDay}</span>
+                                <span style="color:${riskColor};">RISK: ${Math.floor(p.risk * 100)}%</span>
+                            </div>
+                            <div style="color:#94a3b8; font-size:8px; margin-top:2px;">Contributors: ${p.contributors.size} generations</div>
+                        </div>
+                    `;
+                });
+
+                html += `</div></div>`;
+                return html;
+    }
+
+    /**
      * Bureau Explanation Layer for Physical Legacy & Property.
      */
     renderPropertyDossier(village) {
@@ -1041,8 +1082,9 @@ class CrowsEyeSystem {
                     </div>
                 </div>
                                 ${this.renderContinuityDiagnostic(v)}
-                ${this.renderTreeConflictLayer(v)}
-                ${this.renderPropertyDossier(v)}
+                                ${this.renderTreeConflictLayer(v)}
+                                ${this.renderCivilizationProjects(v)}
+                                ${this.renderPropertyDossier(v)}
             `;
         } else {
             const profile = window.PersonhoodManager?.getProfile(this.selectedEntityId);
