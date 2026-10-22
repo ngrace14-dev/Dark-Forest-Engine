@@ -286,22 +286,78 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         };
 
                 // --- PHASE 3.2: HISTORIAN/SCRIBE ACTION LOOP ---
-        if (en.role === 'scribe' || en.role === 'historian') {
-            const village = window.VillageManager?.villages.find(v => v.id === en.villageId);
-            const archive = window.GameCore.activeEntities.find(e => e.villageId === en.villageId && e.def.type === 'archive');
+                if (en.role === 'scribe' || en.role === 'recorder' || en.role === 'historian') {
+                    const village = window.VillageManager?.villages.find(v => v.id === en.villageId);
+                    const archive = window.GameCore.activeEntities.find(e => e.villageId === en.villageId && e.def.type === 'archive');
             
-            if (archive && !window.VillageManager.canAccessArchive(village, en.id, archive.id)) {
-                en.currentTask = 'Denied Archive Access';
-                return;
-            }
+                    if (archive && !window.VillageManager.canAccessArchive(village, en.id, archive.id)) {
+                        en.currentTask = 'Denied Archive Access';
+                        return;
+                    }
 
-            // 1. SEEK: If I know things that aren't physical records yet
+                    // --- TIER 3: HISTORIAN (Verification) ---
+                    if (en.role === 'historian') {
+                        const unverifiedRumors = (window.IntelManager?.getIntelForNode(en.id) || [])
+                            .filter(i => i.truth_state === 'UNKNOWN' && i.payload.target_coord);
+                
+                        if (unverifiedRumors.length > 0) {
+                            const rumor = unverifiedRumors[0];
+                            const targetPos = new window.THREE.Vector3(rumor.payload.target_coord.x, 0, rumor.payload.target_coord.z);
+                            const distToRumor = en.visual.position.distanceTo(targetPos);
 
-            const personalIntel = window.IntelManager?.getIntelForNode(en.id) || [];
-            const unrecorded = personalIntel.filter(intel => {
-                const recordExists = Array.from(window.MountainArchives.records.values()).some(r => r.intel_id === intel.intel_id);
-                return !recordExists && intel.truth_state === 'TRUE'; // Historians seek truth
-            });
+                            if (distToRumor > 10.0) {
+                                en.currentTask = 'Verifying Rumor';
+                                en.taskTarget = rumor.payload.title;
+                                moveCompanion(en, targetPos, 0.9, delta);
+                                return;
+                            } else {
+                                // At target: Perform verification
+                                if (!en.verificationTimer || en.verificationTimer <= 0) {
+                                    en.verificationTimer = 15.0;
+                                    en.currentTask = 'Observing Reality';
+                                } else {
+                                    en.verificationTimer -= delta;
+                                    if (en.verificationTimer <= 0) {
+                                        window.IntelEconomy?.verifyIntel(rumor.intel_id, en, true);
+                                        en.currentTask = 'Rumor Verified';
+                                    }
+                                    return;
+                                }
+                            }
+                        }
+                    }
+
+                    // --- TIER 2: RECORDER (Information Inter-Village Sync) ---
+                    if (en.role === 'recorder' && !en.isSyncing) {
+                         const otherVillages = window.VillageManager?.villages.filter(v => v.id !== en.villageId);
+                         const targetVillage = otherVillages[Math.floor(Math.random() * otherVillages.length)];
+                         const targetPos = new window.THREE.Vector3(targetVillage.x, 0, targetVillage.z);
+                 
+                         en.currentTask = 'Syncing Records';
+                         en.taskTarget = targetVillage.name;
+                         moveCompanion(en, targetPos, 0.7, delta);
+                 
+                         if (en.visual.position.distanceTo(targetPos) < 20.0) {
+                             // Perform Sync (Exchange memory with village hub)
+                             const targetHubId = `village_${targetVillage.id}`;
+                             const myIntel = window.IntelManager.getIntelForNode(en.id);
+                             myIntel.forEach(intel => {
+                                 window.IntelPropagation.sync(en, { id: targetHubId, faction: 'neutral' }, intel.intel_id, 1.0);
+                             });
+                             en.isSyncing = true; // Simple cooldown
+                             setTimeout(() => en.isSyncing = false, 60000);
+                         }
+                         return;
+                    }
+
+                    // --- TIER 1: SCRIBE (Transcription) ---
+                    // 1. SEEK: If I know things that aren't physical records yet
+                    const personalIntel = window.IntelManager?.getIntelForNode(en.id) || [];
+                    const unrecorded = personalIntel.filter(intel => {
+                        const recordExists = Array.from(window.MountainArchives.records.values()).some(r => r.intel_id === intel.intel_id);
+                        return !recordExists && intel.truth_state === 'TRUE'; // Scribes record truths
+                    });
+
 
             if (unrecorded.length > 0 && archive) {
                 const distToArchive = en.visual.position.distanceTo(archive.visual.position);
