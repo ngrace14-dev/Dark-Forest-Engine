@@ -142,7 +142,7 @@ class DynastyManagerSystem {
                 prestige: 100,
                 isBlessed: index < 9, // First 9 are "Blessed" (Bible §19)
                 
-                // --- PHASE 1A: INSTITUTIONAL STATS ---
+                                // --- PHASE 1A: INSTITUTIONAL STATS ---
                 legitimacy: (name === 'Terminus') ? 0.9 : 0.6,
                 historicalContinuity: (name === 'Terminus') ? 18000 : 12000,
                 informationalScarcity: (name === 'Terminus') ? 50 : 20,
@@ -153,7 +153,12 @@ class DynastyManagerSystem {
                 continuityIndex: (name === 'Terminus') ? 0.8 : 0.4,
                 sovereignty: (name === 'Terminus') ? 0.5 : 0.0,
                 
+                // --- PHASE 2: INSTITUTIONAL FRICTION ---
+                internalConflictLevel: 0.1, // 0.0 to 1.0
+                narrativeGap: 0.0,          // Distance between Official History and Truth
+                
                 archives: [],
+
 
                 
                                 // --- THE RARE PART: Institutional Memory & Action Pipeline ---
@@ -1031,9 +1036,38 @@ class DynastyManagerSystem {
         return profiles[houseKey] || { 'COMMON': 1.0, 'RUMOR': 1.1 };
     }
 
-    getHouse(id) {
-        return this.houses.get(id);
+        /**
+     * Updates the global state of a House based on simulation feedback.
+     * Bible §Continuity: Institutions are dams against entropy.
+     */
+    updateInstitutionalState(houseId) {
+        const house = this.houses.get(houseId);
+        if (!house) return;
+
+        // 1. Calculate Narrative Gap
+        // The more contradictions in their archives, the higher the gap
+        const contradictions = Array.from(house.beliefs.values()).filter(b => b.state === 'DOUBTED' || b.state === 'SHATTERED').length;
+        house.narrativeGap = Math.min(1.0, contradictions * 0.1);
+
+        // 2. Calculate Internal Friction (Conflict)
+        // High narrative gap and low legitimacy drive internal conflict
+        const frictionBase = (house.narrativeGap * 0.6) + ((1.0 - house.legitimacy) * 0.4);
+        house.internalConflictLevel = Math.max(0.1, Math.min(1.0, frictionBase));
+
+        // 3. Legitimacy Decay/Growth
+        // Legitimacy is a function of Verse Influence and Public Trust
+        const targetLegitimacy = (house.verseInfluence * 0.5) + (house.publicTrust * 0.5);
+        house.legitimacy = (house.legitimacy * 0.9) + (targetLegitimacy * 0.1); // Slow smoothing
+
+        // 4. Truth Exposure Risk
+        // High scarcity but high conflict increases risk of leaks
+        house.truthExposureRisk = (house.informationalScarcity / 100) * house.internalConflictLevel;
+
+        if (house.internalConflictLevel > 0.8 && !house.activeSchism) {
+            this.triggerInstitutionalCrisis(house);
+        }
     }
+
 
         getFeuds() {
         return this.feuds;

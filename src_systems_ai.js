@@ -77,14 +77,27 @@ function moveCompanion(companion, destination, speedMultiplier = 1, delta = 0) {
  * Manifestation Rule: Trust Networks.
  * NPCs physically cluster around trusted influencers and mentors.
  */
-function processCrowdGathering(entity, delta) {
+    processCrowdGathering(entity, delta) {
     if (!window.ReputationManager || !window.PersonhoodManager) return;
     
     // Only NPCs within villages gather
     if (!entity.villageId) return;
 
     const nearby = window.GameCore.SpatialGrid.getNearbyEntities(entity.visual.position.x, entity.visual.position.z, 10);
+    
+    // --- PHASE 2A: WATCHER SPOTTING ---
+    const watchers = window.GameCore.activeEntities.filter(e => e.name === 'Watcher');
+    if (watchers.length > 0) {
+        entity.visual.lookAt(watchers[0].visual.position);
+        if (Math.random() < 0.01) {
+            window.EventBus.emit('UI_LOG_DEBUG', `[WATCHER] ${entity.name} is paralyzed by the sight of the dual shadows.`);
+            entity.staggeredUntil = performance.now() + 5000;
+        }
+        return;
+    }
+
     const influencer = nearby.find(n => {
+
         if (n === entity) return false;
         const trust = window.ReputationManager.calculateTrust(n, entity);
         const profile = window.PersonhoodManager.getProfile(n.id);

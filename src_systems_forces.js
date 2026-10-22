@@ -54,7 +54,7 @@ window.ForceManager = {
             pressure: 'consumption',
             value: 0
         },
-        'Truth': { 
+                'Truth': { 
             strength: 500, 
             label: 'Accuracy', 
             description: 'Encourages verification and factual clarity.',
@@ -62,7 +62,16 @@ window.ForceManager = {
             pressure: 'verification',
             value: 0
         },
+        'Watcher': {
+            strength: 0,
+            label: 'Anomalous Observation',
+            description: 'The presence of the dual shadows during turning points.',
+            metric: 'Sighting Count',
+            pressure: 'awe',
+            value: 0
+        },
                 'Orb': {
+
             strength: 300,
             label: 'Witness',
             description: 'Encourages interpretation and observation.',
@@ -231,16 +240,49 @@ window.ForceManager = {
 
 
         recalculateWendigo: function() {
-        const force = this.forces['Wendigo'];
-        // Strength grows with fear (low prosperity) and deaths
-        const events = window.ChronicleManager?.worldLedger || [];
-        const deaths = events.filter(e => e.type === 'DEFEAT' || e.type === 'die').length;
+            const force = this.forces['Wendigo'];
+            // Strength grows with fear (low prosperity) and deaths
+            const events = window.ChronicleManager?.worldLedger || [];
+            const deaths = events.filter(e => e.type === 'DEFEAT' || e.type === 'die').length;
         
-        force.value = deaths;
-        force.strength = Math.min(1000, 100 + (deaths * 20));
-    },
+            force.value = deaths;
+            force.strength = Math.min(1000, 100 + (deaths * 20));
+        },
 
-    // --- HUNTSMAN LOGIC ---
+        /**
+         * Spawns the Watchers during extreme significance events.
+         * Addendum BZ-1
+         */
+        triggerWatcherSighting: function(pos) {
+            if (this.forces['Watcher'].active) return;
+        
+            window.EventBus.emit('UI_LOG', `[ANOMALY] Two male-shaped shadows have been reported at the site of the event.`);
+        
+            const watcher1 = window.GameCore.instantiatePrefab('Watcher', pos.x + 2, pos.y, pos.z);
+            const watcher2 = window.GameCore.instantiatePrefab('Watcher', pos.x - 2, pos.y, pos.z);
+        
+            if (watcher1) watcher1.name = 'Watcher';
+            if (watcher2) watcher2.name = 'Watcher';
+        
+            this.forces['Watcher'].active = true;
+            this.forces['Watcher'].value++;
+
+            setTimeout(() => {
+                if (watcher1) {
+                    window.GameCore.scene.remove(watcher1.visual);
+                    window.GameCore.world.removeRigidBody(watcher1.body);
+                }
+                if (watcher2) {
+                    window.GameCore.scene.remove(watcher2.visual);
+                    window.GameCore.world.removeRigidBody(watcher2.body);
+                }
+                this.forces['Watcher'].active = false;
+                window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e.name !== 'Watcher');
+            }, 60000); // 60 second sighting
+        },
+
+        // --- HUNTSMAN LOGIC ---
+
     applyScorn: function(entityId, durationHours = 12) {
         this.huntsman.scornedIds.add(entityId);
         window.EventBus.emit('UI_LOG', `[THE MARK] You are Scorned. The forest ignores your presence.`);

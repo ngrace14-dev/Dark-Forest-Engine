@@ -599,13 +599,19 @@ window.GameCore = {
             window.CareerManager.addXP('chronicler', impact * 5);
         }
 
-        // --- NOBLE HOUSE CROW: ENDGAME BLESSING TRIGGER ---
+                // --- NOBLE HOUSE CROW: ENDGAME BLESSING TRIGGER ---
         if (narrator.attention >= 100 && !narrator.crowsBlessingEarned) {
             narrator.crowsBlessingEarned = true;
             window.EventBus.emit('UI_LOG', "✨ [REVELATION] Your significance has reached Legendary heights. The Crow's Eye is now open to you.");
+            
+            // --- PHASE 2A: THE WATCHERS ---
+            if (window.ForceManager?.triggerWatcherSighting) {
+                window.ForceManager.triggerWatcherSighting(window.GameCore.playerObj.visual.position);
+            }
         }
 
         window.EventBus.emit('UI_UPDATE_HUD');
+
     },
 
     loseCrowInterest: function(amount = 1, reason = 'The story grows quiet.') {
