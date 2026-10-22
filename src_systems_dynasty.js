@@ -1026,7 +1026,41 @@ class DynastyManagerSystem {
 
      * Defines what each house actively seeks in the information market.
      */
+        /**
+     * Institutional Fear Matrix.
+     * Bible §36: Every institution is defined by what it fears.
+     */
+    getInitialHouseFears(houseKey) {
+        // Default for Noble Houses
+        const fears = {
+            primary: 'REPLACEMENT',
+            secondary: 'RESOURCE_LOSS',
+            acceptableLoss: 'TRUTH',
+            unacceptableLoss: 'CONTINUITY'
+        };
+
+        if (houseKey === 'aethel' || houseKey === 'capital') {
+            fears.primary = 'LEGITIMACY_COLLAPSE';
+            fears.secondary = 'POLITICAL_DISSENT';
+            fears.acceptableLoss = 'HISTORICAL_ACCURACY';
+            fears.unacceptableLoss = 'FUEL_AUTHORITY';
+        } else if (houseKey === 'terminus') {
+            fears.primary = 'PATTERN_FAILURE';
+            fears.secondary = 'ISOLATION';
+            fears.acceptableLoss = 'POLITICAL_INFLUENCE';
+            fears.unacceptableLoss = 'OBSERVATIONAL_INTEGRITY';
+        } else if (houseKey === 'epitaph') {
+            fears.primary = 'SIGNIFICANCE_ESCALATION';
+            fears.secondary = 'EXPOSURE';
+            fears.acceptableLoss = 'POLITICAL_CONTROL';
+            fears.unacceptableLoss = 'SECOND_FRACTURE';
+        }
+
+        return fears;
+    }
+
     getInitialDemandProfile(houseKey) {
+
         const profiles = {
             'aethel': { 'MONOPOLY': 5.0, 'SOVEREIGNTY': 10.0, 'SUCCESSION': 3.0 },
             'terminus': { 'LONGITUDINAL': 8.0, 'GEOGRAPHY': 4.0, 'STAR_CHART': 6.0 },
