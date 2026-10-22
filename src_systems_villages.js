@@ -95,9 +95,14 @@ window.VillageManager = {
                 }, 
                 population: { current: population, capacity: Math.ceil(population * 1.2) }, 
                                 expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [],
-                // --- PHYSICAL LEGACY: PROPERTY REGISTRY (Phase 14) ---
+                                // --- PHYSICAL LEGACY: PROPERTY REGISTRY (Phase 14) ---
                 propertyRegistry: new Map(), // id -> { type, ownerId, occupantId, houseId, genCount, history: [], anchoredKnowledge: [] }
+                
+                // --- PHASE 3: ARCHIVE PHYSICALITY ---
+                archiveAccessControl: new Map(), // node_id -> access_level (0:Public, 1:Citizen, 2:Noble, 3:Elite)
+
                 relations: {}, 
+ 
                 diplomaticState: {}, 
                 tensions: 0,
                 crisisLog: [], // --- GOVERNANCE MEMORY ---
@@ -656,7 +661,30 @@ window.VillageManager = {
         window.EventBus.emit('UI_LOG', `[LEGACY] ${prop.type} ${prop.id} inherited by ${newOwnerId}.`);
     },
 
-    simulateVillage: function(village) {
+        /**
+     * Physical Archive Access Check.
+     * Bible §Power: Information is gated by social standing.
+     */
+    canAccessArchive: function(village, requesterId, archiveId) {
+        const archive = window.MountainArchives.archiveContainers.get(archiveId);
+        if (!archive) return false;
+
+        const profile = window.PersonhoodManager?.getProfile(requesterId);
+        const playerRep = window.GameState?.reputation?.village || 0;
+        
+        let requesterLevel = 0;
+        if (requesterId === 'player') {
+            if (playerRep > 80) requesterLevel = 3;
+            else if (playerRep > 40) requesterLevel = 2;
+            else if (playerRep > 10) requesterLevel = 1;
+        } else if (profile) {
+            if (profile.role === 'historian' || profile.role === 'scribe') requesterLevel = 2;
+            if (profile.houseId && profile.houseId.includes(village.nobleHouse.toLowerCase())) requesterLevel = 2;
+        }
+
+        return requesterLevel >= archive.access_level;
+    },
+
 
         const cal = window.CalibrationFramework?.settings || {};
         const econCal = cal.economy || { consumption: 1.0, scarcity: 1.0, tradeEfficiency: 1.0 };

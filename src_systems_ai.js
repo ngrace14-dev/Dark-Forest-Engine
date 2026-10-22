@@ -285,12 +285,18 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             curiosity: 0.2 // Added for Historian/Scribe loop
         };
 
-        // --- PHASE 3.2: HISTORIAN/SCRIBE ACTION LOOP ---
+                // --- PHASE 3.2: HISTORIAN/SCRIBE ACTION LOOP ---
         if (en.role === 'scribe' || en.role === 'historian') {
             const village = window.VillageManager?.villages.find(v => v.id === en.villageId);
             const archive = window.GameCore.activeEntities.find(e => e.villageId === en.villageId && e.def.type === 'archive');
             
+            if (archive && !window.VillageManager.canAccessArchive(village, en.id, archive.id)) {
+                en.currentTask = 'Denied Archive Access';
+                return;
+            }
+
             // 1. SEEK: If I know things that aren't physical records yet
+
             const personalIntel = window.IntelManager?.getIntelForNode(en.id) || [];
             const unrecorded = personalIntel.filter(intel => {
                 const recordExists = Array.from(window.MountainArchives.records.values()).some(r => r.intel_id === intel.intel_id);
