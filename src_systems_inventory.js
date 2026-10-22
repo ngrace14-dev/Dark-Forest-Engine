@@ -213,12 +213,19 @@ window.EventBus.on('INV_USE', (packIndex) => {
             if (item.stats.buff) window.EventBus.emit('UI_LOG', `${item.name} grants +${item.stats.amount} ${item.stats.buff} for ${item.stats.duration}s.`);
             window.EventBus.emit('UI_UPDATE_HUD');
         }
-    } else if (item.isDiscovery) {
-        // --- ARTIFACT BRIDGE: INSPECTION FLOW ---
+        else if (item.isDiscovery || item.type === 'weapon' || item.type === 'armor') {
+        // --- ARTIFACT & STEEL STRAND: INSPECTION FLOW ---
         window.EventBus.emit('UI_LOG', `[ARTIFACT] Inspecting ${item.name}...`);
         
-        if (window.IntelManager) {
+        // 1. Check for attached provenance (Steel Strand)
+        if (window.MountainArchives?.readItemProvenance) {
+            window.MountainArchives.readItemProvenance(itemId, 'player');
+        }
+
+        // 2. Original Discovery logic
+        if (item.isDiscovery && window.IntelManager) {
             const intelId = window.IntelManager.register({
+
                 type: 'FACT',
                 payload: {
                     title: `Artifact Analysis: ${item.name}`,

@@ -12,11 +12,13 @@ class MountainArchiveSystem {
         this.activeTheories = new Map(); // theoryId -> { name, description, accuracy }
         
         // --- PHASE 3: PHYSICAL HISTORY ---
-        this.records = new Map(); // record_id -> HistoricalRecord object
+                this.records = new Map(); // record_id -> HistoricalRecord object
         this.archiveContainers = new Map(); // building_id -> { records: Set<record_id>, access_level: 0 }
         this.monuments = new Map(); // monument_id -> { record_id, radius: 5 }
+        this.itemHistory = new Map(); // item_instance_id -> anchoredHistory: Set<intel_id>
 
         window.EventBus.on('ENGINE_READY', () => this.init());
+
         window.EventBus.on('SHIFT_COMPLETE', () => this.recordLongitudinalData());
         
         // Monument Proximity Tick
@@ -119,7 +121,30 @@ class MountainArchiveSystem {
         });
     }
 
+        /**
+     * The Steel Strand: Physical Item Provenance.
+     * Bible §Power: "History is physically attached to the tool of the history."
+     */
+    anchorIntelToItem(itemInstanceId, intel_id) {
+        if (!this.itemHistory.has(itemInstanceId)) {
+            this.itemHistory.set(itemInstanceId, new Set());
+        }
+        this.itemHistory.get(itemInstanceId).add(intel_id);
+        window.EventBus.emit('UI_LOG_DEBUG', `[STEEL] Item ${itemInstanceId} has witnessed a new truth.`);
+    }
+
+    readItemProvenance(itemInstanceId, readerId) {
+        const history = this.itemHistory.get(itemInstanceId);
+        if (history && window.IntelManager) {
+            history.forEach(intelId => {
+                window.IntelManager.grantOwnership(intelId, readerId);
+            });
+            window.EventBus.emit('UI_LOG', `[HISTORY] You study the markings on the artifact. It speaks of the past.`);
+        }
+    }
+
     init() {
+
 
         // Initialize Terminus Theories (Bible §8)
         this.activeTheories.set('static_mountain_theory', {
