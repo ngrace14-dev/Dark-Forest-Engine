@@ -30,6 +30,55 @@ class PersonhoodSystem {
 
     }
 
+    /**
+     * Substrate Population Engine: Births, Growth, and Sigmoid Logic.
+     */
+    processDemographics() {
+        if (!window.VillageManager) return;
+        
+        const villages = window.VillageManager.villages;
+        const globalPop = villages.reduce((sum, v) => sum + v.population.current, 0);
+        const softCap = 250000;
+
+        villages.forEach(v => {
+            // 1. BIRTH MODEL: Prosperity-Linked Sigmoid
+            const capacityRatio = globalPop / softCap;
+            const prosperityMult = v.stats.prosperity / 100;
+            const foodSecurity = Math.min(1.0, v.stats.food / Math.max(1, v.population.current * 10));
+            
+            // Base growth rate slows as we hit cap (Sigmoid Brake)
+            const growthRate = 0.02 * (1.0 - capacityRatio) * prosperityMult * foodSecurity;
+            
+            if (growthRate > 0) {
+                const births = Math.floor(v.population.current * growthRate);
+                v.population.current += births;
+                
+                // Create new personhood profiles for newborns
+                for (let i = 0; i < Math.min(births, 5); i++) { // Sample new profiles to save memory
+                    const childId = `npc_${v.id}_gen${v.expansionLevel}_${Date.now()}_${i}`;
+                    const profile = this.getProfile(childId);
+                    profile.age = 0;
+                    profile.lifeStage = 'CHILD';
+                    profile.property.homeVillageId = v.id;
+                }
+            }
+
+            // 2. MIGRATION MODEL: The Opportunity Gradient
+            // Simple logic: NPCs move toward villages with higher prosperity/safety
+            if (v.population.current > 100 && Math.random() < 0.05) {
+                const attractors = villages.filter(other => other.id !== v.id && other.stats.prosperity > v.stats.prosperity + 20);
+                if (attractors.length > 0) {
+                    const target = attractors[Math.floor(Math.random() * attractors.length)];
+                    const migratoryGroup = Math.floor(v.population.current * 0.02);
+                    v.population.current -= migratoryGroup;
+                    target.population.current += migratoryGroup;
+                    window.EventBus.emit('UI_LOG_DEBUG', `[DEMOGRAPHICS] ${migratoryGroup} souls migrated from ${v.name} to ${target.name}.`);
+                }
+            }
+        });
+    }
+
+
 
         init() {
         // --- PLAYER INTEGRATION (Node 0) ---
@@ -57,8 +106,9 @@ class PersonhoodSystem {
                         const archetypeKeys = Object.keys(this.ARCHETYPES);
                         const identity = archetypeKeys[Math.floor(Math.random() * archetypeKeys.length)];
 
-                        // --- GENERATIONAL CIVILIZATION: BIOLOGICAL AGING (Node 1) ---
-                        const initialAge = 18 + Math.floor(Math.random() * 40); // Initial NPCs start as adults
+                                                // --- GENERATIONAL CIVILIZATION: BIOLOGICAL AGING (Node 1) ---
+                        // INITIAL NPCS start with established skills/careers
+                        const initialAge = 18 + Math.floor(Math.random() * 40); 
                         const lifeStage = this.getLifeStage(initialAge);
 
                         this.profiles.set(nodeId, {
@@ -70,7 +120,19 @@ class PersonhoodSystem {
                             birthDay: window.EngineParams?.worldDay || 0,
                             mortalityRisk: 0.0,
                             bias: this.ARCHETYPES[identity].bias,
+                            
+                            // --- MASTERY & SKILLS (Safe Villager Rule) ---
+                            skills: {
+                                farming: { level: Math.random() * 50, xp: 0 },
+                                construction: { level: Math.random() * 50, xp: 0 },
+                                history: { level: Math.random() * 50, xp: 0 },
+                                combat: { level: Math.random() * 50, xp: 0 },
+                                lore: { level: Math.random() * 50, xp: 0 }
+                            },
+                            isAdventurer: false, // Danger-exposed status
+
                             // --- SOCIAL TRUST NETWORKS (Node 1) ---
+
                             relationships: new Map(), // nodeId -> { trust, respect, loyalty, suspicion, fear, sinceDay }
                             ancestry: { parents: [], children: [], houseFounderDescent: false }, // --- LINEAGE PIVOT ---
 
@@ -375,14 +437,47 @@ class PersonhoodSystem {
             return 'VENERABLE';
         }
 
+                /**
+         * Safe Villager Rule Logic
+         * Bible: NPCs in safe villages cannot exceed 50% skill cap.
+         */
+        updateSkill(nodeId, skillName, amount) {
+            const profile = this.getProfile(nodeId);
+            if (!profile || !profile.skills[skillName]) return;
+
+            const skill = profile.skills[skillName];
+            
+            // Apply Skill Cap (50%) if not an Adventurer
+            const cap = profile.isAdventurer ? 100 : 50;
+            
+            if (skill.level < cap) {
+                skill.xp += amount;
+                if (skill.xp >= (skill.level + 1) * 10) {
+                    skill.level = Math.min(cap, skill.level + 1);
+                    skill.xp = 0;
+                    
+                    if (skill.level === 50 && !profile.isAdventurer) {
+                        window.EventBus.emit('UI_LOG_DEBUG', `[MASTERY] ${nodeId} has reached their safe potential in ${skillName}. Hardship required for further growth.`);
+                    }
+                }
+            }
+        }
+
         /**
          * Periodically advances ages of all profiles.
          * Bible: Time is the ultimate filter.
          */
         simulateAging() {
             const currentDay = window.EngineParams?.worldDay || 0;
+            
+            // --- POPULATION SUBSTRATE: MIGRATION & GROWTH (Phase 4) ---
+            if (currentDay % 14 === 0 && currentDay !== this._lastGlobalUpdate) {
+                this._lastGlobalUpdate = currentDay;
+                this.processDemographics();
+            }
         
             this.profiles.forEach(profile => {
+
                 // One year passes every 14 days (One Shift cycle = One Season)
                 // Scaling: 1 year per 14 game days
                 if (currentDay % 14 === 0 && currentDay !== profile._lastAgeUpdate) {
