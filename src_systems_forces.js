@@ -252,12 +252,22 @@ window.ForceManager = {
         }, durationHours * 60 * 1000); // Note: Should probably be tied to world time, but for now...
     },
 
-    checkIntervention: function(playerHpPercent) {
+        checkIntervention: function(playerHpPercent) {
         const day = window.EngineParams?.worldDay || 0;
-        if (playerHpPercent < 0.45 && (day - this.huntsman.lastInterventionDay >= this.huntsman.interventionCooldownDays)) {
+        const mantle = window.GameState.huntsmanMantle;
+
+        // --- HARVEST VALUE CALCULATION ---
+        const pStats = window.GameState.pStats;
+        const significance = window.GameState.narrator?.targetHeat || 0;
+        const combatMastery = (pStats.meleeAtt.level + pStats.meleeDef.level + pStats.toughness.level) / 3;
+        
+        mantle.harvestValue = (significance * 2) + (combatMastery * 5);
+
+        if (playerHpPercent < 0.45 && (day - mantle.lastInterventionDay >= 3)) {
             this.executeIntervention();
         }
     },
+
 
         executeIntervention: function() {
             this.huntsman.lastInterventionDay = window.EngineParams.worldDay;
@@ -268,15 +278,20 @@ window.ForceManager = {
          * Physical manifestation of the Huntsman's Rescue
          */
         handleInterventionEvent: function() {
+            const mantle = window.GameState.huntsmanMantle;
+
             // --- PHASE 1: FORCE BUDGET & TIMEOUT FAILSAFE ---
             if (this.huntsman.activeIntervention) {
                 window.EventBus.emit('UI_LOG_DEBUG', `[FORCE BUDGET] Huntsman is already deployed. Intervention aborted.`);
                 return;
             }
 
-            window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "You are not yet ready to feed the roots."`);
+            // --- HARVEST THRESHOLD CHECK ---
+            const isFinalLesson = mantle.harvestValue >= mantle.maxHarvestThreshold;
+
+            window.EventBus.emit('UI_LOG', isFinalLesson ? `[THE HUNTSMAN] "The harvest is ripe."` : `[THE HUNTSMAN] "You are not yet ready to feed the roots."`);
         
-            // 1. Freeze player controls (simplified)
+            // 1. Freeze player controls
             window.Input.frozen = true;
         
             // 2. Spawn Huntsman
@@ -289,6 +304,7 @@ window.ForceManager = {
                 huntsman.isIntervening = true;
                 huntsman.interventionPhase = 'clearing';
                 this.huntsman.activeIntervention = true;
+                mantle.interventionCount++;
             
                 // --- FAILSAFE: 60 SECOND HARD RESET ---
                 this.huntsman.timeoutId = setTimeout(() => {
@@ -329,32 +345,69 @@ window.ForceManager = {
                     });
                     window.playerHealth.updateUI();
                 
-                    window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "Learn from your weakness."`);
+                    if (isFinalLesson) {
+                        window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "My task is finished. The Sovereign awaits."`);
+                        this.executeHuntsmanSacrifice(huntsman);
+                    } else {
+                        window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "Learn from your weakness."`);
 
-                    // 5. Give the Orb
-                    this.orbMessenger.attachedToId = 'player';
-                    window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "The Messenger will watch your struggle."`);
+                        // 5. Give the Orb
+                        this.orbMessenger.attachedToId = 'player';
+                        window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "The Messenger will watch your struggle."`);
 
-                    // 6. Apply Scorn (12h)
-                    this.applyScorn('player', 12);
+                        // 6. Apply Scorn (12h)
+                        this.applyScorn('player', 12);
 
-                    // Cleanup
-                    window.Input.frozen = false;
-                    setTimeout(() => {
-                        clearTimeout(this.huntsman.timeoutId);
-                        this.huntsman.activeIntervention = false;
+                        // Cleanup
+                        window.Input.frozen = false;
+                        setTimeout(() => {
+                            clearTimeout(this.huntsman.timeoutId);
+                            this.huntsman.activeIntervention = false;
 
-                        if (window.GameCore?.scene && huntsman.visual) window.GameCore.scene.remove(huntsman.visual);
-                        if (window.GameCore?.world && huntsman.body) {
-                            window.PhysicsQueue.enqueue(() => window.GameCore.world.removeRigidBody(huntsman.body));
-                        }
-                        if (window.GameCore?.activeEntities) {
-                            window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e !== huntsman);
-                        }
-                    }, 5000);
+                            if (window.GameCore?.scene && huntsman.visual) window.GameCore.scene.remove(huntsman.visual);
+                            if (window.GameCore?.world && huntsman.body) {
+                                window.PhysicsQueue.enqueue(() => window.GameCore.world.removeRigidBody(huntsman.body));
+                            }
+                            if (window.GameCore?.activeEntities) {
+                                window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e !== huntsman);
+                            }
+                        }, 5000);
+                    }
                 }, 3000);
             }
         },
+
+        /**
+         * Permanent end of the cultivation phase.
+         */
+        executeHuntsmanSacrifice: function(huntsman) {
+            const mantle = window.GameState.huntsmanMantle;
+            mantle.isCultivationComplete = true;
+        
+            // Remove Scorn immediately
+            this.huntsman.scornedIds.delete('player');
+            window.EventBus.emit('UI_LOG', `[THE MARK] The Huntsman's protection has vanished. You are exposed.`);
+        
+            // Silent Orb
+            window.GameState.orbMessenger.isSilent = true;
+
+            // Huntsman Dies
+            window.EventBus.emit('UI_LOG', `[NARRATIVE] The shadowed shepherd falls to his knees and dissolves into the roots.`);
+        
+            window.Input.frozen = false;
+            this.huntsman.activeIntervention = false;
+        
+            if (window.GameCore?.scene && huntsman.visual) window.GameCore.scene.remove(huntsman.visual);
+            if (window.GameCore?.world && huntsman.body) {
+                window.PhysicsQueue.enqueue(() => window.GameCore.world.removeRigidBody(huntsman.body));
+            }
+            if (window.GameCore?.activeEntities) {
+                window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e !== huntsman);
+            }
+
+            window.EventBus.emit('HARVEST_CYCLE_BEGINS');
+        },
+
 
 
     getForceStrength: function(name) {

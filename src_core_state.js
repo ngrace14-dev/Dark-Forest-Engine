@@ -133,13 +133,18 @@ window.GameState = {
     },
 
         // --- CULTIVATION & CONSUMPTION: THE MANTLE ---
-    huntsmanMantle: {
-        currentHuntsmanId: 'huntsman_init',
-        lastVictimId: 'none',
-        strengthThreshold: 100,
-        lastInterventionDay: -3,
-        orbMarkedId: null
-    },
+        huntsmanMantle: {
+            currentHuntsmanId: 'huntsman_init',
+            lastVictimId: 'none',
+            strengthThreshold: 100,
+            lastInterventionDay: -3,
+            orbMarkedId: null,
+            interventionCount: 0,    // --- HARVEST THRESHOLD TRACKING ---
+            harvestValue: 0,         // Weighted score of Significance + Mastery
+            isCultivationComplete: false,
+            maxHarvestThreshold: 500 // Hidden limit
+        },
+
     // --- THE MESSENGER: ORB COMPANION ---
     orbMessenger: {
         attachedToId: null,
