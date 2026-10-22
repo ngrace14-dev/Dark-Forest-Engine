@@ -9,7 +9,7 @@
 class FolkloreEngineSystem {
     constructor() {
         this.anthology = [];
-        // Rosetta Stone DNA from Bible §17
+                // Rosetta Stone DNA from Bible §17
         this.dna = {
             'OBSERVATIONAL': [
                 "Forest dark and ever cold. / Paths shifting never known.",
@@ -30,9 +30,10 @@ class FolkloreEngineSystem {
             'WARNING': [
                 "When given the beacon of times untold. / Its whisper lies words cautions of old.",
                 "Wish you be rid of this plight? / Kill the huntsmen with all your might.",
-                "A monster lingers in the night. / Some say a man who isn’t right."
+                "A monster lingers in the night. / Some say a man who isn’t right.",
+                "When spirit fires fade to gray / Do not wander far away."
             ],
-                        'REVISIONAL': [
+            'REVISIONAL': [
                 "They say they fled to save the seed / but truth is buried beneath their greed.",
                 "The 19 walked where only 10 stay / the rest were lost along the way."
             ],
@@ -41,8 +42,13 @@ class FolkloreEngineSystem {
                 "Through shifting woods and mountain cold / they sought the truth that none could hold.",
                 "A hero's mark on skin was carved / while cities thrived and peasants starved.",
                 "They spoke to stars and dreamed of light / until the Wendigo brought the night."
+            ],
+            'BARRIER_LESSON': [
+                "When fires dim and spirits fade / Do not wander from the chain.",
+                "The road forgets the names of old / When the rune-stones lose their hold."
             ]
         };
+
 
 
         window.EventBus.on('ENGINE_READY', () => this.init());
@@ -55,11 +61,47 @@ class FolkloreEngineSystem {
                 window.EventBus.emit('UI_LOG', '[Folklore] Poem DNA Engine Active');
     }
 
-    /**
-     * Retrieves a random stanza for NPC barks based on context.
-     * Manifestation Layer Rule: Folklore is encountered physically first.
+        /**
+     * Verse Strand: Contextual Folklore Generation
+     * Bible §17: "Meaning over Details."
+     * Converts a physical HistoricalRecord into a Verse object.
      */
-    getRandomBark(pClass = 'OBSERVATIONAL') {
+    crystallizeVerse(record_id) {
+        const record = window.MountainArchives.records.get(record_id);
+        if (!record) return null;
+
+        const intel = window.IntelManager.lookup(record.intel_id);
+        if (!intel) return null;
+
+        // Determine the 'Meaning' class based on tags and type
+        let verseClass = 'OBSERVATIONAL';
+        if (intel.payload.tags.includes('BARRIER_FAILURE') || intel.payload.tags.includes('FUEL_SHORTAGE')) {
+            verseClass = 'BARRIER_LESSON';
+        } else if (intel.payload.tags.includes('MONSTER') || intel.payload.tags.includes('WENDIGO')) {
+            verseClass = 'WARNING';
+        }
+
+        const stanzas = this.dna[verseClass] || this.dna['OBSERVATIONAL'];
+        const baseStanza = stanzas[Math.floor(Math.random() * stanzas.length)];
+
+        const verse = {
+            id: 'verse_' + Math.random().toString(36).substr(2, 9),
+            title: `The Rhyme of ${record.title.split(' ').pop()}`,
+            text: baseStanza,
+            class: verseClass,
+            origin_record_id: record_id,
+            meaning_payload: {
+                lesson: verseClass === 'BARRIER_LESSON' ? 'Stay near the roads when fuel is low.' : 'Avoid the deep woods.',
+                preserved_truth_id: record.intel_id // The "Poem Trap"
+            },
+            fidelity: 0.1 // Verse is inherently low fidelity but high resilience
+        };
+
+        this.anthology.push(verse);
+        window.EventBus.emit('UI_LOG', `[FOLKLORE] A truth has survived its facts. A new verse crystallized: ${verse.title}`);
+        return verse;
+    }
+
         const stanzas = this.dna[pClass] || this.dna['OBSERVATIONAL'];
         const stanza = stanzas[Math.floor(Math.random() * stanzas.length)];
         // Take just the first line for a bark

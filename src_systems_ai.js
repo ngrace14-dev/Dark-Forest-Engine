@@ -286,11 +286,45 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         };
 
                 // --- PHASE 3.2: HISTORIAN/SCRIBE ACTION LOOP ---
-                if (en.role === 'scribe' || en.role === 'recorder' || en.role === 'historian') {
+                if (en.role === 'scribe' || en.role === 'recorder' || en.role === 'historian' || en.role === 'bard') {
                     const village = window.VillageManager?.villages.find(v => v.id === en.villageId);
                     const archive = window.GameCore.activeEntities.find(e => e.villageId === en.villageId && e.def.type === 'archive');
             
+                    // --- TIER 4: BARD (Folklore/Verse Generation) ---
+                    if (en.role === 'bard' && archive) {
+                        // Bards look for old records to turn into Verse
+                        const records = Array.from(window.MountainArchives.records.values())
+                            .filter(r => {
+                                const day = window.EngineParams?.worldDay || 0;
+                                const age = day - r.creation_day;
+                                // Records older than 5 days are "Folklore Candidates"
+                                return age >= 5 && !window.FolkloreEngine.anthology.some(v => v.origin_record_id === r.id);
+                            });
+
+                        if (records.length > 0) {
+                            const distToArchive = en.visual.position.distanceTo(archive.visual.position);
+                            if (distToArchive > 2.0) {
+                                en.currentTask = 'Seeking Inspiration';
+                                moveCompanion(en, archive.visual.position, 0.8, delta);
+                                return;
+                            } else {
+                                if (!en.compositionTimer || en.compositionTimer <= 0) {
+                                    en.compositionTimer = 20.0;
+                                    en.currentTask = 'Composing Verse';
+                                } else {
+                                    en.compositionTimer -= delta;
+                                    if (en.compositionTimer <= 0) {
+                                        window.FolkloreEngine.crystallizeVerse(records[0].id);
+                                        en.currentTask = 'Verse Composed';
+                                    }
+                                    return;
+                                }
+                            }
+                        }
+                    }
+
                     if (archive && !window.VillageManager.canAccessArchive(village, en.id, archive.id)) {
+
                         en.currentTask = 'Denied Archive Access';
                         return;
                     }
