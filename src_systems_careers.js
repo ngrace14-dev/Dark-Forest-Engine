@@ -14,18 +14,23 @@ window.CareerManager = {
         gatherer: { name: "Gatherer", tier: 1, produces: ["Herbs", "Ingredients", "Reagents"], ranks: ["Forager", "Herbalist", "Botanist", "Master Herbalist", "Forest Sage"] },
         trapper: { name: "Trapper", tier: 1, produces: ["Furs", "Exotic Parts"], ranks: ["Layman", "Snarer", "Trapper", "Trap Lord", "Wilderness Warden"] },
         farmer: { name: "Farmer", tier: 1, produces: ["Crops", "Livestock"], ranks: ["Peasant", "Tiller", "Husbandman", "Yeoman", "Estate Baron"] },
+        scribe: { name: "Scribe", tier: 1, produces: ["Records", "Ink"], ranks: ["Copyist", "Ledger-Keeper", "Clerk", "Senior Scribe", "Master Scribe"] },
         
         // TIER 2: TRADES & CRAFTS
         blacksmith: { name: "Blacksmith", tier: 2, produces: ["Weapons", "Armor", "Prosthetics"], ranks: ["Apprentice", "Journeyman", "Master Smith", "Noble Armorer", "Legendary Smith"] },
         alchemist: { name: "Alchemist", tier: 2, produces: ["Potions", "Tonics", "Poisons"], ranks: ["Brewer", "Chemist", "Transmuter", "Grand Alchemist", "Philosopher"] },
         rune_engineer: { name: "Rune Engineer", tier: 2, produces: ["Barrier Modules", "Rune Stones"], ranks: ["Artificer", "Warden-Builder", "Barrier Master", "Arch-Engineer", "Master Warden Engineer"] },
         chef: { name: "Chef", tier: 2, produces: ["Travel Rations", "Banquets"], ranks: ["Cook", "Caterer", "Culinary Master", "Noble Chef", "Royal Chef"] },
+        recorder: { name: "Recorder", tier: 2, produces: ["Synced History", "Travelogues"], ranks: ["Messenger", "Chronicler-Adept", "Traveling Scribe", "World Recorder", "Master Recorder"] },
 
         // TIER 3: COMMERCE & WEALTH
         merchant: { name: "Merchant", tier: 3, produces: ["Gold", "Contracts"], ranks: ["Peddler", "Trader", "Factor", "Guildmaster", "Merchant Prince"] },
         caravan_master: { name: "Caravan Master", tier: 3, produces: ["Prosperity", "Routes"], ranks: ["Guard", "Wagoner", "Convoy Leader", "Route Master", "Trade King"] },
         landlord: { name: "Landlord", tier: 3, produces: ["Rent", "Taxes"], ranks: ["Collector", "Property Manager", "Owner", "District Lord", "Property Magnate"] },
         info_broker: { name: "Information Broker", tier: 3, produces: ["Rumors", "Intel"], ranks: ["Listener", "Spy", "Broker", "Shadow Master", "Shadow Chancellor"] },
+        historian: { name: "Historian", tier: 3, produces: ["Facts", "Verified Truth"], ranks: ["Researcher", "Verified Scribe", "Analyst", "Senior Historian", "Grand Historian"] },
+
+        // TIER 4: ARCANE & SOCIAL
 
         // TIER 4: ARCANE & SOCIAL
         arcane_proprietor: { name: "Arcane Proprietor", tier: 4, produces: ["Influence", "Establishment"], ranks: ["Barkeep", "Host", "Proprietor", "Arcane Steward", "Keeper of Doors"] },
