@@ -131,7 +131,7 @@ class DynastyManagerSystem {
 
         houseNames.forEach((name, index) => {
             const id = `house_${name.toLowerCase()}`;
-                        this.houses.set(id, {
+                                                this.houses.set(id, {
                 id: id,
                 name: `House ${name}`,
                 founder: `Founder ${name}`,
@@ -141,8 +141,20 @@ class DynastyManagerSystem {
                 monopolies: [], // "Blessed Spots"
                 prestige: 100,
                 isBlessed: index < 9, // First 9 are "Blessed" (Bible §19)
-                legitimacy: 0.5, // --- CREDIBILITY PILLAR: Institutional legitimacy (0.0 - 1.0) ---
+                
+                // --- PHASE 1A: INSTITUTIONAL STATS ---
+                legitimacy: (name === 'Terminus') ? 0.9 : 0.6,
+                historicalContinuity: (name === 'Terminus') ? 18000 : 12000,
+                informationalScarcity: (name === 'Terminus') ? 50 : 20,
+                publicTrust: (name === 'Terminus') ? 0.8 : 0.5,
+                verseInfluence: 0.3,
+                archiveIntegrity: 0.9,
+                truthExposureRisk: 0.1,
+                continuityIndex: (name === 'Terminus') ? 0.8 : 0.4,
+                sovereignty: (name === 'Terminus') ? 0.5 : 0.0,
+                
                 archives: [],
+
                 
                                 // --- THE RARE PART: Institutional Memory & Action Pipeline ---
                 reportBuffer: new Map(), // intelId -> { reports, aggregateCertainty, status }
