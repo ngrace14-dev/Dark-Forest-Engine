@@ -11,11 +11,116 @@ class MountainArchiveSystem {
         this.measurements = []; // Array of { epoch, rotation, starPos, distanceToCapital }
         this.activeTheories = new Map(); // theoryId -> { name, description, accuracy }
         
+        // --- PHASE 3: PHYSICAL HISTORY ---
+        this.records = new Map(); // record_id -> HistoricalRecord object
+        this.archiveContainers = new Map(); // building_id -> { records: Set<record_id>, access_level: 0 }
+        this.monuments = new Map(); // monument_id -> { record_id, radius: 5 }
+
         window.EventBus.on('ENGINE_READY', () => this.init());
         window.EventBus.on('SHIFT_COMPLETE', () => this.recordLongitudinalData());
+        
+        // Monument Proximity Tick
+        window.EventBus.on('AI_TICK', ({ delta }) => this.updateMonuments(delta));
+    }
+
+    /**
+     * Creates a new physical record from a subjective memory.
+     * Bible §Information Ownership: Transcription converts RAM data to a physical item.
+     */
+    createRecord(intel_id, scribe_id, accuracy = 1.0) {
+        const intel = window.IntelManager?.lookup(intel_id);
+        if (!intel) return null;
+
+        const recordId = `record_${Math.random().toString(36).substr(2, 9)}`;
+        const record = {
+            id: recordId,
+            intel_id: intel_id,
+            scribe_id: scribe_id,
+            creation_day: window.EngineParams?.worldDay || 0,
+            accuracy: accuracy,
+            integrity: 100, // Physical condition
+            version: intel.version,
+            title: intel.payload.title,
+            isAnchored: intel.isAnchored || false
+        };
+
+        this.records.set(recordId, record);
+        
+        // Create the physical document item
+        if (window.ItemDatabase) {
+            window.ItemDatabase[recordId] = {
+                id: recordId,
+                name: `Record: ${record.title}`,
+                type: 'document',
+                weight: 0.5,
+                metadata: { record_id: recordId },
+                description: `A physical transcription of ${record.title}. Created on Day ${record.creation_day}.`
+            };
+        }
+
+        window.EventBus.emit('UI_LOG_DEBUG', `[HISTORY] New record created: ${record.title}`);
+        return recordId;
+    }
+
+    /**
+     * Links an archive building to the storage system.
+     */
+    registerArchiveBuilding(building_id, access_level = 0) {
+        this.archiveContainers.set(building_id, {
+            records: new Set(),
+            access_level: access_level
+        });
+    }
+
+    storeRecordInArchive(building_id, record_id) {
+        const container = this.archiveContainers.get(building_id);
+        if (container && this.records.has(record_id)) {
+            container.records.add(record_id);
+            
+            // Sync with Institutional Silo
+            const record = this.records.get(record_id);
+            const building = window.GameCore?.activeEntities.find(e => e.id === building_id);
+            if (building && building.villageId) {
+                window.IntelManager?.shareToInstitution(record.intel_id, `house_${building.nobleHouse?.toLowerCase() || 'neutral'}`);
+            }
+        }
+    }
+
+    /**
+     * Monuments act as permanent witnesses.
+     * Bible §5: Monuments preserve memory beyond the life of witnesses.
+     */
+    registerMonument(entity_id, record_id, radius = 10) {
+        this.monuments.set(entity_id, {
+            record_id: record_id,
+            radius: radius
+        });
+    }
+
+    updateMonuments(delta) {
+        if (!window.GameCore?.playerObj) return;
+        const pPos = window.GameCore.playerObj.visual.position;
+
+        this.monuments.forEach((data, entity_id) => {
+            const monumentEnt = window.GameCore.activeEntities.find(e => e.id === entity_id);
+            if (!monumentEnt) return;
+
+            const dist = monumentEnt.visual.position.distanceTo(pPos);
+            if (dist < data.radius) {
+                const record = this.records.get(data.record_id);
+                if (record && window.IntelManager) {
+                    // Player (and NPCs in future) "witnesses" the monument's truth
+                    if (!window.IntelManager.ownershipRegistry.get(record.intel_id)?.has('player')) {
+                        window.IntelManager.grantOwnership(record.intel_id, 'player');
+                        window.EventBus.emit('UI_LOG', `[HISTORY] You read the inscriptions on the ${monumentEnt.name}. A forgotten truth is revealed.`);
+                    }
+                }
+            }
+        });
     }
 
     init() {
+
         // Initialize Terminus Theories (Bible §8)
         this.activeTheories.set('static_mountain_theory', {
             name: 'The Fixed Bedrock',
