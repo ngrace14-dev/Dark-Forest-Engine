@@ -143,21 +143,24 @@ class DynastyManagerSystem {
                 isBlessed: index < 9, // First 9 are "Blessed" (Bible §19)
                 
                                 // --- PHASE 1A: INSTITUTIONAL STATS ---
-                legitimacy: (name === 'Terminus') ? 0.9 : 0.6,
-                historicalContinuity: (name === 'Terminus') ? 18000 : 12000,
-                informationalScarcity: (name === 'Terminus') ? 50 : 20,
-                publicTrust: (name === 'Terminus') ? 0.8 : 0.5,
-                verseInfluence: 0.3,
-                archiveIntegrity: 0.9,
-                truthExposureRisk: 0.1,
-                continuityIndex: (name === 'Terminus') ? 0.8 : 0.4,
-                sovereignty: (name === 'Terminus') ? 0.5 : 0.0,
+                                legitimacy: (name === 'Terminus') ? 0.9 : 0.6,
+                                historicalContinuity: (name === 'Terminus') ? 18000 : 12000,
+                                informationalScarcity: (name === 'Terminus') ? 50 : 20,
+                                publicTrust: (name === 'Terminus') ? 0.8 : 0.5,
+                                verseInfluence: 0.3,
+                                archiveIntegrity: 0.9,
+                                truthExposureRisk: 0.1,
+                                continuityIndex: (name === 'Terminus') ? 0.8 : 0.4,
+                                sovereignty: (name === 'Terminus') ? 0.5 : 0.0,
                 
-                // --- PHASE 2: INSTITUTIONAL FRICTION ---
-                internalConflictLevel: 0.1, // 0.0 to 1.0
-                narrativeGap: 0.0,          // Distance between Official History and Truth
+                                // --- PHASE 2B: INSTITUTIONAL ANXIETY ---
+                                internalConflictLevel: 0.1,
+                                narrativeGap: 0.0,          // Distance between Official History and Truth
+                                exposureAnxiety: 0.1,       // Danger of truth becoming public
+                                suppressionBurden: 0.0,     // Resource cost of hiding truth
                 
-                archives: [],
+                                archives: [],
+
 
 
                 
@@ -1037,36 +1040,58 @@ class DynastyManagerSystem {
     }
 
         /**
-     * Updates the global state of a House based on simulation feedback.
-     * Bible §Continuity: Institutions are dams against entropy.
-     */
-    updateInstitutionalState(houseId) {
-        const house = this.houses.get(houseId);
-        if (!house) return;
+         * Updates the global state of a House based on simulation feedback.
+         * Bible §Continuity: Institutions are dams against entropy.
+         */
+        updateInstitutionalState(houseId) {
+            const house = this.houses.get(houseId);
+            if (!house) return;
 
-        // 1. Calculate Narrative Gap
-        // The more contradictions in their archives, the higher the gap
-        const contradictions = Array.from(house.beliefs.values()).filter(b => b.state === 'DOUBTED' || b.state === 'SHATTERED').length;
-        house.narrativeGap = Math.min(1.0, contradictions * 0.1);
+            const day = window.EngineParams?.worldDay || 0;
 
-        // 2. Calculate Internal Friction (Conflict)
-        // High narrative gap and low legitimacy drive internal conflict
-        const frictionBase = (house.narrativeGap * 0.6) + ((1.0 - house.legitimacy) * 0.4);
-        house.internalConflictLevel = Math.max(0.1, Math.min(1.0, frictionBase));
+            // 1. Calculate Narrative Gap
+            // Measures the volume of contradictions held in archives
+            const contradictions = Array.from(house.beliefs.values()).filter(b => b.state === 'DOUBTED' || b.state === 'SHATTERED').length;
+            house.narrativeGap = Math.min(1.0, contradictions * 0.15);
 
-        // 3. Legitimacy Decay/Growth
-        // Legitimacy is a function of Verse Influence and Public Trust
-        const targetLegitimacy = (house.verseInfluence * 0.5) + (house.publicTrust * 0.5);
-        house.legitimacy = (house.legitimacy * 0.9) + (targetLegitimacy * 0.1); // Slow smoothing
+            // 2. Calculate Exposure Anxiety (Phase 2B)
+            // Spikes if narrative gap is wide and public trust is high (danger of fall)
+            const baseAnxiety = (house.narrativeGap * 0.7) + (house.truthExposureRisk * 0.3);
+            house.exposureAnxiety = (house.exposureAnxiety * 0.8) + (baseAnxiety * 0.2); // Smooth drift
 
-        // 4. Truth Exposure Risk
-        // High scarcity but high conflict increases risk of leaks
-        house.truthExposureRisk = (house.informationalScarcity / 100) * house.internalConflictLevel;
+            // 3. Institutional Action Triggered by Anxiety
+            if (house.exposureAnxiety > 0.6) {
+                this.handleAnxiousDecision(house);
+            }
 
-        if (house.internalConflictLevel > 0.8 && !house.activeSchism) {
-            this.triggerInstitutionalCrisis(house);
+            // 4. Calculate Internal Friction
+            const frictionBase = (house.exposureAnxiety * 0.6) + ((1.0 - house.legitimacy) * 0.4);
+            house.internalConflictLevel = Math.max(0.1, Math.min(1.0, frictionBase));
+
+            // 5. Legitimacy Adjustment
+            const targetLegitimacy = (house.verseInfluence * 0.5) + (house.publicTrust * 0.5);
+            house.legitimacy = (house.legitimacy * 0.9) + (targetLegitimacy * 0.1);
+
+            if (house.internalConflictLevel > 0.8 && !house.activeSchism) {
+                this.triggerInstitutionalCrisis(house);
+            }
         }
-    }
+
+        /**
+         * Decision logic for anxious institutions.
+         */
+        handleAnxiousDecision(house) {
+            // High anxiety drives suppression and aggressive sponsorship
+            if (house.exposureAnxiety > 0.8) {
+                window.EventBus.emit('UI_LOG_DEBUG', `[ANXIETY] ${house.name} is in a state of informational panic. Suppression edicts issued.`);
+                house.suppressionBurden += 10.0;
+                // logic to block gossip syncs or increase bribe weight
+            } else {
+                window.EventBus.emit('UI_LOG_DEBUG', `[ANXIETY] ${house.name} is sponsoring new Verse to stabilize its narrative.`);
+                house.verseInfluence = Math.min(1.0, house.verseInfluence + 0.05);
+            }
+        }
+
 
 
         getFeuds() {
