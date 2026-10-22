@@ -99,7 +99,7 @@ class MountainArchiveSystem {
         });
     }
 
-    updateMonuments(delta) {
+        updateMonuments(delta) {
         if (!window.GameCore?.playerObj) return;
         const pPos = window.GameCore.playerObj.visual.position;
 
@@ -111,15 +111,31 @@ class MountainArchiveSystem {
             if (dist < data.radius) {
                 const record = this.records.get(data.record_id);
                 if (record && window.IntelManager) {
-                    // Player (and NPCs in future) "witnesses" the monument's truth
+                    
+                    // --- CAREER-BASED DECIPHERING (Stone Strand) ---
+                    const archivistStats = window.CareerManager?.stats['archivist'];
+                    const loreSkill = window.PersonhoodManager?.getProfile('player_node')?.skills?.lore?.level || 0;
+                    
+                    // Monuments are harder to read than items (require Level 5 / 25 Lore)
+                    const isDecipherable = (archivistStats && archivistStats.level >= 5) || loreSkill >= 25;
+
                     if (!window.IntelManager.ownershipRegistry.get(record.intel_id)?.has('player')) {
-                        window.IntelManager.grantOwnership(record.intel_id, 'player');
-                        window.EventBus.emit('UI_LOG', `[HISTORY] You read the inscriptions on the ${monumentEnt.name}. A forgotten truth is revealed.`);
+                        if (isDecipherable) {
+                            window.IntelManager.grantOwnership(record.intel_id, 'player');
+                            window.EventBus.emit('UI_LOG', `[HISTORY] You read the inscriptions on the ${monumentEnt.name}. A forgotten truth is revealed.`);
+                        } else {
+                            // Only bark once per visit
+                            if (!monumentEnt._lastFailedAttempt || Date.now() - monumentEnt._lastFailedAttempt > 60000) {
+                                window.EventBus.emit('UI_LOG', `[HISTORY] The ${monumentEnt.name} bears ancient text. Your knowledge of Lore is insufficient to decode it.`);
+                                monumentEnt._lastFailedAttempt = Date.now();
+                            }
+                        }
                     }
                 }
             }
         });
     }
+
 
         /**
      * The Steel Strand: Physical Item Provenance.
@@ -133,15 +149,26 @@ class MountainArchiveSystem {
         window.EventBus.emit('UI_LOG_DEBUG', `[STEEL] Item ${itemInstanceId} has witnessed a new truth.`);
     }
 
-    readItemProvenance(itemInstanceId, readerId) {
+        readItemProvenance(itemInstanceId, readerId) {
         const history = this.itemHistory.get(itemInstanceId);
-        if (history && window.IntelManager) {
-            history.forEach(intelId => {
-                window.IntelManager.grantOwnership(intelId, readerId);
-            });
-            window.EventBus.emit('UI_LOG', `[HISTORY] You study the markings on the artifact. It speaks of the past.`);
+        if (!history || !window.IntelManager) return;
+
+        // --- CAREER-BASED DECIPHERING (Steel Strand) ---
+        const archivistStats = window.CareerManager?.stats['archivist'];
+        const loreSkill = window.PersonhoodManager?.getProfile('player_node')?.skills?.lore?.level || 0;
+        
+        // Basic Deciphering Gate
+        if (readerId === 'player' && (!archivistStats || archivistStats.level < 2) && loreSkill < 15) {
+            window.EventBus.emit('UI_LOG', `[HISTORY] You see markings on the item, but you lack the historical training to decipher them.`);
+            return;
         }
+
+        history.forEach(intelId => {
+            window.IntelManager.grantOwnership(intelId, readerId);
+        });
+        window.EventBus.emit('UI_LOG', `[HISTORY] You study the markings on the artifact. It speaks of the past.`);
     }
+
 
     init() {
 
