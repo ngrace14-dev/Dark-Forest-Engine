@@ -273,7 +273,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         else if (distToPlayer > 50) { if (!en.lastAiUpdate || now - en.lastAiUpdate < 100) return; }
         en.lastAiUpdate = now;
 
-        // --- PHASE 5: NPC COGNITION ENGINE ---
+                // --- PHASE 3: NPC COGNITION ENGINE ---
         // Bible §22: Every profession contains Drives, Affinities, and Dreams
         en.ambitions = en.ambitions || {
             aggression: 0.3,
@@ -281,8 +281,48 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
             patience: 0.5,
             investigation: 0.2,
             authority: 0.2,
-            stealth: 0.1
+            stealth: 0.1,
+            curiosity: 0.2 // Added for Historian/Scribe loop
         };
+
+        // --- PHASE 3.2: HISTORIAN/SCRIBE ACTION LOOP ---
+        if (en.role === 'scribe' || en.role === 'historian') {
+            const village = window.VillageManager?.villages.find(v => v.id === en.villageId);
+            const archive = window.GameCore.activeEntities.find(e => e.villageId === en.villageId && e.def.type === 'archive');
+            
+            // 1. SEEK: If I know things that aren't physical records yet
+            const personalIntel = window.IntelManager?.getIntelForNode(en.id) || [];
+            const unrecorded = personalIntel.filter(intel => {
+                const recordExists = Array.from(window.MountainArchives.records.values()).some(r => r.intel_id === intel.intel_id);
+                return !recordExists && intel.truth_state === 'TRUE'; // Historians seek truth
+            });
+
+            if (unrecorded.length > 0 && archive) {
+                const distToArchive = en.visual.position.distanceTo(archive.visual.position);
+                if (distToArchive > 2.0) {
+                    en.currentTask = 'Seeking Archive';
+                    en.taskTarget = archive.name;
+                    moveCompanion(en, archive.visual.position, 0.8, delta);
+                    return;
+                } else {
+                    // 2. TRANSCRIBE: I am at the archive, convert memory to record
+                    if (!en.transcriptionTimer || en.transcriptionTimer <= 0) {
+                        en.transcriptionTimer = 10.0; // 10 seconds to write a book
+                        en.currentTask = 'Transcribing';
+                        window.EventBus.emit('UI_LOG_DEBUG', `[HISTORY] ${en.name} begins transcribing ${unrecorded[0].payload.title}.`);
+                    } else {
+                        en.transcriptionTimer -= delta;
+                        if (en.transcriptionTimer <= 0) {
+                            const recordId = window.MountainArchives.createRecord(unrecorded[0].intel_id, en.id);
+                            window.MountainArchives.storeRecordInArchive(archive.id, recordId);
+                            en.currentTask = 'Finished Work';
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
 
                         // Apply Divine Influence (Bible §21)
         if (window.DreamManager) {
