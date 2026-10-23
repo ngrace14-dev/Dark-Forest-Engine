@@ -309,6 +309,118 @@ window.SystemDefinitions = [
         triggers: { FEAR_LOAD: ">0.3" }
     },
 
+    // --- PHASE 4: THE INSTITUTIONAL FABRIC ---
+    {
+        id: 31,
+        name: "Violence Monopoly",
+        tier: "Governance",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { VIOLENCE_POTENTIAL: -0.2, LEGITIMACY_INDEX: 0.1, FEAR_LOAD: -0.1 },
+            scalar_to_framework: { formal_contract_enforcement: 0.3 }
+        },
+        triggers: { LEGITIMACY_INDEX: ">0.5", TRUST_DENSITY: ">0.3" }
+    },
+    {
+        id: 32,
+        name: "Legitimacy",
+        tier: "Governance",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { COHESION_INDEX: 0.1, TRUST_DENSITY: 0.05 },
+            scalar_to_framework: { obedience_threshold_modifier: 0.2 }
+        },
+        triggers: null
+    },
+    {
+        id: 33,
+        name: "Bureaucracy",
+        tier: "Governance",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { WORLD_ENTROPY: 0.02, COHESION_INDEX: 0.02 },
+            scalar_to_framework: { labor_delay_factor: 1.3 }
+        },
+        triggers: { LEGITIMACY_INDEX: ">0.6" }
+    },
+    {
+        id: 34,
+        name: "Class Structure",
+        tier: "Governance",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { COHESION_INDEX: -0.05, SIGNIFICANCE_DENSITY: 0.05 },
+            scalar_to_framework: { mobility_friction: 0.4 }
+        },
+        triggers: { LEGITIMACY_INDEX: ">0.4" }
+    },
+    {
+        id: 35,
+        name: "Diplomacy",
+        tier: "Governance",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { TRUST_DENSITY: 0.1, VIOLENCE_POTENTIAL: -0.1 },
+            scalar_to_framework: { alliance_stability_bonus: 0.2 }
+        },
+        triggers: { TRUST_DENSITY: ">0.5" }
+    },
+    {
+        id: 51,
+        name: "Social Capital",
+        tier: "Social",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { TRUST_DENSITY: 0.05, COHESION_INDEX: 0.05 },
+            scalar_to_framework: { favor_exchange_efficiency: 0.3 }
+        },
+        triggers: null
+    },
+    {
+        id: 53,
+        name: "Patronage",
+        tier: "Social",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { LEGITIMACY_INDEX: 0.05, SIGNIFICANCE_DENSITY: 0.02 },
+            scalar_to_framework: { specialized_labor_access: 0.2 }
+        },
+        triggers: { TRUST_DENSITY: ">0.4" }
+    },
+    {
+        id: 55,
+        name: "Feuds",
+        tier: "Social",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { VIOLENCE_POTENTIAL: 0.1, FEAR_LOAD: 0.1, TRUST_DENSITY: -0.1 },
+            scalar_to_framework: { contract_vendetta_weight: 0.5 }
+        },
+        triggers: { VIOLENCE_POTENTIAL: ">0.4", LEGITIMACY_INDEX: "<0.4" }
+    },
+    {
+        id: 57,
+        name: "Kinship",
+        tier: "Social",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { TRUST_DENSITY: 0.1, COHESION_INDEX: 0.1 },
+            scalar_to_framework: { safety_net_resilience: 0.4 }
+        },
+        triggers: null
+    },
+    {
+        id: 59,
+        name: "Leadership",
+        tier: "Social",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { LEGITIMACY_INDEX: 0.1, COHESION_INDEX: 0.1 },
+            scalar_to_framework: { panic_suppression_bonus: 0.3 }
+        },
+        triggers: { SIGNIFICANCE_DENSITY: ">0.4" }
+    },
+
     // --- EXISTING CORE SYSTEMS ---
     {
         id: 36,
