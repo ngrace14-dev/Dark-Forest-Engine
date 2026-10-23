@@ -8,14 +8,50 @@ class KnowledgeInventory {
     constructor(factionId) {
         this.factionId = factionId;
         this.records = new Map(); // Map<intelId, FactObject>
+        this.contracts = []; // System 2.2: Active expedition demands
         this.continuityDebt = 0; // Cumulative weight of fossilized models
         this.attentionQuota = 100; // Capacity to notice new events
     }
 
     /**
-     * System 2.1: Identify the most critical gaps in the faction's model.
-     * Expresses "Truth Hunger" - Bible §13, §14.
+     * System 2.2: Convert high-priority deficits into Expedition Contracts.
+     * Enforces "Deficit-Driven" discovery - Bible §13.
      */
+    generateContracts() {
+        const deficits = this.getKnowledgeDeficits();
+        
+        deficits.slice(0, 5).forEach(deficit => {
+            // Only create if not already being sought
+            const existing = this.contracts.find(c => c.intelId === deficit.id && c.status !== 'FAILED');
+            if (existing) return;
+
+            const contract = {
+                id: `contract_${Math.random().toString(36).substr(2, 5)}`,
+                intelId: deficit.id,
+                type: deficit.type,
+                priority: deficit.priority,
+                originId: this.factionId,
+                requiredLenses: this.determineRequiredLenses(deficit.type),
+                status: 'OPEN',
+                team: []
+            };
+
+            this.contracts.push(contract);
+            console.log(`[Demand] ${this.factionId} issued contract for ${deficit.id} (Priority: ${deficit.priority.toFixed(2)})`);
+        });
+    }
+
+    determineRequiredLenses(type) {
+        const mapping = {
+            'hostile': ['adventurer'],
+            'spatial': ['surveyor', 'explorer'],
+            'runic': ['scholar'],
+            'historical': ['historian'],
+            'dissonant': ['agent']
+        };
+        return mapping[type] || ['adventurer'];
+    }
+
     getKnowledgeDeficits() {
         const deficits = [];
         this.records.forEach((record, id) => {
