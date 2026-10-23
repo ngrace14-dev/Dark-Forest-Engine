@@ -20,13 +20,29 @@ class ConsequenceEngine {
 
         // Fix #3: Bridge Observation to Epistemology (Belief Update)
         window.EventBus.on(ConsequenceEvents.TRUTH_EXTRACTED, (data) => {
+            // Null Safety: Verify engine and data are ready
+            if (!window.GameCore?.activeEntities || !window.ModelLayer || !window.VillageManager) return;
+
             const seeker = window.GameCore.activeEntities.find(e => e.id === data.seekerId);
-            const factionId = seeker?.villageId || seeker?.houseId || 'independent';
-            
+            if (!seeker) return;
+
+            // Identity Mapping: Convert integer villageId to House/Faction Name string
+            let factionId = seeker.houseId; 
+            if (!factionId && seeker.villageId !== undefined) {
+                const village = window.VillageManager.villages[seeker.villageId];
+                factionId = village?.nobleHouse || 'independent';
+            }
+
+            // Payload Fetch: Get actual truth data from registry to fulfill Seeker extraction
+            const latentTruth = window.ModelLayer.latentRegistry.get(data.intelId);
+            if (!latentTruth) return;
+
             window.EventBus.emit(ConsequenceEvents.REQ_BELIEF_UPDATE, {
                 factionId: factionId,
                 packet: {
                     intelId: data.intelId,
+                    value: latentTruth.value,
+                    type: latentTruth.type,
                     fidelity: data.fidelity,
                     timestamp: Date.now()
                 }

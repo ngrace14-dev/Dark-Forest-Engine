@@ -7,10 +7,11 @@ import RAPIER from 'rapier';
 import alea from 'alea';
 
 // Your AAA system imports
-import { WetlandsSystem } from './src_systems_wetlands.js';
-import { MountainSystem } from './src_systems_mountains.js';
-import { DunesSystem } from './src_systems_dunes.js';
-import { TidewaterSystem } from './src_systems_tidewater.js';
+import WetlandsSystem from './src_systems_wetlands.js';
+import MountainSystem from './src_systems_mountains.js';
+import DunesSystem from './src_systems_dunes.js';
+import TidewaterSystem from './src_systems_tidewater.js';
+
 
 // Redwood Ecosystem imports
 import RedwoodGenerator from './src_generators_redwood.js';
@@ -2282,57 +2283,4 @@ window.EventBus?.on('PLAYER_RESPAWN', () => {
     window.GameState.pStats.hp = window.GameState.pStats.maxHp; 
     window.GameState.inventory.gold = Math.floor(window.GameState.inventory.gold / 2); 
     playEntityAnimation(window.GameCore.playerObj, 'idle'); 
-    window.EventBus.emit('UI_UPDATE_HUD'); 
-});
-
-window.EventBus?.on('GAME_STARTED', () => {
-    if (window.CapitalCityManager && !window.CapitalCityManager.isGenerated) {
-        window.CapitalCityManager.generateCapital();
-    }
-    
-    if (window.GameCore?.playerObj && window.GameCore.playerObj.body) {
-        ChunkManager.activeChunks.forEach((chunk, key) => ChunkManager.unloadChunk(key));
-        ChunkManager.currentChunkX = null;
-        ChunkManager.currentChunkZ = null;
-        
-        const p = window.GameCore.playerObj.visual.position;
-        ChunkManager.forceUpdatePosition(new THREE.Vector3(p.x, 0, p.z));
-    }
-    
-    window.EventBus.emit('UI_LOG', "World Simulation Engaged. Wilderness Synchronized.");
-});
-
-// BOOT ENGINE
-async function bootEngine() {
-    try {
-        document.getElementById('loading-bar').style.width = "50%"; 
-        await RAPIER.init(); 
-        document.getElementById('loading-bar').style.width = "100%"; 
-        document.getElementById('loading-container').classList.add('hidden'); 
-        document.getElementById('btn-start').classList.remove('hidden');
-        
-        window.GameCore.scene = new THREE.Scene(); 
-        window.GameCore.scene.fog = new THREE.FogExp2(0x040608, 0.00008); 
-        window.GameCore.scene.background = new THREE.Color(0x040608);
-        window.GameCore.camera = new THREE.PerspectiveCamera(60, (window.innerWidth || 800) / (window.innerHeight || 600), 0.1, 2000000); 
-
-                // INITIALIZE REDWOOD WORKER ARCHETYPES & FOREST SYSTEM
-                if (window.RedwoodGenerator?.init) {
-                    try {
-                        // Pre-Flight Synchronization: Await worker generation before initiating the Baker
-                        await window.RedwoodGenerator.init('src_workers_tree_worker.js');
-                        console.log('[Engine] Master Redwood Geometries stored locally.');
-                    } catch (err) {
-                        console.warn('[Engine] RedwoodGenerator worker fallback:', err);
-                    }
-                }
-
-                if (window.ForestRenderer) {
-                    await window.ForestRenderer.ensureAssets();
-                    window.GameCore.scene.add(window.ForestRenderer.group);
-                }
-
-                // --- PRE-FLIGHT SYNCHRONIZATION ---
-                // We only proceed to bake and initialize impostors if the Worker successfully returned the geometries.
-                if (window.ImpostorBaker && window.RedwoodGenerator?.isInitialized) {
-                    console.log('[Engine] Initia
+    window.EventBus.emit('UI_UPD
