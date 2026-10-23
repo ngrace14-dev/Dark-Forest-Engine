@@ -46,6 +46,17 @@ class KnowledgeInventory {
 class SeekerPipeline {
     constructor() {
         this.activePackets = []; // Packets in transport
+        
+        // Professional Lenses: Efficiency and Fidelity Mapping
+        // Every seeker can extract anything, but with varying success.
+        this.LENSES = {
+            'adventurer': { hostile: 1.0, spatial: 0.2, runic: 0.1, historical: 0.3, cost: 1.0 },
+            'explorer':   { hostile: 0.4, spatial: 0.8, runic: 0.3, historical: 0.4, cost: 0.8 },
+            'surveyor':   { hostile: 0.1, spatial: 1.0, runic: 0.2, historical: 0.2, cost: 1.5 },
+            'historian':  { hostile: 0.2, spatial: 0.4, runic: 0.2, historical: 1.0, cost: 0.7 },
+            'scholar':    { hostile: 0.1, spatial: 0.2, runic: 1.0, historical: 0.5, cost: 1.2 },
+            'agent':      { hostile: 0.3, spatial: 0.3, runic: 0.4, historical: 0.6, cost: 1.0 }
+        };
     }
 
     /**
@@ -56,22 +67,38 @@ class SeekerPipeline {
         const truth = window.ModelLayer.latentRegistry.get(latentId);
         if (!truth) return null;
 
-        // Extraction has a cost (CA-2)
+        const role = seekerEntity.role || 'adventurer';
+        const lens = this.LENSES[role] || this.LENSES['adventurer'];
+        const truthType = truth.type || 'historical';
+        
+        // Calculate Professional Multiplier
+        const fidelityMult = lens[truthType] || 0.1;
+        const costMult = lens.cost || 1.0;
+
+        // Extraction failure check (Randomness based on role mastery)
+        if (Math.random() > fidelityMult + 0.2) {
+            console.log(`[Seeker] ${seekerEntity.id} (${role}) failed to comprehend ${latentId} (Type: ${truthType}).`);
+            return null;
+        }
+
+        // Extraction has a cost (CA-2) - Modified by role efficiency
         if (seekerEntity.stats) {
-            seekerEntity.stats.stamina = Math.max(0, seekerEntity.stats.stamina - 10);
+            const baseCost = 10;
+            seekerEntity.stats.stamina = Math.max(0, seekerEntity.stats.stamina - (baseCost * costMult));
         }
 
         const packet = {
             intelId: latentId,
             data: { ...truth },
             sourceId: seekerEntity.id,
+            seekerRole: role,
             originCoord: seekerEntity.visual?.position || { x: 0, z: 0 },
             timestamp: window.EngineParams?.worldDay || 0,
-            fidelity: 1.0 // Degrades during transport
+            fidelity: 1.0 * fidelityMult // Domain Mastery determines initial fidelity
         };
 
         this.activePackets.push(packet);
-        console.log(`[Seeker] Truth extracted by ${seekerEntity.id}: ${latentId}`);
+        console.log(`[Seeker] ${seekerEntity.id} extracted ${latentId} with ${Math.round(packet.fidelity * 100)}% fidelity.`);
         return packet;
     }
 
@@ -104,19 +131,24 @@ class BeliefRevisionEngine {
      * Enforces CA-1 (Continuity Debt).
      */
     process(inventory, packet) {
-        const friction = inventory.calculateRevisionFriction(
-            inventory.records.get(packet.intelId) || { confidence: 0, age: 0 },
-            packet.data
-        );
+        const existing = inventory.records.get(packet.intelId) || { confidence: 0, age: 0 };
+        const friction = inventory.calculateRevisionFriction(existing, packet.data);
 
+        // Verification Friction: Packet Fidelity determines how "persuasive" the truth is.
+        // Low fidelity packets are easily dismissed by the institution.
+        const fidelityBonus = (1.0 - packet.fidelity); // 0.1 fidelity adds 0.9 friction
+        
         // Institutional Fear increases friction
         const fearMod = (inventory.records.size > 50) ? 1.5 : 1.0; 
-        const finalFriction = friction * fearMod;
+        const finalFriction = (friction + fidelityBonus) * fearMod;
 
         if (Math.random() > finalFriction) {
-            return inventory.integrate(packet.intelId, packet.data);
+            return inventory.integrate(packet.intelId, {
+                ...packet.data,
+                confidence: packet.fidelity // Integrated belief is capped by the seeker's fidelity
+            });
         } else {
-            console.log(`[Revision] Packet ${packet.intelId} suppressed by Faction ${inventory.factionId}.`);
+            console.log(`[Revision] Packet ${packet.intelId} suppressed by Faction ${inventory.factionId} (Friction: ${finalFriction.toFixed(2)}).`);
             return false;
         }
     }
