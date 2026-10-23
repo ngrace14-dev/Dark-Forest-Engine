@@ -54,7 +54,7 @@ class StrategicProcessor {
         const fuelScore = fuelFact ? (fuelFact.value / 100) : 0.5;
 
         // 3. Safety Score (0.2)
-        const threats = facts.filter(f => f.truthClass === 'THREAT' && f.confidence > 0.5);
+        const threats = facts.filter(f => f.value?.type === 'THREAT' && f.confidence > 0.5);
         const safetyScore = Math.max(0, 1.0 - (threats.length * 0.2));
 
         // 4. Confidence Score (0.1)
