@@ -65,11 +65,15 @@ class KnowledgeInventory {
         const type = deficit.value?.type || 'historical';
         const isTerminus = this.factionId === 'House Terminus';
         
+        // System 9: Check if this deficit requires a physical artifact
+        const requiresArtifact = deficitId.startsWith('artifact_');
+        
         const packet = {
             id: `packet_${Math.random().toString(36).substr(2, 5)}`,
             origin: this.factionId,
-            goal: `Resolve deficit in ${deficitId}`,
+            goal: requiresArtifact ? `Retrieve ${deficitId}` : `Resolve deficit in ${deficitId}`,
             targetIntelId: deficitId,
+            isRetrieval: requiresArtifact,
             requiredLenses: isTerminus ? ['terminus_scout'] : this.determineRequiredLenses(type),
             minimumTeam: isTerminus ? ['terminus_scout'] : [this.determineRequiredLenses(type)[0]],
             idealTeam: isTerminus ? ['terminus_scout', 'surveyor', 'recorder'] : [...this.determineRequiredLenses(type), 'adventurer', 'recorder'],
@@ -77,7 +81,7 @@ class KnowledgeInventory {
             owner: this.factionId,
             status: 'OPEN',
             teamMembers: [],
-            priority: 50
+            priority: requiresArtifact ? 80 : 50
         };
         this.contracts.push(packet);
         return packet;
@@ -179,12 +183,19 @@ class SeekerPipeline {
         if (!truth) return null;
         const role = seekerEntity.role || 'adventurer';
         const lens = this.LENSES[role] || this.LENSES['adventurer'];
-        const fidelityMult = lens[truth.type] || 0.1;
-        if (Math.random() > fidelityMult + 0.2) return null;
-        if (seekerEntity.stats) seekerEntity.stats.stamina = Math.max(0, seekerEntity.stats.stamina - (10 * (lens.cost || 1.0)));
+        const truthType = truth.type || 'historical';
+        
+        // System 9: Physical Artifact Handling
+        const isPhysical = truth.isPhysical || false;
+        const fidelityMult = isPhysical ? 1.0 : (lens[truthType] || 0.1);
+        const costMult = isPhysical ? 2.0 : (lens.cost || 1.0); 
+
+        if (!isPhysical && Math.random() > fidelityMult + 0.2) return null;
+        if (seekerEntity.stats) seekerEntity.stats.stamina = Math.max(0, seekerEntity.stats.stamina - (10 * costMult));
+        
         const packet = {
             intelId: latentId, data: { ...truth }, sourceId: seekerEntity.id, seekerRole: role,
-            timestamp: window.EngineParams?.worldDay || 0, fidelity: 1.0 * fidelityMult
+            isArtifact: isPhysical, timestamp: window.EngineParams?.worldDay || 0, fidelity: 1.0 * fidelityMult
         };
         this.activePackets.push(packet);
         return packet;
@@ -193,6 +204,16 @@ class SeekerPipeline {
     deliver(packet, factionId) {
         const inventory = window.ModelLayer.getInventory(factionId);
         if (!inventory || (inventory.shockLevel > 80 && Math.random() < 0.5)) return;
+
+        // System 9: Artifact Delivery bypasses Revision (Physical Proof)
+        if (packet.isArtifact) {
+            inventory.artifacts.add(packet.intelId);
+            inventory.integrate(packet.intelId, { ...packet.data, confidence: 1.0 });
+            this.activePackets = this.activePackets.filter(p => p !== packet);
+            window.EventBus.emit('UI_LOG', `📦 [ARTIFACT] ${factionId} now possesses the physical ${packet.intelId}.`);
+            return;
+        }
+
         if (new BeliefRevisionEngine().process(inventory, packet)) {
             this.activePackets = this.activePackets.filter(p => p !== packet);
         }
