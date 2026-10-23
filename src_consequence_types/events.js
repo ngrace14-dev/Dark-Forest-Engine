@@ -21,6 +21,12 @@ export const ConsequenceEvents = {
     EXPEDITION_DEPART: 'EXPEDITION_DEPART',// AI -> Dispatcher
     
     // Metaphysics
-    HEAT_SPIKE:       'HEAT_SPIKE',        // Inventory -> Aggregator
-    HARVEST_BEGIN:    'HARVEST_BEGIN'      // Aggregator -> Forces
+        HEAT_SPIKE:       'HEAT_SPIKE',        
+    HARVEST_BEGIN:    'HARVEST_BEGIN',
+
+    // Drift & Lifecycle
+    FACT_FORGOTTEN:   'FACT_FORGOTTEN',
+    FACT_DECAYED:     'FACT_DECAYED',
+    VOID_AMNESIA:     'VOID_AMNESIA',
+    TRADITION_FORMED: 'TRADITION_FORMED'
 };
