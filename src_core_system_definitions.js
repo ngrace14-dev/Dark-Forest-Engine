@@ -210,15 +210,17 @@ window.SystemDefinitions = [
 
     // --- PHASE 3: THE EPISTEMIC LENS ---
     {
-        id: 01,
-        name: "Information Provenance",
-        tier: "Epistemology",
-        framework: "EpistemicFilter",
-        vectors: {
-            scalar_to_scalar: { TRUST_DENSITY: 0.05, TRUTH_DECAY: -0.02 },
-            scalar_to_framework: { source_verification_bonus: 0.2 }
-        },
-        triggers: { TRUST_DENSITY: ">0.6" }
+        system_id: "SYS-01",
+        name: "Information Provenance & Acquisition",
+        framework_target: "F3_CONSEQUENCE_INTERCEPTOR",
+        primary_scalar: "TRUST_DENSITY",
+        secondary_scalar: "VIOLENCE_POTENTIAL",
+        activation_logic: { threshold: "TRUST_DENSITY < 0.4", state: "DEGRADED" },
+        scalar_vectors: [["TRUTH_DECAY", "+", 0.2], ["DISCOVERY_PRESSURE", "+", 0.15], ["VIOLENCE_POTENTIAL", "+", 0.1]],
+        framework_modifiers: [["F3_CONTRACT_VOID_CHANCE", 0.25]],
+        historical_weight: 0.65,
+        emergence_classification: "PRESSURE_MODIFIER",
+        implementation_classification: "Shared Framework Logic"
     },
     {
         id: 02,
@@ -629,3 +631,17 @@ window.SystemLoader = {
 
 // Auto-initialize Loader
 window.SystemLoader.init();
+
+        // For each active system, apply scalar nudges
+        this.activeSystems.forEach(sys => {
+            window.ScalarFlux.applySystemNudge(sys.id, sys.vectors);
+        });
+
+        // Emit active systems for Profiler and other Frameworks
+        window.EventBus.emit('ACTIVE_SYSTEMS_UPDATED', this.activeSystems);
+    }
+};
+
+// Auto-initialize Loader
+window.SystemLoader.init();
+
