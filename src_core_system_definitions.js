@@ -275,6 +275,58 @@ window.SystemDefinitions = [
         implementation_classification: "Data Only"
     },
     {
+        system_id: "SYS-06",
+        name: "Editorial Execution & Reality Manipulation",
+        framework_target: "F3_CONSEQUENCE_INTERCEPTOR",
+        primary_scalar: "VIOLENCE_POTENTIAL",
+        secondary_scalar: "LEGITIMACY_INDEX",
+        activation_logic: { threshold: "VIOLENCE_POTENTIAL > 0.5", state: "REDACTION" },
+        scalar_vectors: [["FEAR_LOAD", "+", 0.3], ["TRUTH_DECAY", "+", 0.2], ["WORLD_ENTROPY", "+", 0.1]],
+        framework_modifiers: [["F3_CAUSAL_REWRITE", 0.4], ["F4_RECORDS_PURGED", 0.2]],
+        historical_weight: 0.75,
+        emergence_classification: "EMERGENT_OUTCOME",
+        implementation_classification: "Framework Parameter"
+    },
+    {
+        system_id: "SYS-07",
+        name: "Global Fidelity & Truth Economy",
+        framework_target: "F2_EPISTEMIC_FILTER",
+        primary_scalar: "TRUST_DENSITY",
+        secondary_scalar: "TRUTH_DECAY",
+        activation_logic: { threshold: "TRUST_DENSITY > 0.6", state: "STABILIZED" },
+        scalar_vectors: [["COHESION_INDEX", "+", 0.2], ["LEGITIMACY_INDEX", "+", 0.1], ["TRUTH_DECAY", "-", 0.15]],
+        framework_modifiers: [["F2_SIGNAL_PURITY", 0.3]],
+        historical_weight: 0.40,
+        emergence_classification: "PRESSURE_SINK",
+        implementation_classification: "Shared Framework Logic"
+    },
+    {
+        system_id: "SYS-08",
+        name: "Epistemic Unreliability & Perspective Mechanics",
+        framework_target: "F3_CONSEQUENCE_INTERCEPTOR",
+        primary_scalar: "TRUTH_DECAY",
+        secondary_scalar: "VIOLENCE_POTENTIAL",
+        activation_logic: { threshold: "TRUTH_DECAY > 0.4", state: "FRAGMENTED" },
+        scalar_vectors: [["COHESION_INDEX", "-", 0.2], ["DISCOVERY_PRESSURE", "+", 0.1], ["VIOLENCE_POTENTIAL", "+", 0.15]],
+        framework_modifiers: [["F3_CONTRACT_FRICTION", 0.3]],
+        historical_weight: 0.55,
+        emergence_classification: "PRESSURE_MODIFIER",
+        implementation_classification: "Shared Framework Logic"
+    },
+    {
+        system_id: "SYS-09",
+        name: "Social Contagion & Ideological Vectors",
+        framework_target: "F3_CONSEQUENCE_INTERCEPTOR",
+        primary_scalar: "FEAR_LOAD",
+        secondary_scalar: "COHESION_INDEX",
+        activation_logic: { threshold: "FEAR_LOAD > 0.6", state: "OUTBREAK" },
+        scalar_vectors: [["VIOLENCE_POTENTIAL", "+", 0.25], ["SIGNIFICANCE_DENSITY", "+", 0.1], ["TRUST_DENSITY", "-", 0.2]],
+        framework_modifiers: [["F3_CASCADE_TRIGGER", 0.4], ["F1_PROPAGATION_VELOCITY", 0.2]],
+        historical_weight: 0.80,
+        emergence_classification: "EMERGENT_OUTCOME",
+        implementation_classification: "Shared Framework Logic"
+    },
+    {
         id: 04,
         name: "Narrative Gravity",
         tier: "Epistemology",
@@ -672,20 +724,4 @@ window.SystemLoader = {
 
 // Auto-initialize Loader
 window.SystemLoader.init();
-
-        // For each active system, apply scalar nudges
-        this.activeSystems.forEach(sys => {
-            window.ScalarFlux.applySystemNudge(sys.id, sys.vectors);
-        });
-
-        // Emit active systems for Profiler and other Frameworks
-        window.EventBus.emit('ACTIVE_SYSTEMS_UPDATED', this.activeSystems);
-    }
-};
-
-// Auto-initialize Loader
-window.SystemLoader.init();
-window.SystemLoader.init();
-
-
 
