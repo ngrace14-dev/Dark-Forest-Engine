@@ -213,25 +213,66 @@ window.SystemDefinitions = [
         system_id: "SYS-01",
         name: "Information Provenance & Acquisition",
         framework_target: "F3_CONSEQUENCE_INTERCEPTOR",
-        primary_scalar: "TRUST_DENSITY",
-        secondary_scalar: "VIOLENCE_POTENTIAL",
+        primary_scalar: "DISCOVERY_PRESSURE",
+        secondary_scalar: "TRUST_DENSITY",
         activation_logic: { threshold: "TRUST_DENSITY < 0.4", state: "DEGRADED" },
-        scalar_vectors: [["TRUTH_DECAY", "+", 0.2], ["DISCOVERY_PRESSURE", "+", 0.15], ["VIOLENCE_POTENTIAL", "+", 0.1]],
+        scalar_vectors: [["TRUTH_DECAY", "+", 0.2], ["TRUST_DENSITY", "-", 0.15], ["VIOLENCE_POTENTIAL", "+", 0.1]],
         framework_modifiers: [["F3_CONTRACT_VOID_CHANCE", 0.25]],
         historical_weight: 0.65,
         emergence_classification: "PRESSURE_MODIFIER",
         implementation_classification: "Shared Framework Logic"
     },
     {
-        id: 02,
-        name: "Institutional Drift",
-        tier: "Epistemology",
-        framework: "ScalarFlux",
-        vectors: {
-            scalar_to_scalar: { LEGITIMACY_INDEX: -0.05, WORLD_ENTROPY: 0.02 },
-            scalar_to_framework: { bureaucratic_friction: 0.1 }
-        },
-        triggers: { TRUTH_DECAY: ">0.5" }
+        system_id: "SYS-02",
+        name: "Institutional Model Drift & Continuity Debt",
+        framework_target: "F4_CHRONICLE_ENGINE",
+        primary_scalar: "LEGITIMACY_INDEX",
+        secondary_scalar: "TRUST_DENSITY",
+        activation_logic: { threshold: "COHESION_INDEX < 0.3", state: "DRIFT" },
+        scalar_vectors: [["LEGITIMACY_INDEX", "-", 0.2], ["COHESION_INDEX", "-", 0.15], ["MATERIAL_STRESS", "+", 0.1]],
+        framework_modifiers: [["F4_CHRONOLOGY_SKEW", 0.3]],
+        historical_weight: 0.85,
+        emergence_classification: "HISTORICAL_PROCESS",
+        implementation_classification: "Data Only"
+    },
+    {
+        system_id: "SYS-03",
+        name: "Information Entropy & The Seeker Requirement",
+        framework_target: "F3_CONSEQUENCE_INTERCEPTOR",
+        primary_scalar: "DISCOVERY_PRESSURE",
+        secondary_scalar: "WORLD_ENTROPY",
+        activation_logic: { threshold: "DISCOVERY_PRESSURE > 0.7", state: "ACTIVE_SEARCH" },
+        scalar_vectors: [["WORLD_ENTROPY", "+", 0.1], ["TRUTH_DECAY", "+", 0.15], ["FEAR_LOAD", "+", 0.1]],
+        framework_modifiers: [["F3_LABOR_EFFICIENCY", -0.2]],
+        historical_weight: 0.50,
+        emergence_classification: "PRESSURE_SOURCE",
+        implementation_classification: "Framework Parameter"
+    },
+    {
+        system_id: "SYS-04",
+        name: "Attention Bandwidth & Narrative Gravity",
+        framework_target: "F2_EPISTEMIC_FILTER",
+        primary_scalar: "SIGNIFICANCE_DENSITY",
+        secondary_scalar: "FEAR_LOAD",
+        activation_logic: { threshold: "SIGNIFICANCE_DENSITY > 0.8", state: "SINGULARITY" },
+        scalar_vectors: [["BIOLOGICAL_LOAD", "+", 0.15], ["TRUTH_DECAY", "+", 0.2], ["COHESION_INDEX", "-", 0.1]],
+        framework_modifiers: [["F2_FILTER_STRENGTH", 0.4]],
+        historical_weight: 0.70,
+        emergence_classification: "EMERGENT_OUTCOME",
+        implementation_classification: "Shared Framework Logic"
+    },
+    {
+        system_id: "SYS-05",
+        name: "Procedural Folklore & Poem Traps",
+        framework_target: "F4_CHRONICLE_ENGINE",
+        primary_scalar: "TRUTH_DECAY",
+        secondary_scalar: "SIGNIFICANCE_DENSITY",
+        activation_logic: { threshold: "TRUTH_DECAY > 0.6", state: "MYTHOS_GEN" },
+        scalar_vectors: [["COHESION_INDEX", "+", 0.2], ["LEGITIMACY_INDEX", "+", 0.15], ["TRUST_DENSITY", "+", 0.1]],
+        framework_modifiers: [["F4_NARRATIVE_LATCH", 0.5]],
+        historical_weight: 0.90,
+        emergence_classification: "HISTORICAL_PROCESS",
+        implementation_classification: "Data Only"
     },
     {
         id: 04,
@@ -644,4 +685,7 @@ window.SystemLoader.init();
 
 // Auto-initialize Loader
 window.SystemLoader.init();
+window.SystemLoader.init();
+
+
 
