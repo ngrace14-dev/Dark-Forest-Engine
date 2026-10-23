@@ -63,6 +63,14 @@ class SystemHeartbeat {
         if (this.accumulators.t1 >= this.thresholds.t1) {
             this.ticks.t1 = true;
             this.accumulators.t1 -= this.thresholds.t1;
+            
+            // Fix #2: Emit HEARTBEAT_TICK for Consequence Engine
+            if (window.EventBus) {
+                window.EventBus.emit('HEARTBEAT_TICK', { 
+                    delta, 
+                    worldDay: window.EngineParams?.worldDay || 0 
+                });
+            }
         }
     }
 }

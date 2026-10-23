@@ -1,14 +1,5 @@
-// --- LIFECYCLE ENUMS (PHASE 1) ---
-window.EntityState = { ACTIVE: 0, SLEEPING: 1, VIRTUAL: 2 };
-window.ChunkState = { LOADING: 0, ACTIVE: 1, UNLOADING: 2, UNLOADED: 3 };
-
 import * as THREE from 'three';
 
-window.EventBus = {
-    events: {},
-    on: function(event, callback) { if(!this.events[event]) this.events[event] = []; this.events[event].push(callback); },
-    emit: function(event, data) { if(this.events[event]) this.events[event].forEach(cb => cb(data)); }
-};
 
 const runPotentialTiers = [
     { name: 'Common', chance: 55, bonus: 1, color: '#9ca3af' },
@@ -898,26 +889,30 @@ window.EventBus.on('GAME_SAVE', () => {
             if (member) member.hp = entity.hp;
         });
 
-        // --- PHASE 1: ABSOLUTE COORDINATE SAVING ---
+                // --- PHASE 1: ABSOLUTE COORDINATE SAVING ---
         // Save player and companion positions as absolute values
         if (window.GameCore.playerObj) {
-            window.GameState.savedAbsPos = window.GameCore.getAbsolutePos(window.GameCore.playerObj.visual.position);
+            const absPos = window.GameCore.getAbsolutePos(window.GameCore.playerObj.visual.position);
+            window.GameState.savedAbsPos = { x: absPos.x, y: absPos.y, z: absPos.z };
         }
         
         window.GameState.companionsAbsPos = {};
         window.GameCore.activeEntities.filter(en => en.companionId).forEach(en => {
-            window.GameState.companionsAbsPos[en.companionId] = window.GameCore.getAbsolutePos(en.visual.position);
+            const absPos = window.GameCore.getAbsolutePos(en.visual.position);
+            window.GameState.companionsAbsPos[en.companionId] = { x: absPos.x, y: absPos.y, z: absPos.z };
         });
 
         // --- COMPRESSION IMPLEMENTATION ---
         // Serialize and compress data to bypass QuotaExceededError in localStorage
+        const offset = window.GameCore.worldOffset;
         const saveData = { 
             gameState: window.GameState, 
             engineParams: window.EngineParams, 
-            worldOffset: window.GameCore.worldOffset,
+            worldOffset: { x: offset.x, y: offset.y, z: offset.z },
             villages: window.VillageManager ? window.VillageManager.villages : [], 
             adventurers: window.AdventurerManager ? window.AdventurerManager.records : [] 
         };
+
         
         const jsonString = JSON.stringify(saveData);
         // If LZString is loaded, compress. Otherwise, fall back to raw string.
@@ -954,10 +949,11 @@ window.EventBus.on('GAME_LOAD', () => {
         if (save.gameState) Object.assign(window.GameState, save.gameState);
         if (save.engineParams) Object.assign(window.EngineParams, save.engineParams);
         
-        // Restore the World Offset first so future coordinate math is correct
+                // Restore the World Offset first so future coordinate math is correct
         if (save.worldOffset) {
-            window.GameCore.worldOffset.copy(save.worldOffset);
+            window.GameCore.worldOffset.set(save.worldOffset.x, save.worldOffset.y, save.worldOffset.z);
         }
+
 
         if (Array.isArray(save.villages) && window.VillageManager) {
             window.VillageManager.villages = save.villages;
@@ -973,11 +969,14 @@ window.EventBus.on('GAME_LOAD', () => {
         // The player and companions must be placed AFTER this to ensure they don't fall through ground.
         window.EventBus.emit('WORLD_REGENERATE');
         
-        // Restore Player to Local space based on saved Absolute position
+                // Restore Player to Local space based on saved Absolute position
         if (window.GameState.savedAbsPos && window.GameCore.playerObj) {
-            const localPos = window.GameCore.getLocalPos(window.GameState.savedAbsPos);
+            const savedPos = window.GameState.savedAbsPos;
+            const absPosVec = new THREE.Vector3(savedPos.x, savedPos.y, savedPos.z);
+            const localPos = window.GameCore.getLocalPos(absPosVec);
             window.GameCore.playerObj.body.setTranslation(localPos, true);
         }
+
 
         window.EventBus.emit('UI_LOG', 'Game loaded (Coordinates Synced).');
     } catch (error) {

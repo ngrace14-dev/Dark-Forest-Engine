@@ -133,7 +133,11 @@ class IntelManagerSystem {
         });
 
         const pos = eventData.payload.target_coord;
-        if (!pos) return truthId;
+        
+        // Fix #5: SpatialGrid null reference
+        if (!pos || !window.GameCore?.SpatialGrid) {
+            return truthId;
+        }
 
         const witnesses = window.GameCore.SpatialGrid.getNearbyEntities(pos.x, pos.z, radius);
         

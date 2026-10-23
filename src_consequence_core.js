@@ -17,6 +17,21 @@ class ConsequenceEngine {
         
         window.EventBus.on('ENGINE_READY', () => this.init());
         window.EventBus.on('HEARTBEAT_TICK', (data) => this.tick(data));
+
+        // Fix #3: Bridge Observation to Epistemology (Belief Update)
+        window.EventBus.on(ConsequenceEvents.TRUTH_EXTRACTED, (data) => {
+            const seeker = window.GameCore.activeEntities.find(e => e.id === data.seekerId);
+            const factionId = seeker?.villageId || seeker?.houseId || 'independent';
+            
+            window.EventBus.emit(ConsequenceEvents.REQ_BELIEF_UPDATE, {
+                factionId: factionId,
+                packet: {
+                    intelId: data.intelId,
+                    fidelity: data.fidelity,
+                    timestamp: Date.now()
+                }
+            });
+        });
     }
 
     init() {

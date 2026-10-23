@@ -1,7 +1,11 @@
 // File: src_main.js
 
+// 0. Core Event Bus (MUST BE FIRST)
+import './src_core_event_bus.js';
+
 // --- DIAGNOSTIC VOICE WRAPPER ---
 import './src_systems_diagnostic_wrapper.js';
+
 
 // 0. Core Registry & State
 
@@ -67,10 +71,11 @@ import './src_generators_redwood.js';        // <-- ADDED: Redwood Generator & W
 import './src_systems_procedural_trees.js';   // High-Quality Procedural Trees
 import { ImpostorBaker } from './src_systems_impostor_baker.js'; // Single Authority Baker
 import './src_systems_forest_impostors.js';   // 3km Distant Canopy Impostor System
-import { WetlandsSystem } from './src_systems_wetlands.js';
-import { MountainSystem } from './src_systems_mountains.js';
-import { DunesSystem } from './src_systems_dunes.js';
-import { TidewaterSystem } from './src_systems_tidewater.js';
+import WetlandsSystem from './src_systems_wetlands.js';
+import MountainSystem from './src_systems_mountains.js';
+import DunesSystem from './src_systems_dunes.js';
+import TidewaterSystem from './src_systems_tidewater.js';
+
 import './src_systems_input.js';
 import './src_systems_audio.js';
 import './src_systems_vfx.js';

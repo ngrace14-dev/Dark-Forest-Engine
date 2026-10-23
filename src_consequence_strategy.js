@@ -47,11 +47,13 @@ class StrategicProcessor {
         
         // 1. Food Score (0.4)
         const foodFact = inventory.records.get('resource_food');
-        const foodScore = foodFact ? (foodFact.value / 100) : 0.5;
+        const foodValue = (typeof foodFact?.value === 'object') ? (foodFact.value.amount || 0) : (foodFact?.value || 0);
+        const foodScore = foodFact ? (foodValue / 100) : 0.5;
 
         // 2. Fuel Score (0.3)
         const fuelFact = inventory.records.get('resource_fuel');
-        const fuelScore = fuelFact ? (fuelFact.value / 100) : 0.5;
+        const fuelValue = (typeof fuelFact?.value === 'object') ? (fuelFact.value.amount || 0) : (fuelFact?.value || 0);
+        const fuelScore = fuelFact ? (fuelValue / 100) : 0.5;
 
         // 3. Safety Score (0.2)
         const threats = facts.filter(f => f.value?.type === 'THREAT' && f.confidence > 0.5);
