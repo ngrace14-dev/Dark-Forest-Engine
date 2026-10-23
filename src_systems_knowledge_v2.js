@@ -13,6 +13,34 @@ class KnowledgeInventory {
     }
 
     /**
+     * System 2.1: Identify the most critical gaps in the faction's model.
+     * Expresses "Truth Hunger" - Bible §13, §14.
+     */
+    getKnowledgeDeficits() {
+        const deficits = [];
+        this.records.forEach((record, id) => {
+            // Priority = (Age * 2) + (1.0 - Confidence * 10)
+            const ageWeight = record.age * 0.5;
+            const uncertaintyWeight = (1.0 - record.confidence) * 15.0;
+            
+            // Bias based on truth type importance
+            let importance = 1.0;
+            if (id.startsWith('location_')) importance = 5.0;
+            if (id.startsWith('threat_')) importance = 3.0;
+
+            deficits.push({
+                id: id,
+                type: record.value?.type || 'historical',
+                priority: (ageWeight + uncertaintyWeight) * importance,
+                record: record
+            });
+        });
+
+        // Sort by highest priority
+        return deficits.sort((a, b) => b.priority - a.priority);
+    }
+
+    /**
      * System 2: Add or update a fact in the faction's perceived reality.
      */
     integrate(intelId, data) {

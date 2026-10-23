@@ -277,14 +277,56 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
     const now = performance.now();
 
     window.GameCore.activeEntities.forEach(en => {
+        // ... physics sync ...
         if(en.body && en.body.isDynamic && en.body.isDynamic()) { const p = en.body.translation(); en.visual.position.set(p.x, p.y, p.z); }
         if (en.def.type !== 'npc') return;
 
-        // --- AI DISTANCE THROTTLING ---
-        const distToPlayer = en.visual.position.distanceTo(pPos);
-        if (distToPlayer > 100) { if (!en.lastAiUpdate || now - en.lastAiUpdate < 2000) return; }
-        else if (distToPlayer > 50) { if (!en.lastAiUpdate || now - en.lastAiUpdate < 100) return; }
-        en.lastAiUpdate = now;
+        // --- THE TRUTH HUNGER DRIVE (Bible §13, §14) ---
+        // NPCs prioritize action based on their Professional Lens and Faction Deficits.
+        if (!en.currentTask || en.currentTask === 'idle' || en.currentTask === 'Finished Work') {
+            const inventory = window.ModelLayer.getInventory(en.villageId || en.houseId || 'independent');
+            const deficits = inventory.getKnowledgeDeficits();
+            
+            // Filter deficits by Professional Lens
+            const lens = window.ModelLayer.seekerPipeline.LENSES[en.role] || { historical: 0.1 };
+            const suitableDeficits = deficits.filter(d => (lens[d.type] || 0) > 0.5);
+
+            if (suitableDeficits.length > 0) {
+                const primaryDeficit = suitableDeficits[0];
+                en.currentTask = 'Seeking Truth';
+                en.targetDeficitId = primaryDeficit.id;
+                
+                // Set physical goal based on deficit location
+                if (primaryDeficit.record.value?.payload?.target_coord) {
+                    en.cognitiveTarget = new window.THREE.Vector3(
+                        primaryDeficit.record.value.payload.target_coord.x,
+                        0,
+                        primaryDeficit.record.value.payload.target_coord.z
+                    );
+                    window.EventBus.emit('UI_LOG_DEBUG', `[AI] ${en.name} (${en.role}) is moving to resolve uncertainty in ${primaryDeficit.id}.`);
+                }
+            }
+        }
+
+        // --- EXISTING TASK LOGIC ---
+        if (en.currentTask === 'Seeking Truth' && en.cognitiveTarget) {
+            const dist = en.visual.position.distanceTo(en.cognitiveTarget);
+            if (dist > 5.0) {
+                moveCompanion(en, en.cognitiveTarget, 0.9, delta);
+                return;
+            } else {
+                // At target: Perform specialized extraction
+                const packet = window.ModelLayer.seekerPipeline.extract(en.targetDeficitId, en);
+                if (packet) {
+                    window.ModelLayer.seekerPipeline.deliver(packet, en.villageId || en.houseId || 'independent');
+                    en.currentTask = 'idle'; // Deficit resolved
+                }
+                return;
+            }
+        }
+        
+        // ... rest of AI_TICK ...
+
 
                 // --- PHASE 3: NPC COGNITION ENGINE ---
         // Bible §22: Every profession contains Drives, Affinities, and Dreams
