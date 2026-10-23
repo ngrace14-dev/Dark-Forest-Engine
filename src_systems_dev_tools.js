@@ -181,12 +181,54 @@ window.EventBus.on('ENGINE_READY', () => {
             window.GameState?.processCrowDay?.();
             window.EventBus.emit('UI_LOG', '[DEV] Simulated one world day.');
         } }, 'day').name('📅 Simulate Day');
-        narratorFolder.add({ ledger: () => {
+                narratorFolder.add({ ledger: () => {
             const records = window.AdventurerManager?.records || [];
             console.table(records.map(record => ({ id: record.id, name: record.name, alive: record.alive, level: record.level, storyHeat: record.storyHeat, quest: record.quest?.type, progress: `${record.quest?.progress || 0}/${record.quest?.goal || 0}` })));
             console.table({ ...window.GameState?.narrator });
             window.EventBus.emit('UI_LOG', '[DEV] Adventurer ledger and crow state written to the console.');
         } }, 'ledger').name('📊 Dump Hidden Ledger');
+
+        const epistemFolder = gui.addFolder('⚖️ Epistemology & Truth');
+        epistemFolder.add({
+            audit: () => {
+                console.log("%c DARK FOREST EPISTEMOLOGICAL AUDIT ", "background: #1e1e1e; color: #a855f7; font-weight: bold; padding: 5px;");
+                
+                // 1. Discovery Debt Calculation
+                const latentCount = window.ModelLayer.latentRegistry.size;
+                let totalBeliefs = 0;
+                let totalConfidence = 0;
+                
+                window.ModelLayer.inventories.forEach(inv => {
+                    totalBeliefs += inv.records.size;
+                    inv.records.forEach(r => totalConfidence += r.confidence);
+                    
+                    console.group(`Faction: ${inv.factionId}`);
+                    console.log(`- Continuity Debt: ${inv.continuityDebt.toFixed(2)}`);
+                    console.log(`- Belief Count: ${inv.records.size}`);
+                    console.log(`- Average Confidence: ${(inv.records.size > 0 ? (totalConfidence / inv.records.size) * 100 : 0).toFixed(1)}%`);
+                    console.groupEnd();
+                });
+
+                const discoveryDebt = latentCount - (totalBeliefs / Math.max(1, window.ModelLayer.inventories.size));
+                console.log(`%c GLOBAL DISCOVERY DEBT: ${discoveryDebt.toFixed(2)}`, "color: #f87171; font-weight: bold;");
+                window.EventBus.emit('UI_LOG', `[AUDIT] Global Discovery Debt: ${discoveryDebt.toFixed(2)}`);
+            }
+        }, 'audit').name('🕵️ Run Truth Audit');
+
+        epistemFolder.add({
+            drift: () => {
+                window.EventBus.emit('SHIFT_START');
+                window.EventBus.emit('UI_LOG', '[DEV] Forced 14-day Model Drift.');
+            }
+        }, 'drift').name('📉 Force Model Drift');
+
+        epistemFolder.add({
+            clear: () => {
+                window.ModelLayer.inventories.forEach(inv => inv.records.clear());
+                window.EventBus.emit('UI_LOG', '[DEV] All Faction Memories Cleared.');
+            }
+        }, 'clear').name('🧹 Reset Perceived Reality');
+
 
     } catch(e) {
         console.warn("LIL-GUI failed initialization safely:", e);
