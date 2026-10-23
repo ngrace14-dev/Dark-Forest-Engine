@@ -72,20 +72,40 @@ class KnowledgeInventory {
 }
 
 class SeekerPipeline {
-    constructor() {
-        this.activePackets = []; // Packets in transport
-        
-        // Professional Lenses: Efficiency and Fidelity Mapping
-        // Every seeker can extract anything, but with varying success.
-        this.LENSES = {
-            'adventurer': { hostile: 1.0, spatial: 0.2, runic: 0.1, historical: 0.3, cost: 1.0 },
-            'explorer':   { hostile: 0.4, spatial: 0.8, runic: 0.3, historical: 0.4, cost: 0.8 },
-            'surveyor':   { hostile: 0.1, spatial: 1.0, runic: 0.2, historical: 0.2, cost: 1.5 },
-            'historian':  { hostile: 0.2, spatial: 0.4, runic: 0.2, historical: 1.0, cost: 0.7 },
-            'scholar':    { hostile: 0.1, spatial: 0.2, runic: 1.0, historical: 0.5, cost: 1.2 },
-            'agent':      { hostile: 0.3, spatial: 0.3, runic: 0.4, historical: 0.6, cost: 1.0 }
+    // ... existing constructor ...
+
+    /**
+     * System 3.1: Calculate Expedition Bonuses based on Team Composition.
+     * Enforces "Ideal Team" logic - Bible §31.
+     */
+    calculateTeamBonuses(seekers, truthType) {
+        let bonuses = {
+            fidelity: 1.0,
+            survival: 1.0,
+            extraction: 1.0,
+            interpretation: 1.0
         };
+
+        const roles = seekers.map(s => s.role);
+        
+        // INTERDEPENDENCE LOGIC
+        // 1. Guard Support (Survival)
+        if (roles.includes('adventurer')) bonuses.survival += 0.5;
+        
+        // 2. Domain Specialists (Fidelity/Interpretation)
+        if (truthType === 'spatial' && roles.includes('surveyor')) bonuses.fidelity += 0.4;
+        if (truthType === 'runic' && roles.includes('scholar')) bonuses.interpretation += 0.5;
+        if (truthType === 'historical' && roles.includes('historian')) bonuses.fidelity += 0.3;
+        
+        // 3. Synergy: Surveyor + Explorer (Efficiency)
+        if (roles.includes('surveyor') && roles.includes('explorer')) {
+            bonuses.extraction += 0.3;
+            bonuses.fidelity += 0.2;
+        }
+
+        return bonuses;
     }
+}
 
     /**
      * System 3: Extract truth from Latent Reality.

@@ -281,49 +281,93 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         if(en.body && en.body.isDynamic && en.body.isDynamic()) { const p = en.body.translation(); en.visual.position.set(p.x, p.y, p.z); }
         if (en.def.type !== 'npc') return;
 
-        // --- THE TRUTH HUNGER DRIVE (Bible §13, §14) ---
-        // NPCs prioritize action based on their Professional Lens and Faction Deficits.
+                // --- THE TRUTH HUNGER DRIVE (Bible §13, §14) ---
         if (!en.currentTask || en.currentTask === 'idle' || en.currentTask === 'Finished Work') {
             const inventory = window.ModelLayer.getInventory(en.villageId || en.houseId || 'independent');
             const deficits = inventory.getKnowledgeDeficits();
             
-            // Filter deficits by Professional Lens
             const lens = window.ModelLayer.seekerPipeline.LENSES[en.role] || { historical: 0.1 };
             const suitableDeficits = deficits.filter(d => (lens[d.type] || 0) > 0.5);
 
             if (suitableDeficits.length > 0) {
                 const primaryDeficit = suitableDeficits[0];
+                
+                // --- SYSTEM 3.2: EXPEDITION GROUPING LOGIC ---
+                // Instead of solo-seeking, attempt to form a team.
+                const village = window.VillageManager?.villages.find(v => v.id === en.villageId);
+                const candidates = window.GameCore.activeEntities.filter(c => 
+                    c.villageId === en.villageId && 
+                    c.id !== en.id && 
+                    (c.currentTask === 'idle' || !c.currentTask)
+                );
+
+                const team = [en]; // Start with the initiator
+                
+                // Minimum Team: Just the seeker (allows for "Solo Hubris")
+                // Ideal Team: Seeker + Support (Adventurer/Recorder)
+                const support = candidates.find(c => c.role === 'adventurer' || c.role === 'recorder');
+                if (support) {
+                    team.push(support);
+                    support.currentTask = 'Seeking Truth';
+                    support.targetDeficitId = primaryDeficit.id;
+                    support.cognitiveTarget = null; // Follow the leader
+                    support.expeditionLeader = en.id;
+                    window.EventBus.emit('UI_LOG_DEBUG', `[Expedition] ${support.name} joined ${en.name} to resolve ${primaryDeficit.id}.`);
+                }
+
                 en.currentTask = 'Seeking Truth';
                 en.targetDeficitId = primaryDeficit.id;
+                en.expeditionTeam = team;
                 
-                // Set physical goal based on deficit location
                 if (primaryDeficit.record.value?.payload?.target_coord) {
                     en.cognitiveTarget = new window.THREE.Vector3(
                         primaryDeficit.record.value.payload.target_coord.x,
                         0,
                         primaryDeficit.record.value.payload.target_coord.z
                     );
-                    window.EventBus.emit('UI_LOG_DEBUG', `[AI] ${en.name} (${en.role}) is moving to resolve uncertainty in ${primaryDeficit.id}.`);
                 }
             }
         }
 
-        // --- EXISTING TASK LOGIC ---
-        if (en.currentTask === 'Seeking Truth' && en.cognitiveTarget) {
+        // --- EXPEDITION MOVEMENT ---
+        if (en.expeditionLeader) {
+            const leader = window.GameCore.activeEntities.find(l => l.id === en.expeditionLeader);
+            if (leader && leader.currentTask === 'Seeking Truth') {
+                const followPos = leader.visual.position.clone().add(new window.THREE.Vector3(1, 0, 1));
+                moveCompanion(en, followPos, 1.0, delta);
+                return;
+            } else {
+                en.currentTask = 'idle';
+                en.expeditionLeader = null;
+            }
+        }
+
+        if (en.currentTask === 'Seeking Truth' && en.cognitiveTarget && !en.expeditionLeader) {
             const dist = en.visual.position.distanceTo(en.cognitiveTarget);
             if (dist > 5.0) {
                 moveCompanion(en, en.cognitiveTarget, 0.9, delta);
                 return;
             } else {
-                // At target: Perform specialized extraction
+                // At target: Calculate Group Bonuses
+                const bonuses = window.ModelLayer.seekerPipeline.calculateTeamBonuses(
+                    en.expeditionTeam || [en], 
+                    inventory.records.get(en.targetDeficitId)?.value?.type || 'historical'
+                );
+
                 const packet = window.ModelLayer.seekerPipeline.extract(en.targetDeficitId, en);
                 if (packet) {
+                    // Apply Expedition Bonuses to Packet
+                    packet.fidelity *= bonuses.fidelity;
                     window.ModelLayer.seekerPipeline.deliver(packet, en.villageId || en.houseId || 'independent');
-                    en.currentTask = 'idle'; // Deficit resolved
+                    
+                    if (en.expeditionTeam) {
+                        en.expeditionTeam.forEach(member => member.currentTask = 'idle');
+                    }
                 }
                 return;
             }
         }
+
         
         // ... rest of AI_TICK ...
 
