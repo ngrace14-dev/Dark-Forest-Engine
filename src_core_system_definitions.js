@@ -208,6 +208,107 @@ window.SystemDefinitions = [
         triggers: { VIOLENCE_POTENTIAL: ">0.7" }
     },
 
+    // --- PHASE 3: THE EPISTEMIC LENS ---
+    {
+        id: 01,
+        name: "Information Provenance",
+        tier: "Epistemology",
+        framework: "EpistemicFilter",
+        vectors: {
+            scalar_to_scalar: { TRUST_DENSITY: 0.05, TRUTH_DECAY: -0.02 },
+            scalar_to_framework: { source_verification_bonus: 0.2 }
+        },
+        triggers: { TRUST_DENSITY: ">0.6" }
+    },
+    {
+        id: 02,
+        name: "Institutional Drift",
+        tier: "Epistemology",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { LEGITIMACY_INDEX: -0.05, WORLD_ENTROPY: 0.02 },
+            scalar_to_framework: { bureaucratic_friction: 0.1 }
+        },
+        triggers: { TRUTH_DECAY: ">0.5" }
+    },
+    {
+        id: 04,
+        name: "Narrative Gravity",
+        tier: "Epistemology",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { SIGNIFICANCE_DENSITY: 0.1, COHESION_INDEX: 0.05 },
+            scalar_to_framework: { lore_persistence_multiplier: 1.5 }
+        },
+        triggers: { SIGNIFICANCE_DENSITY: ">0.3" }
+    },
+    {
+        id: 05,
+        name: "Folklore",
+        tier: "Epistemology",
+        framework: "EpistemicFilter",
+        vectors: {
+            scalar_to_scalar: { SIGNIFICANCE_DENSITY: 0.05, TRUTH_DECAY: 0.05 },
+            scalar_to_framework: { mythmaking_rate: 0.2 }
+        },
+        triggers: null
+    },
+    {
+        id: 09,
+        name: "Social Contagion",
+        tier: "Epistemology",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { FEAR_LOAD: 0.2, COHESION_INDEX: -0.1 },
+            scalar_to_framework: { rumor_spread_velocity: 2.0 }
+        },
+        triggers: { FEAR_LOAD: ">0.5" }
+    },
+    {
+        id: 45,
+        name: "Memory",
+        tier: "Psychology",
+        framework: "EpistemicFilter",
+        vectors: {
+            scalar_to_scalar: { SIGNIFICANCE_DENSITY: 0.02, TRUTH_DECAY: -0.01 },
+            scalar_to_framework: { fact_retention_duration: 1.5 }
+        },
+        triggers: null
+    },
+    {
+        id: 46,
+        name: "Cognitive Bias",
+        tier: "Psychology",
+        framework: "EpistemicFilter",
+        vectors: {
+            scalar_to_scalar: { TRUTH_DECAY: 0.05, COHESION_INDEX: 0.02 },
+            scalar_to_framework: { contradictory_fact_rejection: 0.3 }
+        },
+        triggers: { COHESION_INDEX: ">0.6" }
+    },
+    {
+        id: 47,
+        name: "Deception",
+        tier: "Psychology",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { TRUST_DENSITY: -0.1, VIOLENCE_POTENTIAL: 0.05 },
+            scalar_to_framework: { contract_fraud_chance: 0.2 }
+        },
+        triggers: { TRUST_DENSITY: "<0.4" }
+    },
+    {
+        id: 50,
+        name: "Threat Recognition",
+        tier: "Psychology",
+        framework: "EpistemicFilter",
+        vectors: {
+            scalar_to_scalar: { FEAR_LOAD: 0.05, DISCOVERY_PRESSURE: 0.02 },
+            scalar_to_framework: { danger_packet_priority: 0.5 }
+        },
+        triggers: { FEAR_LOAD: ">0.3" }
+    },
+
     // --- EXISTING CORE SYSTEMS ---
     {
         id: 36,
