@@ -282,52 +282,43 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         if (en.def.type !== 'npc') return;
 
                 // --- THE TRUTH HUNGER DRIVE (Bible §13, §14) ---
-        if (!en.currentTask || en.currentTask === 'idle' || en.currentTask === 'Finished Work') {
-            const inventory = window.ModelLayer.getInventory(en.villageId || en.houseId || 'independent');
-            const deficits = inventory.getKnowledgeDeficits();
+                if (!en.currentTask || en.currentTask === 'idle' || en.currentTask === 'Finished Work') {
+                    // System 2.2: Scan for open Contracts from ANY Institution
+                    let activeContract = null;
+                    const institutions = Array.from(window.ModelLayer.inventories.values());
             
-            const lens = window.ModelLayer.seekerPipeline.LENSES[en.role] || { historical: 0.1 };
-            const suitableDeficits = deficits.filter(d => (lens[d.type] || 0) > 0.5);
+                    // Prioritize contracts where I have the required Lens
+                    for (const inv of institutions) {
+                        const open = inv.contracts.filter(c => c.status === 'OPEN' && c.requiredLenses.includes(en.role));
+                        if (open.length > 0) {
+                            activeContract = open.sort((a, b) => b.priority - a.priority)[0];
+                            break;
+                        }
+                    }
 
-            if (suitableDeficits.length > 0) {
-                const primaryDeficit = suitableDeficits[0];
-                
-                // --- SYSTEM 3.2: EXPEDITION GROUPING LOGIC ---
-                // Instead of solo-seeking, attempt to form a team.
-                const village = window.VillageManager?.villages.find(v => v.id === en.villageId);
-                const candidates = window.GameCore.activeEntities.filter(c => 
-                    c.villageId === en.villageId && 
-                    c.id !== en.id && 
-                    (c.currentTask === 'idle' || !c.currentTask)
-                );
+                    if (activeContract) {
+                        en.currentTask = 'Seeking Truth';
+                        en.targetDeficitId = activeContract.intelId;
+                        en.activeContract = activeContract;
+                        activeContract.status = 'IN_PROGRESS';
+                        activeContract.team.push(en);
 
-                const team = [en]; // Start with the initiator
-                
-                // Minimum Team: Just the seeker (allows for "Solo Hubris")
-                // Ideal Team: Seeker + Support (Adventurer/Recorder)
-                const support = candidates.find(c => c.role === 'adventurer' || c.role === 'recorder');
-                if (support) {
-                    team.push(support);
-                    support.currentTask = 'Seeking Truth';
-                    support.targetDeficitId = primaryDeficit.id;
-                    support.cognitiveTarget = null; // Follow the leader
-                    support.expeditionLeader = en.id;
-                    window.EventBus.emit('UI_LOG_DEBUG', `[Expedition] ${support.name} joined ${en.name} to resolve ${primaryDeficit.id}.`);
+                        const deficitRecord = window.ModelLayer.getInventory(activeContract.originId).records.get(activeContract.intelId);
+                        if (deficitRecord?.value?.payload?.target_coord) {
+                            en.cognitiveTarget = new window.THREE.Vector3(
+                                deficitRecord.value.payload.target_coord.x,
+                                0,
+                                deficitRecord.value.payload.target_coord.z
+                            );
+                        }
+                        window.EventBus.emit('UI_LOG_DEBUG', `[Expedition] ${en.name} (${en.role}) accepted ${activeContract.originId}'s contract for ${activeContract.intelId}.`);
+                    } else {
+                        // No global contracts, check local faction deficits (Solo fallback)
+                        const inventory = window.ModelLayer.getInventory(en.villageId || en.houseId || 'independent');
+                        // ... rest of local deficit logic ...
+                    }
                 }
 
-                en.currentTask = 'Seeking Truth';
-                en.targetDeficitId = primaryDeficit.id;
-                en.expeditionTeam = team;
-                
-                if (primaryDeficit.record.value?.payload?.target_coord) {
-                    en.cognitiveTarget = new window.THREE.Vector3(
-                        primaryDeficit.record.value.payload.target_coord.x,
-                        0,
-                        primaryDeficit.record.value.payload.target_coord.z
-                    );
-                }
-            }
-        }
 
         // --- EXPEDITION MOVEMENT ---
         if (en.expeditionLeader) {
