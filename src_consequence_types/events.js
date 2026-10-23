@@ -21,15 +21,19 @@ export const ConsequenceEvents = {
     EXPEDITION_DEPART: 'EXPEDITION_DEPART',// AI -> Dispatcher
     
         // Metaphysics
-    HEAT_SPIKE:       'HEAT_SPIKE',        
-    HARVEST_BEGIN:    'HARVEST_BEGIN',
+        HEAT_SPIKE:       'HEAT_SPIKE',        
+        HARVEST_BEGIN:    'HARVEST_BEGIN',
 
-    // Drift & Lifecycle
-    FACT_FORGOTTEN:   'FACT_FORGOTTEN',
-    FACT_DECAYED:     'FACT_DECAYED',
-    VOID_AMNESIA:     'VOID_AMNESIA',
-    TRADITION_FORMED: 'TRADITION_FORMED',
+        // Drift & Lifecycle
+        FACT_FORGOTTEN:   'FACT_FORGOTTEN',
+        FACT_DECAYED:     'FACT_DECAYED',
+        VOID_AMNESIA:     'VOID_AMNESIA',
+        TRADITION_FORMED: 'TRADITION_FORMED',
 
-    // Observation & Awareness
-    SIGNAL_NOTICED:   'SIGNAL_NOTICED'
+        // Observation & Awareness
+        SIGNAL_NOTICED:   'SIGNAL_NOTICED',
+
+        // Strategic Events
+        INTENT_CHANGED:   'INTENT_CHANGED',
+        SYSTEMIC_SHOCK:   'SYSTEMIC_SHOCK'
 };
