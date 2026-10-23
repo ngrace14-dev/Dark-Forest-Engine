@@ -48,9 +48,15 @@ class ContractDispatcher {
                 const primary = redundant[0];
                 for (let i = 1; i < redundant.length; i++) {
                     const secondary = redundant[i];
-                    primary.priority += (secondary.priority * 0.5); // Accumulate priority
+                    primary.priority += (secondary.priority * 0.5); 
                     primary.idealTeam = [...new Set([...primary.idealTeam, ...secondary.idealTeam])];
-                    secondary.status = ContractState.ABANDONED; // Mark for GC
+                    
+                    // Issue 3: Contract GC through explicit abandonment
+                    secondary.status = ContractState.ABANDONED;
+                    window.EventBus.emit('CONTRACT_ABANDONED', { 
+                        factionId: inventory.factionId, 
+                        contractId: secondary.contractId 
+                    });
                 }
                 console.log(`[Dispatcher] Merged ${redundant.length} contracts for ${primary.targetIntelId}.`);
             }
@@ -68,6 +74,7 @@ class ContractDispatcher {
         );
 
         for (const role of missingRoles) {
+            // Issue 4: Ensure faction-local recruitment (implied by idleNPCs filter in core)
             const candidate = idleNPCs.find(npc => npc.role === role && !npc.assignedContractId);
             if (candidate) {
                 this._assignNPCToContract(candidate, contract);
@@ -88,9 +95,11 @@ class ContractDispatcher {
                 this._transitionContract(contract, ContractState.ASSIGNED);
             } else if (contract.status === ContractState.RECRUITING) {
                 this._transitionContract(contract, ContractState.WAITING);
-                contract.waitStartedAt = worldDay;
+                // Issue 2: Wait State Timestamp Protection
+                if (contract.waitStartedAt === undefined) {
+                    contract.waitStartedAt = worldDay;
+                }
             } else if (contract.status === ContractState.WAITING) {
-                // Solo Hubris / Minimum Launch Trigger
                 if (worldDay - contract.waitStartedAt > this.waitThreshold) {
                     this._transitionContract(contract, ContractState.ASSIGNED);
                 }
