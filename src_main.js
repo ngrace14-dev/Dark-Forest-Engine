@@ -83,7 +83,26 @@ import './src_systems_ai.js';
 import './src_systems_assets.js';
 import './src_systems_careers.js';
 import './src_systems_establishment.js';
+import './src_systems_social_capital.js';
+import './src_systems_cognition.js';
+import './src_systems_nociception.js';
+import './src_systems_perception.js';
+import './src_systems_household.js';
 import './src_systems_relationships.js';
+import './src_systems_feuds.js';
+import './src_systems_prestige.js';
+import './src_systems_kinship.js';
+import './src_systems_social_signaling.js';
+import './src_systems_group_dynamics.js';
+import './src_systems_gossip.js';
+
+
+
+import './src_systems_feuds.js';
+import './src_systems_prestige.js';
+import './src_systems_social_signaling.js';
+import './src_systems_gossip.js';
+
 import './src_systems_warden.js';
 import './src_systems_chronicle.js';
 import './src_systems_forces.js';
