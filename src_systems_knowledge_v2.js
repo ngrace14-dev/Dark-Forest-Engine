@@ -11,6 +11,43 @@ class KnowledgeInventory {
         this.contracts = []; // System 2.2: Active expedition demands
         this.continuityDebt = 0; // Cumulative weight of fossilized models
         this.attentionQuota = 100; // Capacity to notice new events
+        this.shockLevel = 0; // System 7: Cognitive Collapse indicator (0-100)
+    }
+
+    /**
+     * System 7: Calculate the delta between Belief and Latent Reality.
+     * Enforces "Systemic Shock" - Bible §14.
+     */
+    updateShockLevel() {
+        let totalDelta = 0;
+        let checkedFacts = 0;
+
+        this.records.forEach((record, id) => {
+            const latent = window.ModelLayer.latentRegistry.get(id);
+            if (latent) {
+                // Measure physical distance delta for locations
+                if (record.value?.type === 'LOCATION') {
+                    const dist = Math.hypot(record.value.x - latent.value.x, record.value.z - latent.value.z);
+                    totalDelta += Math.min(1.0, dist / 1000); // Scale 0-1 per 1km error
+                }
+                checkedFacts++;
+            }
+        });
+
+        const discoveryDebt = checkedFacts > 0 ? (totalDelta / checkedFacts) : 0;
+        
+        // Shock accumulates if debt is high and continuity is rigid
+        const shockPressure = discoveryDebt * (1 + (this.continuityDebt / 100));
+        
+        if (shockPressure > 0.5) {
+            this.shockLevel = Math.min(100, this.shockLevel + (shockPressure * 5));
+        } else {
+            this.shockLevel = Math.max(0, this.shockLevel - 2);
+        }
+
+        if (this.shockLevel > 75) {
+            window.EventBus.emit('UI_LOG', `⚠️ [COLLAPSE] ${this.factionId} is suffering from Systemic Shock. Model divergence critical.`);
+        }
     }
 
     /**
@@ -21,23 +58,9 @@ class KnowledgeInventory {
         const deficits = this.getKnowledgeDeficits();
         
         deficits.slice(0, 5).forEach(deficit => {
-            // Only create if not already being sought
-            const existing = this.contracts.find(c => c.intelId === deficit.id && c.status !== 'FAILED');
+            const existing = this.contracts.find(c => c.targetIntelId === deficit.id && c.status !== 'FAILED');
             if (existing) return;
-
-            const contract = {
-                id: `contract_${Math.random().toString(36).substr(2, 5)}`,
-                intelId: deficit.id,
-                type: deficit.type,
-                priority: deficit.priority,
-                originId: this.factionId,
-                requiredLenses: this.determineRequiredLenses(deficit.type),
-                status: 'OPEN',
-                team: []
-            };
-
-            this.contracts.push(contract);
-            console.log(`[Demand] ${this.factionId} issued contract for ${deficit.id} (Priority: ${deficit.priority.toFixed(2)})`);
+            this.generateExpeditionPacket(deficit.id);
         });
     }
 
@@ -51,6 +74,38 @@ class KnowledgeInventory {
         };
         return mapping[type] || ['adventurer'];
     }
+        const deficit = this.records.get(deficitId);
+        if (!deficit) return null;
+
+        const type = deficit.value?.type || 'historical';
+        
+        // Define specialized requirements based on origin institution
+        const isTerminus = this.factionId === 'House Terminus';
+        
+        const packet = {
+            id: `packet_${Math.random().toString(36).substr(2, 5)}`,
+            origin: this.factionId,
+            goal: `Resolve deficit in ${deficitId}`,
+            targetIntelId: deficitId,
+            requiredLenses: isTerminus ? ['terminus_scout'] : this.determineRequiredLenses(type),
+            
+            // Minimum vs Ideal Team (Prevents Deadlock)
+            minimumTeam: isTerminus ? ['terminus_scout'] : [this.determineRequiredLenses(type)[0]],
+            idealTeam: isTerminus ? 
+                ['terminus_scout', 'surveyor', 'recorder'] : 
+                [...this.determineRequiredLenses(type), 'adventurer', 'recorder'],
+            
+            expirationCondition: 'NEXT_SHIFT', // Bible §5: 14-day cycle
+            owner: this.factionId,
+            status: 'OPEN',
+            teamMembers: []
+        };
+
+        this.contracts.push(packet);
+        console.log(`[Packet] ${this.factionId} published ${packet.id} for ${type} truth.`);
+        return packet;
+    }
+}
 
     getKnowledgeDeficits() {
         const deficits = [];
@@ -77,9 +132,41 @@ class KnowledgeInventory {
     }
 
     /**
-     * System 2: Add or update a fact in the faction's perceived reality.
+     * System 3.3: Refined Expedition Packet Structure.
+     * Enforces minimum/ideal team logic and expiration conditions.
      */
-    integrate(intelId, data) {
+    generateExpeditionPacket(deficitId) {
+        const deficit = this.records.get(deficitId);
+        if (!deficit) return null;
+
+        const type = deficit.value?.type || 'historical';
+        
+        // Define specialized requirements based on origin institution
+        const isTerminus = this.factionId === 'House Terminus';
+        
+        const packet = {
+            id: `packet_${Math.random().toString(36).substr(2, 5)}`,
+            origin: this.factionId,
+            goal: `Resolve deficit in ${deficitId}`,
+            targetIntelId: deficitId,
+            requiredLenses: isTerminus ? ['terminus_scout'] : this.determineRequiredLenses(type),
+            
+            // Minimum vs Ideal Team (Prevents Deadlock)
+            minimumTeam: isTerminus ? ['terminus_scout'] : [this.determineRequiredLenses(type)[0]],
+            idealTeam: isTerminus ? 
+                ['terminus_scout', 'surveyor', 'recorder'] : 
+                [...this.determineRequiredLenses(type), 'adventurer', 'recorder'],
+            
+            expirationCondition: 'NEXT_SHIFT', // Bible §5: 14-day cycle
+            owner: this.factionId,
+            status: 'OPEN',
+            teamMembers: []
+        };
+
+        this.contracts.push(packet);
+        console.log(`[Packet] ${this.factionId} published ${packet.id} for ${type} truth.`);
+        return packet;
+    }
         // Enforce CA-1: Revision Friction
         const existing = this.records.get(intelId);
         if (existing) {
@@ -186,6 +273,9 @@ class SeekerPipeline {
         return packet;
     }
 
+class SeekerPipeline {
+    // ... existing ...
+
     /**
      * Transport the packet to a destination.
      * Logic for interception, loss, or degradation.
@@ -199,6 +289,12 @@ class SeekerPipeline {
         const inventory = window.ModelLayer.getInventory(factionId);
         if (!inventory) return;
 
+        // System 7: Systemic Shock makes delivery harder
+        if (inventory.shockLevel > 80 && Math.random() < 0.5) {
+            console.log(`[Revision] Packet ${packet.intelId} lost in the chaos of ${factionId}'s Systemic Shock.`);
+            return;
+        }
+
         // Hand off to System 4: Belief Revision Engine
         const revisionEngine = new BeliefRevisionEngine();
         const success = revisionEngine.process(inventory, packet);
@@ -207,6 +303,7 @@ class SeekerPipeline {
             this.activePackets = this.activePackets.filter(p => p !== packet);
         }
     }
+}
 }
 
 class BeliefRevisionEngine {
@@ -279,6 +376,9 @@ class ModelLayerSystem {
     onShift() {
         // System 6: Apply drift on every 14-day shift
         this.driftProcessor.process(this.inventories);
+        
+        // System 7: Update Shock levels for all institutions
+        this.inventories.forEach(inv => inv.updateShockLevel());
     }
 
     getInventory(factionId) {

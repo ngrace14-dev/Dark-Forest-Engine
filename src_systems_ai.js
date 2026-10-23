@@ -281,7 +281,34 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
         if(en.body && en.body.isDynamic && en.body.isDynamic()) { const p = en.body.translation(); en.visual.position.set(p.x, p.y, p.z); }
         if (en.def.type !== 'npc') return;
 
+                // --- SYSTEM 7: SYSTEMIC SHOCK BEHAVIOR (Bible §14) ---
+                // If the faction's model is collapsing, NPCs suffer cognitive paralysis.
+                const inventory = window.ModelLayer.getInventory(en.villageId || en.houseId || 'independent');
+                if (inventory.shockLevel > 75) {
+                    en.currentTask = 'Panic';
+                    en.targetDeficitId = null;
+                    en.cognitiveTarget = null;
+            
+                    // Randomized Panic: Wander aimlessly or stand frozen
+                    if (Math.random() < 0.05) {
+                        const wanderDir = new window.THREE.Vector3(Math.random()-0.5, 0, Math.random()-0.5).normalize();
+                        moveCompanion(en, en.visual.position.clone().add(wanderDir.multiplyScalar(5)), 1.2, delta);
+                        if (Math.random() < 0.1) {
+                            window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                                text: 'THE WORLD IS WRONG', 
+                                pos: en.visual.position, 
+                                color: '#f87171' 
+                            });
+                        }
+                    } else {
+                        en.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                        if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(en, 'idle');
+                    }
+                    return; // Terminate normal logic
+                }
+
                 // --- THE TRUTH HUNGER DRIVE (Bible §13, §14) ---
+
                 if (!en.currentTask || en.currentTask === 'idle' || en.currentTask === 'Finished Work') {
                     // System 2.2: Scan for open Contracts from ANY Institution
                     let activeContract = null;
