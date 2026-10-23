@@ -6,6 +6,130 @@
  */
 
 window.SystemDefinitions = [
+    // --- PHASE 1: THE MATERIAL BEDROCK ---
+    {
+        id: 11,
+        name: "Shift Cycle",
+        tier: "Environment",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { WORLD_ENTROPY: 0.01, BIOLOGICAL_LOAD: 0.01 },
+            scalar_to_framework: { labor_fatigue_penalty: 0.05 }
+        },
+        triggers: null // Constant pressure
+    },
+    {
+        id: 16,
+        name: "Environment",
+        tier: "Environment",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { MATERIAL_STRESS: 0.02, BIOLOGICAL_LOAD: 0.01 },
+            scalar_to_framework: { resource_yield_modifier: -0.05 }
+        },
+        triggers: null
+    },
+    {
+        id: 18,
+        name: "Structural Decay",
+        tier: "Environment",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { WORLD_ENTROPY: 0.05, MATERIAL_STRESS: 0.02 },
+            scalar_to_framework: { maintenance_cost_multiplier: 1.2 }
+        },
+        triggers: { WORLD_ENTROPY: ">0.3" }
+    },
+    {
+        id: 19,
+        name: "Weather",
+        tier: "Environment",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { MATERIAL_STRESS: 0.03, FEAR_LOAD: 0.02 },
+            scalar_to_framework: { travel_speed_modifier: -0.1, visibility_range: -0.2 }
+        },
+        triggers: null
+    },
+    {
+        id: 21,
+        name: "Fuel Pipeline",
+        tier: "Economy",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { MATERIAL_STRESS: -0.05, LEGITIMACY_INDEX: 0.02 },
+            scalar_to_framework: { industrial_output_multiplier: 1.1 }
+        },
+        triggers: { MATERIAL_STRESS: ">0.1" }
+    },
+    {
+        id: 23,
+        name: "Material Extraction",
+        tier: "Economy",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { MATERIAL_STRESS: -0.1, WORLD_ENTROPY: 0.02 },
+            scalar_to_framework: { pollution_rate: 0.05 }
+        },
+        triggers: { DISCOVERY_PRESSURE: ">0.2" }
+    },
+    {
+        id: 24,
+        name: "Bio-Supply Chain",
+        tier: "Economy",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { BIOLOGICAL_LOAD: -0.05, MATERIAL_STRESS: 0.02 },
+            scalar_to_framework: { food_stability: 0.1 }
+        },
+        triggers: { MATERIAL_STRESS: "<0.8" }
+    },
+    {
+        id: 27,
+        name: "Agriculture",
+        tier: "Economy",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { BIOLOGICAL_LOAD: -0.1, COHESION_INDEX: 0.05 },
+            scalar_to_framework: { settlement_stability: 0.1 }
+        },
+        triggers: null
+    },
+    {
+        id: 85,
+        name: "Energy",
+        tier: "Technology",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { MATERIAL_STRESS: -0.05, DISCOVERY_PRESSURE: 0.02 },
+            scalar_to_framework: { automation_efficiency: 0.1 }
+        },
+        triggers: { MATERIAL_STRESS: ">0.4" }
+    },
+    {
+        id: 86,
+        name: "Civil Engineering",
+        tier: "Technology",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { COHESION_INDEX: 0.05, MATERIAL_STRESS: -0.02 },
+            scalar_to_framework: { logistics_range_multiplier: 1.2 }
+        },
+        triggers: { LEGITIMACY_INDEX: ">0.4" }
+    },
+    {
+        id: 89,
+        name: "Infrastructure Resilience",
+        tier: "Technology",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { WORLD_ENTROPY: -0.05, MATERIAL_STRESS: 0.02 },
+            scalar_to_framework: { maintenance_interval_multiplier: 1.5 }
+        },
+        triggers: { DISCOVERY_PRESSURE: ">0.5" }
+    },
+
+    // --- EXISTING CORE SYSTEMS ---
     {
         id: 36,
         name: "Corruption",
