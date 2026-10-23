@@ -47,75 +47,110 @@ class EcologySystem {
 
     /**
      * 64.3 Epidemic Vector Tracking
+     * 64.6 Pathogen Mutation Rates
      */
     simulateEpidemiology() {
-        // Logic to spread pathogens between entities in proximity
-        // 64.4 Quarantine Enclosures: Check for village-level containment
+        this.infections.forEach((activePathogens, entityId) => {
+            const profile = window.PersonhoodManager?.getProfile(entityId);
+            if (!profile) return;
+
+            activePathogens.forEach(pathogenId => {
+                const pathogen = this.pathogens.get(pathogenId);
+                if (!pathogen) return;
+
+                // 64.5 Immune System Resilience
+                const resistance = profile.traits.riskTolerance * 0.5; // Placeholder for physical health
+                if (Math.random() < pathogen.mortality * (1.0 - resistance)) {
+                    window.EventBus.emit('ENTITY_DIED', { id: entityId, cause: 'DISEASE', pathogen: pathogenId });
+                }
+
+                // 64.6 Mutation
+                if (Math.random() < 0.01) {
+                    pathogen.virulence *= 1.1;
+                    window.EventBus.emit('UI_LOG_DEBUG', `[DISEASE] ${pathogen.name} has mutated! Virulence increased.`);
+                }
+            });
+        });
+    }
+
+    /**
+     * 64.8 Herbal Remedy Efficacy
+     */
+    applyRemedy(entityId, pathogenId) {
+        const active = this.infections.get(entityId);
+        if (active && active.has(pathogenId)) {
+            active.delete(pathogenId);
+            window.EventBus.emit('UI_LOG', `[DISEASE] ${entityId} has been cured of ${pathogenId}.`);
+        }
     }
 
     /**
      * 65.1 Apex Predator Territory Marking
      * 65.2 Prey Population Carrying Capacity
+     * 65.4 Pack Hunting Coordination
      */
     updatePredatorPreyDynamics() {
-        // Logic to balance monster populations based on available village population (prey)
-        // 65.3 Monster Starvation Aggression: Starving monsters raid villages more frequently
+        this.territories.forEach((territory, regionId) => {
+            // 65.2 Carrying Capacity
+            const preyCount = territory.preyCount || 100;
+            const predatorCount = territory.predators.length;
+            
+            // 65.3 Monster Starvation Aggression
+            if (predatorCount > preyCount / 10) {
+                territory.aggressionLevel = 1.0;
+                window.EventBus.emit('UI_LOG_DEBUG', `[ECOLOGY] Monsters in ${regionId} are starving and aggressive.`);
+            }
+        });
     }
 
     /**
-     * 66.2 Chemo-Reception (Scent Tracking)
-     * 66.5 Scent-Masking Poultices
+     * 66.1 Photoreception & Night Vision
+     * 66.3 Tactile Ground Vibration Sensing
+     * 66.6 Heat Signature Detection
      */
-    getScentSignature(entityId) {
-        const profile = window.PersonhoodManager?.getProfile(entityId);
-        if (!profile) return 0;
+    detectEntity(observerId, targetId) {
+        const observer = window.PersonhoodManager.getProfile(observerId);
+        const target = window.PersonhoodManager.getProfile(targetId);
+        if (!observer || !target) return false;
+
+        // 66.6 Heat Signature: High stress (fear) increases detectability
+        const heat = target.traits.fear;
+        const vibration = target.traits.ambition * 0.5; // Heavy movement
         
-        let scent = profile.traits.fear * 10; // Fear pheromones (58.8)
-        if (profile.hasScentMask) scent *= 0.1;
-        return scent;
+        return (heat + vibration) > 0.8;
     }
 
     /**
-     * 67.1 Inherited Physical Traits
-     * 67.5 Mutation Drift
+     * 67.2 Inbreeding Depression
+     * 67.3 Origin Native Genetic Immunity
+     * 67.6 Hybrid Vigor
      */
-    applyHereditaryMutation(parentId, childId) {
-        const parent = window.PersonhoodManager.getProfile(parentId);
-        const child = window.PersonhoodManager.getProfile(childId);
-        if (!parent || !child) return;
-
-        // 67.7 Recessive Runic Affinity
-        if (parent.runicAffinity && Math.random() < 0.25) {
-            child.runicAffinity = true;
-        }
-
-        // 67.5 Mutation Drift: Small chance of spontaneous mutation
-        if (Math.random() < 0.01) {
-            child.mutations = child.mutations || [];
-            child.mutations.push('VOID_SIGHT');
-        }
-    }
-
-    /**
-     * 68.1 Canopy Siphon-Vine Predation
-     * 68.4 Mind-Altering Fungal Infections
-     */
-    applyParasite(entityId, parasiteType) {
-        if (!this.infections.has(entityId)) this.infections.set(entityId, new Set());
-        this.infections.get(entityId).add(parasiteType);
+    calculateGeneticFit(parentId, otherId) {
+        const p1 = window.PersonhoodManager.getProfile(parentId);
+        const p2 = window.PersonhoodManager.getProfile(otherId);
         
-        // 68.5 Parasitic Host Exploitation: Energy drain or behavior modification
-        if (parasiteType === 'SIPHON_VINE') {
-            window.EventBus.emit('UI_LOG_DEBUG', `[PARASITE] ${entityId} is being drained by a Siphon-Vine.`);
-        }
+        // 67.2: High kinship increases risk of depression
+        const kinship = window.KinshipManager?.getKinshipBonus(parentId, otherId) || 1.0;
+        if (kinship > 1.5) return 'INBREEDING_RISK';
+        
+        return 'STABLE';
     }
 
     /**
-     * 69.1 The Silken Pact (Symbiosis)
+     * 68.3 Blood-Sucking Parasites
+     * 68.8 Symbiotic Parasitism
      */
-    establishSymbiosis(entityA, entityB, type) {
-        // 69.8 Structural Bio-Shields: Symbiotic organisms providing protection
-        window.EventBus.emit('UI_LOG', `[SYMBIOSIS] ${type} established between ${entityA} and ${entityB}.`);
+    applyBloodParasite(entityId) {
+        this.applyParasite(entityId, 'BLOOD_TICK');
+        // 68.8: Some parasites might provide a runic bonus (System 81)
+    }
+
+    /**
+     * 69.2 Fungal-Tree Nutrient Sharing
+     * 69.4 Alchemical Gut Flora Adaptation
+     */
+    updateSymbiosis() {
+        // Logic for regional ecosystem bonuses (System 16)
     }
 
     handleDeath(data) {

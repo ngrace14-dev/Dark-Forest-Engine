@@ -18,7 +18,14 @@ class PersonhoodSystem {
             SCHOLAR: { bias: 'PATTERNS', desc: 'Prioritizes poem decoding and pattern recognition.' } // Bible §36
         };
 
-                this.institutions = {
+        this.TRAUMA_THRESHOLDS = {
+            MILD: 20,
+            MODERATE: 50,
+            SEVERE: 80,
+            CRITICAL: 100
+        };
+
+        this.institutions = {
             'historical_office': { label: 'Historical Office', focus: 'STABILITY', siloedIntel: new Set() },
             'guardians_300': { label: 'The 300 Guardians', focus: 'CONTINUITY', siloedIntel: new Set() },
             'scholastic_order': { label: 'The Scholastic Order', focus: 'TRUTH', siloedIntel: new Set() }
@@ -27,8 +34,8 @@ class PersonhoodSystem {
         this.wendigoCandidates = []; // Array of { profile, lastPosition }
 
         window.EventBus.on('ENGINE_READY', () => this.init());
-
     }
+
 
     /**
      * Substrate Population Engine: Births, Growth, and Sigmoid Logic.
@@ -89,9 +96,84 @@ class PersonhoodSystem {
     }
 
 
-    /**
-     * Generates or retrieves a unique personality for an entity.
+        /**
+     * System 45: Memory Registration & Trauma Retention
+     * Enforces Bible §1: Action -> Legend -> History -> Trauma.
      */
+    registerTrauma(nodeId, intensity, triggerTag, description) {
+        const profile = this.profiles.get(nodeId);
+        if (!profile) return;
+
+        const day = window.EngineParams?.worldDay || 0;
+        const traumaId = `trauma_${day}_${triggerTag}`;
+        
+        // 45.2 Trauma Encoding
+        const existing = profile.memory.traumaEncoded.get(traumaId) || { intensity: 0, day, triggerTag, description };
+        existing.intensity = Math.min(100, existing.intensity + intensity);
+        profile.memory.traumaEncoded.set(traumaId, existing);
+
+        // 42.5 Stress Accumulation
+        profile.survival.stress += (intensity * 0.5);
+
+        // 45.3 Trauma Trigger Flashes
+        if (existing.intensity > this.TRAUMA_THRESHOLDS.SEVERE) {
+            window.EventBus.emit('UI_LOG_DEBUG', `[PSYCHOLOGY] ${nodeId} has developed a permanent trauma trigger for ${triggerTag}.`);
+        }
+
+        // 45.8 Trauma Transposition (Shared Trauma)
+        if (intensity > 50) {
+            this.broadcastTrauma(nodeId, triggerTag, intensity * 0.3);
+        }
+    }
+
+    /**
+     * System 42: The Will to Live & Survival Physics
+     */
+    updateSurvivalState(nodeId, delta) {
+        const profile = this.profiles.get(nodeId);
+        if (!profile) return;
+
+        // 42.5 Stress Accumulation over time
+        profile.survival.stress = Math.max(0, profile.survival.stress - profile.survival.recoveryRate * delta);
+
+        // 42.6 Panic Trigger Mechanics
+        if (profile.survival.stress > profile.survival.fearThreshold * 100) {
+            if (!profile.survival.panicTriggered) {
+                profile.survival.panicTriggered = true;
+                window.EventBus.emit('UI_LOG', `[REFLEX] ${nodeId} has entered a state of PANIC!`);
+                // 42.8 Self-Preservation Betrayal
+                if (Math.random() < profile.traits.fear) {
+                    window.EventBus.emit('UI_LOG_DEBUG', `[REFLEX] ${nodeId}'s panic led to a self-preservation betrayal.`);
+                }
+            }
+        } else {
+            profile.survival.panicTriggered = false;
+        }
+
+        // 42.7 Recovery & Reassessment
+        if (profile.survival.stress < 10) {
+            profile.survival.willToLive = Math.min(1.0, profile.survival.willToLive + 0.01);
+        }
+    }
+
+    /**
+     * System 41: Career Integrity & Specialty Binding
+     */
+    applyCareerIntegrity(nodeId, careerId) {
+        const profile = this.profiles.get(nodeId);
+        if (!profile) return;
+
+        profile.career.id = careerId;
+        // 41.4 Professional Pride: Boosts efficiency
+        profile.career.specializedEfficiency = 1.0 + (profile.traits.ambition * 0.5);
+        
+        window.EventBus.emit('UI_LOG_DEBUG', `[CAREER] ${nodeId} bound to specialty: ${careerId}. Integrity: ${profile.career.integrity}`);
+    }
+
+    broadcastTrauma(originId, triggerTag, secondaryIntensity) {
+        // Logic to apply trauma to nearby allies (witnesses)
+    }
+
     getProfile(nodeId) {
         if (!this.profiles.has(nodeId)) {
                         const traits = {
@@ -111,7 +193,7 @@ class PersonhoodSystem {
                         const initialAge = 18 + Math.floor(Math.random() * 40); 
                         const lifeStage = this.getLifeStage(initialAge);
 
-                        this.profiles.set(nodeId, {
+                                                this.profiles.set(nodeId, {
                             id: nodeId,
                             traits,
                             identity,
@@ -121,7 +203,35 @@ class PersonhoodSystem {
                             mortalityRisk: 0.0,
                             bias: this.ARCHETYPES[identity].bias,
                             
+                            // --- SYSTEM 41: CAREER INTEGRITY ---
+                            career: {
+                                id: 'COMMONER',
+                                integrity: 1.0, // 41.1 Civilian Function Primacy
+                                resistance: 0.5, // 41.3 Career Resistance
+                                specializedEfficiency: 1.0, // 41.5 Labor Specialization Efficiency
+                                corruptionRisk: 0.0, // 41.6 Career Corruption Risk
+                                adaptFriction: 0.2 // 41.7 Career Adaptation Friction
+                            },
+
+                            // --- SYSTEM 42: SURVIVAL PHYSICS ---
+                            survival: {
+                                willToLive: 1.0,
+                                fearThreshold: 0.5 + (Math.random() * 0.3), // 42.2 Fear Thresholds
+                                stress: 0.0, // 42.5 Stress Accumulation
+                                panicTriggered: false, // 42.6 Panic Trigger Mechanics
+                                recoveryRate: 0.1 // 42.7 Recovery
+                            },
+
+                            // --- SYSTEM 45: MEMORY & TRAUMA ---
+                            memory: {
+                                shortTermBuffer: [], // 45.1 Short-Term Sensory Buffering
+                                traumaEncoded: new Map(), // 45.2 Trauma Encoding (id -> { intensity, day, triggerTag })
+                                nostalgia: 0.0, // 45.5 Nostalgia & Romanticization
+                                muscleMemory: new Map() // 45.7 Skills & Muscle Memory
+                            },
+
                             // --- MASTERY & SKILLS (Safe Villager Rule) ---
+
                             skills: {
                                 farming: { level: Math.random() * 50, xp: 0 },
                                 construction: { level: Math.random() * 50, xp: 0 },

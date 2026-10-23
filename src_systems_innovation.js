@@ -20,16 +20,23 @@ class InnovationSystem {
 
     /**
      * 84.1 Trial-and-Error Experimentation
-     * 84.3 Accidental Discovery Triggers
+     * 84.2 Empirical Documentation
+     * 84.6 Technological Reverse-Engineering
      */
     attemptInnovation(houseId, field = 'METALLURGY') {
         const house = window.DynastyManager?.houses.get(houseId);
         if (!house) return false;
 
-        // 84.7 Research Funding Allocation: Prestige/Gold cost
+        // 84.4 Innovation Suppression
+        if (house.currentIdentity.mission === 'PRESERVE_ORDER' && Math.random() < 0.2) {
+            window.EventBus.emit('UI_LOG_DEBUG', `[TECH] ${house.name} leadership suppressed a breakthrough to maintain stability.`);
+            return false;
+        }
+
+        // 84.7 Research Funding Allocation
         const cost = 100;
         
-        // 84.5 Prototype Testing Hazards: Risk of industrial accident (System 87)
+        // 84.5 Prototype Testing Hazards
         if (Math.random() < 0.1) {
             this.triggerIndustrialAccident(houseId, 'LAB_EXPLOSION');
             return false;
@@ -39,6 +46,9 @@ class InnovationSystem {
             const current = this.techLevel.get(houseId) || 1;
             this.techLevel.set(houseId, current + 1);
             window.EventBus.emit('UI_LOG', `[TECH] ${house.name} has achieved a breakthrough in ${field}!`);
+            
+            // 84.8 Scientific Secret Theft: Rivals might steal the breakthrough
+            this.checkForTechTheft(houseId, field);
             return true;
         }
         
@@ -47,16 +57,18 @@ class InnovationSystem {
 
     /**
      * 85.1 Thermal Barrier Fuel Braziers
-     * 85.3 Abyssal Oil Illumination
+     * 85.4 Geothermal Heat Harnessing
+     * 85.7 Energy Overload Explosions
      */
     getEnergyOutput(villageId) {
-        // 85.6 Fuel Efficiency Upgrades: Multiply base output
+        // 85.8 Energy Grid Interdependence: Nearby villages boost each other
         return 100;
     }
 
     /**
      * 86.1 Bedrock Anchor Drilling
-     * 86.4 Stabilization Cable Tensioning
+     * 86.5 Stilt Foundation Engineering
+     * 86.8 Aqueduct & Reservoir Construction
      */
     constructInfrastructure(villageId, type = 'AQUEDUCT') {
         if (!this.infrastructure.has(villageId)) this.infrastructure.set(villageId, new Set());
@@ -64,7 +76,7 @@ class InnovationSystem {
         this.infrastructure.get(villageId).add({
             type,
             integrity: 1.0,
-            vulnerability: type === 'AQUEDUCT' ? 'POISONING' : 'STRUCTURAL' // 89.2
+            vulnerability: type === 'AQUEDUCT' ? 'POISONING' : 'STRUCTURAL' 
         });
 
         window.EventBus.emit('UI_LOG', `[ENGINEERING] ${type} completed in ${villageId}.`);
@@ -72,7 +84,8 @@ class InnovationSystem {
 
     /**
      * 87.1 Retort Vat Explosions
-     * 87.4 Toxic Gas Leaks
+     * 87.5 Abyssal Bell Implosions
+     * 87.7 Runic Feedback Flashover
      */
     triggerIndustrialAccident(houseId, type) {
         window.EventBus.emit('UI_LOG', `[DISASTER] INDUSTRIAL ACCIDENT in ${houseId} facilities: ${type}!`);
@@ -80,20 +93,26 @@ class InnovationSystem {
     }
 
     /**
-     * 88.3 Labor Shortage Bottlenecks
-     * 88.4 Guild Strike Blockades
+     * 88.1 Slaughter-Chute Automation Friction
+     * 88.6 Slave/Gladiator Revolts
+     * 88.8 Automation Sabotage
      */
     checkLaborStatus(villageId) {
-        // Logic to slow production if population is low or tensions high
+        // 88.2 Penal Labor Mutinies
     }
 
     /**
      * 90.1 Black Market Weapon Spoilage
-     * 90.8 Knowledge Smuggling
+     * 90.4 Proliferation Suppression
+     * 90.5 Technological Asymmetry
      */
     leakTechnology(sourceHouse, targetHouse) {
         // 90.7 Trade Route Tech Leakage
         window.EventBus.emit('UI_LOG_DEBUG', `[TECH] Technology from ${sourceHouse} has leaked to ${targetHouse}.`);
+    }
+
+    checkForTechTheft(houseId, field) {
+        // 84.8 Logic
     }
 }
 

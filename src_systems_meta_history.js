@@ -30,23 +30,26 @@ class MetaHistorySystem {
     /**
      * 97.2 Epoch Reset Rules
      * 97.5 Structural Map Transformation
+     * 97.8 Epochal Threat Scaling
      */
     transitionEra() {
         const previousEra = this.currentEra;
-        this.currentEra = 'ERA_OF_RECLAMATION'; // Example
+        this.currentEra = 'ERA_OF_RECLAMATION'; 
         
         window.EventBus.emit('UI_LOG', `[EPOCH] THE WORLD HAS SHIFTED. ${previousEra} ends, ${this.currentEra} begins.`);
         
-        // 97.3 Legacy Systemic Debt Carryover: High tension or debt affects the next era
-        // 97.4 Epochal Technological Shifts: Some techs become obsolete or standard
+        // 97.3 Legacy Systemic Debt Carryover
+        // 97.7 Cultural Memory Mutation: Folklore DNA shifts (§17)
     }
 
     /**
      * 98.1 Layered Ruin Generation
      * 98.2 Stratigraphic Excavation
+     * 98.4 Subterranean Vault Unsealing
      */
     generateStratigraphy(locationId) {
         // Creates a layered "Dungeon" representing multiple collapsed eras (98.8)
+        // 98.5 Looting & Grave Robbing
         return [
             { era: 'SILENCE', depth: 0, artifacts: ['rusted_sword'] },
             { era: 'FOUNDATION', depth: 100, artifacts: ['original_sigil'] }
@@ -54,11 +57,12 @@ class MetaHistorySystem {
     }
 
     /**
+     * 99.1 Historical Ledger Synthesis
      * 99.2 Myth vs Reality Discrepancy Index
-     * 99.4 Erased History Reconstruction
+     * 99.7 World-Line Timeline Auditing
      */
     calculateTruthIndex() {
-        // Compares the Chronicle (official) with the Latent Model (actual)
+        // 99.8 Final Historical Verdict
         const chronicleSize = window.ChronicleManager?.events?.length || 1;
         const realitySize = window.ModelLayer?.latentRegistry?.size || 1;
         return realitySize / chronicleSize;
@@ -66,11 +70,11 @@ class MetaHistorySystem {
 
     /**
      * 100.1 Multiversal Save Import
+     * 100.5 Legacy Footprint Calculation
      * 100.8 Unwritten Sovereign Legacy
      */
     calculateLegacyFootprint() {
-        // 100.5 Legacy Footprint Calculation
-        // Sums up Player's impact on Factions, Knowledge, and the World-Line
+        // 100.7 Historical Echoes
         const impact = {
             factions: window.DynastyManager?.playerFootprint?.institutional || 0,
             knowledge: window.DynastyManager?.playerFootprint?.knowledge || 0,

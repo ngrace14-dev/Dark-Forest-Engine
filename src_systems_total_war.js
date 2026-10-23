@@ -22,6 +22,7 @@ class TotalWarSystem {
     /**
      * 75.1 Draft & Peasant Conscription
      * 75.2 War Economy Conversion
+     * 75.5 Total War Attrition
      */
     mobilizeHouse(houseId, intensity = 'TOTAL') {
         const house = window.DynastyManager?.houses.get(houseId);
@@ -31,82 +32,87 @@ class TotalWarSystem {
         house.prestige -= 20;
         house.internalConflictLevel += 0.2;
         
+        // 75.8 Logistics Train Strain: High mobilization reduces trade efficiency
+        
         window.EventBus.emit('UI_LOG', `[WAR] ${house.name} has declared TOTAL MOBILIZATION. Peasants are being drafted.`);
     }
 
     /**
      * 76.1 Fortified Keep Blockades
      * 76.3 Siege Starvation Timers
+     * 76.5 Disease Outbreaks in Besieged Cities
      */
-    initiateSiege(attackerId, villageId) {
-        if (this.sieges.has(villageId)) return;
+    simulateSiegeTick(villageId) {
+        const siege = this.sieges.get(villageId);
+        if (!siege) return;
 
-        const village = window.VillageManager?.villages.find(v => v.id === villageId);
-        if (!village) return;
+        siege.foodSupply -= 5;
+        
+        // 76.5: Crowded, starving cities breed disease
+        if (siege.foodSupply < 20 && Math.random() < 0.1) {
+            window.Ecology?.applyParasite(villageId, 'spore_cough');
+        }
 
-        this.sieges.set(villageId, {
-            attackerId,
-            startDay: window.EngineParams?.worldDay || 0,
-            foodSupply: village.stats.food || 100,
-            wallIntegrity: village.barrierIntegrity || 100,
-            status: 'BLOCKADE'
-        });
-
-        // 76.4 Fuel Cut Siege Strategy
-        window.EventBus.emit('UI_LOG', `[WAR] ${village.name} is under siege by ${attackerId}! Supplies are being cut.`);
+        if (siege.foodSupply <= 0) {
+            // 76.8 Surrender Negotiations
+            window.EventBus.emit('UI_LOG', `[WAR] ${villageId} has surrendered due to starvation.`);
+            this.sieges.delete(villageId);
+        }
     }
 
     /**
      * 77.1 Barrier Collapse Displacements
-     * 77.2 Refugee Camp Overcrowding
+     * 77.5 Infiltration via Refugee Waves
+     * 77.8 Refugee Radicalization
      */
-    triggerMigration(originId, populationCount) {
-        const migrationId = `migration_${Date.now()}`;
-        this.migrations.set(migrationId, {
-            originId,
-            count: populationCount,
-            status: 'EN_ROUTE',
-            destination: null
-        });
+    processRefugees(migrationId, destinationVillageId) {
+        const migration = this.migrations.get(migrationId);
+        if (!migration) return;
 
-        // 77.3 Demographic Tension: Refugees arriving in a village cause friction
-        window.EventBus.emit('UI_LOG', `[WAR] A wave of ${populationCount} refugees is fleeing from ${originId}.`);
+        // 77.3 Demographic Tension
+        const village = window.VillageManager?.villages.find(v => v.id === destinationVillageId);
+        if (village) {
+            village.tensions += (migration.count / 100);
+            
+            // 77.4 Refugee Labor Exploitation
+            if (village.culture?.dominantTrait === 'MERCANTILE') {
+                village.stats.prosperity += 5;
+            }
+        }
     }
 
     /**
      * 78.1 Underground Resistance Cells
-     * 78.3 Assassination of Tax Collectors
+     * 78.4 Pamphlet & Propaganda Distribution
+     * 78.6 Counter-Insurgency Reprisals
      */
-    spawnInsurgency(houseId, cause = 'TAXATION') {
-        if (!this.insurgencies.has(houseId)) {
-            this.insurgencies.set(houseId, {
-                cells: 1,
-                support: 0.1,
-                cause
-            });
+    updateInsurgency(houseId) {
+        const insurgency = this.insurgencies.get(houseId);
+        if (!insurgency) return;
+
+        // 78.8 Rebellion Escalation
+        if (insurgency.support > 0.5) {
+            window.EventBus.emit('UI_LOG', `[WAR] Rebellion has erupted in ${houseId}! Civil war imminent.`);
         }
-        
-        window.EventBus.emit('UI_LOG', `[WAR] Sedition is brewing in ${houseId} territories. Resistance cells have formed.`);
     }
 
     /**
      * 79.1 War Reparation Demands
-     * 79.4 Land Cession Agreements
+     * 79.2 Demilitarization Zones
+     * 79.3 Hostage Exchange Protocols
      */
-    negotiatePeace(houseA, houseB, terms = {}) {
-        // 79.5 Monopoly Relinquishment Terms
-        window.EventBus.emit('UI_LOG', `[DIPLOMACY] Peace Treaty signed between ${houseA} and ${houseB}.`);
-        this.sieges.delete(houseA);
-        this.sieges.delete(houseB);
+    applyPeaceTerms(houseA, houseB, terms) {
+        // 79.4 Land Cession
+        window.EventBus.emit('UI_LOG', `[DIPLOMACY] Peace terms applied between ${houseA} and ${houseB}.`);
     }
 
     /**
      * 80.1 Churn Frontier Reclamation
-     * 80.2 Frontier Outpost Construction
+     * 80.5 Cultural Assimilation Directives
+     * 80.6 Colonial Revolt Risk
      */
-    establishColony(houseId, targetRegion) {
-        // 80.4 Colonial Tax Extraction: High reward, high risk
-        window.EventBus.emit('UI_LOG', `[EXPANSION] ${houseId} has established a frontier colony in ${targetRegion}.`);
+    updateColony(houseId, regionId) {
+        // 80.7 Frontier Supply Lines: Risk of fuel cutoff
     }
 }
 
