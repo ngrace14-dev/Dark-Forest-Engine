@@ -421,6 +421,96 @@ window.SystemDefinitions = [
         triggers: { SIGNIFICANCE_DENSITY: ">0.4" }
     },
 
+    // --- PHASE 5: THE ESCALATION & CHRONICLE ---
+    {
+        id: 71,
+        name: "Balance of Power",
+        tier: "Conflict",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { FEAR_LOAD: 0.05, VIOLENCE_POTENTIAL: -0.1 },
+            scalar_to_framework: { escalation_delay: 2.0 }
+        },
+        triggers: { VIOLENCE_POTENTIAL: ">0.3", LEGITIMACY_INDEX: ">0.4" }
+    },
+    {
+        id: 73,
+        name: "Espionage",
+        tier: "Conflict",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { TRUST_DENSITY: -0.1, TRUTH_DECAY: 0.05 },
+            scalar_to_framework: { secret_packet_retrieval: 0.3 }
+        },
+        triggers: { TRUST_DENSITY: "<0.6" }
+    },
+    {
+        id: 75,
+        name: "Total War",
+        tier: "Conflict",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { WORLD_ENTROPY: 0.2, VIOLENCE_POTENTIAL: 0.3, FEAR_LOAD: 0.2 },
+            scalar_to_framework: { resource_drain_rate: 3.0, labor_cost_scaling: 4.0 }
+        },
+        triggers: { VIOLENCE_POTENTIAL: ">0.8" }
+    },
+    {
+        id: 84,
+        name: "Innovation",
+        tier: "Technology",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { DISCOVERY_PRESSURE: 0.1, MATERIAL_STRESS: -0.05 },
+            scalar_to_framework: { tech_tier_shift_chance: 0.05 }
+        },
+        triggers: { DISCOVERY_PRESSURE: ">0.6" }
+    },
+    {
+        id: 94,
+        name: "Historical Weight",
+        tier: "History",
+        framework: "ChronicleEngine",
+        vectors: {
+            scalar_to_scalar: { SIGNIFICANCE_DENSITY: 0.05, COHESION_INDEX: 0.05 },
+            scalar_to_framework: { narrative_persistence_bonus: 0.2 }
+        },
+        triggers: { SIGNIFICANCE_DENSITY: ">0.5" }
+    },
+    {
+        id: 95,
+        name: "Collapse",
+        tier: "History",
+        framework: "ChronicleEngine",
+        vectors: {
+            scalar_to_scalar: { WORLD_ENTROPY: 0.1, LEGITIMACY_INDEX: -0.2, COHESION_INDEX: -0.2 },
+            scalar_to_framework: { institution_erasure_rate: 0.5 }
+        },
+        triggers: { WORLD_ENTROPY: ">0.8", LEGITIMACY_INDEX: "<0.2" }
+    },
+    {
+        id: 97,
+        name: "Era Transitions",
+        tier: "History",
+        framework: "ChronicleEngine",
+        vectors: {
+            scalar_to_scalar: { DISCOVERY_PRESSURE: -0.3, SIGNIFICANCE_DENSITY: -0.5 },
+            scalar_to_framework: { global_scalar_reset: true }
+        },
+        triggers: { SIGNIFICANCE_DENSITY: ">0.9" }
+    },
+    {
+        id: 100,
+        name: "Legacy",
+        tier: "History",
+        framework: "ChronicleEngine",
+        vectors: {
+            scalar_to_scalar: { SIGNIFICANCE_DENSITY: 0.05, COHESION_INDEX: 0.02 },
+            scalar_to_framework: { bloodline_buff_potential: 0.1 }
+        },
+        triggers: null
+    },
+
     // --- EXISTING CORE SYSTEMS ---
     {
         id: 36,
