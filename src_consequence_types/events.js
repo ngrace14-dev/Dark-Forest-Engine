@@ -20,13 +20,16 @@ export const ConsequenceEvents = {
     CONTRACT_ASSIGNED: 'CONTRACT_ASSIGNED',// Dispatcher -> AI
     EXPEDITION_DEPART: 'EXPEDITION_DEPART',// AI -> Dispatcher
     
-    // Metaphysics
-        HEAT_SPIKE:       'HEAT_SPIKE',        
+        // Metaphysics
+    HEAT_SPIKE:       'HEAT_SPIKE',        
     HARVEST_BEGIN:    'HARVEST_BEGIN',
 
     // Drift & Lifecycle
     FACT_FORGOTTEN:   'FACT_FORGOTTEN',
     FACT_DECAYED:     'FACT_DECAYED',
     VOID_AMNESIA:     'VOID_AMNESIA',
-    TRADITION_FORMED: 'TRADITION_FORMED'
+    TRADITION_FORMED: 'TRADITION_FORMED',
+
+    // Observation & Awareness
+    SIGNAL_NOTICED:   'SIGNAL_NOTICED'
 };
