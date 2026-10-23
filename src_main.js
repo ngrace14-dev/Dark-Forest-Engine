@@ -7,6 +7,12 @@ import './src_systems_diagnostic_wrapper.js';
 
 import './src_systems_profiler.js';
 import './src_core_registry.js';
+import './src_core_civilization.js';
+import './src_core_system_definitions.js';
+import './src_consequence_epistemic_filter.js';
+import './src_consequence_interceptor.js';
+import './src_consequence_chronicle_engine.js';
+import './src_systems_civilization_profiler.js';
 import './src_core_state.js';
 import './src_core_config.js';
 import './src_core_worker_pool.js';
@@ -36,7 +42,13 @@ import './src_systems_personhood.js';
 import './src_systems_legacy.js';
 import './src_systems_conviction.js';
 
+// --- CONSEQUENCE ENGINE (Phase 3 Integration) ---
+import './src_consequence_epistemology.js';
+import './src_consequence_core.js';
+// ------------------------------------------------
+
 import './src_systems_origin.js';
+
 import './src_systems_runes.js';
 import './src_systems_narrative_driver.js';
 import './src_systems_world.js';

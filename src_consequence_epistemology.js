@@ -49,6 +49,10 @@ class EpistemologyController {
         // Issue 6: Hard Guard
         if (!packet || !packet.intelId) return;
 
+        // --- FRAMEWORK 2 INTEGRATION (LAW #3) ---
+        const filteredPacket = window.EpistemicFilter ? window.EpistemicFilter.filterPacket(packet) : packet;
+        if (!filteredPacket) return; // Packet lost in noise
+
         const inventory = window.ModelLayer.getInventory(factionId);
         if (!inventory) return;
 
