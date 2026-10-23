@@ -129,6 +129,85 @@ window.SystemDefinitions = [
         triggers: { DISCOVERY_PRESSURE: ">0.5" }
     },
 
+    // --- PHASE 2: THE BIOLOGICAL BURDEN ---
+    {
+        id: 42,
+        name: "Survival",
+        tier: "Psychology",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { FEAR_LOAD: 0.1, BIOLOGICAL_LOAD: 0.05 },
+            scalar_to_framework: { logic_bypass_threshold: 0.3 } // High fear causes survival-only intent
+        },
+        triggers: { BIOLOGICAL_LOAD: ">0.4" }
+    },
+    {
+        id: 48,
+        name: "Physiology",
+        tier: "Psychology",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { BIOLOGICAL_LOAD: 0.02, WORLD_ENTROPY: 0.01 },
+            scalar_to_framework: { recovery_rate_base: 0.1 }
+        },
+        triggers: null
+    },
+    {
+        id: 61,
+        name: "Wendigos",
+        tier: "Biology",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { FEAR_LOAD: 0.2, VIOLENCE_POTENTIAL: 0.1 },
+            scalar_to_framework: { expansion_friction: 0.3 }
+        },
+        triggers: { BIOLOGICAL_LOAD: ">0.6", WORLD_ENTROPY: ">0.5" }
+    },
+    {
+        id: 63,
+        name: "Mortality",
+        tier: "Biology",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { SIGNIFICANCE_DENSITY: 0.05, BIOLOGICAL_LOAD: 0.02 },
+            scalar_to_framework: { legacy_generation_multiplier: 1.5 }
+        },
+        triggers: null
+    },
+    {
+        id: 65,
+        name: "Predator Ecology",
+        tier: "Biology",
+        framework: "ConsequenceInterceptor",
+        vectors: {
+            scalar_to_scalar: { FEAR_LOAD: 0.05, BIOLOGICAL_LOAD: 0.05 },
+            scalar_to_framework: { resource_extraction_friction: 0.2 }
+        },
+        triggers: { WORLD_ENTROPY: "<0.6" }
+    },
+    {
+        id: 69,
+        name: "Symbiosis",
+        tier: "Biology",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { TRUST_DENSITY: 0.1, BIOLOGICAL_LOAD: -0.05 },
+            scalar_to_framework: { cooperative_labor_bonus: 0.2 }
+        },
+        triggers: { TRUST_DENSITY: ">0.4" }
+    },
+    {
+        id: 70,
+        name: "Collective Trauma",
+        tier: "Biology",
+        framework: "ScalarFlux",
+        vectors: {
+            scalar_to_scalar: { FEAR_LOAD: 0.1, COHESION_INDEX: 0.05 },
+            scalar_to_framework: { logic_stagnation_weight: 0.2 }
+        },
+        triggers: { VIOLENCE_POTENTIAL: ">0.7" }
+    },
+
     // --- EXISTING CORE SYSTEMS ---
     {
         id: 36,
