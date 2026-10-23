@@ -133,8 +133,30 @@ window.spawnPartyMembers = window.spawnPartyMembers || function() {
 };
 
 window.regenerateWorldCycle = window.regenerateWorldCycle || function() {
+    // --- CA-1, CA-2, CA-3: THE SHIFT & MODEL DRIFT ---
+    // Update Latent Reality (Truth) while leaving Institutional Beliefs (Inventories) alone.
+    
+    if (window.VillageManager) {
+        window.VillageManager.villages.forEach(village => {
+            const latentId = `village_location_${village.id}`;
+            const trueLocation = { x: village.x, z: village.z };
+
+            // Update System 1: The Objective Truth
+            window.ModelLayer.updateLatent(latentId, {
+                type: 'LOCATION',
+                value: trueLocation,
+                magnitude: 100 // High magnitude for relocation
+            });
+
+            // Note: We do NOT update the KnowledgeInventory here. 
+            // The village's belief about where other villages are is now outdated (Drift).
+            console.log(`[Shift] Latent truth updated for ${village.name}. Discovery Debt increased.`);
+        });
+    }
+
     window.EventBus?.emit('WORLD_REGENERATE');
 };
+
 
 // Empty fallback catchers to prevent game loop crashes
 window.processCompanionNeeds = window.processCompanionNeeds || function() {};

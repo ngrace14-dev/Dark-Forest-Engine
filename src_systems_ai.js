@@ -1,5 +1,5 @@
 window.EventBus.on('PARTY_COMMAND', command => {
-    
+    nce 
     window.GameState.party.command = command;
     window.GameCore.activeEntities.filter(entity => entity.companionId).forEach(entity => {
         const selected = window.GameState.party.selectedMembers.includes(entity.companionId);
@@ -342,10 +342,12 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                         return;
                     }
 
-                    // --- TIER 3: HISTORIAN (Verification) ---
+                                        // --- TIER 3: HISTORIAN (Verification) ---
                     if (en.role === 'historian') {
-                        const unverifiedRumors = (window.IntelManager?.getIntelForNode(en.id) || [])
-                            .filter(i => i.truth_state === 'UNKNOWN' && i.payload.target_coord);
+                        const inventory = window.ModelLayer?.getInventory(en.villageId || 'independent');
+                        const unverifiedRumors = Array.from(inventory?.records?.entries() || [])
+                            .filter(([id, r]) => r.confidence < 1.0 && r.value?.payload?.target_coord)
+                            .map(([id, r]) => ({ intel_id: id, ...r.value }));
                 
                         if (unverifiedRumors.length > 0) {
                             const rumor = unverifiedRumors[0];
@@ -365,8 +367,12 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                                 } else {
                                     en.verificationTimer -= delta;
                                     if (en.verificationTimer <= 0) {
-                                        window.IntelEconomy?.verifyIntel(rumor.intel_id, en, true);
-                                        en.currentTask = 'Rumor Verified';
+                                        // System 3: Seeker Extraction replaces auto-verify
+                                        const packet = window.ModelLayer.seekerPipeline.extract(rumor.intel_id, en);
+                                        if (packet) {
+                                            window.ModelLayer.seekerPipeline.deliver(packet, en.villageId || 'independent');
+                                            en.currentTask = 'Rumor Verified';
+                                        }
                                     }
                                     return;
                                 }
@@ -374,7 +380,8 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                         }
                     }
 
-                    // --- TIER 2: RECORDER (Information Inter-Village Sync) ---
+
+                                        // --- TIER 2: RECORDER (Information Inter-Village Sync) ---
                     if (en.role === 'recorder' && !en.isSyncing) {
                          const otherVillages = window.VillageManager?.villages.filter(v => v.id !== en.villageId);
                          const targetVillage = otherVillages[Math.floor(Math.random() * otherVillages.length)];
@@ -385,11 +392,11 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                          moveCompanion(en, targetPos, 0.7, delta);
                  
                          if (en.visual.position.distanceTo(targetPos) < 20.0) {
-                             // Perform Sync (Exchange memory with village hub)
-                             const targetHubId = `village_${targetVillage.id}`;
-                             const myIntel = window.IntelManager.getIntelForNode(en.id);
-                             myIntel.forEach(intel => {
-                                 window.IntelPropagation.sync(en, { id: targetHubId, faction: 'neutral' }, intel.intel_id, 1.0);
+                             // Perform Sync: Use Seeker Pipeline to deliver local packets to target
+                             const myInventory = window.ModelLayer.getInventory(en.villageId);
+                             myInventory.records.forEach((record, id) => {
+                                 const packet = { intelId: id, data: record.value, sourceId: en.id };
+                                 window.ModelLayer.seekerPipeline.deliver(packet, targetVillage.id);
                              });
                              en.isSyncing = true; // Simple cooldown
                              setTimeout(() => en.isSyncing = false, 60000);
@@ -397,13 +404,7 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                          return;
                     }
 
-                    // --- TIER 1: SCRIBE (Transcription) ---
-                    // 1. SEEK: If I know things that aren't physical records yet
-                    const personalIntel = window.IntelManager?.getIntelForNode(en.id) || [];
-                    const unrecorded = personalIntel.filter(intel => {
-                        const recordExists = Array.from(window.MountainArchives.records.values()).some(r => r.intel_id === intel.intel_id);
-                        return !recordExists && intel.truth_state === 'TRUE'; // Scribes record truths
-                    });
+
 
 
             if (unrecorded.length > 0 && archive) {
@@ -499,14 +500,6 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 caravan.status = 'arrived';
                 if (window.GameState.party.escortCaravanId === caravan.id) {
                     window.GameState.party.escortCaravanId = null;
-                    // --- PHASE 3: CARAVAN MASTER XP ---
-                    // Award XP for successful escort delivery
-                    window.CareerManager.addXP('caravan_master', 100);
-                    window.EventBus.emit('UI_LOG', `[COMMERCE] Escort complete. You earned 100 Caravan Master XP.`);
-                }
-                en.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-                window.EventBus.emit('UI_LOG', `Merchant caravan reached ${destination.name}.`);
-                        } else {
                 moveCompanion(en, destinationPosition, 1.2, delta);
                         }
             return;
@@ -841,9 +834,6 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
 
             if (dist < detectionRange && !isPlayerSafe && !window.EngineParams.isPlayerHidden) {
                 if (window.Input.isStealth) {
-                    // Stealth reduces sight range massively
-                    if (dist < 3) canSeePlayer = true;
-        } else {
                     canSeePlayer = true;
                 }
             }
@@ -858,7 +848,6 @@ window.EventBus.on('AI_TICK', ({ delta, isPlayerSafe }) => {
                 }
             }
 
-            if (canSeePlayer || canHearPlayer) {
                 target = pPos;
                 if (canHearPlayer && !canSeePlayer && Math.random() < 0.05) {
                     window.EventBus.emit('UI_LOG', `[PERCEPTION] ${en.name} heard you!`);

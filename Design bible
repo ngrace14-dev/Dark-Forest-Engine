@@ -187,6 +187,11 @@ A perfect truth spoken by a known liar may be worth less than an uncertain rumor
 
 **Acquisition Cost:** Information is never "free." It is acquired through trade, theft, or Adventurer-led extraction. Every fact in the Crow's Eye represents a specific expenditure of gold, rations, or lives.
 
+**ADDENDUM CA-1: CONTINUITY DEBT (The Law of Institutional Sunk Cost)**
+Institutions accumulate cognitive debt as their models fossilize around past successes. Success creates the "Validation Trap," where a model is credited for survival rather than environmental luck.
+* **Mechanism:** The more successful an institution has been for a longer period, the higher the "Will" required to unlearn its founding assumptions.
+* **Effect:** High-fidelity information that contradicts a successful model is reflexively treated as "noise" or "subversion" to protect systemic stability.
+
 **Ownership:** Knowledge is held by specific entities (Houses, NPCs, Archives). It does not spread automatically. Public knowledge is a deliberate act of "Publishing" (as defined in the Manifesto).
 
 **Information Lifecycle:**
@@ -199,6 +204,11 @@ Common Intel, Market Intel, Locational Intel, Historical Intel, Anchored Intel, 
 
 Truth exists independently of belief and measures reality rather than consensus. Tracked metrics include Facts, Distortions, Fabrications, Rumors, and Verification. **Global Fidelity** measures the overall health of reality.
 
+**ADDENDUM CA-2: THE WILL TO SEEK (The Law of Information Entropy)**
+Truth is never granted, distributed, or revealed for its own sake. Truth is an object with zero velocity; it remains where it was left until an entity expends resources to retrieve it.
+* **The Seeker Requirement:** Access to truth requires the intentional expenditure of effort, sacrifice, and persistence.
+* **The Persistence Rule:** A civilization may live beside a truth for 18,000 years and never discover it. If no seeker exists, the truth remains latent, regardless of the civilization's need or proximity.
+
 # 15. CHRONICLE SYSTEM
 
 Purpose: Record events without interpreting them. Stores: Event, Date, Significance, Historical Weight, Witnesses, and Participants.
@@ -208,6 +218,11 @@ Purpose: Record events without interpreting them. Stores: Event, Date, Significa
 **Career Path:** Scribe $\rightarrow$ Recorder $\rightarrow$ Historian $\rightarrow$ Royal Historian $\rightarrow$ Grand Historian
 **Purpose:** Transform Truth into Official History.
 **Historical Layers:** Chronicle $\rightarrow$ Truth $\rightarrow$ Official History $\rightarrow$ Folklore. Historians create understanding, not truth.
+
+**ADDENDUM CA-3: MODEL INHERITANCE (The Law of Generational Bias)**
+New institutions do not build models from raw observation; they inherit them from predecessors. They do not observe the world; they observe the assumptions of those who came before.
+* **The Ghost in the Foundation:** Constants that were true at the time of an institution's founding (e.g., "The Mountain does not move") become hard-coded into the logic gates of all subsequent data processing.
+* **Semantic Decay:** As models are inherited, the original context of metrics is lost, leaving only the metric itself (e.g., mistaking a "Full Granary" for "Food Security").
 
 # 17. FOLKLORE SYSTEM
 
@@ -300,6 +315,11 @@ An Observatory, Living Atlas, Investigation Tool, and Historical Archive. Driven
 # 27. LIVING ATLAS
 
 Supports Zoom, Scroll, Follow, Investigation, and Historical Playback. Makes the player feel the world is vastly larger than their understanding of it.
+
+**ADDENDUM CA-4: THE ATTENTION PRINCIPLE (The Law of Salience and Bandwidth)**
+Civilizational attention is a finite, depletable resource. Information that is not Salient—meaning it lacks Utility, Novelty, or Narrative Resonance—is functionally non-existent to the institution.
+* **The Mundane Apocalypse:** Important truths (e.g., slow-onset resource depletion) frequently die because they are "boring."
+* **Narrative Gravity:** Falsehoods frequently survive because they are "interesting." A beautiful lie that reduces internal cognitive friction will always out-compete a messy truth for the institution's limited attention bandwidth.
 
 # 28. FOLLOW SYSTEM
 
