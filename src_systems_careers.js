@@ -42,13 +42,13 @@ window.CareerManager = {
 
         // TIER 5: CIVILIZATION
         warden: { name: "Warden", tier: 5, produces: ["Protection"], ranks: ["Watcher", "Keeper", "Protector", "High Warden", "Guardian of the Forest"] },
-        councilor: { name: "Councilor", tier: 5, produces: ["Policy"], ranks: ["Envoy", "Councilor", "Minister", "Regent", "High Chancellor"] },
-        levy_commander: { name: "Levy Commander", tier: 5, produces: ["Army Power"], ranks: ["Sergeant", "Lieutenant", "Captain", "Commander", "Grand Marshal"] },
+        councilor: { name: "Councilor", tier: 5, produces: ["Policy"], ranks: ["Envoy", "Councilor", "Minister", "Regent", "High Chancellor"], isOffice: true },
+        levy_commander: { name: "Levy Commander", tier: 5, produces: ["Army Power"], ranks: ["Sergeant", "Lieutenant", "Captain", "Commander", "Grand Marshal"], isOffice: true },
         builder: { name: "Builder", tier: 5, produces: ["Infrastructure"], ranks: ["Mason", "Architect", "Urban Planner", "Master Builder", "Realm Architect"] },
         recon_engineer: { name: "Reconstruction Engineer", tier: 5, produces: ["Resurgence"], ranks: ["Salvager", "Reconstruction Engineer", "Anchor Restorer", "Infrastructure Reconciler", "Master of Resurgence"] },
 
         // TIER 6: WORLD-SHAPERS
-        navigator: { name: "Shift Navigator", tier: 6, produces: ["Safety"], ranks: ["Pathfinder", "Predictor", "Void-Gazer", "Navigator", "Master Navigator"] },
+        navigator: { name: "Shift Navigator", tier: 6, produces: ["Safety"], ranks: ["Pathfinder", "Predictor", "Void-Gazer", "Navigator", "Master Navigator"], isOffice: true },
         cartographer: { name: "Shift Cartographer", tier: 6, produces: ["Coordinates"], ranks: ["Void-Watcher", "Shift Cartographer", "Coordinate Auditor", "Entropy Analyst", "Master of the Living Atlas"] },
         archivist: { name: "Archivist", tier: 6, produces: ["Memory Persistence"], ranks: ["Scribe", "Recorder", "Historian", "Epoch Keeper", "Grand Archivist"] },
         chronicler: { name: "Crow Chronicler", tier: 6, produces: ["Legacy"], ranks: ["Observer", "Storyteller", "Narrator", "Voice of the Crow", "Mythic Voice"] },
@@ -65,6 +65,19 @@ window.CareerManager = {
             });
             window.GameState.careerStats = this.stats;
         }
+
+        Object.keys(this.definitions).forEach(key => {
+            const def = this.definitions[key];
+            // Logic for Office-based progression
+            if (def.isOffice) {
+                // Office holders gain "XP" from Institutional Stability events
+                window.EventBus.on('INSTITUTIONAL_STABILITY_CHECK', (data) => {
+                    if (this.currentOfficeHolder === 'player') {
+                        this.addXP(key, data.stabilityGain * 10);
+                    }
+                });
+            }
+        });
     },
 
     addXP: function(careerId, amount) {
@@ -108,3 +121,4 @@ window.CareerManager = {
 };
 
 window.CareerManager.init();
+
