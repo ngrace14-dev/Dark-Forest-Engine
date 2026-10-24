@@ -10,45 +10,49 @@ window.CareerManager = {
     // Career Definitions
     definitions: {
         // TIER 1: FOUNDATIONS
-        hunter: { name: "Hunter", tier: 1, produces: ["Meat", "Hides", "Bones", "Antlers"], ranks: ["Trapper", "Tracker", "Slayer", "Big Game Hunter", "Apex Predator"] },
-        gatherer: { name: "Gatherer", tier: 1, produces: ["Herbs", "Ingredients", "Reagents"], ranks: ["Forager", "Herbalist", "Botanist", "Master Herbalist", "Forest Sage"] },
+        hunter: { name: "Hunter", tier: 1, produces: ["Meat", "Hides", "Bones"], ranks: ["Trapper", "Tracker", "Slayer", "Big Game Hunter", "Apex Predator"] },
+        gatherer: { name: "Gatherer", tier: 1, produces: ["Herbs", "Reagents"], ranks: ["Forager", "Herbalist", "Botanist", "Master Herbalist", "Forest Sage"] },
         trapper: { name: "Trapper", tier: 1, produces: ["Furs", "Exotic Parts"], ranks: ["Layman", "Snarer", "Trapper", "Trap Lord", "Wilderness Warden"] },
         farmer: { name: "Farmer", tier: 1, produces: ["Crops", "Livestock"], ranks: ["Peasant", "Tiller", "Husbandman", "Yeoman", "Estate Baron"] },
         scribe: { name: "Scribe", tier: 1, produces: ["Records", "Ink"], ranks: ["Copyist", "Ledger-Keeper", "Clerk", "Senior Scribe", "Master Scribe"] },
+        teacher: { name: "Teacher", tier: 1, produces: ["Skill Transfer"], ranks: ["Tutor", "Teacher", "Master Instructor", "Professor", "Dean"] },
+        lorekeeper: { name: "Lorekeeper", tier: 1, produces: ["Cultural Memory"], ranks: ["Storyteller", "Lorekeeper", "Songkeeper", "Ritual Keeper", "Story Elder"] },
+        registrar: { name: "Registrar", tier: 1, produces: ["Legitimacy"], ranks: ["Clerk", "Registrar", "Census Master", "Royal Registrar", "Keeper of Records"] },
         
         // TIER 2: TRADES & CRAFTS
-        blacksmith: { name: "Blacksmith", tier: 2, produces: ["Weapons", "Armor", "Prosthetics"], ranks: ["Apprentice", "Journeyman", "Master Smith", "Noble Armorer", "Legendary Smith"] },
-        alchemist: { name: "Alchemist", tier: 2, produces: ["Potions", "Tonics", "Poisons"], ranks: ["Brewer", "Chemist", "Transmuter", "Grand Alchemist", "Philosopher"] },
-        rune_engineer: { name: "Rune Engineer", tier: 2, produces: ["Barrier Modules", "Rune Stones"], ranks: ["Artificer", "Warden-Builder", "Barrier Master", "Arch-Engineer", "Master Warden Engineer"] },
-        chef: { name: "Chef", tier: 2, produces: ["Travel Rations", "Banquets"], ranks: ["Cook", "Caterer", "Culinary Master", "Noble Chef", "Royal Chef"] },
-        recorder: { name: "Recorder", tier: 2, produces: ["Synced History", "Travelogues"], ranks: ["Messenger", "Chronicler-Adept", "Traveling Scribe", "World Recorder", "Master Recorder"] },
+        blacksmith: { name: "Blacksmith", tier: 2, produces: ["Weapons", "Armor"], ranks: ["Apprentice", "Journeyman", "Master Smith", "Noble Armorer", "Legendary Smith"] },
+        alchemist: { name: "Alchemist", tier: 2, produces: ["Potions", "Tonics"], ranks: ["Brewer", "Chemist", "Transmuter", "Grand Alchemist", "Philosopher"] },
+        rune_scholar: { name: "Rune Scholar", tier: 2, produces: ["Runic Theory"], ranks: ["Student", "Rune Scholar", "Rune Linguist", "Rune Theorist", "Rune Professor"] },
+        rune_engineer: { name: "Rune Engineer", tier: 2, produces: ["Barrier Maintenance"], ranks: ["Artificer", "Warden-Builder", "Barrier Master", "Arch-Engineer", "Master Warden Engineer"] },
+        chef: { name: "Chef", tier: 2, produces: ["Rations"], ranks: ["Cook", "Caterer", "Culinary Master", "Noble Chef", "Royal Chef"] },
+        recorder: { name: "Recorder", tier: 2, produces: ["Fact Persistence"], ranks: ["Messenger", "Chronicler-Adept", "Traveling Scribe", "World Recorder", "Master Recorder"] },
 
         // TIER 3: COMMERCE & WEALTH
         merchant: { name: "Merchant", tier: 3, produces: ["Gold", "Contracts"], ranks: ["Peddler", "Trader", "Factor", "Guildmaster", "Merchant Prince"] },
-        caravan_master: { name: "Caravan Master", tier: 3, produces: ["Prosperity", "Routes"], ranks: ["Guard", "Wagoner", "Convoy Leader", "Route Master", "Trade King"] },
+        quartermaster: { name: "Quartermaster", tier: 3, produces: ["Logistics"], ranks: ["Stockpiler", "Quartermaster", "Warehouse Keeper", "Logistics Planner", "Grand Quartermaster"] },
         landlord: { name: "Landlord", tier: 3, produces: ["Rent", "Taxes"], ranks: ["Collector", "Property Manager", "Owner", "District Lord", "Property Magnate"] },
         info_broker: { name: "Information Broker", tier: 3, produces: ["Rumors", "Intel"], ranks: ["Listener", "Spy", "Broker", "Shadow Master", "Shadow Chancellor"] },
-        historian: { name: "Historian", tier: 3, produces: ["Facts", "Verified Truth"], ranks: ["Researcher", "Verified Scribe", "Analyst", "Senior Historian", "Grand Historian"] },
+        historian: { name: "Historian", tier: 3, produces: ["Historical Audit"], ranks: ["Researcher", "Verified Scribe", "Analyst", "Senior Historian", "Grand Historian"] },
 
         // TIER 4: ARCANE & SOCIAL
-
-        // TIER 4: ARCANE & SOCIAL
-        arcane_proprietor: { name: "Arcane Proprietor", tier: 4, produces: ["Influence", "Establishment"], ranks: ["Barkeep", "Host", "Proprietor", "Arcane Steward", "Keeper of Doors"] },
-        diplomat: { name: "Diplomat", tier: 4, produces: ["Treaties", "Peace"], ranks: ["Envoy", "Negotiator", "Arbitrator", "Ambassador", "Grand Diplomat"] },
-        matchmaker: { name: "Matchmaker", tier: 4, produces: ["Alliances", "Marriages"], ranks: ["Intermediary", "Contractor", "Alliance Weaver", "House Binder", "Court Architect"] },
-        entertainer: { name: "Entertainer", tier: 4, produces: ["Reputation", "Patronage"], ranks: ["Busker", "Bard", "Performer", "Maestro", "Living Legend"] },
+        arcane_proprietor: { name: "Arcane Proprietor", tier: 4, produces: ["Influence"], ranks: ["Barkeep", "Host", "Proprietor", "Arcane Steward", "Keeper of Doors"] },
+        diplomat: { name: "Diplomat", tier: 4, produces: ["Treaties"], ranks: ["Envoy", "Negotiator", "Arbitrator", "Ambassador", "Grand Diplomat"] },
+        matchmaker: { name: "Matchmaker", tier: 4, produces: ["Alliances"], ranks: ["Intermediary", "Contractor", "Alliance Weaver", "House Binder", "Court Architect"] },
+        entertainer: { name: "Entertainer", tier: 4, produces: ["Reputation"], ranks: ["Busker", "Bard", "Performer", "Maestro", "Living Legend"] },
 
         // TIER 5: CIVILIZATION
-        warden: { name: "Warden", tier: 5, produces: ["Barrier Stability", "Protection"], ranks: ["Watcher", "Keeper", "Protector", "High Warden", "Guardian of the Forest"] },
-        noble_retainer: { name: "Noble Retainer", tier: 5, produces: ["Trust", "Authority"], ranks: ["Servant", "Squire", "Steward", "Castellan", "House Steward"] },
-        levy_commander: { name: "Levy Commander", tier: 5, produces: ["Army Power", "Militia"], ranks: ["Sergeant", "Lieutenant", "Captain", "Commander", "Grand Marshal"] },
-        builder: { name: "Builder", tier: 5, produces: ["Infrastructure", "Upgrades"], ranks: ["Mason", "Architect", "Urban Planner", "Master Builder", "Realm Architect"] },
+        warden: { name: "Warden", tier: 5, produces: ["Protection"], ranks: ["Watcher", "Keeper", "Protector", "High Warden", "Guardian of the Forest"] },
+        councilor: { name: "Councilor", tier: 5, produces: ["Policy"], ranks: ["Envoy", "Councilor", "Minister", "Regent", "High Chancellor"] },
+        levy_commander: { name: "Levy Commander", tier: 5, produces: ["Army Power"], ranks: ["Sergeant", "Lieutenant", "Captain", "Commander", "Grand Marshal"] },
+        builder: { name: "Builder", tier: 5, produces: ["Infrastructure"], ranks: ["Mason", "Architect", "Urban Planner", "Master Builder", "Realm Architect"] },
+        recon_engineer: { name: "Reconstruction Engineer", tier: 5, produces: ["Resurgence"], ranks: ["Salvager", "Reconstruction Engineer", "Anchor Restorer", "Infrastructure Reconciler", "Master of Resurgence"] },
 
         // TIER 6: WORLD-SHAPERS
-        navigator: { name: "Shift Navigator", tier: 6, produces: ["Epoch Predictions", "Safety"], ranks: ["Pathfinder", "Predictor", "Void-Gazer", "Navigator", "Master Navigator"] },
-        archivist: { name: "Archivist", tier: 6, produces: ["Historical Records", "Truth"], ranks: ["Scribe", "Recorder", "Historian", "Epoch Keeper", "Grand Archivist"] },
-        chronicler: { name: "Crow Chronicler", tier: 6, produces: ["Legacy", "Reputation"], ranks: ["Observer", "Storyteller", "Narrator", "Voice of the Crow", "Mythic Voice"] },
-        noble_founder: { name: "Noble Founder", tier: 6, produces: ["Land", "Sovereignty"], ranks: ["Commoner", "Claimant", "Lord", "Great House Patriarch", "Matriarch"] }
+        navigator: { name: "Shift Navigator", tier: 6, produces: ["Safety"], ranks: ["Pathfinder", "Predictor", "Void-Gazer", "Navigator", "Master Navigator"] },
+        cartographer: { name: "Shift Cartographer", tier: 6, produces: ["Coordinates"], ranks: ["Void-Watcher", "Shift Cartographer", "Coordinate Auditor", "Entropy Analyst", "Master of the Living Atlas"] },
+        archivist: { name: "Archivist", tier: 6, produces: ["Memory Persistence"], ranks: ["Scribe", "Recorder", "Historian", "Epoch Keeper", "Grand Archivist"] },
+        chronicler: { name: "Crow Chronicler", tier: 6, produces: ["Legacy"], ranks: ["Observer", "Storyteller", "Narrator", "Voice of the Crow", "Mythic Voice"] },
+        noble_founder: { name: "Noble Founder", tier: 6, produces: ["Sovereignty"], ranks: ["Commoner", "Claimant", "Lord", "Great House Patriarch", "Matriarch"] }
     },
 
     init: function() {
