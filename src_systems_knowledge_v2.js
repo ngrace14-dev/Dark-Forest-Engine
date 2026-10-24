@@ -12,6 +12,8 @@ class KnowledgeInventory {
         this.continuityDebt = 0; // Cumulative weight of fossilized models
         this.attentionQuota = 100; // Capacity to notice new events
         this.shockLevel = 0; // System 7: Cognitive Collapse indicator (0-100)
+        this.truthPressure = 0; // S14.7: Reactive Correction Force
+        this.dtr = 0; // Debt:Truth Ratio
         
         // System 8: Curiosity & Continuity Demand
         this.stabilityScore = 100; 
@@ -47,6 +49,17 @@ class KnowledgeInventory {
         const shockPressure = discoveryDebt * (1 + (this.continuityDebt / 100));
         if (shockPressure > 0.5) this.shockLevel = Math.min(100, this.shockLevel + (shockPressure * 5));
         else this.shockLevel = Math.max(0, this.shockLevel - 2);
+
+        // --- S14.7: TRUTH PRESSURE & DTR (Phase 4 Integration) ---
+        // Truth Pressure scales exponentially with Continuity Debt
+        this.truthPressure = Math.pow(this.continuityDebt / 20, 1.5);
+        
+        // Calculate Debt:Truth Ratio
+        this.dtr = this.truthPressure > 0 ? (this.continuityDebt / this.truthPressure) : 10.0;
+
+        if (this.dtr > 4.0 && this.continuityDebt > 50) {
+            window.EventBus.emit('UI_LOG_DEBUG', `[DTR] ${this.factionId} is at COLLAPSE RISK (Ratio: ${this.dtr.toFixed(1)}).`);
+        }
     }
 
     generateContracts() {
