@@ -255,12 +255,11 @@ function updateWorldClock(delta) {
 }
 
 function updatePeriodicSystems() {
-    if (window.VillageManager?.simulateNextVillage) {
-        window.VillageManager.simulateNextVillage();
-    }
+    // Moved to VillageManager.initScheduler (Tier-based)
     window.AdventurerManager?.syncDeparted();
     window.AdventurerManager?.syncNearby();
 }
+
 
 function updatePlayerStats(delta) {
     if (!window.GameState?.pStats || !window.Input) return;

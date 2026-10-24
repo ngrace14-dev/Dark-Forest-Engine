@@ -56,6 +56,7 @@ class ConsequenceEngine {
 
     /**
      * The Decoupled Consequence Cycle
+     * Re-CADENCED for 12-Hour Day (Phase 4 Refactor)
      */
     tick({ delta, worldDay }) {
         if (this.isProcessing) return;
@@ -64,36 +65,38 @@ class ConsequenceEngine {
         try {
             const inventories = Array.from(window.ModelLayer.inventories.values());
             const activeEntities = window.GameCore.activeEntities;
+            const ticks = window.Heartbeat.ticks;
 
-            // 1. DECAY: Erosion (Daily Gated - Issue 1)
-            if (worldDay > this.lastDriftDay) {
+            // 1. DECAY: Erosion (Daily Gated - Tier 6)
+            if (ticks.t12h) {
                 DriftProcessor.applyDailyDrift(inventories);
-                this.lastDriftDay = worldDay;
             }
 
-            // 2. OBSERVATION: Perception (Decoupled frequency handled in ObservationLayer)
-            ObservationLayer.processObservation(activeEntities, window.ModelLayer.latentRegistry, performance.now());
+            // 2. OBSERVATION: Perception (Tier 1: 30s)
+            if (ticks.t30s) {
+                ObservationLayer.processObservation(activeEntities, window.ModelLayer.latentRegistry, performance.now());
+            }
 
-            // 3 & 4. STRATEGY & DEMAND (Daily Gated - Issue 2 & 3)
-            if (worldDay > this.lastStrategicAuditDay) {
+            // 3 & 4. STRATEGY & DEMAND (Tier 3: 30m)
+            if (ticks.t30m) {
                 inventories.forEach(inv => {
                     Strategist.evaluateFaction(inv, worldDay);
-                    inv.generateContracts(); // Demand generation now linked to strategic audit
+                    inv.generateContracts(); 
                 });
-                this.lastStrategicAuditDay = worldDay;
             }
 
-            // 5. DISPATCH: Labor Allocation (Every tick to ensure rapid recruitment)
-            const baseIdleNPCs = activeEntities.filter(en => en.def.type === 'npc' && !en.assignedContractId);
-            
-            inventories.forEach(inv => {
-                // Issue 4: Filter NPCs by faction for the labor auction
-                const factionIdleNPCs = baseIdleNPCs.filter(npc => 
-                    npc.villageId === inv.factionId || npc.houseId === inv.factionId
-                );
+            // 5. DISPATCH: Labor Allocation (Tier 4: 2h)
+            if (ticks.t2h) {
+                const baseIdleNPCs = activeEntities.filter(en => en.def.type === 'npc' && !en.assignedContractId);
                 
-                Dispatcher.processDispatcher(inv, factionIdleNPCs, worldDay);
-            });
+                inventories.forEach(inv => {
+                    const factionIdleNPCs = baseIdleNPCs.filter(npc => 
+                        npc.villageId === inv.factionId || npc.houseId === inv.factionId
+                    );
+                    
+                    Dispatcher.processDispatcher(inv, factionIdleNPCs, worldDay);
+                });
+            }
 
         } catch (e) {
             console.error("[Consequence] Cycle Failure:", e);

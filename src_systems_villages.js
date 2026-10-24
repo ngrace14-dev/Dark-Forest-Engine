@@ -259,7 +259,7 @@ window.VillageManager = {
     // Instead of simulating all 20 villages at once, we do 1 per logic tick
     simulationIndex: 0,
 
-    simulateNextVillage: function() {
+        simulateNextVillage: function() {
         if (this.villages.length === 0) return;
         
         const village = this.villages[this.simulationIndex];
@@ -273,6 +273,19 @@ window.VillageManager = {
         
         this.simulationIndex = (this.simulationIndex + 1) % this.villages.length;
     },
+
+    initScheduler: function() {
+        // Tier 5: Institutional Review (Every 6 hours)
+        window.EventBus.on('HEARTBEAT_T6H', () => {
+            this.auditMonopolies();
+        });
+
+        // Tier 2: Belief/Intel Exchange (Every 5 minutes)
+        window.EventBus.on('HEARTBEAT_T5M', () => {
+            this.simulateNextVillage();
+        });
+    },
+
 
         processVillageIntelExchange: function(village) {
         if (!window.IntelPropagation) return;
@@ -1612,7 +1625,7 @@ window.VillageManager = {
             window.DynastyManager.setBlessedStatus(weakestBlessed.id, false);
             window.DynastyManager.setBlessedStatus(strongestUnblessed.id, true);
 
-            window.ChronicleManager.recordEvent({
+                        window.ChronicleManager.recordEvent({
                 actorId: 'The Capital',
                 type: 'ROYAL_DECREE',
                 detail: `By Decree of King Alaric, the Blessed Spot held by ${weakestBlessed.name} has been transferred to ${strongestUnblessed.name}.`,
@@ -1622,6 +1635,13 @@ window.VillageManager = {
         }
     }
 };
+
+window.EventBus.on('ENGINE_READY', () => {
+    if (window.VillageManager.initScheduler) {
+        window.VillageManager.initScheduler();
+    }
+});
+
 
 
 
