@@ -97,14 +97,43 @@ class WorldObservatory {
     probeInformationHealth() {
         if (!window.IntelManager) return {};
         const registry = Array.from(window.IntelManager.registry.values());
-        const facts = registry.filter(i => i.type === 'FACT').length;
-        const rumors = registry.filter(i => i.type === 'RUMOR').length;
         const total = registry.length || 1;
+        
+        const facts = registry.filter(i => i.type === 'FACT');
+        const rumors = registry.filter(i => i.type === 'RUMOR');
+        
+        // 1. Truth Fidelity: Ratio of Facts to total Intel
+        const truthFidelity = facts.length / total;
+
+        // 2. Propagation Velocity (Estimate)
+        // Average transmission_count of active intel
+        const avgTransmission = registry.reduce((acc, i) => acc + (i.provenance?.transmission_count || 0), 0) / total;
+
+        // 3. Contamination: Percentage of rumors with certainty > 0.5 that are actually FALSE (if we had truth_state)
+        const falseRumors = rumors.filter(i => i.truth_state === 'FALSE' && i.certainty > 0.5).length;
+        const contamination = falseRumors / (rumors.length || 1);
+
+        // 4. Misinformation Persistence
+        // Average age of FALSE facts
+        const day = window.EngineParams?.worldDay || 0;
+        const falseFacts = facts.filter(i => i.truth_state === 'FALSE');
+        const avgMisinfoAge = falseFacts.reduce((acc, i) => acc + (day - i.payload.timestamp_day), 0) / (falseFacts.length || 1);
+
+        // 5. Silo Isolation
+        // How many intel records are known by only ONE institution/house?
+        let siloedCount = 0;
+        if (window.IntelManager.ownershipRegistry) {
+            for (const [intelId, owners] of window.IntelManager.ownershipRegistry.entries()) {
+                if (owners.size <= 3) siloedCount++; // Assuming < 3 owners counts as siloed
+            }
+        }
 
         return {
-            truthFidelity: facts / total,
-            rumorVolume: rumors,
-            totalIntel: total
+            truthFidelity,
+            avgTransmission,
+            contamination,
+            misinfoPersistence: isNaN(avgMisinfoAge) ? 0 : avgMisinfoAge,
+            siloRatio: siloedCount / total
         };
     }
 
