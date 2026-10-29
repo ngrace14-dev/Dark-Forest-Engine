@@ -341,10 +341,18 @@ class DynastyManagerSystem {
                 // --- INSTITUTIONAL STATE TRANSITIONS ---
                 
                 // 1. Established -> Private Doubt
-                if (belief.state === 'ESTABLISHED' && belief.doubtPressure > 0.3) {
-                    belief.state = 'PRIVATE_DOUBT';
-                    window.EventBus.emit('UI_LOG_DEBUG', `[BELIEF] ${house.name} now harbors private doubts about ${key}.`);
-                }
+                        if (belief.state === 'ESTABLISHED' && belief.doubtPressure > 0.3) {
+                            belief.state = 'PRIVATE_DOUBT';
+                            window.EventBus.emit('UI_LOG_DEBUG', `[BELIEF] ${house.name} now harbors private doubts about ${key}.`);
+                    
+                            // --- GCAB TELEMETRY ---
+                            window.EventBus.emit('CIV_CRISIS_DETECTED', {
+                                type: 'INSTITUTIONAL_DOUBT',
+                                entityId: house.id,
+                                rootCause: 'INFORMATIONAL_CONTRADICTION',
+                                severity: belief.doubtPressure
+                            });
+                        }
 
                 // 2. Private Doubt -> Doubted (Exposure/Publicity usually forces this)
                 if (belief.state === 'PRIVATE_DOUBT' && belief.doubtPressure > 0.6) {
@@ -1390,6 +1398,14 @@ class DynastyManagerSystem {
 
         executeInstitutionalSuppression(house) {
             window.EventBus.emit('UI_LOG', `[ANXIETY] ${house.name} has issued an Edict of Silence. Contradictory reports are being suppressed.`);
+        
+            // --- GCAB TELEMETRY ---
+            window.EventBus.emit('CIV_RESPONSE_EXECUTED', {
+                responseType: 'SUPPRESSION',
+                entityId: house.id,
+                actorId: house.id,
+                cost: house.prestige
+            });
             
             // Physical Suppression: Revoke ownership of "Doubted" intel from NPCs in its territory
             const doubtedIntelIds = [];

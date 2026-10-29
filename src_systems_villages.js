@@ -830,6 +830,16 @@ window.VillageManager = {
                 village.fuelNeed = essenceCost; // Store for feedback
                 village.barrierIntegrity = Math.max(0, (village.barrierIntegrity ?? 100) - essenceCost);
         
+                // --- GCAB TELEMETRY ---
+                if (village.barrierIntegrity < 20) {
+                    window.EventBus.emit('CIV_CRISIS_DETECTED', {
+                        type: 'BARRIER_FAILURE',
+                        entityId: `village_${village.id}`,
+                        rootCause: (village.stats.essence < essenceCost) ? 'FUEL_SCARCITY' : 'MAINTENANCE_NEGLECT',
+                        severity: 1.0 - (village.barrierIntegrity / 20)
+                    });
+                }
+        
                 // --- DREAM PHASE 1: ROOTS INTEGRATION (Barrier Maintenance) ---
         // Bible §10, §21: If the village leader has a ROOTS dream, maintenance is more efficient.
         let maintenanceBonus = 0;
