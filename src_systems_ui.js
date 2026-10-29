@@ -1048,14 +1048,124 @@ class InstitutionalReportUI {
     }
 }
 
-// ==========================================
-// INITIALIZATION BOOTSTRAP
-// ==========================================
-window.addEventListener('DOMContentLoaded', () => {
-    window.UI_IntelBag = new IntelBagUI();
-    window.UI_SquadManager = new SquadManagerUI();
-    window.UI_FactionMap = new FactionMapUI();
-    window.UI_WorldOverlay = new WorldOverlayUI();
-    window.UI_InstitutionalReport = new InstitutionalReportUI();
-});
+    // ==========================================
+    // INITIALIZATION BOOTSTRAP
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', () => {
+        window.UI_IntelBag = new IntelBagUI();
+        window.UI_SquadManager = new SquadManagerUI();
+        window.UI_FactionMap = new FactionMapUI();
+        window.UI_WorldOverlay = new WorldOverlayUI();
+        window.UI_InstitutionalReport = new InstitutionalReportUI();
+        window.UI_WorldHealth = new WorldHealthUI();
+    });
+
+    // ==========================================
+    // COMPONENT 6: WORLD HEALTH DIRECTORATE UI (CROW'S EYE)
+    // ==========================================
+    class WorldHealthUI {
+        constructor() {
+            this.panel = document.createElement('div');
+            this.panel.id = 'world-health-panel';
+            this.panel.className = 'absolute left-1/2 -translate-x-1/2 top-6 w-[800px] bg-black/90 border-2 border-red-900/50 rounded-lg shadow-[0_0_50px_rgba(220,38,38,0.2)] p-4 hidden z-50 flex-col font-mono backdrop-blur-xl pointer-events-auto';
+            document.body.appendChild(this.panel);
+            this.bindEvents();
+        }
+
+        bindEvents() {
+            window.EventBus.on('TOGGLE_WORLD_HEALTH', () => this.toggle());
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'F8') this.toggle();
+            });
+        }
+
+        toggle() {
+            this.panel.classList.toggle('hidden');
+            if (!this.panel.classList.contains('hidden')) this.render();
+        }
+
+        render() {
+            if (!window.WorldObservatory) return;
+            const report = window.WorldObservatory.generateDiagnosticReport();
+            const health = window.WorldObservatory.calculateWorldHealth();
+            
+            const categoryColors = {
+                'EXCELLENT': 'text-emerald-400',
+                'STABLE': 'text-blue-400',
+                'FRAGILE': 'text-yellow-400',
+                'DECLINING': 'text-orange-500',
+                'COLLAPSE': 'text-red-600 animate-pulse'
+            };
+
+            let html = `
+                <div class="flex justify-between items-center mb-4 border-b border-red-900/30 pb-2">
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-red-500 font-black tracking-[0.2em] uppercase text-lg italic">Genesis World Health Directorate</h2>
+                        <div class="px-2 py-0.5 bg-red-950 border border-red-700 rounded text-[10px] text-red-400 font-bold uppercase">Observatory Mode</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs text-gray-500 uppercase font-bold">World Day ${report.day}</div>
+                        <div class="text-[10px] text-gray-600">Verification Hash: ${Math.random().toString(36).substring(7).toUpperCase()}</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-6 mb-6">
+                    <!-- SPEEDOMETER -->
+                    <div class="col-span-1 bg-gray-900/50 rounded border border-gray-800 p-4 flex flex-col items-center justify-center relative overflow-hidden">
+                        <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Civilization Viability</div>
+                        <div class="text-5xl font-black ${categoryColors[health.category]}">${health.score}</div>
+                        <div class="text-sm font-bold mt-1 ${categoryColors[health.category]} tracking-widest">${health.category}</div>
+                        <div class="w-full h-1 bg-gray-800 rounded-full mt-4 overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-red-600 via-yellow-500 to-emerald-500" style="width: ${health.score}%"></div>
+                        </div>
+                    </div>
+
+                    <!-- METRIC GRID -->
+                    <div class="col-span-2 grid grid-cols-4 gap-2">
+                        ${this.generateMetricMiniCard('POP', health.metrics.pop, 'souls')}
+                        ${this.generateMetricMiniCard('INST', health.metrics.inst, 'houses')}
+                        ${this.generateMetricMiniCard('INFO', health.metrics.info, 'truth')}
+                        ${this.generateMetricMiniCard('POL', health.metrics.pol, 'order')}
+                        ${this.generateMetricMiniCard('ECON', health.metrics.econ, 'gold')}
+                        ${this.generateMetricMiniCard('NARR', health.metrics.narr, 'legend')}
+                        ${this.generateMetricMiniCard('FUEL', health.metrics.fuel, 'rune')}
+                    </div>
+                </div>
+
+                <div class="flex-1 bg-black/40 rounded border border-red-900/20 p-4 custom-scrollbar overflow-y-auto max-h-[250px]">
+                    <h3 class="text-[10px] text-red-400 font-bold uppercase mb-3 border-b border-red-900/10 pb-1">Diagnostic Intelligence Output</h3>
+                    <div class="space-y-2">
+                        ${report.notes.map(note => `
+                            <div class="flex gap-3 items-start">
+                                <span class="${note.includes('CRITICAL') ? 'text-red-500' : 'text-yellow-500'} font-bold">>></span>
+                                <span class="text-[11px] ${note.includes('CRITICAL') ? 'text-gray-200' : 'text-gray-400'} leading-relaxed">${note}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <button onclick="window.EventBus.emit('TOGGLE_WORLD_HEALTH')" class="mt-4 border border-red-900/50 px-3 py-2 text-[10px] text-red-500 hover:bg-red-950 transition-all uppercase font-bold tracking-widest">Acknowledge Report</button>
+            `;
+
+            this.panel.innerHTML = html;
+        }
+
+        generateMetricMiniCard(label, value, unit) {
+            const pct = Math.floor(value * 100);
+            const color = pct > 85 ? 'text-emerald-400' : pct > 60 ? 'text-blue-400' : pct > 40 ? 'text-yellow-500' : 'text-red-500';
+            return `
+                <div class="bg-black/30 border border-gray-800 rounded p-2 flex flex-col">
+                    <span class="text-[8px] text-gray-500 font-bold uppercase">${label}</span>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-sm font-bold ${color}">${pct}%</span>
+                        <span class="text-[7px] text-gray-600 italic">${unit}</span>
+                    </div>
+                    <div class="w-full h-0.5 bg-gray-900 mt-1">
+                        <div class="h-full ${color.replace('text-', 'bg-')}" style="width: ${pct}%"></div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
 
