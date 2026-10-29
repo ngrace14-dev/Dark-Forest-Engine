@@ -34,7 +34,21 @@ class WorldObservatory {
     initializeHealthState() {
         return {
             world: { extinctionRisk: 0, prosperityGradient: 0, popStability: 1.0 },
-            information: { truthFidelity: 1.0, propagationVelocity: 0, contamination: 0 },
+            information: { 
+                truthFidelity: 1.0, 
+                propagationVelocity: 0, 
+                contamination: 0,
+                lifecycle: {
+                    events: 0,
+                    witnesses: 0,
+                    intel: 0,
+                    rumors: 0,
+                    verifications: 0,
+                    truths: 0,
+                    history: 0,
+                    folklore: 0
+                }
+            },
             political: { meanLegitimacy: 1.0, powerConcentration: 0, conflictFrequency: 0 },
             historical: { mythicDrift: 0, knowledgeHalfLife: 0, archiveDensity: 0 },
             significance: { giniCoefficient: 0, inflationRate: 0, anchorDensity: 0 },
@@ -101,13 +115,26 @@ class WorldObservatory {
     probeInformationHealth() {
         if (!window.IntelManager) return {};
         const registry = Array.from(window.IntelManager.registry.values());
-        const total = registry.length || 1;
+        const archive = Array.from(window.IntelManager.archive.values());
+        const total = registry.length + archive.length || 1;
         
         const facts = registry.filter(i => i.type === 'FACT');
         const rumors = registry.filter(i => i.type === 'RUMOR');
         
-        // 1. Truth Fidelity: Ratio of Facts to total Intel
-        const truthFidelity = facts.length / total;
+        // --- 1.1 INFORMATION CYCLE TELEMETRY ---
+        const lifecycle = {
+            events: window.ChronicleManager?.worldLedger.length || 0,
+            witnesses: registry.reduce((acc, i) => acc + (i.provenance?.origin ? 1 : 0), 0),
+            intel: registry.length,
+            rumors: rumors.length,
+            verifications: registry.filter(i => i.supersedes_intel_id !== null).length,
+            truths: facts.filter(i => i.truth_state === 'TRUE').length,
+            history: archive.length,
+            folklore: window.FolkloreEngine?.anthology.length || 0
+        };
+
+        // 1. Truth Fidelity
+        const truthFidelity = lifecycle.truths / (lifecycle.intel || 1);
 
         // 2. Propagation Velocity (Estimate)
         // Average transmission_count of active intel
@@ -137,7 +164,8 @@ class WorldObservatory {
             avgTransmission,
             contamination,
             misinfoPersistence: isNaN(avgMisinfoAge) ? 0 : avgMisinfoAge,
-            siloRatio: siloedCount / total
+            siloRatio: siloedCount / (total || 1),
+            lifecycle
         };
     }
 
