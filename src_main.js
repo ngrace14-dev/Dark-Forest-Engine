@@ -1,3 +1,23 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // File: src_main.js
 
 // 0. Core Event Bus (MUST BE FIRST)
@@ -55,7 +75,8 @@ import './src_systems_dune_investigation.js';
 import './src_systems_playback.js';
 import './src_systems_meaning.js';
 import './src_systems_knowledge.js';
-import './src_systems_personhood.js';
+import './src_systems_trait_evolution.js';
+import './src_systems_shackle_walker.js';
 import './src_systems_legacy.js';
 import './src_systems_conviction.js';
 

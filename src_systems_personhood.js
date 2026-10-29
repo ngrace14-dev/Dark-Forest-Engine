@@ -1,5 +1,8 @@
 /**
- * File: src_systems_personhood.js
+ * File: src_syst
+ 
+ 
+ vems_personhood.js
  * Phase: NPC Personhood & Individual Conclusion logic
  * 
  * Expresses Bible §22 (Career Ambition) and §34 (NPC Autonomy).
@@ -60,10 +63,27 @@ class PersonhoodSystem {
                 const births = Math.floor(v.population.current * growthRate);
                 v.population.current += births;
                 
-                // Create new personhood profiles for newborns
+                                // Create new personhood profiles for newborns
                 for (let i = 0; i < Math.min(births, 5); i++) { // Sample new profiles to save memory
                     const childId = `npc_${v.id}_gen${v.expansionLevel}_${Date.now()}_${i}`;
+                    
+                    // --- TRAIT INHERITANCE (Node 1) ---
+                    // Newborns inherit traits from the general village pool (Cultural DNA)
                     const profile = this.getProfile(childId);
+                    
+                    if (v.residents && v.residents.length > 0) {
+                        const parent = v.residents[Math.floor(Math.random() * v.residents.length)];
+                        const parentProfile = this.profiles.get(parent.id);
+                        if (parentProfile) {
+                            Object.keys(profile.traits).forEach(k => {
+                                if (k === 'credibility') return;
+                                // Crossover + Mutation (5%)
+                                const mutation = (Math.random() * 0.1) - 0.05;
+                                profile.traits[k] = Math.max(0, Math.min(1, parentProfile.traits[k] + mutation));
+                            });
+                        }
+                    }
+
                     profile.age = 0;
                     profile.lifeStage = 'CHILD';
                     profile.property.homeVillageId = v.id;
@@ -174,7 +194,7 @@ class PersonhoodSystem {
         // Logic to apply trauma to nearby allies (witnesses)
     }
 
-    getProfile(nodeId) {
+        getProfile(nodeId) {
         if (!this.profiles.has(nodeId)) {
                         const traits = {
                             loyalty: Math.random(),
@@ -182,6 +202,10 @@ class PersonhoodSystem {
                             ambition: Math.random(),
                             riskTolerance: Math.random(),
                             cynicism: Math.random(),
+                            curiosity: Math.random(),
+                            aggression: Math.random(),
+                            adaptability: Math.random(),
+                            discipline: Math.random(),
                             credibility: 0.3 // DEFAULT: Unknown (0.0 - 1.0)
                         };
             
@@ -653,9 +677,11 @@ class PersonhoodSystem {
                 });
             }
 
-            // Remove from simulation (House handling logic triggers on ENTITY_DIED usually)
+            // Remove from simulation
+            this.profiles.delete(profile.id);
+        
             window.EventBus.emit('ENTITY_DIED', { id: profile.id, cause: 'NATURAL_CAUSES', houseId: profile.houseId });
-        }
+    }
 
         findSuccessor(profile) {
             // Priority 1: Apprentice
@@ -803,6 +829,10 @@ class PersonhoodSystem {
         }
     }
 }
+
+
+window.PersonhoodManager = new PersonhoodSystem();
+export default window.PersonhoodManager;
 
 
 window.PersonhoodManager = new PersonhoodSystem();

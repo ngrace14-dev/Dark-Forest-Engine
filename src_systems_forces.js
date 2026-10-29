@@ -79,13 +79,21 @@ window.ForceManager = {
             pressure: 'interpretation',
             value: 0
         },
-                'Houses': { 
+                                'Houses': { 
             strength: 400, 
             label: 'Prosperity', 
             description: 'Encourages economic growth and resource accumulation.',
             metric: 'Total Prosperity',
             pressure: 'prosperity',
             value: 0 
+        },
+        'The Shackle': {
+            strength: 150,
+            label: 'The Bound Walker',
+            description: 'The Shambling Shadow that enforces the entropy of the path.',
+            metric: 'Villages Crossed',
+            pressure: 'mutation',
+            value: 0
         }
     },
 
@@ -170,8 +178,9 @@ window.ForceManager = {
         this.recalculateCrown();
         this.recalculateForest();
         this.recalculateHouses();
-        this.recalculateWendigo();
+                this.recalculateWendigo();
         this.recalculateTree();
+        this.recalculateShackle();
     },
 
         recalculateTree: function() {
@@ -249,17 +258,27 @@ window.ForceManager = {
 
 
         recalculateWendigo: function() {
-                const force = this.forces['Wendigo'];
-                // Strength grows with fear (low prosperity) and deaths
-                const events = window.ChronicleManager?.worldLedger || [];
-                const deaths = events.filter(e => e.type === 'DEFEAT' || e.type === 'die').length;
+                    const force = this.forces['Wendigo'];
+                    // Strength grows with fear (low prosperity) and deaths
+                    const events = window.ChronicleManager?.worldLedger || [];
+                    const deaths = events.filter(e => e.type === 'DEFEAT' || e.type === 'die').length;
         
-                // AED Integration: Innovation and Harvest Efficiency increase lethality
-                const aedBonus = window.AED ? (window.AED.metrics.predatorInnovationScore * 150 + window.AED.metrics.harvestEfficiencyScore * 100) : 0;
+                    // AED Integration: Innovation and Harvest Efficiency increase lethality
+                    const aedBonus = window.AED ? (window.AED.metrics.predatorInnovationScore * 150 + window.AED.metrics.harvestEfficiencyScore * 100) : 0;
 
-                force.value = deaths;
-                force.strength = Math.min(1200, 100 + (deaths * 20) + aedBonus);
-            },
+                    force.value = deaths;
+                    force.strength = Math.min(1200, 100 + (deaths * 20) + aedBonus);
+                },
+
+        recalculateShackle: function() {
+            const force = this.forces['The Shackle'];
+            if (!force) return;
+        
+            // Strength scales with the number of mutation events globally
+            const mutationCount = (window.ChronicleManager?.worldLedger || []).filter(e => e.type === 'SPONTANEOUS_MUTATION').length;
+            force.value = mutationCount;
+            force.strength = Math.min(1000, 150 + (mutationCount * 10));
+        },
 
 
         /**
