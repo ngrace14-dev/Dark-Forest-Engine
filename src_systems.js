@@ -16,6 +16,7 @@ import './src_systems_vat.js';
 import './src_systems_health.js';
 import './src_systems_encounters.js';
 import './src_systems_tree.js';
+import './src_systems_economic_ecology.js';
 
 export { ForestSystem } from './src_systems_forest.js';
 export { ForestRenderer } from './src_systems_forest_renderer.js';

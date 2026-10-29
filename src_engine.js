@@ -223,8 +223,18 @@ function updateCameraAndShadows(delta) {
 function updateWorldClock(delta) {
     if (!window.NetworkSession?.connected) {
         const hoursPerSecond = 24 / (window.EngineParams?.dayLengthSeconds || 1200);
+        const oldHour = Math.floor(window.EngineParams.timeOfDay);
         window.EngineParams.timeOfDay += delta * hoursPerSecond;
+        const newHour = Math.floor(window.EngineParams.timeOfDay);
+        
+        window.EngineParams.worldHour = newHour;
+
+        if (newHour !== oldHour) {
+            window.EventBus?.emit('HEARTBEAT_TICK');
+        }
+
         if (window.EngineParams.timeOfDay >= 24) {
+
                 const elapsedDays = Math.floor(window.EngineParams.timeOfDay / 24);
                 window.EngineParams.timeOfDay %= 24;
                 window.EngineParams.worldDay += elapsedDays;
