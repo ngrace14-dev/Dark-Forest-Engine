@@ -137,6 +137,8 @@ import './src_systems_observatory.js';
 import './src_systems_rogue_civilization_bureau.js';
 import './src_systems_truth_recovery_observatory.js';
 import './src_systems_physical_realism_audit_office.js';
+import './src_systems_information_velocity_observatory.js';
+
 
 
 
