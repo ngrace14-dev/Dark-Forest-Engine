@@ -1239,7 +1239,7 @@ class DynastyManagerSystem {
          * Updates the global state of a House based on simulation feedback.
          * Bible §Continuity: Institutions are dams against entropy.
          */
-        updateInstitutionalState(houseId) {
+                updateInstitutionalState(houseId) {
             const house = this.houses.get(houseId);
             if (!house) return;
 
@@ -1247,46 +1247,104 @@ class DynastyManagerSystem {
 
             // 1. Calculate Narrative Gap
             // Measures the volume of contradictions held in archives
+            const totalBeliefs = house.beliefs.size || 1;
             const contradictions = Array.from(house.beliefs.values()).filter(b => b.state === 'DOUBTED' || b.state === 'SHATTERED').length;
-            house.narrativeGap = Math.min(1.0, contradictions * 0.15);
+            house.narrativeGap = contradictions / totalBeliefs;
 
-            // 2. Calculate Exposure Anxiety (Phase 2B)
-            // Spikes if narrative gap is wide and public trust is high (danger of fall)
-            const baseAnxiety = (house.narrativeGap * 0.7) + (house.truthExposureRisk * 0.3);
-            house.exposureAnxiety = (house.exposureAnxiety * 0.8) + (baseAnxiety * 0.2); // Smooth drift
+            // 2. Calculate Public Doubt (Regional Truth Fidelity)
+            // Sampling villages under this house's control
+            let avgRegionalFidelity = 1.0;
+            const villages = window.VillageManager?.villages.filter(v => v.nobleHouse === house.name) || [];
+            if (villages.length > 0) {
+                const sumFidelity = villages.reduce((acc, v) => acc + (v.stats?.truthFidelity || 1.0), 0);
+                avgRegionalFidelity = sumFidelity / villages.length;
+            }
+            const publicDoubt = 1.0 - avgRegionalFidelity;
 
-            // 3. Institutional Action Triggered by Anxiety
+            // 3. Calculate Exposure Anxiety (Phase 2B)
+            // Formula: Ae = (Narrative Gap * 0.6) + (Public Doubt * 0.4)
+            const targetAnxiety = (house.narrativeGap * 0.6) + (publicDoubt * 0.4);
+            house.exposureAnxiety = (house.exposureAnxiety * 0.7) + (targetAnxiety * 0.3); // Smooth transition
+
+            // 4. Institutional Response
             if (house.exposureAnxiety > 0.6) {
                 this.handleAnxiousDecision(house);
             }
 
-            // 4. Calculate Internal Friction
+            // 5. Internal Friction (Internal Conflict Level)
             const frictionBase = (house.exposureAnxiety * 0.6) + ((1.0 - house.legitimacy) * 0.4);
-            house.internalConflictLevel = Math.max(0.1, Math.min(1.0, frictionBase));
+            house.internalConflictLevel = (house.internalConflictLevel * 0.8) + (frictionBase * 0.2);
 
-            // 5. Legitimacy Adjustment
-            const targetLegitimacy = (house.verseInfluence * 0.5) + (house.publicTrust * 0.5);
-            house.legitimacy = (house.legitimacy * 0.9) + (targetLegitimacy * 0.1);
+            // 6. Legitimacy & Trust Decay
+            if (house.exposureAnxiety > 0.8) {
+                house.legitimacy = Math.max(0.1, house.legitimacy - 0.01);
+                house.publicTrust = Math.max(0.1, house.publicTrust - 0.02);
+            }
 
+            // 7. Crisis Trigger
             if (house.internalConflictLevel > 0.8 && !house.activeSchism) {
                 this.triggerInstitutionalCrisis(house);
             }
         }
 
-        /**
-         * Decision logic for anxious institutions.
-         */
         handleAnxiousDecision(house) {
-            // High anxiety drives suppression and aggressive sponsorship
-            if (house.exposureAnxiety > 0.8) {
-                window.EventBus.emit('UI_LOG_DEBUG', `[ANXIETY] ${house.name} is in a state of informational panic. Suppression edicts issued.`);
-                house.suppressionBurden += 10.0;
-                // logic to block gossip syncs or increase bribe weight
-            } else {
-                window.EventBus.emit('UI_LOG_DEBUG', `[ANXIETY] ${house.name} is sponsoring new Verse to stabilize its narrative.`);
-                house.verseInfluence = Math.min(1.0, house.verseInfluence + 0.05);
+            // Decision Matrix: Suppression vs. Sponsorship
+            
+            // SUPPRESSION: If legitimacy is low, use force to purge knowledge
+            if (house.legitimacy < 0.4 || house.exposureAnxiety > 0.8) {
+                this.executeInstitutionalSuppression(house);
+            } 
+            // SPONSORSHIP: If legitimacy is high, use propaganda/verse
+            else {
+                this.executeInstitutionalSponsorship(house);
             }
         }
+
+        executeInstitutionalSuppression(house) {
+            window.EventBus.emit('UI_LOG', `[ANXIETY] ${house.name} has issued an Edict of Silence. Contradictory reports are being suppressed.`);
+            
+            // Physical Suppression: Revoke ownership of "Doubted" intel from NPCs in its territory
+            const doubtedIntelIds = [];
+            house.beliefs.forEach((belief) => {
+                if (belief.state === 'DOUBTED' || belief.state === 'PRIVATE_DOUBT') {
+                    doubtedIntelIds.push(...belief.evidenceSources);
+                }
+            });
+
+            if (doubtedIntelIds.length > 0 && window.VillageManager) {
+                const villages = window.VillageManager.villages.filter(v => v.nobleHouse === house.name);
+                villages.forEach(v => {
+                    // This is "Informational Warfare" - cleaning the registry of the village hub
+                    doubtedIntelIds.forEach(id => {
+                        window.IntelManager?.revokeOwnership(id, v.id);
+                        // Also penalty to village caution
+                        v.memoryProfile.caution = Math.max(0.1, v.memoryProfile.caution - 0.05);
+                    });
+                });
+            }
+
+            house.suppressionBurden = Math.min(1.0, house.suppressionBurden + 0.1);
+            house.prestige = Math.max(0, house.prestige - 5);
+        }
+
+        executeInstitutionalSponsorship(house) {
+            window.EventBus.emit('UI_LOG_DEBUG', `[ANXIETY] ${house.name} is sponsoring new Verse to stabilize its narrative.`);
+            
+            // Commission stabilizing folklore
+            if (window.FolkloreEngine) {
+                const stableVerse = {
+                    id: house.id, // For context
+                    title: `The Glory of ${house.name}`,
+                    type: 'LEGITIMIZATION',
+                    power: house.prestige
+                };
+                window.FolkloreEngine.generatePoem(stableVerse);
+                house.verseInfluence = Math.min(1.0, house.verseInfluence + 0.05);
+            }
+            
+            house.prestige = Math.max(0, house.prestige - 2);
+        }
+
 
 
 
