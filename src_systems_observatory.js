@@ -74,7 +74,14 @@ class WorldObservatory {
     init() {
         window.EventBus.on('HEARTBEAT_T1', () => this.runDailyProbe());
         window.EventBus.on('SHIFT_COMPLETE', () => this.recordEpochReport());
+        
+        // --- EPISTEMIC HEATMAP LISTENERS ---
+        window.EventBus.on('CMD_TOGGLE_HEATMAP', () => {
+            window.EventBus.emit('TOGGLE_EPISTEMIC_HEATMAP');
+        });
+
         console.log("🔭 [OBSERVATORY] System Online. Monitoring the threads of time.");
+        console.log("%c[Observatory] Epistemic Heatmap available: window.EventBus.emit('CMD_TOGGLE_HEATMAP')", "color: #3b82f6;");
     }
 
     /**

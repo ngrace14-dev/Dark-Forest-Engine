@@ -15,6 +15,7 @@ import { TreatmentCenterComponent } from './components/TreatmentCenterComponent.
 import { RuneSocketMenuComponent } from './components/RuneSocketMenuComponent.js';
 import { SquadManagerComponent } from './components/SquadManagerComponent.js';
 import { FactionMapComponent } from './components/FactionMapComponent.js';
+import { EpistemicHeatmapComponent } from './components/EpistemicHeatmapComponent.js';
 
 export function initializeUIEngine(eventBus) {
     const engine = new UIEngine(eventBus);
@@ -36,6 +37,7 @@ export function initializeUIEngine(eventBus) {
     engine.registerComponent('rune-socket-menu', new RuneSocketMenuComponent());
     engine.registerComponent('squad-manager', new SquadManagerComponent());
     engine.registerComponent('faction-map', new FactionMapComponent());
+    engine.registerComponent('epistemic-heatmap', new EpistemicHeatmapComponent());
     
     window.UIEngineInstance = engine;
     return engine;
