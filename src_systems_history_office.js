@@ -70,42 +70,41 @@ class HistoryOfficeSystem {
     publishOfficialNarrative(event, truth, historian) {
         const bias = historian.houseId || 'CROWN';
         
+        // --- STEP 7-2: OFFICIAL PUBLICATION ---
         // Check if this event already has an official version for this bias
-        if (this.officialLedger.some(n => n.originalEventId === event.id && n.bias === bias)) return;
+        const existing = window.ChronicleManager?.officialRecords?.get(event.id) || [];
+        if (existing.some(n => n.bias === bias)) return;
 
         const spin = this.calculateNarrativeSpin(event, truth, bias);
+        const authority = this.calculateAuthority(historian);
 
         const narrative = {
-            id: 'hist_' + Math.random().toString(36).substr(2, 9),
-            title: spin.title,
-            detail: spin.detail,
-            sourceEventId: event.id,
+            eventId: event.id,
+            bias,
             truthId: truth.intel_id,
-            historianId: historian.id,
-            authority: this.calculateAuthority(historian),
-            bias: bias,
-            date: window.EngineParams?.worldDay || 0,
-            divergence: spin.divergence // 0 to 1 score of how much it deviates from Chronicle
+            detail: spin.detail,
+            authority: authority
         };
 
-        this.officialLedger.push(narrative);
+        // Register in Chronicle Registry
+        window.ChronicleManager?.registerOfficialNarrative(narrative);
 
-        // Register as Intel Record (Bible §16: Education Records)
+        // Register as Intel Record for world education (The Shield)
         window.IntelManager.register({
             type: 'FACT',
             payload: {
-                title: narrative.title,
-                description: narrative.detail,
-                tags: ['OFFICIAL_HISTORY', 'EDUCATIONAL', bias]
+                title: spin.title,
+                description: spin.detail,
+                tags: ['OFFICIAL_HISTORY', 'EDUCATIONAL', bias],
+                sourceEventId: event.id
             },
             significance: { political: 80, historical: event.historicalWeight },
-            truth_state: 'TRUE', // It's factually true that this is the Official Record
-            certainty: narrative.authority,
-            isAnchored: true // Official History survives Shifts
+            truth_state: 'TRUE',
+            certainty: authority,
+            isAnchored: true
         });
 
         window.EventBus.emit('UI_LOG', `[HISTORY] ${bias.toUpperCase()} has published its official account of ${event.type}.`);
-        window.EventBus.emit('HISTORY_PUBLISHED', narrative);
     }
 
     calculateNarrativeSpin(event, truth, bias) {

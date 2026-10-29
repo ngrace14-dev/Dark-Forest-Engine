@@ -349,11 +349,29 @@ window.IntelPropagation = {
      * @param {String} intel_id 
      * @param {Float} vectorFidelity - from window.IntelEnums.VECTORS
      */
-    sync: function(sourceNode, targetNode, intel_id, vectorFidelity) {
+        sync: function(sourceNode, targetNode, intel_id, vectorFidelity) {
         const intel = window.IntelManager.lookup(intel_id);
         if (!intel || intel.persistence !== window.IntelEnums.PERSISTENCE.ACTIVE) return;
 
+        // --- STEP 7-3: NARRATIVE SHIELDING (Bible §1, §16) ---
+        // If an Official Narrative exists for this event, it exerts pressure on the rumor
+        const eventId = intel.payload?.sourceEventId;
+        if (eventId && window.ChronicleManager) {
+            const official = window.ChronicleManager.getDominantNarrative(eventId);
+            if (official && official.bias !== intel.provenance.origin?.source_faction) {
+                // RUMOR CONTRADICTS OFFICIAL HISTORY: Apply Authority Penalty
+                const shieldPenalty = official.authority * 0.5;
+                vectorFidelity *= (1.0 - shieldPenalty);
+                
+                if (shieldPenalty > 0.4) {
+                    window.EventBus.emit('UI_LOG_DEBUG', `[SHIELD] Official History of ${official.bias} is suppressing rumors of ${intel.payload.title}.`);
+                }
+            }
+        }
+
         // --- GOSSIP BUDGET (Information as a Resource) ---
+// ... existing budget check ...
+
         targetNode.gossip_budget = targetNode.gossip_budget || { day: 0, count: 0 };
         if (targetNode.gossip_budget.day !== (window.EngineParams?.worldDay || 0)) {
             targetNode.gossip_budget.day = window.EngineParams?.worldDay || 0;

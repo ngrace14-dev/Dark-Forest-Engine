@@ -242,16 +242,18 @@ window.ChronicleManager = {
         event.witnesses = witnesses.map(w => w.id);
 
                 // 5. Generate Intel Records (Phase 1C: Pipeline Activation)
-        witnesses.forEach(w => {
-            const intelId = window.IntelManager.register({
-                type: event.significance > 50 ? window.IntelEnums.TYPES.FACT : window.IntelEnums.TYPES.RUMOR,
-                payload: {
-                    title: event.type.toUpperCase().replace(/_/g, ' '),
-                    description: event.detail,
-                    timestamp_day: event.timestamp.day,
-                    target_coord: { x: event.location.x, z: event.location.z },
-                    tags: ['CHRONICLE', event.type, w.type]
-                },
+                witnesses.forEach(w => {
+                    const intelId = window.IntelManager.register({
+                        type: event.significance > 50 ? window.IntelEnums.TYPES.FACT : window.IntelEnums.TYPES.RUMOR,
+                        payload: {
+                            title: event.type.toUpperCase().replace(/_/g, ' '),
+                            description: event.detail,
+                            timestamp_day: event.timestamp.day,
+                            target_coord: { x: event.location.x, z: event.location.z },
+                            tags: ['CHRONICLE', event.type, w.type],
+                            sourceEventId: event.id // LINK TO CHRONICLE (Step 7-2)
+                        },
+
                 significance: {
                     historical: event.historicalWeight,
                     crow: event.significance
