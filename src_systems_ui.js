@@ -1121,7 +1121,7 @@ class InstitutionalReportUI {
                     </div>
                 </div>
 
-                                <!-- INFORMATION ECONOMY ANALYTICS -->
+                                                <!-- INFORMATION ECONOMY ANALYTICS -->
                 <div class="grid grid-cols-2 gap-6 mb-6">
                     <div class="bg-black/40 border border-blue-900/20 rounded p-3">
                         <h3 class="text-[10px] text-blue-400 font-bold uppercase mb-2 border-b border-blue-900/10 pb-1">Epistemic Distribution (Gini)</h3>
@@ -1133,29 +1133,41 @@ class InstitutionalReportUI {
                             <div class="w-full h-1.5 bg-gray-900 rounded-full overflow-hidden">
                                 <div class="h-full bg-blue-500" style="width: ${(whdHealth.metrics.info_gini || 0) * 100}%"></div>
                             </div>
-                            <p class="text-[8px] text-gray-500 leading-tight italic">
-                                ${whdHealth.metrics.info_gini > 0.8 ? 'CRITICAL: Information Monopoly detected. Knowledge is held by less than 1% of nodes.' : 
-                                  whdHealth.metrics.info_gini > 0.5 ? 'WARNING: High siloing. Institutions are hoarding truth.' : 'STABLE: Healthy information distribution.'}
-                            </p>
+                            <div class="flex justify-between mt-2 pt-2 border-t border-blue-900/10">
+                                <div class="flex flex-col">
+                                    <span class="text-[7px] text-gray-500 uppercase">Mythic Drift</span>
+                                    <span class="text-[10px] text-purple-400 font-bold">${((whdHealth.metrics.mythic_drift || 0) * 100).toFixed(1)}%</span>
+                                </div>
+                                <div class="flex flex-col items-end">
+                                    <span class="text-[7px] text-gray-500 uppercase">Infection Rate</span>
+                                    <span class="text-[10px] text-orange-400 font-bold">${(whdHealth.metrics.infection_rate || 0).toFixed(2)} / day</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="bg-black/40 border border-amber-900/20 rounded p-3">
-                        <h3 class="text-[10px] text-amber-400 font-bold uppercase mb-2 border-b border-amber-900/10 pb-1">Market Dynamics</h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="flex flex-col">
-                                <span class="text-[8px] text-gray-500 uppercase">Scarcity Index</span>
-                                <span class="text-sm font-bold text-amber-300">${(whdHealth.metrics.info_scarcity || 0).toFixed(2)}</span>
+                    <!-- FOLKLORE LINEAGE STATUS -->
+                    <div class="bg-black/40 border border-purple-900/20 rounded p-3">
+                        <h3 class="text-[10px] text-purple-400 font-bold uppercase mb-2 border-b border-purple-900/10 pb-1">Folklore Lineage Status</h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center text-[9px]">
+                                <span class="text-gray-500">Truth → Folklore Conversion</span>
+                                <span class="text-white font-bold">${whdHealth.metrics.folklore_conv}%</span>
                             </div>
-                            <div class="flex flex-col">
-                                <span class="text-[8px] text-gray-500 uppercase">Silo Ratio</span>
-                                <span class="text-sm font-bold text-purple-400">${(whdHealth.metrics.info_silo || 0).toFixed(2)}</span>
+                            <div class="h-12 flex items-center justify-center border border-purple-900/10 bg-purple-950/10 rounded font-serif italic text-[10px] text-purple-300/70 p-2 text-center">
+                                "The story of ${whdHealth.metrics.latest_myth || 'the world'} shall never die."
+                            </div>
+                            <div class="grid grid-cols-3 gap-1 mt-2">
+                                <div class="text-center"><div class="text-[7px] text-gray-500 uppercase">Active Facts</div><div class="text-[10px] text-white font-bold">${whdHealth.metrics.fact_count}</div></div>
+                                <div class="text-center"><div class="text-[7px] text-gray-500 uppercase">Rumors</div><div class="text-[10px] text-yellow-500 font-bold">${whdHealth.metrics.rumor_count}</div></div>
+                                <div class="text-center"><div class="text-[7px] text-gray-500 uppercase">Verses</div><div class="text-[10px] text-purple-400 font-bold">${whdHealth.metrics.verse_count}</div></div>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- HISTORICAL TREND ANALYSIS -->
+
 
                 <div class="mb-6 bg-black/40 border border-gray-800 rounded p-3">
                     <h3 class="text-[10px] text-gray-400 font-bold uppercase mb-2 border-b border-gray-800 pb-1">1000-Year Historical Continuity Analysis</h3>
