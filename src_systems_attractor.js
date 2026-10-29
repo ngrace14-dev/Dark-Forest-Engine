@@ -92,27 +92,31 @@ class AttractorSystem {
 
 
         executeChoice(choiceKey) {
-        const choice = this.choices[choiceKey];
-        if (!choice) return;
+            const choice = this.choices[choiceKey];
+            if (!choice) return;
 
-        window.EventBus.emit('UI_LOG', `[FINALITY] You have chosen: ${choice.title}`);
+            window.EventBus.emit('UI_LOG', `[FINALITY] You have chosen: ${choice.title}`);
         
-        // Hide terminal after choice
-        const overlay = document.getElementById('endgame-terminal-overlay');
-        if (overlay) overlay.classList.add('hidden');
+            // --- STEP 10-4: SAVE THE ETERNAL RECORD ---
+            this.saveTombstone(choiceKey);
 
-        switch (choice.outcome) {
-            case 'RESET_LOOP':
-                this.claimTheThrone();
-                break;
-            case 'DROSTE_VIEW':
-                this.activate5DMode();
-                break;
-            case 'BLACKOUT':
-                this.triggerBlackout();
-                break;
+            // Hide terminal after choice
+            const overlay = document.getElementById('endgame-terminal-overlay');
+            if (overlay) overlay.classList.add('hidden');
+
+            switch (choice.outcome) {
+                case 'RESET_LOOP':
+                    this.claimTheThrone();
+                    break;
+                case 'DROSTE_VIEW':
+                    this.activate5DMode();
+                    break;
+                case 'BLACKOUT':
+                    this.triggerBlackout();
+                    break;
+            }
         }
-    }
+
 
     /**
      * Outcome 1: THE THRONE (CROWN)
@@ -240,23 +244,35 @@ class AttractorSystem {
      * Bible §24: Forest Will Whispers.
      * Background pressure that influences NPCs without player input.
      */
-    emitForestWhisper() {
-        const whispers = ['Wander', 'Follow', 'Build', 'Dig', 'Leave', 'Listen'];
-        const w = whispers[Math.floor(Math.random() * whispers.length)];
+        /**
+     * Step 10-4: The Tombstone
+     * Saves a summary of the simulation for the next age.
+     */
+    saveTombstone(finalChoice) {
+        const health = window.WorldObservatory?.calculateWorldHealth() || { score: 50, category: 'UNKNOWN' };
+        const topLegends = (window.GameState?.legends || [])
+            .sort((a, b) => b.power - a.power)
+            .slice(0, 3)
+            .map(l => ({ title: l.title, name: l.name }));
+
+        const tombstone = {
+            epoch: window.EngineParams?.worldEpoch || 0,
+            day: window.EngineParams?.worldDay || 0,
+            health: health.score,
+            category: health.category,
+            choice: finalChoice,
+            legends: topLegends,
+            timestamp: Date.now()
+        };
+
+        const history = JSON.parse(localStorage.getItem('dark-forest-sim-history') || '[]');
+        history.push(tombstone);
+        localStorage.setItem('dark-forest-sim-history', JSON.stringify(history.slice(-10))); // Keep last 10 ages
         
-        if (window.EngineConfig?.showSystemReasoning) {
-            window.EventBus.emit('UI_LOG', `[DEV] Forest Will: ${w}`);
-        }
-        
-        // Influence random NPC ambition slightly
-        const npcs = window.GameCore?.activeEntities.filter(e => e.def?.type === 'npc');
-        if (npcs?.length > 0) {
-            const target = npcs[Math.floor(Math.random() * npcs.length)];
-            // Meta-causality shift
-            window.EventBus.emit('FOREST_WHISPER', { targetId: target.id, whisper: w });
-        }
+        console.log("%c[ETERNAL RECORD] Simulation sealed. This age will be remembered.", "color: #10b981; font-weight: bold;");
     }
 }
+
 
 window.AttractorSystem = new AttractorSystem();
 export default window.AttractorSystem;
