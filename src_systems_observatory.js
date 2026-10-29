@@ -458,6 +458,55 @@ class WorldObservatory {
         if (score >= 20) return 'DECLINING';
         return 'COLLAPSE';
     }
+
+    /**
+     * STEP 3: AUTOMATED DIAGNOSTIC REPORTS
+     * Generates actionable Director's Notes based on metric thresholds.
+     */
+    generateDiagnosticReport() {
+        const health = this.calculateWorldHealth();
+        const m = health.metrics;
+        const notes = [];
+
+        // 1. Fuel (Priority 1)
+        if (m.fuel < 0.2) notes.push("CRITICAL: Global barrier collapse imminent. Essence reserves exhausted.");
+        else if (m.fuel < 1.0) notes.push("WARNING: Fuel reserves dropping below 5-day safety margin.");
+
+        // 2. Population
+        if (m.pop < 0.5) notes.push("CRITICAL: Massive depopulation detected. Civilization viability threshold breached.");
+        else if (m.pop < 0.85) notes.push("WARNING: Population volatility detected. Growth/Death ratio unstable.");
+
+        // 3. Information
+        if (m.info < 0.15) notes.push("CRITICAL: Epistemic Dark Age. Truth has been entirely superseded by contamination.");
+        else if (m.info < 0.40) notes.push("WARNING: Information health declining. Misinformation is becoming the dominant world-state.");
+
+        // 4. Institutional
+        if (m.inst < 0.25) notes.push("CRITICAL: Institutional collapse. Legitimacy has failed; schisms are absolute.");
+        else if (m.inst < 0.60) notes.push("WARNING: Institutional fragility. Legitimacy is eroding under schism pressure.");
+
+        // 5. Political (HHI)
+        const hhi = this.getStatus().political?.powerConcentration || 0.2;
+        if (hhi > 0.9) notes.push("CRITICAL: Absolute Tyranny. Political plurality is extinct.");
+        else if (hhi < 0.02) notes.push("CRITICAL: Political Anarchy. Institutional order has dissolved.");
+        else if (hhi > 0.6) notes.push("WARNING: Dangerous power concentration detected.");
+        else if (hhi < 0.05) notes.push("WARNING: Political fragmentation. House influence is too diluted for stability.");
+
+        // 6. Prosperity
+        if (m.econ < 0.15) notes.push("CRITICAL: Total Economic Collapse. Scarcity is absolute.");
+        else if (m.econ < 0.40) notes.push("WARNING: Severe economic stress. Food security is declining.");
+
+        // 7. Narrative
+        if (m.narr < 0.1) notes.push("CRITICAL: Narrative Singularity. Meaning has been monopolized by a single entity.");
+        else if (m.narr < 0.3) notes.push("WARNING: Narrative monopoly. Diversity of legends is dangerously low.");
+
+        return {
+            timestamp: Date.now(),
+            day: window.EngineParams?.worldDay || 0,
+            whs: health.score,
+            category: health.category,
+            notes: notes.length > 0 ? notes : ["Civilization state is stable. No critical interventions required."]
+        };
+    }
         const status = this.getStatus();
         const health = status.currentHealth;
         
