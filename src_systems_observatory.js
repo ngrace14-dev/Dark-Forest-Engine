@@ -416,10 +416,48 @@ class WorldObservatory {
     }
 
     /**
-     * SECTION H: 1000 YEAR STRESS TEST SCORE
-     * Aggregates all telemetry into a final audit grade.
+     * WORLD HEALTH DIRECTORATE (WHD) AGGREGATOR
+     * Calculates the definitive World Health Score (WHS).
      */
-    generateFinalAudit() {
+    calculateWorldHealth() {
+        const h = this.getStatus();
+        
+        // Normalize Metrics to 0.0 - 1.0
+        const m = {
+            pop: Math.min(1.0, (h.world?.population || 0) / (window.VillageManager?.kingdomPopulation || 1)),
+            inst: (h.political?.meanLegitimacy || 0) * (1.0 - (h.political?.schismDensity || 0)),
+            info: (h.information?.truthFidelity || 0) / (1.0 + (h.information?.contamination || 0)),
+            pol: 1.0 - Math.abs(0.2 - (h.political?.powerConcentration || 0.2)),
+            econ: (h.world?.prosperity || 0) / 100,
+            narr: 1.0 - (h.significance?.giniCoefficient || 0),
+            fuel: h.fuel?.stability || 0
+        };
+
+        // Weighted Formula (Bible Weights)
+        const whs = (
+            (m.pop * 2) + 
+            (m.inst * 1.5) + 
+            (m.info * 1.5) + 
+            (m.pol * 1) + 
+            (m.econ * 1) + 
+            (m.narr * 2) + 
+            (m.fuel * 3)
+        ) / 12 * 100;
+
+        return {
+            score: Math.floor(whs),
+            category: this.getCivHealthCategory(whs),
+            metrics: m
+        };
+    }
+
+    getCivHealthCategory(score) {
+        if (score >= 85) return 'EXCELLENT';
+        if (score >= 60) return 'STABLE';
+        if (score >= 40) return 'FRAGILE';
+        if (score >= 20) return 'DECLINING';
+        return 'COLLAPSE';
+    }
         const status = this.getStatus();
         const health = status.currentHealth;
         
