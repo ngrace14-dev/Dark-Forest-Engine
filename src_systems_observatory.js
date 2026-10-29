@@ -103,7 +103,8 @@ class WorldObservatory {
                 dunes: this.probeDuneHealth(),
                 emergent: this.probeEmergentHealth(),
                 adversarial: this.probeAdversarialHealth(),
-                divergence: this.probeDivergenceHealth()
+                divergence: this.probeDivergenceHealth(),
+                community: this.probeCommunityHealth()
             }
         };
 
@@ -614,6 +615,11 @@ class WorldObservatory {
     probeDivergenceHealth() {
         if (!window.CDO) return {};
         return window.CDO.metrics;
+    }
+
+    probeCommunityHealth() {
+        if (!window.CMB) return {};
+        return window.CMB.metrics;
     }
 
     /**
