@@ -7,10 +7,16 @@
  */
 
 class FolkloreEngineSystem {
-    constructor() {
+        constructor() {
         this.anthology = [];
-                // Rosetta Stone DNA from Bible §17
+        this.mythicDriftStats = {
+            totalDrift: 0,
+            crystallizationCount: 0
+        };
+        // Rosetta Stone DNA from Bible §17
         this.dna = {
+// ... existing dna entries ...
+
             'OBSERVATIONAL': [
                 "Forest dark and ever cold. / Paths shifting never known.",
                 "14 days and 14 nights. / Then a shift when dawn breaks light.",
@@ -66,41 +72,117 @@ class FolkloreEngineSystem {
      * Bible §17: "Meaning over Details."
      * Converts a physical HistoricalRecord into a Verse object.
      */
-    crystallizeVerse(record_id) {
-        const record = window.MountainArchives.records.get(record_id);
+        crystallizeVerse(record_id) {
+        const record = window.MountainArchives?.records?.get(record_id);
         if (!record) return null;
 
-        const intel = window.IntelManager.lookup(record.intel_id);
+        const intel = window.IntelManager?.lookup(record.intel_id);
         if (!intel) return null;
 
-        // Determine the 'Meaning' class based on tags and type
+        // --- STEP 5-3: THERMODYNAMIC DECAY ---
+        // Meaning over Details. Strip spatial and temporal precision.
+        const driftLevel = Math.min(0.9, (intel.spread_generation || 0) * 0.1 + 0.3);
+        
+        // Determine the 'Meaning' class
         let verseClass = 'OBSERVATIONAL';
         if (intel.payload.tags.includes('BARRIER_FAILURE') || intel.payload.tags.includes('FUEL_SHORTAGE')) {
             verseClass = 'BARRIER_LESSON';
         } else if (intel.payload.tags.includes('MONSTER') || intel.payload.tags.includes('WENDIGO')) {
             verseClass = 'WARNING';
+        } else if (intel.significance.historical > 100) {
+            verseClass = 'MYTHIC';
         }
 
         const stanzas = this.dna[verseClass] || this.dna['OBSERVATIONAL'];
         const baseStanza = stanzas[Math.floor(Math.random() * stanzas.length)];
 
+        // Apply Mythic Drift (Symbolic Substitution)
+        const crystallizedText = this.applyMythicDrift(baseStanza, driftLevel);
+
         const verse = {
             id: 'verse_' + Math.random().toString(36).substr(2, 9),
-            title: `The Rhyme of ${record.title.split(' ').pop()}`,
-            text: baseStanza,
+            title: this.generateSymbolicTitle({ title: record.title }),
+            text: crystallizedText,
             class: verseClass,
             origin_record_id: record_id,
             meaning_payload: {
-                lesson: verseClass === 'BARRIER_LESSON' ? 'Stay near the roads when fuel is low.' : 'Avoid the deep woods.',
+                lesson: this.extractMoral(verseClass, intel),
                 preserved_truth_id: record.intel_id // The "Poem Trap"
             },
-            fidelity: 0.1 // Verse is inherently low fidelity but high resilience
+            distortionLevel: driftLevel,
+            fidelity: Math.max(0.05, 1.0 - driftLevel)
         };
 
         this.anthology.push(verse);
+        this.mythicDriftStats.totalDrift += driftLevel;
+        this.mythicDriftStats.crystallizationCount++;
+
+        // --- THE POEM TRAP (Bible §17 Addendum BJ) ---
+        // Register as a persistent, low-fidelity world rumor
+        if (window.IntelManager) {
+            window.IntelManager.register({
+                type: 'RUMOR',
+                payload: {
+                    title: verse.title,
+                    description: verse.text,
+                    tags: ['FOLKLORE', verseClass, 'POEM_TRAP', 'CRYSTALLIZED']
+                },
+                significance: { historical: intel.significance.historical * 0.5, crow: 100 },
+                rarity: 'RARE',
+                certainty: verse.fidelity,
+                isAnchored: true // Folklore survives the Shift
+            });
+        }
+
         window.EventBus.emit('UI_LOG', `[FOLKLORE] A truth has survived its facts. A new verse crystallized: ${verse.title}`);
+        window.EventBus.emit('FOLKLORE_CREATED', verse);
         return verse;
     }
+
+    applyMythicDrift(text, level) {
+        let result = text;
+
+        // 1. Symbolic Substitution: Numbers -> Archetypes
+        if (level > 0.3) {
+            result = result.replace(/\b14\b/g, "a fortnight");
+            result = result.replace(/\b19\b/g, "a score of lords");
+            result = result.replace(/\b10\b/g, "the chosen few");
+            result = result.replace(/\d+/g, (match) => {
+                const val = parseInt(match);
+                if (val > 100) return "a multitude";
+                if (val > 10) return "many";
+                return "a handful";
+            });
+        }
+
+        // 2. Spatial Compression: Coordinates -> Directions
+        if (level > 0.5) {
+            result = result.replace(/North/gi, "the frozen reaches");
+            result = result.replace(/South/gi, "the sun-scorched dunes");
+            result = result.replace(/East/gi, "the waking dawn");
+            result = result.replace(/West/gi, "the dying light");
+        }
+
+        // 3. Entity Abstraction: Names -> Titles
+        if (level > 0.7) {
+            result = result.replace(/The Wanderer/g, "The Traveler Between Worlds");
+            result = result.replace(/The Wendigo/g, "The Hunger That Walks");
+            result = result.replace(/The Crown/g, "The Silver Thralldom");
+        }
+
+        return result;
+    }
+
+    extractMoral(vClass, intel) {
+        const morals = {
+            'BARRIER_LESSON': 'Stay near the roads when fuel is low.',
+            'WARNING': 'Avoid the deep woods where shadows speak.',
+            'MYTHIC': 'The past is a mirror of the future.',
+            'OBSERVATIONAL': 'The forest remembers what man forgets.'
+        };
+        return morals[vClass] || 'Meaning is subjective.';
+    }
+
 
         const stanzas = this.dna[pClass] || this.dna['OBSERVATIONAL'];
         const stanza = stanzas[Math.floor(Math.random() * stanzas.length)];

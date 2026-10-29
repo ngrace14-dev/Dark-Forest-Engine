@@ -204,8 +204,11 @@ class WorldObservatory {
 
         // --- 1.3 MYTHIC DRIFT ---
         const poems = window.FolkloreEngine?.anthology || [];
-        const mythicDrift = poems.length > 0 ? 
-            poems.reduce((acc, p) => acc + (1.0 - (p.fidelity || 1.0)), 0) / poems.length : 0;
+        const avgDrift = window.FolkloreEngine?.mythicDriftStats ? 
+            (window.FolkloreEngine.mythicDriftStats.totalDrift / (window.FolkloreEngine.mythicDriftStats.crystallizationCount || 1)) : 0;
+        
+        const mythicDrift = Math.max(avgDrift, poems.length > 0 ? 
+            poems.reduce((acc, p) => acc + (p.distortionLevel || 0), 0) / poems.length : 0);
 
         // --- 1.3 INFECTION RATE (ESTIMATED DELTA) ---
         // Measures how many new ownership links were created compared to the total intel count
