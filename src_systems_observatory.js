@@ -37,7 +37,8 @@ class WorldObservatory {
             information: { truthFidelity: 1.0, propagationVelocity: 0, contamination: 0 },
             political: { meanLegitimacy: 1.0, powerConcentration: 0, conflictFrequency: 0 },
             historical: { mythicDrift: 0, knowledgeHalfLife: 0, archiveDensity: 0 },
-            significance: { giniCoefficient: 0, inflationRate: 0, anchorDensity: 0 }
+            significance: { giniCoefficient: 0, inflationRate: 0, anchorDensity: 0 },
+            dunes: { explorationDensity: 0, successRate: 0, avgSignificance: 0, dominantSurvivorTrait: 'NONE' }
         };
     }
 
@@ -60,7 +61,8 @@ class WorldObservatory {
                 world: this.probeWorldHealth(),
                 information: this.probeInformationHealth(),
                 political: this.probePoliticalHealth(),
-                significance: this.probeSignificanceHealth()
+                significance: this.probeSignificanceHealth(),
+                dunes: this.probeDuneHealth()
             }
         };
 
@@ -172,47 +174,42 @@ class WorldObservatory {
         };
     }
 
-    probeSignificanceHealth() {
-        if (!window.ChronicleManager) return {};
-        const weights = Array.from(window.ChronicleManager.npcHistoricalWeights.values());
-        if (weights.length === 0) return { giniCoefficient: 0, totalSignificance: 0, inflationRate: 0, anchorDensity: 0 };
+    probeDuneHealth() {
+        if (!window.SimTest?.stats?.duneExploration) return { explorationDensity: 0, successRate: 0, avgSignificance: 0 };
+        
+        const data = window.SimTest.stats.duneExploration;
+        if (data.length === 0) return { explorationDensity: 0, successRate: 0, avgSignificance: 0 };
 
-        // 1. Gini Coefficient (Significance Inequality)
-        weights.sort((a, b) => a - b);
-        const n = weights.length;
-        let sum = 0;
-        for (let i = 1; i <= n; i++) {
-            sum += (n + 1 - i) * weights[i - 1];
+        const totalExplorers = new Set(data.map(e => e.id)).size;
+        const survivors = data.filter(e => e.fate === 'EXPLORING');
+        const perished = data.filter(e => e.fate === 'PERISHED');
+        
+        const successRate = survivors.length / (data.length || 1);
+        const avgSignificance = data.reduce((acc, e) => acc + (e.significance || 0), 0) / data.length;
+
+        // Trait Correlation
+        const traitTotals = { aggression: 0, investigation: 0, loyalty: 0 };
+        survivors.forEach(s => {
+            if (s.traits) {
+                traitTotals.aggression += s.traits.aggression || 0;
+                traitTotals.investigation += s.traits.investigation || 0;
+                traitTotals.loyalty += s.traits.loyalty || 0;
+            }
+        });
+
+        let dominantTrait = 'NONE';
+        if (survivors.length > 0) {
+            const max = Math.max(traitTotals.aggression, traitTotals.investigation, traitTotals.loyalty);
+            if (max === traitTotals.aggression) dominantTrait = 'AGGRESSION';
+            else if (max === traitTotals.investigation) dominantTrait = 'INVESTIGATION';
+            else dominantTrait = 'LOYALTY';
         }
-        const totalSig = weights.reduce((a, b) => a + b, 0);
-        const gini = (n + 1 - 2 * (sum / (totalSig || 1))) / n;
-
-        // 2. Inflation Tracking
-        const lastTotal = this._lastTotalSignificance || totalSig;
-        const inflationRate = (totalSig - lastTotal) / (lastTotal || 1);
-        this._lastTotalSignificance = totalSig;
-
-        // 3. Anchor Density (Persistent Significant Entities)
-        // Count entities with significance > 500 (Legends)
-        const legends = weights.filter(w => w > 500).length;
-        const anchorDensity = legends / n;
-
-        // 4. Concentration Audit: Top 1% Share
-        const top1PercentCount = Math.max(1, Math.floor(n * 0.01));
-        const top1PercentSum = weights.slice(-top1PercentCount).reduce((a, b) => a + b, 0);
-        const topShare = top1PercentSum / (totalSig || 1);
-
-        // 5. Loop Risk: Detection of runaway narrative loops
-        // If inflation > 5% per day, something is broken
-        const loopRisk = inflationRate > 0.05 ? 1.0 : 0.0;
 
         return {
-            giniCoefficient: isNaN(gini) ? 0 : gini,
-            totalSignificance: totalSig,
-            inflationRate,
-            anchorDensity,
-            topShare,
-            loopRisk
+            explorationDensity: totalExplorers / (window.VillageManager?.kingdomPopulation || 1),
+            successRate,
+            avgSignificance,
+            dominantSurvivorTrait: dominantTrait
         };
     }
 
