@@ -13,10 +13,14 @@ window.ChronicleManager = {
     // Per-Entity History (Scoped to ID)
     entityRecords: new Map(),
     
-    // LEGEND ENGINE: Tracking weight for individuals (Bible §1)
+        // LEGEND ENGINE: Tracking weight for individuals (Bible §1)
     npcHistoricalWeights: new Map(), // nodeId -> totalWeight
 
-        init: function() {
+    // --- PHASE 7: OFFICIAL HISTORY LAYER ---
+    officialRecords: new Map(), // eventId -> Array<{ id, bias, truthId, publishedDay, detail, authority }>
+    
+    init: function() {
+
         // Hydrate from existing worldEvents if they exist
         if (window.GameState?.worldEvents) {
             window.GameState.worldEvents.forEach(e => this.recordEvent(e));
@@ -381,11 +385,77 @@ window.ChronicleManager = {
         this.snapshots.set(day, snapshot);
     },
 
-    getHistoryFor: function(actorId) {
+        getHistoryFor: function(actorId) {
         return this.entityRecords.get(actorId) || [];
     },
 
+    // --- PHASE 7: NARRATIVE AUTHORITY METHODS ---
+
+    /**
+     * Registers an "Official Version" of a historical event.
+     * Bible §1, §17: "The Final Word."
+     */
+    registerOfficialNarrative: function(data) {
+        const { eventId, bias, truthId, detail, authority } = data;
+        
+        if (!this.officialRecords.has(eventId)) {
+            this.officialRecords.set(eventId, []);
+        }
+
+        const narrative = {
+            id: 'narr_' + Math.random().toString(36).substr(2, 5),
+            eventId,
+            bias, // House ID
+            truthId,
+            detail,
+            authority: authority || 0.5,
+            publishedDay: window.EngineParams?.worldDay || 0
+        };
+
+        this.officialRecords.get(eventId).push(narrative);
+        
+        // Sort by authority (Dominant narrative first)
+        this.officialRecords.get(eventId).sort((a, b) => b.authority - a.authority);
+
+        window.EventBus.emit('HISTORY_PUBLISHED', narrative);
+        return narrative.id;
+    },
+
+    /**
+     * Returns the version of history that currently overrides public rumors.
+     */
+    getDominantNarrative: function(eventId) {
+        const records = this.officialRecords.get(eventId);
+        return records && records.length > 0 ? records[0] : null;
+    },
+
+    /**
+     * Returns all layers of memory for a specific event.
+     * Used by the Crow's Eye UI (Step 7-4).
+     */
+    getNarrativeLayers: function(eventId) {
+        const objective = this.worldLedger.find(e => e.id === eventId);
+        if (!objective) return null;
+
+        const official = this.officialRecords.get(eventId) || [];
+        
+        // Folklore layer (Filtered intel with FOLKLORE tag)
+        let folklore = [];
+        if (window.IntelManager) {
+            folklore = Array.from(window.IntelManager.registry.values())
+                .filter(i => i.payload.tags.includes('CHRONICLE') && 
+                             i.payload.title.includes(objective.type.toUpperCase()));
+        }
+
+        return {
+            objective,
+            official,
+            folklore
+        };
+    },
+
     getRecentGlobal: function(limit = 10) {
+
         return this.worldLedger.slice(-limit).reverse();
     },
 
