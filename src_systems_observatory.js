@@ -38,7 +38,8 @@ class WorldObservatory {
             political: { meanLegitimacy: 1.0, powerConcentration: 0, conflictFrequency: 0 },
             historical: { mythicDrift: 0, knowledgeHalfLife: 0, archiveDensity: 0 },
             significance: { giniCoefficient: 0, inflationRate: 0, anchorDensity: 0 },
-            dunes: { explorationDensity: 0, successRate: 0, avgSignificance: 0, dominantSurvivorTrait: 'NONE' }
+            dunes: { explorationDensity: 0, successRate: 0, avgSignificance: 0, dominantSurvivorTrait: 'NONE' },
+            emergent: { rogueVillageRatio: 0, culturalDiversity: 0, tradeEmpireCount: 0, cascadeIntensity: 0 }
         };
     }
 
@@ -62,7 +63,8 @@ class WorldObservatory {
                 information: this.probeInformationHealth(),
                 political: this.probePoliticalHealth(),
                 significance: this.probeSignificanceHealth(),
-                dunes: this.probeDuneHealth()
+                dunes: this.probeDuneHealth(),
+                emergent: this.probeEmergentHealth()
             }
         };
 
@@ -171,6 +173,89 @@ class WorldObservatory {
             schismDensity: activeSchisms / houses.length,
             feudVolatility: feudCount * avgFeudIntensity,
             blessedRatio: blessedCount / houses.length
+        };
+    }
+
+    probeSignificanceHealth() {
+        if (!window.ChronicleManager) return {};
+        const weights = Array.from(window.ChronicleManager.npcHistoricalWeights.values());
+        if (weights.length === 0) return { giniCoefficient: 0, totalSignificance: 0, inflationRate: 0, anchorDensity: 0 };
+
+        // 1. Gini Coefficient (Significance Inequality)
+        weights.sort((a, b) => a - b);
+        const n = weights.length;
+        let sum = 0;
+        for (let i = 1; i <= n; i++) {
+            sum += (n + 1 - i) * weights[i - 1];
+        }
+        const totalSig = weights.reduce((a, b) => a + b, 0);
+        const gini = (n + 1 - 2 * (sum / (totalSig || 1))) / n;
+
+        // 2. Inflation Tracking
+        const lastTotal = this._lastTotalSignificance || totalSig;
+        const inflationRate = (totalSig - lastTotal) / (lastTotal || 1);
+        this._lastTotalSignificance = totalSig;
+
+        // 3. Anchor Density (Persistent Significant Entities)
+        // Count entities with significance > 500 (Legends)
+        const legends = weights.filter(w => w > 500).length;
+        const anchorDensity = legends / n;
+
+        // 4. Concentration Audit: Top 1% Share
+        const top1PercentCount = Math.max(1, Math.floor(n * 0.01));
+        const top1PercentSum = weights.slice(-top1PercentCount).reduce((a, b) => a + b, 0);
+        const topShare = top1PercentSum / (totalSig || 1);
+
+        // 5. Loop Risk: Detection of runaway narrative loops
+        // If inflation > 5% per day, something is broken
+        const loopRisk = inflationRate > 0.05 ? 1.0 : 0.0;
+
+        return {
+            giniCoefficient: isNaN(gini) ? 0 : gini,
+            totalSignificance: totalSig,
+            inflationRate,
+            anchorDensity,
+            topShare,
+            loopRisk
+        };
+    }
+
+    probeEmergentHealth() {
+        const villages = window.VillageManager?.villages || [];
+        const totalVillages = villages.length || 1;
+
+        // 1. Rogue Village Ratio (Independent settlements)
+        const rogueCount = villages.filter(v => v.feudalState === 'INDEPENDENT' || v.feudalState === 'SOVEREIGN').length;
+        const rogueVillageRatio = rogueCount / totalVillages;
+
+        // 2. Cultural Diversity (Simpson's Diversity Index for cultures)
+        const cultureCounts = {};
+        villages.forEach(v => {
+            const trait = v.culture?.dominantTrait || 'NEUTRAL';
+            cultureCounts[trait] = (cultureCounts[trait] || 0) + 1;
+        });
+        const simpson = 1 - (Object.values(cultureCounts).reduce((acc, count) => acc + (count * (count - 1)), 0) / (totalVillages * (totalVillages - 1) || 1));
+
+        // 3. Trade Empires (Villages with disproportionate gold and caravans)
+        const tradeEmpires = villages.filter(v => (v.stats?.gold || 0) > 10000 && v.caravans.length > 5).length;
+
+        // 4. Information Cascades (Explosive propagation of rumors)
+        let cascadeIntensity = 0;
+        if (window.IntelManager) {
+            const rumors = Array.from(window.IntelManager.registry.values()).filter(i => i.type === 'RUMOR');
+            const fastSpread = rumors.filter(i => i.provenance?.transmission_count > 10).length;
+            cascadeIntensity = fastSpread / (rumors.length || 1);
+        }
+
+        // 5. New Power Centers (Non-capital villages with high prestige)
+        const powerCenters = villages.filter(v => !v.capital && (v.stats?.prosperity || 0) > 80).length;
+
+        return {
+            rogueVillageRatio,
+            culturalDiversity: simpson,
+            tradeEmpireCount: tradeEmpires,
+            cascadeIntensity,
+            powerCenterCount: powerCenters
         };
     }
 
