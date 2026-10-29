@@ -43,6 +43,7 @@ class WorldObservatory {
                 ownershipGini: 0,
                 scarcityIndex: 0,
                 historicalSurvivalRate: 1.0,
+                recoveryRate: 1.0,
                 lifecycle: {
                     events: 0,
                     witnesses: 0,
@@ -246,6 +247,7 @@ class WorldObservatory {
 
         // --- 1.5 HISTORICAL SURVIVAL RATE ---
         const hsr = this.currentHealth.information?.historicalSurvivalRate || 1.0;
+        const recoveryRate = window.TruthRecoveryObservatory?.metrics?.truthRecoveryRate ?? 1.0;
 
         return {
             truthFidelity,
@@ -256,6 +258,7 @@ class WorldObservatory {
             ownershipGini,
             scarcityIndex,
             historicalSurvivalRate: hsr,
+            recoveryRate: recoveryRate,
             misinfoPersistence: isNaN(avgMisinfoAge) ? 0 : avgMisinfoAge,
             knowledgeHalfLife: avgAgeAtArchival,
             siloRatio: siloedCount / (total || 1),
@@ -633,7 +636,7 @@ class WorldObservatory {
         const m = {
             pop: Math.min(1.0, (h.world?.population || 0) / (window.VillageManager?.kingdomPopulation || 1)),
             inst: (h.political?.meanLegitimacy || 0) * (1.0 - (h.political?.schismDensity || 0)),
-            info: (h.information?.truthFidelity || 0) / (1.0 + (h.information?.contamination || 0)),
+            info: (h.information?.truthFidelity || 0) * (h.information?.recoveryRate || 1.0) / (1.0 + (h.information?.contamination || 0)),
             pol: 1.0 - Math.abs(0.2 - (h.political?.powerConcentration || 0.2)),
             econ: (h.world?.prosperity || 0) / 100,
             narr: 1.0 - (h.significance?.giniCoefficient || 0),

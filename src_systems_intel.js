@@ -296,7 +296,12 @@ class IntelManagerSystem {
                 shouldEvict = true;
             }
 
-            if (shouldEvict) {
+                        if (shouldEvict) {
+                if (record.persistence === window.IntelEnums.PERSISTENCE.ARCHIVED) {
+                    window.EventBus.emit('INTEL_ARCHIVED', intel_id);
+                } else if (record.persistence === window.IntelEnums.PERSISTENCE.FORGOTTEN) {
+                    window.EventBus.emit('INTEL_FORGOTTEN', intel_id);
+                }
                 this.registry.delete(intel_id);
                 this.ownershipRegistry.delete(intel_id);
             }
