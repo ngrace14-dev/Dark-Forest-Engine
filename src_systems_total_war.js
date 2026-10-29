@@ -36,6 +36,7 @@ class TotalWarSystem {
             const house = window.DynastyManager?.houses.get(houseId);
             if (house) {
                 house.prestige = Math.max(0, house.prestige - (count * 0.1));
+                window.EventBus.emit('WAR_CASUALTIES', { houseId, amount: count });
             }
         }
 

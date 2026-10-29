@@ -91,6 +91,7 @@ class InstitutionalContinuitySystem {
 
         if (dna.metrics.collapseRisk > 0.8) {
             window.EventBus.emit('INSTITUTIONAL_COLLAPSE_WARNING', { entityId, risk: dna.metrics.collapseRisk });
+            window.EventBus.emit('INSTITUTIONAL_COLLAPSE', { entityId });
         }
     }
 

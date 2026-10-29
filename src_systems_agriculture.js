@@ -26,6 +26,7 @@ class AgricultureSystem {
                 
                 if (v.stats.food < v.population.current) {
                     window.EventBus.emit('UI_LOG', `[UNREST] Bread riots are breaking out in ${v.name}!`);
+                    window.EventBus.emit('FAMINE_DECLARED', { villageId: v.id, severity: 1.0 });
                 }
             }
         });

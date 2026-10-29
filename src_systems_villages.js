@@ -867,6 +867,8 @@ window.VillageManager = {
         } else if (village.barrierIntegrity === 0) {
             // --- GOVERNANCE MEMORY: CRISIS RECORD ---
             this.recordCrisis(village, 'BARRIER_FAILURE', 1.0);
+            window.EventBus.emit('BARRIER_FAILURE', { villageId: village.id });
+    
 
             this.postVillageNeed(village, 'essence', essenceCost, 'fueling the rune barrier');
                         if (Math.random() < 0.15 * (cal.monsters?.spawnFrequency || 1.0)) {

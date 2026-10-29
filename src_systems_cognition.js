@@ -21,7 +21,7 @@ class CognitionSystem {
         window.EventBus.emit('UI_LOG', '[Cognition] Psychological Filters & Biases Active');
     }
 
-    /**
+        /**
      * 46.1 Confirmation Bias
      * 46.4 Availability Heuristic
      * Filters new intel through existing beliefs.
@@ -31,6 +31,22 @@ class CognitionSystem {
         if (!profile) return intel.certainty;
 
         let certainty = intel.certainty;
+
+        // --- CTO INTEGRATION: TRAUMA-DRIVEN SKEPTICISM ---
+        if (window.CTO) {
+            const villageId = profile.property?.homeVillageId;
+            const trauma = window.CTO.getProfile(villageId || profile.houseId);
+            if (trauma) {
+                // Institutional Anxiety makes NPCs more skeptical of "Good News" but more prone to "Threats"
+                if (intel.payload.tags.includes('SUCCESS') || intel.payload.tags.includes('PROSPERITY')) {
+                    certainty *= (1.0 - (trauma.metrics.institutionalAnxiety * 0.5));
+                }
+                if (intel.type === 'WARNING' || intel.payload.tags.includes('THREAT')) {
+                    certainty = Math.min(1.0, certainty * (1.0 + trauma.metrics.culturalFear));
+                }
+            }
+        }
+
 
         // 46.1 Confirmation Bias: Intel that matches current bias is more believable
         if (intel.payload.tags.includes(profile.bias)) {

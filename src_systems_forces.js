@@ -380,10 +380,11 @@ window.ForceManager = {
 
                 // 3. Threat Clear: Kill all hostiles in 30m
                 const nearby = window.GameCore.SpatialGrid.getNearbyEntities(pPos.x, pPos.z, 30);
-                nearby.forEach(en => {
+                                nearby.forEach(en => {
                     if (en !== huntsman && (en.def.faction === 'monster' || en.def.faction === 'forest')) {
                         en.hp = 0;
                         if (window.defeatNpc) window.defeatNpc(en, 'huntsman_intervention');
+                        window.EventBus.emit('MONSTER_RAID_SUCCESS', { targetId: 'player', damage: 100 }); // Count as a trauma event if monster would have killed
                     }
                 });
 

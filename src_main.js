@@ -115,6 +115,7 @@ import './src_systems_innovation.js';
 import './src_systems_meta_history.js';
 import './src_systems_social_capital.js';
 
+import './src_systems_civilization_trauma_office.js';
 import './src_systems_cognition.js';
 import './src_systems_nociception.js';
 import './src_systems_perception.js';

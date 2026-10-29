@@ -17,6 +17,7 @@ class SystemHeartbeat {
             t2h:  0,  // Tier 4: Contract Evaluation
             t6h:  0,  // Tier 5: Institutional Review
             t12h: 0,  // Tier 6: Daily Simulation (12h real = 1d game)
+            t30d: 0,  // Tier 6.5: Monthly Decay (CTO)
             t3_5d: 0  // Tier 7: Weekly / Shift
         };
 
@@ -32,6 +33,7 @@ class SystemHeartbeat {
             t2h:  7200.0,
             t6h:  21600.0,
             t12h: 43200.0,
+            t30d: 2592000.0,
             t3_5d: 302400.0
         };
 
