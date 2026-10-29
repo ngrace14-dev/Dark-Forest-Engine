@@ -333,6 +333,11 @@ class IntelManagerSystem {
 
 window.IntelManager = new IntelManagerSystem();
 
+window.EventBus.on('ENGINE_READY', () => {
+    if (window.TruthSystem && window.TruthSystem.init) {
+        window.TruthSystem.init();
+    }
+});
 
 // ==========================================
 // PHASE 6.2: PROPAGATION PROTOCOL
@@ -541,7 +546,8 @@ window.TruthSystem = {
     // Verified Reality Store
     facts: new Map(), // Map<coord_hash, { type, value, timestamp }>
 
-                window.EventBus.on('ENGINE_READY', () => {
+    init: function() {
+        window.EventBus.on('ENGINE_READY', () => {
             window.EventBus.on('HEARTBEAT_T30S', () => this.update());
         });
     },

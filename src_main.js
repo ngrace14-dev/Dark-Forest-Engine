@@ -58,6 +58,7 @@ import './src_systems_fuel_observatory.js';
 import './src_systems_dunes_analytics.js';
 import './src_systems_anomaly_bureau.js';
 import './src_systems_historical_compression.js';
+import './src_systems_epistemic_integrity.js';
 import './src_systems_intel.js';
 import './src_systems_intel_tracker.js';
 import './src_systems_investigation.js';
