@@ -145,6 +145,10 @@ class WorldObservatory {
         const archive = Array.from(window.IntelManager.archive.values());
         const total = registry.length + archive.length || 1;
         
+        // --- HCB LINK: Historical Capture Metrics ---
+        const hcb = window.HistoricalCaptureBureau;
+        const captureMetrics = hcb ? hcb.metrics : {};
+
         const facts = registry.filter(i => i.type === 'FACT');
         const rumors = registry.filter(i => i.type === 'RUMOR');
         
@@ -262,7 +266,11 @@ class WorldObservatory {
             misinfoPersistence: isNaN(avgMisinfoAge) ? 0 : avgMisinfoAge,
             knowledgeHalfLife: avgAgeAtArchival,
             siloRatio: siloedCount / (total || 1),
-            lifecycle
+            lifecycle,
+            mythCaptureRate: captureMetrics.mythCaptureRate || 0,
+            propagandaEffectiveness: captureMetrics.propagandaEffectiveness || 0,
+            archiveCorruption: captureMetrics.archiveCorruption || 0,
+            rewriteFrequency: captureMetrics.historicalRewriteFrequency || 0
         };
     }
 
@@ -333,6 +341,10 @@ class WorldObservatory {
         const weights = Array.from(window.ChronicleManager.npcHistoricalWeights.values());
         if (weights.length === 0) return { giniCoefficient: 0, totalSignificance: 0, inflationRate: 0, anchorDensity: 0 };
 
+        // --- CSD LINK: Legend Generation Metrics ---
+        const legObs = window.LegendGenerationObservatory;
+        const renewalMetrics = legObs ? legObs.renewalMetrics : {};
+
         // 1. Gini Coefficient (Significance Inequality)
         weights.sort((a, b) => a - b);
         const n = weights.length;
@@ -368,7 +380,11 @@ class WorldObservatory {
             inflationRate,
             anchorDensity,
             topShare,
-            loopRisk
+            loopRisk,
+            legendRenewal: renewalMetrics.legendRenewalRate || 0,
+            heroTurnover: renewalMetrics.heroTurnover || 0,
+            narrativeDiversity: renewalMetrics.narrativeDiversity || 0,
+            ancientHeroDominance: renewalMetrics.ancientHeroDominance || 0
         };
     }
 

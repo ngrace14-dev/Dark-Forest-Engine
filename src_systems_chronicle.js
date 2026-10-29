@@ -130,9 +130,14 @@ window.ChronicleManager = {
             // Check for Epoch achievements after weight update
             this.checkEpochAchievements(event.actorId);
 
-            // LEGACY INTEGRATION: Feed weight into LegacyManager
+                        // LEGACY INTEGRATION: Feed weight into LegacyManager
             if (window.LegacyManager) {
                 window.LegacyManager.addSignificance(event.actorId, event.historicalWeight || 1);
+            }
+
+            // --- CSD LINK: Potential Legend Monitoring ---
+            if (event.historicalWeight > 50) {
+                window.EventBus.emit('POTENTIAL_LEGEND_IMPACT', { actorId: event.actorId, weight: event.historicalWeight });
             }
 
             // --- PHASE 1C/6: LEGEND GENERATION (REFINED SCORING §1) ---
