@@ -142,8 +142,8 @@ class DynastyManagerSystem {
                 prestige: 100,
                 isBlessed: index < 9, // First 9 are "Blessed" (Bible §19)
                 
-                                // --- PHASE 1A: INSTITUTIONAL STATS ---
-                                legitimacy: (name === 'Terminus') ? 0.9 : 0.6,
+                                                                                // --- PHASE 1A: INSTITUTIONAL STATS ---
+                                legitimacy: (name === 'Terminus') ? 0.9 : 0.6, // 0.0 to 1.0 (Bible §19)
                                 historicalContinuity: (name === 'Terminus') ? 18000 : 12000,
                                 informationalScarcity: (name === 'Terminus') ? 50 : 20,
                                 publicTrust: (name === 'Terminus') ? 0.8 : 0.5,
@@ -152,6 +152,14 @@ class DynastyManagerSystem {
                                 truthExposureRisk: 0.1,
                                 continuityIndex: (name === 'Terminus') ? 0.8 : 0.4,
                                 sovereignty: (name === 'Terminus') ? 0.5 : 0.0,
+                
+                                // --- ANCESTRAL PROVENANCE (Plan A) ---
+
+                                ancestralProvenance: {
+                                    steel: [], // Artifact IDs
+                                    ink: []    // Record IDs
+                                },
+
                 
                                 // --- PHASE 2B: INSTITUTIONAL ANXIETY ---
                                 internalConflictLevel: 0.1,
@@ -503,23 +511,63 @@ class DynastyManagerSystem {
         });
     }
 
-    triggerSuccession(house) {
-        const oldLeader = house.currentLeader;
-        // Simple succession: find highest level member of house or generate new heir
-        const newLeaderId = `lord_${house.id.split('_')[1]}_${house.lineage.length + 1}`;
+            triggerSuccession(house) {
+        const oldLeaderId = house.currentLeader;
         
-        // --- LEGACY TRANSFER PIVOT (Bible §36) ---
-        if (oldLeader) {
-            this.transferGenerationalLegacy(oldLeader, newLeaderId);
+        // --- SUCCESSION STATE-MACHINE (Plan A) ---
+        // Choose heir based on Significance, Kinship, and Ambition
+        let potentialHeirs = [];
+        
+        // 1. Check family members (Kinship)
+        if (window.PersonhoodManager) {
+            const oldLeader = window.PersonhoodManager.getProfile(oldLeaderId);
+            if (oldLeader && oldLeader.ancestry?.children?.length > 0) {
+                potentialHeirs = oldLeader.ancestry.children.map(id => {
+                    const profile = window.PersonhoodManager.getProfile(id);
+                    return {
+                        id,
+                        score: (profile ? (profile.traits.ambition * 50) + (profile.traits.credibility * 30) : 0) + 100 // Kinship bonus
+                    };
+                });
+            }
         }
 
-        house.lineage.push(oldLeader);
+        // 2. Check House members (Significance)
+        // (Assuming we can find entities by houseId)
+        const houseEntities = (window.GameCore?.activeEntities || []).filter(e => e.houseId === house.id && e.id !== oldLeaderId);
+        houseEntities.forEach(e => {
+            if (!potentialHeirs.find(h => h.id === e.id)) {
+                const profile = window.PersonhoodManager?.getProfile(e.id);
+                potentialHeirs.push({
+                    id: e.id,
+                    score: (profile ? (profile.traits.ambition * 60) + (profile.traits.credibility * 20) : 0) + (e.level || 0)
+                });
+            }
+        });
+
+        // 3. Selection
+        let newLeaderId;
+        if (potentialHeirs.length > 0) {
+            potentialHeirs.sort((a, b) => b.score - a.score);
+            newLeaderId = potentialHeirs[0].id;
+        } else {
+            // Generate new heir if none found
+            newLeaderId = `lord_${house.id.split('_')[1]}_${house.lineage.length + 1}`;
+        }
+        
+        // --- LEGACY TRANSFER PIVOT (Bible §36) ---
+        if (oldLeaderId) {
+            this.transferGenerationalLegacy(oldLeaderId, newLeaderId);
+            this.applyAncestralProvenance(house, newLeaderId);
+            house.lineage.push(oldLeaderId);
+        }
+
         house.currentLeader = newLeaderId;
 
         const event = {
             actorId: house.id,
             type: 'SUCCESSION',
-            detail: `${house.name}: Succession from ${oldLeader} to ${newLeaderId}.`,
+            detail: `${house.name}: Succession from ${oldLeaderId || 'None'} to ${newLeaderId}.`,
             significance: 120,
             historicalWeight: 80
         };
@@ -527,6 +575,31 @@ class DynastyManagerSystem {
         window.ChronicleManager?.recordEvent(event);
         window.EventBus.emit('UI_LOG', `[DYNASTY] ${house.name} has a new leader: ${newLeaderId}`);
     }
+
+
+    /**
+     * Applies bonuses from House artifacts and records to the new leader.
+     * Plan A: "Ancestral Provenance"
+     */
+    applyAncestralProvenance(house, leaderId) {
+        const profile = window.PersonhoodManager?.getProfile(leaderId);
+        if (!profile) return;
+
+        // Artifacts (Steel) grant Ambition and Combat bonuses
+        const steelCount = house.ancestralProvenance.steel.length;
+        if (steelCount > 0) {
+            profile.traits.ambition = Math.min(1.0, profile.traits.ambition + (steelCount * 0.05));
+            window.EventBus.emit('UI_LOG_DEBUG', `[PROVENANCE] ${leaderId} inherits ${steelCount} ancestral blades.`);
+        }
+
+        // Records (Ink) grant Credibility and Knowledge bonuses
+        const inkCount = house.ancestralProvenance.ink.length;
+        if (inkCount > 0) {
+            profile.traits.credibility = Math.min(1.0, profile.traits.credibility + (inkCount * 0.05));
+            window.EventBus.emit('UI_LOG_DEBUG', `[PROVENANCE] ${leaderId} inherits ${inkCount} archival scrolls.`);
+        }
+    }
+
 
     /**
      * Transfers power, reputation, and beliefs from one generation to the next.
@@ -1014,13 +1087,41 @@ class DynastyManagerSystem {
 
 
 
-            processNarrative(narrative) {
-        // Record official history into house archives
-        const house = this.houses.get(narrative.bias);
-        if (house) {
-            house.archives.push(narrative.id);
-        }
-    }
+                        processNarrative(narrative) {
+                // Record official history into house archives
+                const house = this.houses.get(narrative.bias);
+                if (house) {
+                    house.archives.push(narrative.id);
+                }
+
+                // --- THE FOUNDERS' BETRAYAL CHECK (Plan A) ---
+                // If a Tier 9 Truth (The Betrayal) is published, all Noble Houses lose 50% Legitimacy
+                const truth = window.IntelManager?.lookup(narrative.truthId);
+                if (truth && (truth.tier >= 9 || truth.payload?.tags?.includes('BETRAYAL'))) {
+                    this.triggerBetrayalCollapse();
+                }
+            }
+
+
+            /**
+             * Massive legitimacy loss across all institutions.
+             * Bible §14: The Truth is a weapon that destroys legitimacy.
+             */
+            triggerBetrayalCollapse() {
+                window.EventBus.emit('UI_LOG', '⚠️ [CRISIS] THE FOUNDERS\' BETRAYAL HAS BEEN EXPOSED!');
+                window.EventBus.emit('UI_LOG', 'The legitimacy of the Noble Houses is crumbling.');
+
+                this.houses.forEach(house => {
+                    house.legitimacy *= 0.5;
+                    house.publicTrust *= 0.3;
+                    house.internalConflictLevel = Math.min(1.0, house.internalConflictLevel + 0.4);
+            
+                    if (house.legitimacy < 0.3) {
+                        this.triggerInstitutionalCrisis(house);
+                    }
+                });
+            }
+
 
     /**
 

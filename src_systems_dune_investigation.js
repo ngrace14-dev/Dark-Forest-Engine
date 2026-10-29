@@ -15,17 +15,25 @@ class DuneInvestigationSystem {
         this.lostArchives = [];
         this.recoveredRecords = []; // Array of { id, title, detail, tier, targetHistoryId }
         this.isOccupied = false;
-        this.discoveryChance = 0.05;
+                this.recoveryChance = 0.05;
+        this.sandResistance = 0.0;
         
-        window.EventBus.on('ENGINE_READY', () => this.init());
+        // --- RELATIVE STAT SCALING (Plan B) ---
+        this.scalingFactors = {
+            memoryDecay: 0.1,    // Rate at which personal stats erode in dunes
+            physicalExhaustion: 0.05,
+            significanceDrag: 0.2 // More significance makes navigation harder
+        };
+
         window.EventBus.on('HEARTBEAT_T1', () => this.update());
     }
 
-    init() {
+        init() {
         window.EventBus.emit('UI_LOG', '[Dunes] Lost Memory Scanning Active');
     }
 
     update() {
+
         if (!window.GameCore?.playerObj || !window.WorldGenerator) return;
 
         const pPos = window.GameCore.playerObj.visual?.position || { x: 0, z: 0 };
@@ -41,8 +49,39 @@ class DuneInvestigationSystem {
 
         if (this.isOccupied) {
             this.processDuneScanning();
+            this.applyRelativeStatScaling(window.GameCore.playerObj);
+        } else {
+            // Recover stats slowly when outside
+            this.recoverStats(window.GameCore.playerObj);
         }
     }
+
+    /**
+     * Physical navigation of the Lost Regions (Plan B).
+     * Stats are relative to Significance and Duration.
+     */
+    applyRelativeStatScaling(player) {
+        if (!player.stats) return;
+
+        const significance = window.ChronicleManager?.calculateSignificance(player.id) || 0;
+        const drag = (significance / 1000) * this.scalingFactors.significanceDrag;
+
+        // Personal stats erode
+        player.stats.speed = (player.stats.speed || 1.0) * (1.0 - (this.scalingFactors.physicalExhaustion + drag));
+        player.stats.visibility = (player.stats.visibility || 1.0) * (1.0 - (this.scalingFactors.memoryDecay + drag));
+
+        // UI Feedback for scaling
+        if (Math.random() < 0.01) {
+            window.EventBus.emit('UI_LOG_DEBUG', `[DUNES] Your significance weighs heavy on the sands. Speed reduced by ${(drag * 100).toFixed(1)}%.`);
+        }
+    }
+
+    recoverStats(player) {
+        if (!player.stats) return;
+        player.stats.speed = Math.min(1.0, (player.stats.speed || 1.0) + 0.01);
+        player.stats.visibility = Math.min(1.0, (player.stats.visibility || 1.0) + 0.01);
+    }
+
 
     /**
      * Simulation of finding buried structures in the sands.

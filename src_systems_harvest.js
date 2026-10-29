@@ -100,6 +100,14 @@ class WendigoHarvestSystem {
             this.triggerOrbLament();
         }
 
+        // --- THE RUNIC HARVEST (Plan D) ---
+        // Runic carvings increase significance yield but also danger
+        const runicState = window.RuneSystem?.getCarvings(nodeId);
+        if (runicState && runicState.totalWeight > 0) {
+            candidate.pressureScore += runicState.totalWeight * 0.5;
+            candidate.orbAttention = Math.min(1.0, candidate.orbAttention + (runicState.storyDensity * 0.1));
+        }
+
         this.harvestCandidates.set(nodeId, candidate);
     }
 
@@ -121,11 +129,14 @@ class WendigoHarvestSystem {
 
         const harvestType = candidate.pressureScore > 1500 ? 'EPOCH' : (candidate.pressureScore > 1000 ? 'LEGENDARY' : 'MINOR');
         
+        // --- HARVEST MECHANICS: CONVERSION TO RESOURCE (Plan D) ---
+        // Harvested Significance becomes "Runic Ink" or "Spectral Ash"
         const harvest = {
             id: 'harvest_' + Math.random().toString(36).substr(2, 5),
             targetId: nodeId,
             type: harvestType,
-            startDay: window.EngineParams?.worldDay || 0
+            startDay: window.EngineParams?.worldDay || 0,
+            projectedYield: Math.floor(candidate.pressureScore / 10)
         };
 
         this.activeHarvests.push(harvest);
@@ -138,13 +149,31 @@ class WendigoHarvestSystem {
         window.ChronicleManager?.recordEvent({
             actorId: nodeId,
             type: 'WENDIGO_HARVEST',
-            detail: `The cold hunger of the Wendigo has found a beacon of significance: ${nodeId}.`,
+            detail: `The cold hunger of the Wendigo has found a beacon of significance: ${nodeId}. Yield expected: ${harvest.projectedYield} units.`,
             significance: 300,
             historicalWeight: 200
         });
 
         // Trigger the 3D Wendigo stalker logic for this specific ID
         window.EventBus.emit('WENDIGO_ASSIGN_TARGET', nodeId);
+    }
+
+    /**
+     * Resolves a harvest, converting significance into resources.
+     * Plan D: Significance is a Resource.
+     */
+    resolveHarvest(harvestId, success = true) {
+        const index = this.activeHarvests.findIndex(h => h.id === harvestId);
+        if (index === -1) return;
+
+        const harvest = this.activeHarvests[index];
+        this.activeHarvests.splice(index, 1);
+
+        if (success) {
+            window.EventBus.emit('UI_LOG', `[HARVEST] Harvest ${harvestId} complete. Collected ${harvest.projectedYield} Runic Residue.`);
+            // Grant residue to the 'Harvest Forces' or the Player if they participated
+            window.EventBus.emit('SIGNIFICANCE_RESOURCE_GAINED', { amount: harvest.projectedYield });
+        }
     }
 
     /**
