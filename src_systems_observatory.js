@@ -507,11 +507,14 @@ class WorldObservatory {
         const registry = window.IntelManager?.registry || new Map();
         const archive = window.IntelManager?.archive || new Map();
         
-        // Tally significant records (Significance > 50)
-        const totalSignificantInLastEpoch = Array.from(registry.values()).filter(i => (i.significance.historical + i.significance.crow) > 50).length;
+        // Tally significant records (Significance > 50) that existed before the shift
+        // We estimate this by checking records in archive created in previous epochs
         const survivingInArchive = Array.from(archive.values()).filter(i => i.epoch_created < epoch).length;
+        const currentActive = Array.from(registry.values()).length;
         
-        const hsr = totalSignificantInLastEpoch > 0 ? survivingInArchive / totalSignificantInLastEpoch : 1.0;
+        // Historical Survival Rate: How much of the "Total Knowledge" survived into the archive
+        // In a healthy civ, significant facts are archived before they are purged.
+        const hsr = this._lastTotalSignificant > 0 ? survivingInArchive / this._lastTotalSignificant : 1.0;
         
         // Update live health state
         if (!this.currentHealth.information) this.currentHealth.information = {};
@@ -522,13 +525,25 @@ class WorldObservatory {
             epoch,
             day,
             historicalSurvivalRate: hsr,
+            knowledgeRetained: survivingInArchive,
+            activeIntel: currentActive,
+            stabilityIndex: this.calculateWorldHealth().score / 100,
             reconstructionSuccess: this.probeReconstructionSuccess()
         };
+        
         this.reports.epochs.push(report);
         
         if (hsr < 0.15) {
             window.EventBus.emit('UI_LOG', "⚠️ [BUREAU ALERT] HISTORICAL COLLAPSE: Civilization has entered a state of amnesia.");
+            this.triggerAlert('HISTORICAL COLLAPSE', `Survival Rate: ${(hsr * 100).toFixed(1)}%. Previous epoch records have been largely erased.`);
+        } else {
+            window.EventBus.emit('UI_LOG', `[OBSERVATORY] Epoch ${epoch} Reconstruction Report: Hsr ${(hsr * 100).toFixed(1)}%.`);
         }
+
+        window.EventBus.emit('OBSERVATORY_REPORT_EPOCH', report);
+        
+        // Prepare for next epoch tally
+        this._lastTotalSignificant = Array.from(registry.values()).filter(i => (i.significance.historical + (i.significance.crow || 0)) > 50).length;
     }
 
     probeReconstructionSuccess() {
