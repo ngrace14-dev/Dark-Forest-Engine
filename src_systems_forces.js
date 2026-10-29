@@ -190,13 +190,18 @@ window.ForceManager = {
     },
 
 
-    recalculateCrow: function() {
+        recalculateCrow: function() {
         const force = this.forces['Crow'];
         const legends = window.GameState?.legends?.length || 0;
         const totalHistoricalWeight = (window.ChronicleManager?.worldLedger || []).reduce((acc, e) => acc + (e.historicalWeight || 0), 0);
         
+        // --- CROW OBSERVATORY: GINI INFLUENCE ---
+        // High Gini (monopoly) actually weakens the Crow's ability to find new candidates
+        const gini = window.CrowObservatory ? window.CrowObservatory.metrics.giniCoefficient : 0;
+        const concentrationPenalty = Math.max(0.2, 1.0 - gini);
+
         force.value = legends;
-        force.strength = Math.min(1000, 100 + (legends * 50) + (totalHistoricalWeight / 10));
+        force.strength = Math.min(1000, (100 + (legends * 50) + (totalHistoricalWeight / 10)) * concentrationPenalty);
     },
 
         recalculateTruth: function() {

@@ -73,11 +73,18 @@ class LegacyManagerSystem {
      * Increases the "Story Density" of an entity.
      * Bible §BN: Flesh as the Ledger.
      */
-    addSignificance(entityId, amount) {
+        addSignificance(entityId, amount) {
         const legacy = this.activeLegacies.get(entityId);
         if (!legacy) return;
 
-        legacy.storyDensity += amount;
+        // --- CROW OBSERVATORY: SCARCITY MULTIPLIER ---
+        // If significance is too concentrated, it's harder for legends to grow further
+        let concentrationPenalty = 1.0;
+        if (window.CrowObservatory && window.CrowObservatory.metrics.narrativeConcentration > 0.6) {
+            concentrationPenalty = 0.5;
+        }
+
+        legacy.storyDensity += (amount * concentrationPenalty);
         
         // Update Thresholds
         if (legacy.storyDensity >= this.THRESHOLDS.MYTHIC) legacy.significanceLevel = 'MYTHIC';
