@@ -274,12 +274,13 @@ class IntelManagerSystem {
                 shouldEvict = true;
             }
 
-            // 2. Epoch Purge: Did it survive the wave of white?
+                        // 2. Epoch Purge: Did it survive the wave of white?
             if (record.epoch_created < currentEpoch) {
                 // ANCHOR PIVOT: Anchored Intel survives (Bible §25)
-                if (record.isAnchored) return;
+                if (record.isAnchored) continue;
 
-                const totalSignificance = record.significance.historical + record.significance.crow;
+                const totalSignificance = (record.significance?.historical || 0) + (record.significance?.crow || 0);
+
                 if (totalSignificance > 50 || record.rarity === window.IntelEnums.RARITY.LEGENDARY) {
                     // Archive High-Value Info
                     record.persistence = window.IntelEnums.PERSISTENCE.ARCHIVED;

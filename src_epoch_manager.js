@@ -37,7 +37,7 @@ export class EpochManager {
         return `${this.baseSeed}_epoch_${this.currentEpoch}`;
     }
 
-    advanceEpoch() {
+        advanceEpoch() {
         // --- PHASE 3: STATIC NODE PERSISTENCE ---
         // Capture positions of all static nodes before the shift
         const staticNodes = this._captureStaticNodes();
@@ -49,9 +49,13 @@ export class EpochManager {
         
         // Restore static nodes to their absolute coordinates
         this._restoreStaticNodes(staticNodes);
+
+        // --- STEP 8-2: ROTATE MOUNTAINS ---
+        this.rotateMountains();
         
         return this.currentEpoch;
     }
+
 
 
     _captureStaticNodes() {

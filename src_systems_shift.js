@@ -116,7 +116,7 @@ class ShiftDirectorSystem {
     /**
      * Returns the world to stability.
      */
-    completeShift() {
+        completeShift() {
         this.isShifting = false;
         window.EventBus.emit('ENV_SET_VOID_OVERRIDE', false);
         window.EventBus.emit('UI_LOG', '🌲 [STABILIZATION] Reconstruction complete. Reality has stabilized.');
@@ -131,7 +131,7 @@ class ShiftDirectorSystem {
             window.VillageManager.villages.forEach(v => {
                 // Prosperity drops due to trade link destruction
                 v.stats.prosperity = Math.max(0, v.stats.prosperity - 15);
-                v.tradeDisruptionUntil = window.EngineParams.worldDay + 2;
+                v.tradeDisruptionUntil = (window.EngineParams?.worldDay || 0) + 2;
                 
                 // Disconnected villages risk becoming "Lost"
                 if (v.barrierIntegrity < 20) {
@@ -149,21 +149,20 @@ class ShiftDirectorSystem {
         // 4. Force full chunk refresh
         window.EventBus.emit('WORLD_REGENERATE');
 
-                // --- PHASE 1A: CHRONICLE ACTIVATION ---
-                window.ChronicleManager?.recordEvent?.({
-                    actorId: 'WORLD',
-                    type: 'SHIFT_COMPLETE',
-                    detail: `The World has stabilized. Epoch ${window.EngineParams.worldEpoch} has begun.`,
-                    significance: 150,
-                    historicalWeight: 100,
-                    location: { x: 0, z: 0 },
-                    witnesses: window.VillageManager ? window.VillageManager.villages.map(v => `village_${v.id}`) : []
-                });
+        // --- PHASE 1A: CHRONICLE ACTIVATION ---
+        window.ChronicleManager?.recordEvent({
+            actorId: 'WORLD',
+            type: 'SHIFT_COMPLETE',
+            detail: `The World has stabilized. Epoch ${window.EngineParams?.worldEpoch || 0} has begun.`,
+            significance: 150,
+            historicalWeight: 100,
+            location: { x: 0, z: 0 },
+            witnesses: window.VillageManager ? window.VillageManager.villages.map(v => `village_${v.id}`) : []
+        });
 
-
-        
-        window.EventBus.emit('UI_LOG', `[STABILIZATION] Current Epoch: ${window.EngineParams.worldEpoch}.`);
+        window.EventBus.emit('UI_LOG', `[STABILIZATION] Current Epoch: ${window.EngineParams?.worldEpoch || 0}.`);
     }
+
 }
 
 window.ShiftDirector = new ShiftDirectorSystem();
