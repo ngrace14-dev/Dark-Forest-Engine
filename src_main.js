@@ -129,7 +129,9 @@ import './src_systems_gossip.js';
 
 import './src_systems_warden.js';
 
+import './src_systems_demographic_directorate.js';
 import './src_systems_observatory.js';
+
 import './src_systems_chronicle.js';
 
 import './src_systems_forces.js';

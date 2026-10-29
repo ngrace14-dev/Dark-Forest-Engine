@@ -643,8 +643,10 @@ class DynastyManagerSystem {
             historicalWeight: 80
         };
 
-        window.ChronicleManager?.recordEvent(event);
+                window.ChronicleManager?.recordEvent(event);
+        window.EventBus.emit('SUCCESSION', event);
         window.EventBus.emit('UI_LOG', `[DYNASTY] ${house.name} has a new leader: ${newLeaderId}`);
+
     }
 
 
