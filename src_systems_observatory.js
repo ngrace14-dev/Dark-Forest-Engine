@@ -42,6 +42,7 @@ class WorldObservatory {
                 infectionRate: 0,
                 ownershipGini: 0,
                 scarcityIndex: 0,
+                historicalSurvivalRate: 1.0,
                 lifecycle: {
                     events: 0,
                     witnesses: 0,
@@ -219,6 +220,9 @@ class WorldObservatory {
         const popSize = window.VillageManager?.kingdomPopulation || 1;
         const scarcityIndex = Math.max(0, 1.0 - (lifecycle.intel / popSize));
 
+        // --- 1.5 HISTORICAL SURVIVAL RATE ---
+        const hsr = this.currentHealth.information?.historicalSurvivalRate || 1.0;
+
         return {
             truthFidelity,
             avgTransmission,
@@ -227,6 +231,7 @@ class WorldObservatory {
             infectionRate,
             ownershipGini,
             scarcityIndex,
+            historicalSurvivalRate: hsr,
             misinfoPersistence: isNaN(avgMisinfoAge) ? 0 : avgMisinfoAge,
             knowledgeHalfLife: avgAgeAtArchival,
             siloRatio: siloedCount / (total || 1),
@@ -458,13 +463,32 @@ class WorldObservatory {
         const day = window.EngineParams?.worldDay || 0;
         const epoch = window.EngineParams?.worldEpoch || 0;
         
+        // --- 1.5 SURVIVAL CALCULATION ---
+        const registry = window.IntelManager?.registry || new Map();
+        const archive = window.IntelManager?.archive || new Map();
+        
+        // Tally significant records (Significance > 50)
+        const totalSignificantInLastEpoch = Array.from(registry.values()).filter(i => (i.significance.historical + i.significance.crow) > 50).length;
+        const survivingInArchive = Array.from(archive.values()).filter(i => i.epoch_created < epoch).length;
+        
+        const hsr = totalSignificantInLastEpoch > 0 ? survivingInArchive / totalSignificantInLastEpoch : 1.0;
+        
+        // Update live health state
+        if (!this.currentHealth.information) this.currentHealth.information = {};
+        this.currentHealth.information.historicalSurvivalRate = hsr;
+
         const report = {
             type: 'EPOCH',
             epoch,
             day,
+            historicalSurvivalRate: hsr,
             reconstructionSuccess: this.probeReconstructionSuccess()
         };
         this.reports.epochs.push(report);
+        
+        if (hsr < 0.15) {
+            window.EventBus.emit('UI_LOG', "⚠️ [BUREAU ALERT] HISTORICAL COLLAPSE: Civilization has entered a state of amnesia.");
+        }
     }
 
     probeReconstructionSuccess() {
