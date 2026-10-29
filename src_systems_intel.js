@@ -209,24 +209,46 @@ class IntelManagerSystem {
     /**
      * Grants physical ownership of an Intel Reference to an Entity.
      */
-    grantOwnership(intel_id, node_id) {
+        grantOwnership(intel_id, node_id) {
         if (!this.registry.has(intel_id)) return false;
-        this.ownershipRegistry.get(intel_id).add(node_id);
+        const owners = this.ownershipRegistry.get(intel_id);
+        const alreadyOwned = owners.has(node_id);
+        
+        owners.add(node_id);
         
         // --- THE RARE PART: Propagation Trigger ---
-        window.EventBus.emit('INTEL_GAINED', { intelId: intel_id, nodeId: node_id });
+        if (!alreadyOwned) {
+            window.EventBus.emit('INTEL_GAINED', { intelId: intel_id, nodeId: node_id });
+        }
         
         return true;
     }
 
     revokeOwnership(intel_id, node_id) {
         const owners = this.ownershipRegistry.get(intel_id);
-        if (owners) {
+        if (owners && owners.has(node_id)) {
             owners.delete(node_id);
-            // If no one owns it and it's active, it's technically lost to the world, 
-            // but we leave it in registry until Purge() runs.
+            
+            // --- STEP 5-4: TRUTH EXTINCTION CHECK ---
+            if (owners.size === 0) {
+                this.handleExtinction(intel_id);
+            }
         }
     }
+
+    handleExtinction(intel_id) {
+        const intel = this.registry.get(intel_id);
+        if (!intel) return;
+
+        // Only significant truths trigger the collapse protocol
+        const totalSig = (intel.significance?.historical || 0) + (intel.significance?.survival || 0);
+        
+        if (totalSig > 100) {
+            window.EventBus.emit('UI_LOG', `[EXTINCTION] A critical truth has been physically lost to the world: ${intel.payload.title}`);
+            window.EventBus.emit('INTEL_EXTINGUISHED', intel_id);
+        }
+    }
+
 
     getIntelForNode(node_id) {
         const knownIntel = [];

@@ -80,6 +80,8 @@ class WorldObservatory {
             window.EventBus.emit('TOGGLE_EPISTEMIC_HEATMAP');
         });
 
+        this.checkAlerts();
+
         console.log("🔭 [OBSERVATORY] System Online. Monitoring the threads of time.");
         console.log("%c[Observatory] Epistemic Heatmap available: window.EventBus.emit('CMD_TOGGLE_HEATMAP')", "color: #3b82f6;");
     }
@@ -678,10 +680,28 @@ class WorldObservatory {
             notes: notes.length > 0 ? notes : ["Civilization state is stable. No critical interventions required."]
         };
     }
-    /**
-     * SECTION H: 1000 YEAR STRESS TEST SCORE
-     * Aggregates all telemetry into a final audit grade.
-     */
+    checkAlerts() {
+        // ALERT: HISTORICAL COLLAPSE (H_sr < 0.15)
+        if (this.currentHealth.information?.historicalSurvivalRate < 0.15) {
+            this.triggerAlert('HISTORICAL COLLAPSE', 'Civilization has Amnesia. Lessons of previous epochs are being deleted.');
+        }
+
+        // ALERT: RUMOR DOMINANCE (T_f < 0.3)
+        if (this.currentHealth.information?.truthFidelity < 0.3) {
+            this.triggerAlert('RUMOR DOMINANCE', 'NPCs are acting on false information 70% of the time.');
+        }
+
+        // ALERT: TRUTH EXTINCTION
+        window.EventBus.on('INTEL_EXTINGUISHED', (id) => {
+            const intel = window.IntelManager.lookup(id);
+            this.triggerAlert('TRUTH EXTINCTION', `Critical knowledge "${intel?.payload.title}" has been physically lost to the world.`);
+        });
+    }
+
+    triggerAlert(type, message) {
+        window.EventBus.emit('OBSERVATORY_ALERT', { type, message, timestamp: Date.now() });
+        console.warn(`%c[OBSERVATORY ALERT: ${type}] %c${message}`, "color: #ef4444; font-weight: bold;", "color: #fca5a5;");
+    }
     generateFinalAudit() {
         const status = this.getStatus();
         const health = status.currentHealth;

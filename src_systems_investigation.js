@@ -7,13 +7,46 @@
  */
 
 class InvestigationManagerSystem {
-    constructor() {
+        constructor() {
         this.mysteries = new Map(); // Map<mystery_id, MysteryObject>
         this.activeMysteryId = null;
         
         window.EventBus.on('ENGINE_READY', () => this.init());
         window.EventBus.on('INTEL_VERIFIED', (intel) => this.onIntelVerified(intel));
+        window.EventBus.on('INTEL_EXTINGUISHED', (intelId) => this.handleIntelExtinction(intelId));
     }
+
+    handleIntelExtinction(intelId) {
+        const intel = window.IntelManager?.lookup(intelId);
+        if (!intel) return;
+
+        // --- STEP 5-4: EMERGENT MYSTERY PIVOT ---
+        const id = `lost_truth_${intelId.split('_')[1]}`;
+        if (this.mysteries.has(id)) return;
+
+        const mystery = {
+            id,
+            title: `The Lost Truth: ${intel.payload.title}`,
+            description: `The last owner of this knowledge has died or forgotten it. The truth is now a legend that must be reconstructed.`,
+            tier: 5,
+            category: 'RECONSTRUCTION',
+            state: 'UNSOLVED',
+            linkedEvidence: new Set(),
+            discoveryProgress: 0,
+            originalIntelId: intelId,
+            relatedVerses: this.findRelatedFolklore(intelId)
+        };
+
+        this.mysteries.set(id, mystery);
+        window.EventBus.emit('UI_LOG', `[MYSTERY] A new investigation is required to restore lost knowledge: ${intel.payload.title}`);
+        window.EventBus.emit('MYSTERY_GENERATED', mystery);
+    }
+
+    findRelatedFolklore(intelId) {
+        if (!window.FolkloreEngine) return [];
+        return window.FolkloreEngine.anthology.filter(v => v.meaning_payload?.preserved_truth_id === intelId);
+    }
+
 
         init() {
         this.discoveryTier = 1; // Bible §33
