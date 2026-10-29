@@ -380,14 +380,20 @@ class WorldObservatory {
     }
 
     calculateAverages(data, key = 'metrics') {
-        if (data.length === 0) return {};
+        if (!data || data.length === 0) return {};
         const first = data[0][key];
+        if (!first) return {};
+        
         const result = JSON.parse(JSON.stringify(first));
 
-        // Nested average calculation
+        // Nested average calculation with hardening
         for (const category in result) {
+            if (typeof result[category] !== 'object') continue;
             for (const metric in result[category]) {
-                const sum = data.reduce((acc, entry) => acc + (entry[key][category][metric] || 0), 0);
+                const sum = data.reduce((acc, entry) => {
+                    const val = entry[key]?.[category]?.[metric];
+                    return acc + (typeof val === 'number' ? val : 0);
+                }, 0);
                 result[category][metric] = sum / data.length;
             }
         }
@@ -468,6 +474,8 @@ class WorldObservatory {
      */
     generateDiagnosticReport() {
         const health = this.calculateWorldHealth();
+        if (!health || !health.metrics) return { whs: 0, category: 'COLLAPSE', notes: ["Directorate Failure: Unable to calculate health metrics."] };
+        
         const m = health.metrics;
         const notes = [];
 
