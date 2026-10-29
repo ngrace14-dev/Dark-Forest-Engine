@@ -36,27 +36,9 @@ window.ChronicleManager = {
     },
 
         purgeInsignificantMemories: function() {
-        const threshold = 20; // Events below 20 significance score fade
-        const oldLength = this.worldLedger.length;
-
-        // Filter the ledger
-        this.worldLedger = this.worldLedger.filter(e => {
-            // Keep if Legendary, Recent (last 14 days), or Significant
-            const isRecent = (window.EngineParams?.worldDay || 0) - e.timestamp.day < 14;
-            const isSignificant = (e.significance + e.historicalWeight) > threshold;
-            const isLegendary = e.legendId || e.isLegendary;
-
-            if (!isRecent && !isSignificant && !isLegendary) {
-                window.EventBus.emit('UI_LOG_DEBUG', `[FORGETTING] Event "${e.type}" faded from history.`);
-                return false;
-            }
-            return true;
-        });
-
-        if (this.worldLedger.length < oldLength) {
-            window.EventBus.emit('UI_LOG', `[HISTORY] ${oldLength - this.worldLedger.length} minor events have been forgotten by time.`);
-        }
-    },
+            // --- DEPRECATED: Handled by Grand Historical Office (GHO) Compression ---
+            return;
+        },
 
     /**
      * Epoch-Class Achievement Detection (Phase 2)
