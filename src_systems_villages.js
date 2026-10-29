@@ -904,10 +904,16 @@ window.VillageManager = {
 
         village.territory.control = Math.max(0, Math.min(100, village.territory.control + (village.territory.underRaid ? -localRaiders.length * 2 : 1)));
         
-        // --- PHYSICAL MANIFESTATIONS (Phase 6: Manifestations) ---
+                // --- PHYSICAL MANIFESTATIONS (Phase 6: Manifestations) ---
         this.manifestVillageStates(village);
 
+        // --- STEP 9-2: SIEGE TICK ---
+        if (village.isBesieged && window.TotalWar) {
+            window.TotalWar.simulateSiegeTick(village.id);
+        }
+
         // --- PHASE 6: ECONOMIC CRISES ---
+
         this.processEconomicCrises(village);
 
         const importGoal = Math.ceil(village.population.current * 0.5);

@@ -87,22 +87,102 @@ class TotalWarSystem {
      * 76.3 Siege Starvation Timers
      * 76.5 Disease Outbreaks in Besieged Cities
      */
+    startSiege(attackerHouseId, targetVillageId) {
+        const attacker = window.DynastyManager?.houses.get(attackerHouseId);
+        const village = window.VillageManager?.villages.find(v => v.id === targetVillageId);
+        
+        if (!attacker || !village || this.sieges.has(targetVillageId)) return;
+
+        const siege = {
+            id: `siege_${targetVillageId}_${Date.now()}`,
+            attackerId: attackerHouseId,
+            villageId: targetVillageId,
+            startDay: window.EngineParams?.worldDay || 0,
+            strength: attacker.mobilizationState === 'TOTAL' ? 50 : 20,
+            foodSupply: village.stats.food / 100,
+            barrierIntegrity: village.barrierIntegrity
+        };
+
+        this.sieges.set(targetVillageId, siege);
+        village.isBesieged = true;
+        
+        window.EventBus.emit('UI_LOG', `[WAR] ${attacker.name} has laid siege to ${village.name}!`);
+        window.ChronicleManager?.recordEvent({
+            actorId: attackerHouseId,
+            type: 'SIEGE_START',
+            detail: `${attacker.name} has blockaded ${village.name}.`,
+            significance: 100,
+            location: { x: village.x, z: village.z }
+        });
+    }
+
     simulateSiegeTick(villageId) {
         const siege = this.sieges.get(villageId);
-        if (!siege) return;
+        const village = window.VillageManager?.villages.find(v => v.id === villageId);
+        if (!siege || !village) return;
 
-        siege.foodSupply -= 5;
+        // 76.3: Starvation logic
+        const starvationRate = 5 + (siege.strength * 0.1);
+        village.stats.food = Math.max(0, village.stats.food - (starvationRate * 100));
+        siege.foodSupply = village.stats.food / 100;
         
-        // 76.5: Crowded, starving cities breed disease
-        if (siege.foodSupply < 20 && Math.random() < 0.1) {
-            window.Ecology?.applyParasite(villageId, 'spore_cough');
+        // Attrition of the barrier
+        const damage = siege.strength * 0.1;
+        village.barrierIntegrity = Math.max(0, village.barrierIntegrity - damage);
+        siege.barrierIntegrity = village.barrierIntegrity;
+
+        // 76.5: Disease Outbreaks
+        if (siege.foodSupply < 20 && Math.random() < 0.05) {
+            window.EventBus.emit('UI_LOG_DEBUG', `[WAR] Sickness is spreading in the besieged ${village.name}.`);
+            village.population.current = Math.max(10, village.population.current - 5);
         }
 
-        if (siege.foodSupply <= 0) {
-            // 76.8 Surrender Negotiations
-            window.EventBus.emit('UI_LOG', `[WAR] ${villageId} has surrendered due to starvation.`);
-            this.sieges.delete(villageId);
+        // Capture Condition: Barrier is down and food is low
+        if (village.barrierIntegrity <= 0 || siege.foodSupply <= 0) {
+            this.resolveSiege(villageId, 'CONQUEST');
         }
+    }
+
+    resolveSiege(villageId, result) {
+        const siege = this.sieges.get(villageId);
+        const village = window.VillageManager?.villages.find(v => v.id === villageId);
+        if (!siege || !village) return;
+
+        const attacker = window.DynastyManager?.houses.get(siege.attackerId);
+        const oldOwnerName = village.nobleHouse;
+        const oldHouseId = `house_${oldOwnerName.toLowerCase().replace('house ', '')}`;
+        const defender = window.DynastyManager?.houses.get(oldHouseId);
+
+        if (result === 'CONQUEST') {
+            window.EventBus.emit('UI_LOG', `[WAR] ${village.name} HAS FALLEN to ${attacker.name}!`);
+            
+            // Transfer Ownership
+            village.nobleHouse = attacker.name;
+            village.currentOccupier = siege.attackerId;
+            village.isBesieged = false;
+
+            // Monopoly Transfer (Bible §19)
+            if (defender && defender.isBlessed) {
+                window.DynastyManager.setBlessedStatus(defender.id, false);
+                window.DynastyManager.setBlessedStatus(attacker.id, true);
+                window.EventBus.emit('UI_LOG', `[WAR] The Blessed Spot monopoly has been seized by ${attacker.name}.`);
+            }
+
+            attacker.prestige += 50;
+            if (defender) defender.prestige -= 30;
+
+            window.ChronicleManager?.recordEvent({
+                actorId: siege.attackerId,
+                type: 'VILLAGE_CONQUERED',
+                detail: `${attacker.name} has captured ${village.name} from ${oldOwnerName}.`,
+                significance: 200,
+                historicalWeight: 150,
+                location: { x: village.x, z: village.z }
+            });
+        }
+
+        this.sieges.delete(villageId);
+        village.isBesieged = false;
     }
 
     /**
