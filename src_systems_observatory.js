@@ -451,6 +451,19 @@ class WorldObservatory {
         return { scores, overall };
     }
 
+    probeFuelHealth() {
+        if (!window.VillageManager) return { globalEssence: 0, maintenanceCost: 0, stability: 1.0 };
+        const villages = window.VillageManager.villages || [];
+        const totalEssence = villages.reduce((acc, v) => acc + (v.stats?.essence || 0), 0);
+        const totalCost = villages.reduce((acc, v) => acc + (v.fuelNeed || 0), 0) || 1;
+        
+        return {
+            globalEssence: totalEssence,
+            maintenanceCost: totalCost,
+            stability: Math.min(1.0, totalEssence / (totalCost * 5)) // Normalized: 1.0 = 5 days of reserve
+        };
+    }
+
     getStatus() {
         return {
             world: this.probeWorldHealth(),
@@ -459,7 +472,8 @@ class WorldObservatory {
             historical: this.probeHistoricalHealth(),
             significance: this.probeSignificanceHealth(),
             dunes: this.probeDuneHealth(),
-            emergent: this.probeEmergentHealth()
+            emergent: this.probeEmergentHealth(),
+            fuel: this.probeFuelHealth()
         };
     }
 
