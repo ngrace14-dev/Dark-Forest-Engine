@@ -222,12 +222,23 @@ window.EventBus.on('ENGINE_READY', () => {
             }
         }, 'drift').name('📉 Force Model Drift');
 
-        epistemFolder.add({
+                epistemFolder.add({
             clear: () => {
                 window.ModelLayer.inventories.forEach(inv => inv.records.clear());
                 window.EventBus.emit('UI_LOG', '[DEV] All Faction Memories Cleared.');
             }
         }, 'clear').name('🧹 Reset Perceived Reality');
+
+        const simTestFolder = gui.addFolder('🧪 Simulation Stress Test');
+        simTestFolder.add({
+            run: () => {
+                if (window.SimTest) {
+                    window.SimTest.run1000YearTest();
+                    window.EventBus.emit('UI_LOG', '[SIM] 1000 Year Test Started. Check Console for details.');
+                }
+            }
+        }, 'run').name('⏳ Run 1000 Year Test');
+
 
 
     } catch(e) {
