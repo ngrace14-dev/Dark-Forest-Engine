@@ -40,6 +40,8 @@ class WorldObservatory {
                 contamination: 0,
                 mythicDrift: 0,
                 infectionRate: 0,
+                ownershipGini: 0,
+                scarcityIndex: 0,
                 lifecycle: {
                     events: 0,
                     witnesses: 0,
@@ -194,12 +196,37 @@ class WorldObservatory {
         const infectionRate = (totalOwnershipLinks - lastLinks) / (lifecycle.intel || 1);
         this._lastTotalLinks = totalOwnershipLinks;
 
+        // --- 1.4 INFORMATION OWNERSHIP (GINI) ---
+        const ownershipCounts = new Map(); // node_id -> intel_count
+        if (window.IntelManager.ownershipRegistry) {
+            for (const [intelId, owners] of window.IntelManager.ownershipRegistry.entries()) {
+                owners.forEach(nodeId => {
+                    ownershipCounts.set(nodeId, (ownershipCounts.get(nodeId) || 0) + 1);
+                });
+            }
+        }
+        const counts = Array.from(ownershipCounts.values()).sort((a, b) => a - b);
+        let ownershipGini = 0;
+        if (counts.length > 0) {
+            const n = counts.length;
+            let sum = 0;
+            for (let i = 1; i <= n; i++) sum += (n + 1 - i) * counts[i - 1];
+            const totalCounts = counts.reduce((a, b) => a + b, 0);
+            ownershipGini = (n + 1 - 2 * (sum / (totalCounts || 1))) / n;
+        }
+
+        // --- 1.4 SCARCITY INDEX ---
+        const popSize = window.VillageManager?.kingdomPopulation || 1;
+        const scarcityIndex = Math.max(0, 1.0 - (lifecycle.intel / popSize));
+
         return {
             truthFidelity,
             avgTransmission,
             contamination,
             mythicDrift,
             infectionRate,
+            ownershipGini,
+            scarcityIndex,
             misinfoPersistence: isNaN(avgMisinfoAge) ? 0 : avgMisinfoAge,
             knowledgeHalfLife: avgAgeAtArchival,
             siloRatio: siloedCount / (total || 1),
