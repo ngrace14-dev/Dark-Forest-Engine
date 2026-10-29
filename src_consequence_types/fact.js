@@ -23,7 +23,7 @@ export class Fact {
             ? data.state
             : FactState.RUMOR;
         
-                        // Lineage & Lifecycle (Persistable)
+                                // Lineage & Lifecycle (Persistable)
         this.sourceChain = data.sourceChain ?? []; 
         this.age = data.age ?? 0; 
         this.verificationCount = data.verificationCount ?? 0;
@@ -37,6 +37,7 @@ export class Fact {
         this.significanceValue = data.significanceValue ?? 0;
         this.reservationLinks = data.reservationLinks ?? []; 
     }
+
 
 
     /**

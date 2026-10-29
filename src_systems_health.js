@@ -29,43 +29,44 @@ export class CharacterHealth {
         };
     }
 
-        takeDamage(limbName, amount, entity) {
-            if (!this.isAlive) return;
-            const limb = this.limbs[limbName];
-            if (!limb) return;
+            takeDamage(limbName, amount, entity) {
+        if (!this.isAlive) return;
+        const limb = this.limbs[limbName];
+        if (!limb) return;
 
-            if (limb.isAmputated) {
-                this.logEvent(`💨 The attack passed through the void where your ${limbName} used to be.`);
-                return;
-            }
-
-            const wasAtZero = limb.hp <= 0;
-            limb.hp = Math.max(0, limb.hp - amount);
-        
-            // Amputation Logic: Overkill damage while already at 0 HP
-            if (wasAtZero && amount > 25 && !limb.critical) {
-                limb.isAmputated = true;
-                this.logEvent(`💀 SEVERED! Your ${limbName} has been hacked off!`);
-                window.EventBus.emit('PLAY_SOUND', { url: 'https://tonejs.github.io/audio/drum-samples/crush-analog.mp3', vol: 10 });
-            } else {
-                this.logEvent(`💥 ${this.name} took ${amount} damage to the ${limbName}!`);
-            }
-
-            // --- HUNTSMAN INTERVENTION CHECK ---
-            if (this.name === 'Wanderer' && window.ForceManager?.checkIntervention) {
-                const currentHp = Object.values(this.limbs).reduce((acc, l) => acc + l.hp, 0);
-                const maxHp = Object.values(this.limbs).reduce((acc, l) => acc + l.max, 0);
-                window.ForceManager.checkIntervention(currentHp / maxHp);
-            }
-
-            // Update VAT if this is an NPC
-            if (entity && entity.vatIndex !== undefined) {
-                window.VATManager?.updateInstanceStat(entity, true);
-            }
-
-            this.checkStatus();
-            this.updateUI();
+        if (limb.isAmputated) {
+            this.logEvent(`💨 The attack passed through the void where your ${limbName} used to be.`);
+            return;
         }
+
+        const wasAtZero = limb.hp <= 0;
+        limb.hp = Math.max(0, limb.hp - amount);
+    
+        // Amputation Logic: Overkill damage while already at 0 HP
+        if (wasAtZero && amount > 25 && !limb.critical) {
+            limb.isAmputated = true;
+            this.logEvent(`💀 SEVERED! Your ${limbName} has been hacked off!`);
+            window.EventBus.emit('PLAY_SOUND', { url: 'https://tonejs.github.io/audio/drum-samples/crush-analog.mp3', vol: 10 });
+        } else {
+            this.logEvent(`💥 ${this.name} took ${amount} damage to the ${limbName}!`);
+        }
+
+        // --- HUNTSMAN INTERVENTION CHECK ---
+        if (this.name === 'Wanderer' && window.ForceManager?.checkIntervention) {
+            const currentHp = Object.values(this.limbs).reduce((acc, l) => acc + l.hp, 0);
+            const maxHp = Object.values(this.limbs).reduce((acc, l) => acc + l.max, 0);
+            window.ForceManager.checkIntervention(currentHp / maxHp);
+        }
+
+        // Update VAT if this is an NPC
+        if (entity && entity.vatIndex !== undefined) {
+            window.VATManager?.updateInstanceStat(entity, true);
+        }
+
+        this.checkStatus();
+        this.updateUI();
+    }
+
 
 
     /**
@@ -147,7 +148,7 @@ export class CharacterHealth {
         }
     }
 
-            updateUI() {
+                updateUI() {
         const statsContainer = document.getElementById('stats-container');
         if (!statsContainer) return;
 
@@ -166,6 +167,7 @@ export class CharacterHealth {
 
         html += `<div class="grid grid-cols-2 gap-2">`;
         for (const [name, data] of Object.entries(this.limbs)) {
+
 
             let color = "text-green-400";
             let statusText = `${data.hp}/${data.max}`;
