@@ -318,8 +318,12 @@ class FolkloreEngineSystem {
 
 
         this.anthology.push(poem);
+        
+        // --- BHCB LINK: Mythic Crystallization ---
+        window.EventBus.emit('FOLKLORE_GENERATED', poem);
 
                 // Register as Evidence/Intel (Bible §17)
+
         if (window.IntelManager) {
             window.IntelManager.register({
                 type: 'RUMOR',

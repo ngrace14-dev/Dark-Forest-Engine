@@ -454,7 +454,7 @@ class DynastyManagerSystem {
      * Records an event specifically into a House's institutional memory.
      * Bible §36: "Institutions persist to carry knowledge forward."
      */
-    recordHouseEvent(houseId, event) {
+        recordHouseEvent(houseId, event) {
         const house = this.houses.get(houseId);
         if (!house) return;
 
@@ -468,7 +468,13 @@ class DynastyManagerSystem {
 
         house.legacy += event.historicalWeight || 1;
         house.prestige += Math.floor((event.significance || 10) / 10);
+        
+        // --- HCB LINK: Event Captured by House ---
+        if (event.id) {
+            window.EventBus.emit('HOUSE_EVENT_CAPTURED', { houseId, eventId: event.id });
+        }
     }
+
 
         /**
      * Add a secret that only this house knows.
@@ -800,7 +806,7 @@ class DynastyManagerSystem {
     }
 
 
-    /**
+        /**
      * Node 3 -> 4: Institution -> Action
      * Once the institution "believes" the info, it commits to a world-state change.
      */
@@ -817,10 +823,14 @@ class DynastyManagerSystem {
         window.IntelManager.shareToInstitution(intelId, houseId);
 
         window.EventBus.emit('UI_LOG', `[INSTITUTION] ${house.name} has officially recognized: ${intel.payload.title}`);
+        
+        // --- HCB LINK: Institutional Capture ---
+        window.EventBus.emit('INTEL_INSTITUTIONALIZED', { houseId, intelId });
 
         // TRIGGER ACTION (Node 4)
         this.determineInstitutionalAction(houseId, intel);
     }
+
 
             /**
      * Node 4 & 6: Internal Conflict & Objective Competition

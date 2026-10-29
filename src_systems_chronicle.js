@@ -103,8 +103,12 @@ window.ChronicleManager = {
         event.witnesses ??= [];
         event.location ??= { x: 0, z: 0 };
 
-        // 2. Global Ledger
+                // 2. Global Ledger
         this.worldLedger.push(event);
+        
+        // --- BHCB LINK: Truth Entry ---
+        window.EventBus.emit('CHRONICLE_EVENT_RECORDED', event);
+
 
         // 3. Entity Scoped Ledger
         if (event.actorId) {
