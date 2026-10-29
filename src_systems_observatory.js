@@ -54,7 +54,16 @@ class WorldObservatory {
                     folklore: 0
                 }
             },
-            political: { meanLegitimacy: 1.0, powerConcentration: 0, conflictFrequency: 0 },
+            political: { 
+                meanLegitimacy: 1.0, 
+                powerConcentration: 0, 
+                conflictFrequency: 0,
+                institutionalAnxiety: 0,
+                narrativeGap: 0,
+                identityDrift: 0,
+                successionStability: 1.0,
+                sovereigntyIndex: 0
+            },
             historical: { mythicDrift: 0, knowledgeHalfLife: 0, archiveDensity: 0 },
             significance: { giniCoefficient: 0, inflationRate: 0, anchorDensity: 0 },
             dunes: { explorationDensity: 0, successRate: 0, avgSignificance: 0, dominantSurvivorTrait: 'NONE' },
@@ -249,6 +258,12 @@ class WorldObservatory {
         
         const meanLegitimacy = houses.reduce((acc, h) => acc + (h.legitimacy || 0), 0) / houses.length;
         
+        // --- 3.1 INSTITUTIONAL ANXIETY & STABILITY ---
+        const institutionalAnxiety = houses.reduce((acc, h) => acc + (h.exposureAnxiety || 0), 0) / houses.length;
+        const narrativeGap = houses.reduce((acc, h) => acc + (h.narrativeGap || 0), 0) / houses.length;
+        const identityDrift = houses.reduce((acc, h) => acc + (h.identityDrift || 0), 0) / houses.length;
+        const sovereigntyIndex = houses.reduce((acc, h) => acc + (h.sovereignty || 0), 0) / houses.length;
+
         // 1. Legitimacy Crisis: % of houses below 0.3 legitimacy
         const housesInCrisis = houses.filter(h => h.legitimacy < 0.3).length;
         
@@ -260,8 +275,15 @@ class WorldObservatory {
         const avgFeudIntensity = feudCount > 0 ? 
             window.DynastyManager.feuds.reduce((acc, f) => acc + (f.intensity || 0), 0) / feudCount : 0;
 
-        // 4. Political Stagnation (Inverted delta of blessed spots)
-        // Calculated by the Aggregator over time, but we probe the current count
+        // 4. Succession Stability
+        // Based on recent chronicle events in the last year
+        const day = window.EngineParams?.worldDay || 0;
+        const recentSuccessions = (window.ChronicleManager?.worldLedger || []).filter(e => 
+            e.type === 'SUCCESSION' && e.timestamp.day > day - 365
+        );
+        const peacefulSuccessions = recentSuccessions.filter(e => !e.detail.includes('violent') && !e.detail.includes('coup')).length;
+        const successionStability = recentSuccessions.length > 0 ? peacefulSuccessions / recentSuccessions.length : 1.0;
+
         const blessedCount = houses.filter(h => h.isBlessed).length;
 
         return {
@@ -270,7 +292,12 @@ class WorldObservatory {
             crisisRatio: housesInCrisis / houses.length,
             schismDensity: activeSchisms / houses.length,
             feudVolatility: feudCount * avgFeudIntensity,
-            blessedRatio: blessedCount / houses.length
+            blessedRatio: blessedCount / houses.length,
+            institutionalAnxiety,
+            narrativeGap,
+            identityDrift,
+            successionStability,
+            sovereigntyIndex
         };
     }
 
