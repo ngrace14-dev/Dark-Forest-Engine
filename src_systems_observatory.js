@@ -144,10 +144,31 @@ class WorldObservatory {
 
         const totalPrestige = houses.reduce((acc, h) => acc + (h.prestige || 0), 0) || 1;
         const hhi = houses.reduce((acc, h) => acc + Math.pow((h.prestige || 0) / totalPrestige, 2), 0);
+        
+        const meanLegitimacy = houses.reduce((acc, h) => acc + (h.legitimacy || 0), 0) / houses.length;
+        
+        // 1. Legitimacy Crisis: % of houses below 0.3 legitimacy
+        const housesInCrisis = houses.filter(h => h.legitimacy < 0.3).length;
+        
+        // 2. Schism Density: % of houses with active schisms
+        const activeSchisms = houses.filter(h => h.activeSchism).length;
+
+        // 3. Feud Intensity
+        const feudCount = window.DynastyManager.feuds?.length || 0;
+        const avgFeudIntensity = feudCount > 0 ? 
+            window.DynastyManager.feuds.reduce((acc, f) => acc + (f.intensity || 0), 0) / feudCount : 0;
+
+        // 4. Political Stagnation (Inverted delta of blessed spots)
+        // Calculated by the Aggregator over time, but we probe the current count
+        const blessedCount = houses.filter(h => h.isBlessed).length;
 
         return {
-            meanLegitimacy: houses.reduce((acc, h) => acc + (h.legitimacy || 0), 0) / houses.length,
-            powerConcentration: hhi
+            meanLegitimacy,
+            powerConcentration: hhi,
+            crisisRatio: housesInCrisis / houses.length,
+            schismDensity: activeSchisms / houses.length,
+            feudVolatility: feudCount * avgFeudIntensity,
+            blessedRatio: blessedCount / houses.length
         };
     }
 
