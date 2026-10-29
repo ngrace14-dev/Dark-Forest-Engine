@@ -622,11 +622,19 @@ class DynastyManagerSystem {
             }
         });
 
-        // 3. Selection
+                // 3. Selection
         let newLeaderId;
+        let triggerIntelId = null;
         if (potentialHeirs.length > 0) {
             potentialHeirs.sort((a, b) => b.score - a.score);
             newLeaderId = potentialHeirs[0].id;
+            
+            // Check if the top heir was selected based on a fabrication
+            const profile = window.PersonhoodManager?.profiles.get(newLeaderId);
+            if (profile && profile.traits.isKnownFabricator) {
+                // This heir's legitimacy is built on lies
+                triggerIntelId = 'FABRICATION_FALLBACK'; // Placeholder or actual fabrication ID
+            }
         } else {
             // Generate new heir if none found
             newLeaderId = `lord_${house.id.split('_')[1]}_${house.lineage.length + 1}`;
@@ -646,7 +654,8 @@ class DynastyManagerSystem {
             type: 'SUCCESSION',
             detail: `${house.name}: Succession from ${oldLeaderId || 'None'} to ${newLeaderId}.`,
             significance: 120,
-            historicalWeight: 80
+            historicalWeight: 80,
+            triggerIntelId // Tag for Misinfo Bureau
         };
 
                 window.ChronicleManager?.recordEvent(event);
@@ -731,7 +740,7 @@ class DynastyManagerSystem {
         }
     }
 
-    recordFeudEvent(houseA, houseB, reason) {
+        recordFeudEvent(houseA, houseB, reason, triggerIntelId = null) {
         let feud = this.feuds.find(f => 
             (f.houseA === houseA && f.houseB === houseB) || 
             (f.houseA === houseB && f.houseB === houseA)
@@ -746,8 +755,7 @@ class DynastyManagerSystem {
             feud.reason = reason;
         }
 
-        // Feuds influence NPC cognition (Phase 5)
-        // This is handled by ReputationManager.isRival() which we will hook into
+        window.EventBus.emit('FEUD_INTENSIFIED', { houseA, houseB, intensity: feud.intensity, triggerIntelId });
     }
 
         /**
@@ -912,12 +920,12 @@ class DynastyManagerSystem {
             }
 
 
-        // 2. If it's a SCANDAL about a rival house -> Feud/Leverage
+                // 2. If it's a SCANDAL about a rival house -> Feud/Leverage
         if (intel.payload.tags.includes('SCANDAL')) {
             const rivalHouse = intel.provenance[0]?.source_faction;
             if (rivalHouse && rivalHouse !== houseId) {
                 window.EventBus.emit('UI_LOG', `[ACTION] ${house.name} uses secret intel to leverage ${rivalHouse}!`);
-                this.recordFeudEvent(houseId, rivalHouse, 'POLITICAL_SCANDAL');
+                this.recordFeudEvent(houseId, rivalHouse, 'POLITICAL_SCANDAL', intel.intel_id);
                 this.applyLeverage(rivalHouse, intel.intel_id, 'TAXATION');
             }
         }

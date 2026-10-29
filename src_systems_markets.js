@@ -75,6 +75,7 @@ class MarketSystem {
         if (Math.random() < risk) {
             caravan.status = 'DESTROYED';
             window.EventBus.emit('UI_LOG', `[WAR] A merchant caravan was lost to Churn Rot.`);
+            window.EventBus.emit('CARAVAN_LOST', { caravanId: caravan.id, triggerIntelId: caravan.lastMarketIntelId });
         }
     }
 }

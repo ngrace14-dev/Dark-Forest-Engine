@@ -169,6 +169,7 @@ import './src_systems_information_velocity_observatory.js';
 
 import './src_systems_chronicle.js';
 import './src_systems_historical_divergence.js';
+import './src_systems_misinfo_consequence.js';
 import './src_systems_forces.js';
 import './src_systems_calibration.js';
 import './src_systems_navigation_careers.js';
