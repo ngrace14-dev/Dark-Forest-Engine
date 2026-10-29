@@ -149,7 +149,7 @@ class ShiftDirectorSystem {
         // 4. Force full chunk refresh
         window.EventBus.emit('WORLD_REGENERATE');
 
-        // --- PHASE 1A: CHRONICLE ACTIVATION ---
+                // --- PHASE 1A: CHRONICLE ACTIVATION ---
         window.ChronicleManager?.recordEvent({
             actorId: 'WORLD',
             type: 'SHIFT_COMPLETE',
@@ -160,6 +160,7 @@ class ShiftDirectorSystem {
             witnesses: window.VillageManager ? window.VillageManager.villages.map(v => `village_${v.id}`) : []
         });
 
+        window.EventBus.emit('SHIFT_COMPLETE', { epoch: window.EngineParams?.worldEpoch || 0 });
         window.EventBus.emit('UI_LOG', `[STABILIZATION] Current Epoch: ${window.EngineParams?.worldEpoch || 0}.`);
     }
 

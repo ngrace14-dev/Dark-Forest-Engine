@@ -109,6 +109,12 @@ class SignificanceEconomyAuditSystem {
         if (anomalies.includes("SIGNIFICANCE_STARVATION") || this.metrics.narrativeConcentration > 0.7) {
             this._applySignificanceDecay();
         }
+
+        // --- THERMODYNAMICS SYNC ---
+        // Ensure Thermodynamics is updated after audit
+        if (window.Thermodynamics && window.Thermodynamics.calculateMetrics) {
+            window.Thermodynamics.calculateMetrics();
+        }
         
         this.history.significanceSnapshots.push({
             day: day,

@@ -31,6 +31,13 @@ class IntelManagerSystem {
         this.archive = new Map();  // Map<intel_id, Intel_ID Object> (Historical/Legendary Records)
         this.ownershipRegistry = new Map(); // Map<intel_id, Set<node_id>> (Who physically holds references)
         this.institutionalSilos = new Map(); // Map<institution_id, Set<intel_id>>
+            window.EventBus.on('ENGINE_READY', () => {
+                // Tier 4: Information Purge (Every game day)
+                // Note: t12h real time = 1 game day according to src_core_heartbeat.js
+                window.EventBus.on('HEARTBEAT_T12H', () => {
+                    this.purge(window.EngineParams?.worldEpoch || 0, window.EngineParams?.worldDay || 0);
+                });
+            });
     }
 
     /**
@@ -533,6 +540,11 @@ window.IntelPropagation = {
 window.TruthSystem = {
     // Verified Reality Store
     facts: new Map(), // Map<coord_hash, { type, value, timestamp }>
+
+                window.EventBus.on('ENGINE_READY', () => {
+            window.EventBus.on('HEARTBEAT_T30S', () => this.update());
+        });
+    },
 
     update: function() {
         // Periodically verify standing rumors if player/NPC is present at the location
