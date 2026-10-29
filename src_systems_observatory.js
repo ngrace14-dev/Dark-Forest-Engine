@@ -133,12 +133,33 @@ class WorldObservatory {
             folklore: window.FolkloreEngine?.anthology.length || 0
         };
 
-        // 1. Truth Fidelity
-        const truthFidelity = lifecycle.truths / (lifecycle.intel || 1);
+        // --- 1.2 TRUTH FIDELITY (GLOBAL BELIEF DISTRIBUTION) ---
+        let totalGlobalBeliefs = 0;
+        let totalTrueBeliefs = 0;
+        
+        if (window.IntelManager.ownershipRegistry) {
+            for (const [intelId, owners] of window.IntelManager.ownershipRegistry.entries()) {
+                const intel = window.IntelManager.lookup(intelId);
+                if (!intel) continue;
+                
+                const count = owners.size;
+                totalGlobalBeliefs += count;
+                if (intel.truth_state === 'TRUE') {
+                    totalTrueBeliefs += count;
+                }
+            }
+        }
+        
+        const truthFidelity = totalGlobalBeliefs > 0 ? totalTrueBeliefs / totalGlobalBeliefs : 1.0;
+
+        // --- 1.2 KNOWLEDGE HALF-LIFE (APPROXIMATION) ---
+        const day = window.EngineParams?.worldDay || 0;
+        const deceasedIntel = archive.filter(i => i.persistence === 'FORGOTTEN' || i.persistence === 'ARCHIVED');
+        const avgAgeAtArchival = deceasedIntel.length > 0 ? 
+            deceasedIntel.reduce((acc, i) => acc + (i.archivedAtDay - i.payload.timestamp_day), 0) / deceasedIntel.length : 0;
 
         // 2. Propagation Velocity (Estimate)
-        // Average transmission_count of active intel
-        const avgTransmission = registry.reduce((acc, i) => acc + (i.provenance?.transmission_count || 0), 0) / total;
+        const avgTransmission = registry.reduce((acc, i) => acc + (i.provenance?.transmission_count || 0), 0) / (registry.length || 1);
 
         // 3. Contamination: Percentage of rumors with certainty > 0.5 that are actually FALSE (if we had truth_state)
         const falseRumors = rumors.filter(i => i.truth_state === 'FALSE' && i.certainty > 0.5).length;
@@ -164,6 +185,7 @@ class WorldObservatory {
             avgTransmission,
             contamination,
             misinfoPersistence: isNaN(avgMisinfoAge) ? 0 : avgMisinfoAge,
+            knowledgeHalfLife: avgAgeAtArchival,
             siloRatio: siloedCount / (total || 1),
             lifecycle
         };
