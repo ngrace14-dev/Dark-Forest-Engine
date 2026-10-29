@@ -141,20 +141,41 @@ class HistoryOfficeSystem {
     }
 
     /**
-     * Cross-references the 4 layers of an event.
+     * The Player (as Editor) publishes a verified truth to the world.
+     * Bible §1, §16: "The Editor's Decree."
      */
-    getNarrativeLayers(eventId) {
-        const chronicle = window.ChronicleManager?.worldLedger.find(e => e.id === eventId);
-        if (!chronicle) return null;
+    publishPlayerNarrative(eventId, truthId) {
+        const event = window.ChronicleManager?.worldLedger.find(e => e.id === eventId);
+        const truth = window.IntelManager?.lookup(truthId);
+        if (!event || !truth) return;
 
-        const truth = Array.from(window.IntelManager?.registry.values() || [])
-            .find(i => i.significance.historical === chronicle.historicalWeight && i.type === 'FACT');
+        const narrative = {
+            eventId: event.id,
+            bias: 'PLAYER_EDITOR',
+            truthId: truth.intel_id,
+            detail: `DIRECTORATE DECREE: ${truth.payload.description}`,
+            authority: 1.0 // Maximum authority
+        };
 
-        const official = this.officialLedger.filter(n => n.originalEventId === eventId);
+        window.ChronicleManager?.registerOfficialNarrative(narrative);
 
-        const folklore = window.GameState?.anthology?.filter(p => p.originId === (chronicle.legendId || 'none'));
+        // Register as a global fact that overrides rumors
+        window.IntelManager.register({
+            type: 'FACT',
+            payload: {
+                title: `DIRECTORATE RECORD: ${event.type}`,
+                description: narrative.detail,
+                tags: ['OFFICIAL_HISTORY', 'DIRECTORATE_DECREE', 'UNBIASED'],
+                sourceEventId: event.id
+            },
+            significance: { political: 100, historical: event.historicalWeight * 2 },
+            truth_state: 'TRUE',
+            certainty: 1.0,
+            isAnchored: true
+        });
 
-        return { chronicle, truth, official, folklore };
+        window.EventBus.emit('UI_LOG', `[HISTORY] The Directorate has canonized the truth of ${event.type}.`);
+        window.EventBus.emit('HISTORY_PUBLISHED', narrative);
     }
 }
 
