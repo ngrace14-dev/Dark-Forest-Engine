@@ -91,45 +91,115 @@ class AttractorSystem {
     }
 
 
-    executeChoice(choiceKey) {
+        executeChoice(choiceKey) {
         const choice = this.choices[choiceKey];
         if (!choice) return;
 
         window.EventBus.emit('UI_LOG', `[FINALITY] You have chosen: ${choice.title}`);
         
+        // Hide terminal after choice
+        const overlay = document.getElementById('endgame-terminal-overlay');
+        if (overlay) overlay.classList.add('hidden');
+
         switch (choice.outcome) {
             case 'RESET_LOOP':
-                this.ouroborosReset();
+                this.claimTheThrone();
                 break;
             case 'DROSTE_VIEW':
                 this.activate5DMode();
                 break;
             case 'BLACKOUT':
-                this.walkAway();
+                this.triggerBlackout();
                 break;
         }
     }
 
-    ouroborosReset() {
-        window.EventBus.emit('UI_LOG', 'The Ouroboros bites its tail. Everything begins again.');
+    /**
+     * Outcome 1: THE THRONE (CROWN)
+     * Locks reality into a permanent, stable state.
+     * Bible §BM: "Anchoring the loop."
+     */
+    claimTheThrone() {
+        window.EventBus.emit('UI_LOG', '👑 [ASCENSION] You have claimed the Throne. The loop is anchored.');
+        
+        // 1. Physics Lock
+        if (window.ShiftDirector) {
+            window.ShiftDirector.isShifting = false;
+            // Disable the cycle check
+            window.ShiftDirector.checkCycle = () => {}; 
+        }
+
+        // 2. Institutional Stasis
+        if (window.DynastyManager) {
+            window.DynastyManager.houses.forEach(h => {
+                h.internalConflictLevel = 0;
+                h.exposureAnxiety = 0;
+                h.legitimacy = 1.0;
+                h.publicTrust = 1.0;
+            });
+        }
+
+        // 3. Narrative Finality
+        window.ChronicleManager?.recordEvent({
+            actorId: 'player',
+            type: 'ETERNAL_SOVEREIGN',
+            detail: 'The Wanderer has ascended. The Dark Forest is unified under a single, unchanging truth.',
+            significance: 1000,
+            historicalWeight: 500
+        });
+
         setTimeout(() => {
-            localStorage.removeItem('dark-forest-save');
-            window.location.reload();
+            window.EventBus.emit('UI_LOG', 'Simulation Stasis Achieved. The record is sealed.');
+            // Allow continued observation in a static world
+            if (window.GameCore) window.GameCore.paused = false;
         }, 3000);
     }
 
+    /**
+     * Outcome 2: THE 5D CUSTODIAN (CROW)
+     * Removes player from physical world, unlocks full observation.
+     * Bible §BM: "Refusing the throne."
+     */
     activate5DMode() {
-        // Bible §BM: Droste recursive zoom across nested universe scenes.
-        // For now, boilerplate: Unlock all views and disable all costs/risk.
-        window.EngineConfig.showSystemReasoning = true;
-        if (window.DreamManager) {
-            window.DreamManager.patronage.activePath = '5D_CUSTODIAN';
+        window.EventBus.emit('UI_LOG', '👁️ [ASCENSION] You have refused the Throne. You are now the Custodian.');
+        
+        // 1. Remove Physical Presence
+        if (window.GameCore?.playerObj) {
+            window.GameCore.scene.remove(window.GameCore.playerObj.visual);
+            window.GameCore.playerObj = null;
         }
+
+        // 2. Unlock 5D Vision
+        window.EngineConfig.crowsEyeMode = true;
+        window.GameState.narrator.crowsBlessingEarned = true;
+        
+        // 3. Systemic Invisibility
+        // NPCs can no longer "Observe" the player. All risk metrics removed.
+        
         window.EventBus.emit('UI_LOG', 'You are now the Unspecial Nobody. The harvest cannot find you.');
+        
+        if (window.GameCore) window.GameCore.paused = false;
+        // The simulation continues in a permanent loop
     }
 
-    walkAway() {
-        // Bible §BM: 60-second blackout screen -> Main Menu.
+    /**
+     * Outcome 3: THE 60-SECOND BLACKOUT (WENDIGO)
+     * Erases all significance to hide from the harvest.
+     * Bible §BM: "The final layer."
+     */
+    triggerBlackout() {
+        window.EventBus.emit('UI_LOG', '⚫ [RENUNCIATION] You are ceasing observation. Reality is being erased.');
+
+        // 1. Recursive Deletion of Ledger
+        let deleteInterval = setInterval(() => {
+            if (window.ChronicleManager?.worldLedger.length > 0) {
+                window.ChronicleManager.worldLedger.pop();
+            } else {
+                clearInterval(deleteInterval);
+            }
+        }, 10);
+
+        // 2. The Blackout Screen
         const overlay = document.createElement('div');
         overlay.style.cssText = `
             position: fixed;
@@ -137,22 +207,34 @@ class AttractorSystem {
             background: black;
             z-index: 100000;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
-            color: #451a03;
             font-family: monospace;
             opacity: 0;
-            transition: opacity 5s ease-in;
+            transition: opacity 10s ease-in;
         `;
-        overlay.innerHTML = 'CEASING OBSERVATION... THE HARVEST ENDS.';
+        overlay.innerHTML = `
+            <div style="color: #451a03; font-size: 14px; letter-spacing: 0.5em; margin-bottom: 20px;">CEASING OBSERVATION...</div>
+            <div id="blackout-timer" style="color: #1a0a01; font-size: 10px;">60s remaining</div>
+        `;
         document.body.appendChild(overlay);
         
         setTimeout(() => overlay.style.opacity = '1', 100);
-        
-        setTimeout(() => {
-            window.location.reload(); // Return to menu/restart
-        }, 60000);
+
+        let countdown = 60;
+        const timerText = overlay.querySelector('#blackout-timer');
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            if (timerText) timerText.innerText = `${countdown}s remaining`;
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                localStorage.removeItem('dark-forest-save');
+                window.location.reload();
+            }
+        }, 1000);
     }
+
 
     /**
      * Bible §24: Forest Will Whispers.
