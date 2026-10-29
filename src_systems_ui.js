@@ -1048,26 +1048,14 @@ class InstitutionalReportUI {
     }
 }
 
-    // ==========================================
-    // INITIALIZATION BOOTSTRAP
-    // ==========================================
-    window.addEventListener('DOMContentLoaded', () => {
-        window.UI_IntelBag = new IntelBagUI();
-        window.UI_SquadManager = new SquadManagerUI();
-        window.UI_FactionMap = new FactionMapUI();
-        window.UI_WorldOverlay = new WorldOverlayUI();
-        window.UI_InstitutionalReport = new InstitutionalReportUI();
-        window.UI_WorldHealth = new WorldHealthUI();
-    });
-
-    // ==========================================
+        // ==========================================
     // COMPONENT 6: WORLD HEALTH DIRECTORATE UI (CROW'S EYE)
     // ==========================================
     class WorldHealthUI {
         constructor() {
             this.panel = document.createElement('div');
             this.panel.id = 'world-health-panel';
-            this.panel.className = 'absolute left-1/2 -translate-x-1/2 top-6 w-[800px] bg-black/90 border-2 border-red-900/50 rounded-lg shadow-[0_0_50px_rgba(220,38,38,0.2)] p-4 hidden z-50 flex-col font-mono backdrop-blur-xl pointer-events-auto';
+            this.panel.className = 'absolute left-1/2 -translate-x-1/2 top-6 w-[850px] bg-black/90 border-2 border-red-900/50 rounded-lg shadow-[0_0_50px_rgba(220,38,38,0.2)] p-4 hidden z-50 flex-col font-mono backdrop-blur-xl pointer-events-auto';
             document.body.appendChild(this.panel);
             this.bindEvents();
         }
@@ -1088,6 +1076,7 @@ class InstitutionalReportUI {
             if (!window.WorldObservatory) return;
             const report = window.WorldObservatory.generateDiagnosticReport();
             const health = window.WorldObservatory.calculateWorldHealth();
+            const decades = window.WorldObservatory.reports.decades;
             
             const categoryColors = {
                 'EXCELLENT': 'text-emerald-400',
@@ -1132,7 +1121,24 @@ class InstitutionalReportUI {
                     </div>
                 </div>
 
-                <div class="flex-1 bg-black/40 rounded border border-red-900/20 p-4 custom-scrollbar overflow-y-auto max-h-[250px]">
+                <!-- STEP 5: HISTORICAL TREND ANALYSIS (1000-YEAR TIMELINE) -->
+                <div class="mb-6 bg-black/40 border border-gray-800 rounded p-3">
+                    <h3 class="text-[10px] text-gray-400 font-bold uppercase mb-2 border-b border-gray-800 pb-1">1000-Year Historical Continuity Analysis</h3>
+                    <div class="flex items-end gap-1 h-20 w-full bg-gray-950/50 p-1">
+                        ${decades.length === 0 ? '<div class="text-center w-full text-[10px] text-gray-700 py-6 uppercase tracking-widest">Accumulating Century Data...</div>' : ''}
+                        ${decades.map(d => {
+                            const h = d.whsTrend || 50;
+                            const color = h > 85 ? 'bg-emerald-500' : h > 60 ? 'bg-blue-500' : h > 40 ? 'bg-yellow-500' : 'bg-red-600';
+                            return `<div class="flex-1 ${color} opacity-80 hover:opacity-100 transition-opacity cursor-help" style="height: ${h}%" title="Year ${d.year}: Health ${Math.floor(h)}%"></div>`;
+                        }).join('')}
+                    </div>
+                    <div class="flex justify-between mt-1 text-[8px] text-gray-600 font-bold uppercase">
+                        <span>Year 0</span>
+                        <span>Millennial Horizon (1000 Years)</span>
+                    </div>
+                </div>
+
+                <div class="flex-1 bg-black/40 rounded border border-red-900/20 p-4 custom-scrollbar overflow-y-auto max-h-[200px]">
                     <h3 class="text-[10px] text-red-400 font-bold uppercase mb-3 border-b border-red-900/10 pb-1">Diagnostic Intelligence Output</h3>
                     <div class="space-y-2">
                         ${report.notes.map(note => `
@@ -1167,5 +1173,18 @@ class InstitutionalReportUI {
             `;
         }
     }
+
+    // ==========================================
+    // INITIALIZATION BOOTSTRAP
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', () => {
+        window.UI_IntelBag = new IntelBagUI();
+        window.UI_SquadManager = new SquadManagerUI();
+        window.UI_FactionMap = new FactionMapUI();
+        window.UI_WorldOverlay = new WorldOverlayUI();
+        window.UI_InstitutionalReport = new InstitutionalReportUI();
+        window.UI_WorldHealth = new WorldHealthUI();
+    });
+
 
 

@@ -334,10 +334,13 @@ class WorldObservatory {
 
     aggregateDecade(year) {
         const decadeData = this.reports.years.slice(-10);
+        const trends = this.calculateTrends(decadeData);
+        
         const report = {
             type: 'DECADE',
             year,
-            trends: this.calculateTrends(decadeData)
+            trends,
+            whsTrend: this.calculateWorldHealth().score // Store health at end of decade
         };
         this.reports.decades.push(report);
 
