@@ -7,7 +7,7 @@
  */
 
 class AttractorSystem {
-    constructor() {
+        constructor() {
         this.isChoiceActive = false;
         this.choices = {
             THRONE: { 
@@ -29,10 +29,13 @@ class AttractorSystem {
 
         window.EventBus.on('ENGINE_READY', () => this.init());
         window.EventBus.on('MYSTERY_RESOLVED', (mId) => this.checkEndgameThreshold(mId));
+        
+        // --- STEP 10-1: CONTINUOUS HEALTH MONITORING ---
+        window.EventBus.on('HEARTBEAT_T1', () => this.checkGlobalStabilityThreshold());
     }
 
     init() {
-        console.log("⚡ [Attractor] The Great Attractor is monitoring the Zero Horizon.");
+        console.log("%c⚡ [Attractor] The Great Attractor is monitoring the Zero Horizon.", "color: #a855f7; font-weight: bold;");
     }
 
     /**
@@ -40,23 +43,53 @@ class AttractorSystem {
      * Bible §33: Tier 11 (The First Wendigo).
      */
     checkEndgameThreshold(mId) {
+        if (this.isChoiceActive) return;
+
         if (mId === 'first_wendigo' || mId === 'origin_fracture') {
-            const mystery = window.InvestigationManager?.mysteries.get('first_wendigo');
+            const mystery = window.InvestigationManager?.mysteries.get(mId);
             if (mystery?.state === 'RESOLVED') {
-                this.activateTrinityOfChoice();
+                this.activateTrinityOfChoice('DISCOVERY');
             }
         }
     }
 
-    activateTrinityOfChoice() {
-        this.isChoiceActive = true;
-        window.EventBus.emit('UI_LOG', '⚠️ [CRITICAL] THE ZERO HORIZON HAS BEEN BREACHED.');
-        window.EventBus.emit('UI_LOG', '⚠️ [CRITICAL] THE GREAT ATTRACTOR IS PULLING YOU IN.');
-        window.EventBus.emit('ENDGAME_CHOICE_READY');
-        
-        // Mute all distractions
-        if (window.Tone && window.Tone.Destination) window.Tone.Destination.mute = true;
+    /**
+     * Triggers the endgame when civilization reaches peak stability or absolute collapse.
+     */
+    checkGlobalStabilityThreshold() {
+        if (this.isChoiceActive || !window.WorldObservatory) return;
+
+        const health = window.WorldObservatory.calculateWorldHealth();
+        if (health.score >= 85) {
+            this.activateTrinityOfChoice('STABILITY');
+        } else if (health.score < 20) {
+            this.activateTrinityOfChoice('COLLAPSE');
+        }
     }
+
+    activateTrinityOfChoice(path) {
+        if (this.isChoiceActive) return;
+        this.isChoiceActive = true;
+
+        window.EventBus.emit('UI_LOG', `⚠️ [CRITICAL] THE ZERO HORIZON HAS BEEN BREACHED VIA THE ${path} PATH.`);
+        window.EventBus.emit('UI_LOG', '⚠️ [CRITICAL] THE GREAT ATTRACTOR IS PULLING YOU IN.');
+        
+        // 1. SYSTEM MUTE (Symbolic Silence)
+        if (window.Tone && window.Tone.Destination) {
+            window.Tone.Destination.mute = true;
+        }
+
+        // 2. DISABLE WORLD SIMULATION
+        if (window.GameCore) {
+            window.GameCore.paused = true;
+        }
+
+        // 3. TRIGGER TERMINAL UI
+        window.EventBus.emit('ENDGAME_CHOICE_READY', { path });
+        
+        console.warn(`%c[ZERO HORIZON] Simulation frozen. Finality state active.`, "color: #ef4444; font-weight: bold;");
+    }
+
 
     executeChoice(choiceKey) {
         const choice = this.choices[choiceKey];
