@@ -799,36 +799,56 @@ class DynastyManagerSystem {
         window.EventBus.emit('UI_LOG_DEBUG', `[DYNASTY] ${house.name} received report on ${intel.payload.title}. Certainty: ${buffer.aggregateCertainty.toFixed(2)}`);
 
                 // If certainty passes the Institutional Threshold, it becomes Institutional Knowledge
-        if (buffer.aggregateCertainty > 0.7 && buffer.status === 'UNVERIFIED') {
-            this.institutionalizeIntel(houseId, intelId);
-            this.updateInstitutionalBeliefs(houseId, intelId);
-        }
+                if (buffer.aggregateCertainty > 0.7 && buffer.status === 'UNVERIFIED') {
+                    this.institutionalizeIntel(houseId, intelId);
+                    this.updateInstitutionalBeliefs(houseId, intelId);
+                }
     }
 
 
-        /**
+    /**
+     * Node 1: TRUTH, RUMOR, FABRICATION, MYTH, HISTORY
+     */
+        categorizeNarrative(intelId) {
+        const intel = window.IntelManager?.lookup(intelId);
+        if (!intel) return 'UNKNOWN';
+
+        const tags = intel.payload?.tags || [];
+        const isMyth = tags.includes('FOLKLORE') || tags.includes('POEM_TRAP');
+        const isFabrication = intel.truth_state === 'FALSE' && (intel.certainty > 0.8 || tags.includes('FABRICATION'));
+        const isHistory = intel.historical_status === 'HISTORICAL' || tags.includes('CHRONICLE');
+        
+        if (isMyth) return 'MYTH';
+        if (isFabrication) return 'FABRICATION';
+        if (isHistory && intel.truth_state === 'TRUE') return 'HISTORY';
+        if (intel.type === 'FACT' && intel.truth_state === 'TRUE') return 'TRUTH';
+        return 'RUMOR';
+    }
+
+
+                /**
      * Node 3 -> 4: Institution -> Action
      * Once the institution "believes" the info, it commits to a world-state change.
      */
     institutionalizeIntel(houseId, intelId) {
-        const house = this.houses.get(houseId);
-        const intel = window.IntelManager.lookup(intelId);
-        if (!house || !intel) return;
+                const house = this.houses.get(houseId);
+                const intel = window.IntelManager.lookup(intelId);
+                if (!house || !intel) return;
 
-        const buffer = house.reportBuffer.get(intelId);
-        buffer.status = 'OFFICIAL';
+                const buffer = house.reportBuffer.get(intelId);
+                buffer.status = 'OFFICIAL';
         
-        // Add to permanent archives
-        house.archives.push(intelId);
-        window.IntelManager.shareToInstitution(intelId, houseId);
+                // Add to permanent archives
+                house.archives.push(intelId);
+                window.IntelManager.shareToInstitution(intelId, houseId);
 
-        window.EventBus.emit('UI_LOG', `[INSTITUTION] ${house.name} has officially recognized: ${intel.payload.title}`);
+                window.EventBus.emit('UI_LOG', `[INSTITUTION] ${house.name} has officially recognized: ${intel.payload.title}`);
         
-        // --- HCB LINK: Institutional Capture ---
-        window.EventBus.emit('INTEL_INSTITUTIONALIZED', { houseId, intelId });
+                // --- HCB LINK: Institutional Capture ---
+                window.EventBus.emit('INTEL_INSTITUTIONALIZED', { houseId, intelId, category: this.categorizeNarrative(intelId) });
 
-        // TRIGGER ACTION (Node 4)
-        this.determineInstitutionalAction(houseId, intel);
+                // TRIGGER ACTION (Node 4)
+                this.determineInstitutionalAction(houseId, intel);
     }
 
 
