@@ -45,9 +45,15 @@ class DuneInvestigationSystem {
             this.regenerateDunes();
         }
         
-        this.isOccupied = insideDunes;
+                this.isOccupied = insideDunes;
 
         if (this.isOccupied) {
+            // --- DRD ANALYTICS: EXPEDITION TRACKING ---
+            if (!this._lastOccupiedState && window.DunesAnalytics) {
+                const profile = window.PersonhoodManager?.getProfile('player_node');
+                window.DunesAnalytics.startExpedition('player', profile?.traits || {}, profile?.career || 'Wanderer');
+            }
+
             this.processDuneScanning();
             this.applyRelativeStatScaling(window.GameCore.playerObj);
         } else {
