@@ -7,7 +7,12 @@ export class CharacterHealth {
         this.isAlive = true;
         this.blood = 100; 
         
+        // --- PHASE 1: CORE INTEGRITY ---
+        this.core_integrity = 100;
+        this.is_core_shattered = false;
+        
                 this.limbs = {
+
             head: { hp: 100, max: 100, critical: true, isAmputated: false },
             torso: { hp: 100, max: 100, critical: true, isAmputated: false },
             leftArm: { hp: 100, max: 100, critical: false, isAmputated: false },
@@ -25,46 +30,70 @@ export class CharacterHealth {
     }
 
         takeDamage(limbName, amount, entity) {
-        if (!this.isAlive) return;
-        const limb = this.limbs[limbName];
-        if (!limb) return;
+            if (!this.isAlive) return;
+            const limb = this.limbs[limbName];
+            if (!limb) return;
 
-                if (limb.isAmputated) {
-            this.logEvent(`💨 The attack passed through the void where your ${limbName} used to be.`);
-            return;
-        }
+            if (limb.isAmputated) {
+                this.logEvent(`💨 The attack passed through the void where your ${limbName} used to be.`);
+                return;
+            }
 
-        const wasAtZero = limb.hp <= 0;
-        limb.hp = Math.max(0, limb.hp - amount);
+            const wasAtZero = limb.hp <= 0;
+            limb.hp = Math.max(0, limb.hp - amount);
         
-        // Amputation Logic: Overkill damage while already at 0 HP
-                if (wasAtZero && amount > 25 && !limb.critical) {
-            limb.isAmputated = true;
-            this.logEvent(`💀 SEVERED! Your ${limbName} has been hacked off!`);
-            window.EventBus.emit('PLAY_SOUND', { url: 'https://tonejs.github.io/audio/drum-samples/crush-analog.mp3', vol: 10 });
-        } else {
-            this.logEvent(`💥 ${this.name} took ${amount} damage to the ${limbName}!`);
+            // Amputation Logic: Overkill damage while already at 0 HP
+            if (wasAtZero && amount > 25 && !limb.critical) {
+                limb.isAmputated = true;
+                this.logEvent(`💀 SEVERED! Your ${limbName} has been hacked off!`);
+                window.EventBus.emit('PLAY_SOUND', { url: 'https://tonejs.github.io/audio/drum-samples/crush-analog.mp3', vol: 10 });
+            } else {
+                this.logEvent(`💥 ${this.name} took ${amount} damage to the ${limbName}!`);
+            }
+
+            // --- HUNTSMAN INTERVENTION CHECK ---
+            if (this.name === 'Wanderer' && window.ForceManager?.checkIntervention) {
+                const currentHp = Object.values(this.limbs).reduce((acc, l) => acc + l.hp, 0);
+                const maxHp = Object.values(this.limbs).reduce((acc, l) => acc + l.max, 0);
+                window.ForceManager.checkIntervention(currentHp / maxHp);
+            }
+
+            // Update VAT if this is an NPC
+            if (entity && entity.vatIndex !== undefined) {
+                window.VATManager?.updateInstanceStat(entity, true);
+            }
+
+            this.checkStatus();
+            this.updateUI();
         }
 
-        // --- HUNTSMAN INTERVENTION CHECK ---
-        if (this.name === 'Wanderer' && window.ForceManager?.checkIntervention) {
-            const currentHp = Object.values(this.limbs).reduce((acc, l) => acc + l.hp, 0);
-            const maxHp = Object.values(this.limbs).reduce((acc, l) => acc + l.max, 0);
-            window.ForceManager.checkIntervention(currentHp / maxHp);
+
+    /**
+     * Core Integrity represents the entity's soul-anchor.
+     * If it hits 0, the core shatters, leading to non-linear debuffs.
+     */
+    damageCore(amount) {
+        if (this.is_core_shattered) return;
+        
+        this.core_integrity = Math.max(0, this.core_integrity - amount);
+        this.logEvent(`🌀 CORE DAMAGE: ${amount}. Integrity: ${this.core_integrity}%`);
+        
+        if (this.core_integrity <= 0) {
+            this.is_core_shattered = true;
+            this.logEvent(`⚠️ CRITICAL: YOUR CORE HAS SHATTERED. Reality begins to bleed.`);
+            window.EventBus.emit('CORE_SHATTERED', { name: this.name });
         }
-
-        // Update VAT if this is an NPC
-
-        if (entity && entity.vatIndex !== undefined) {
-            window.VATManager.updateInstanceStat(entity, true);
-        }
-
-        this.checkStatus();
+        
         this.updateUI();
     }
 
+    repairCore(amount) {
+        this.core_integrity = Math.min(100, this.core_integrity + amount);
+        if (this.core_integrity > 0) this.is_core_shattered = false;
+        this.updateUI();
+    }
 
-        checkStatus() {
+    checkStatus() {
         if (this.limbs.head.hp <= 0 || this.limbs.torso.hp <= 0) {
             this.isAlive = false;
             this.logEvent(`💀 ${this.name} has died.`);
@@ -82,6 +111,7 @@ export class CharacterHealth {
             }
             return;
         }
+
 
 
                 if (this.limbs.leftLeg.hp <= 0 && this.limbs.rightLeg.hp <= 0) {
@@ -117,12 +147,26 @@ export class CharacterHealth {
         }
     }
 
-        updateUI() {
+            updateUI() {
         const statsContainer = document.getElementById('stats-container');
         if (!statsContainer) return;
 
-        let html = `<div class="grid grid-cols-2 gap-2">`;
+        let html = `
+            <div class="mb-4 p-2 bg-indigo-900/40 border border-indigo-700 rounded">
+                <div class="flex justify-between text-xs text-indigo-300 uppercase mb-1">
+                    <span>Core Integrity</span>
+                    <span>${this.core_integrity}%</span>
+                </div>
+                <div class="w-full bg-gray-900 h-2 rounded-full overflow-hidden border border-indigo-800">
+                    <div class="h-full ${this.is_core_shattered ? 'bg-red-600 animate-pulse' : 'bg-indigo-500'}" style="width: ${this.core_integrity}%"></div>
+                </div>
+                ${this.is_core_shattered ? '<div class="text-[10px] text-red-400 mt-1 italic">NON-LINEAR DEGRADATION ACTIVE</div>' : ''}
+            </div>
+        `;
+
+        html += `<div class="grid grid-cols-2 gap-2">`;
         for (const [name, data] of Object.entries(this.limbs)) {
+
             let color = "text-green-400";
             let statusText = `${data.hp}/${data.max}`;
             

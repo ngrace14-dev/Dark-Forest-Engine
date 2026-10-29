@@ -23,18 +23,21 @@ export class Fact {
             ? data.state
             : FactState.RUMOR;
         
-                // Lineage & Lifecycle (Persistable)
-        this.sourceChain = data.sourceChain || []; 
-        this.age = data.age || 0; 
-        this.verificationCount = data.verificationCount || 0;
-        this.cooldownUntil = data.cooldownUntil || 0; 
-        this.isAnchored = data.isAnchored || false; // Issue 5: Persistence of Anchor status
+                        // Lineage & Lifecycle (Persistable)
+        this.sourceChain = data.sourceChain ?? []; 
+        this.age = data.age ?? 0; 
+        this.verificationCount = data.verificationCount ?? 0;
+        this.cooldownUntil = data.cooldownUntil ?? 0; 
+        this.isAnchored = data.isAnchored ?? false; // Issue 5: Persistence of Anchor status
+        
+        // Dune Saturation Flag (Phase 1)
+        this.hasTrippedDuneSaturation = data.hasTrippedDuneSaturation ?? false;
         
         // Pressure Hooks
-
-        this.significanceValue = data.significanceValue || 0;
-        this.reservationLinks = data.reservationLinks || []; 
+        this.significanceValue = data.significanceValue ?? 0;
+        this.reservationLinks = data.reservationLinks ?? []; 
     }
+
 
     /**
      * Serializes the fact for persistence.

@@ -33,17 +33,53 @@ export class EpochManager {
 
     }
 
-    _generateEpochSeed() {
+        _generateEpochSeed() {
         return `${this.baseSeed}_epoch_${this.currentEpoch}`;
     }
 
     advanceEpoch() {
+        // --- PHASE 3: STATIC NODE PERSISTENCE ---
+        // Capture positions of all static nodes before the shift
+        const staticNodes = this._captureStaticNodes();
+
         this.currentEpoch++;
         this.currentSeed = this._generateEpochSeed();
         this.prng = alea(this.currentSeed);
         this.noise2D = createNoise2D(this.prng);
+        
+        // Restore static nodes to their absolute coordinates
+        this._restoreStaticNodes(staticNodes);
+        
         return this.currentEpoch;
     }
+
+
+    _captureStaticNodes() {
+        if (!window.GameCore?.activeEntities) return [];
+        return window.GameCore.activeEntities
+            .filter(e => e.is_static_node || e.is_anchored)
+            .map(e => ({
+                id: e.id,
+                pos: { x: e.visual.position.x, z: e.visual.position.z },
+                worldState: e.worldState ? { ...e.worldState } : null
+            }));
+    }
+
+    _restoreStaticNodes(nodes) {
+        if (!nodes || nodes.length === 0) return;
+        
+        nodes.forEach(nodeData => {
+            const ent = window.GameCore.activeEntities.find(e => e.id === nodeData.id);
+            if (ent) {
+                // Force absolute coordinate lock
+                ent.visual.position.set(nodeData.pos.x, ent.visual.position.y, nodeData.pos.z);
+                if (ent.worldState) ent.worldState = nodeData.worldState;
+                
+                window.EventBus.emit('UI_LOG_DEBUG', `[EPOCH] Static Node ${ent.id} resisted the scattering loop.`);
+            }
+        });
+    }
+
 
         update(dt) {
         // --- THE 7-DAY PERCEPTION SKIP (§5) ---

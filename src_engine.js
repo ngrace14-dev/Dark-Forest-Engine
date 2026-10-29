@@ -864,14 +864,14 @@ function updateCombatHitboxes(delta) {
                     const attBuff = window.GameCore?.getBuffBonus?.('meleeAtt') ?? 0;
                     const injuryMult = window.GameCore?.getCombatInjuryMultiplier?.() ?? 1.0;
 
-                    const rawDamage = weaponDmg + ((strLvl + strBuff) * 2) + attBuff;
+                                        const rawDamage = weaponDmg + ((strLvl + strBuff) * 2) + attBuff;
                     const damage = Math.max(1, Math.floor(rawDamage * damageMultiplier * injuryMult) - (en.def?.armor || 0)); 
                     
-                                        en.hp = Math.max(0, en.hp - damage); 
-                    en.poise = Math.max(0, (en.poise || 10) - (sweep.profile.poise || 10));
+                    en.hp = Math.max(0, en.hp - damage); 
+                    en.poise = Math.max(0, (en.poise || 10) - (sweep.profile?.poise || 10));
 
                     // --- THE STEEL STRAND: COMBAT PROVENANCE ---
-                    if (window.GameState.inventory.equipment.weapon && window.MountainArchives?.anchorIntelToItem) {
+                    if (window.GameState?.inventory?.equipment?.weapon && window.MountainArchives?.anchorIntelToItem) {
                         const weaponId = window.GameState.inventory.equipment.weapon;
                         // For demonstration: Slaying high-significance targets anchors their death truth to the sword
                         if (en.hp <= 0 && (en.significance > 50 || en.name === 'Greater Wendigo')) {
@@ -881,7 +881,20 @@ function updateCombatHitboxes(delta) {
                         }
                     }
 
+                    // --- PHASE 3: FRACTAL BLADE HOOK ---
+                    if (en.hp <= 0 && window.GameState?.inventory?.equipment?.weapon === 'fractal_blade') {
+                        // Reconstruction Event: affinity to MAX
+                        en.affinity = 1.0; 
+                        if (window.EncounterDirector?.recordFractalKill) {
+                            window.EncounterDirector.recordFractalKill();
+                        }
+                        window.EventBus?.emit('UI_LOG', `⚔️ [RECONSTRUCTION] ${en.name} has been reconstructed by the Fractal Blade.`);
+                    }
+
                     window.EventBus?.emit('ENTITY_DAMAGED', { damage: damage, position: ePos, isPlayer: false });
+
+
+
 
                     window.EventBus?.emit('SPAWN_HIT_VFX', { type: en.def?.vfx?.onHit || 'Blood', pos: ePos.clone().add(_v1.set(0, 1, 0)) });
                     

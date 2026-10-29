@@ -123,7 +123,7 @@ class DuneInvestigationSystem {
         }
     }
 
-    generateFragmentDetail(archive, official) {
+        generateFragmentDetail(archive, official) {
         if (archive.tier === 'EPOCH') {
             return "THE CHAMPION DID NOT FLEE. HE WAS PIERCED BY 19 BLADES. THE SEAL IS COMPROMISED.";
         }
@@ -135,12 +135,19 @@ class DuneInvestigationSystem {
 
     regenerateDunes() {
         window.EventBus.emit('UI_LOG', '[DUNES] Sector Abandoned. The sands have shifted and memory is lost.');
+        // --- PHASE 1: DUNE SATURATION (Bible §5) ---
+        if (window.GameCore?.playerObj) {
+            window.GameCore.playerObj.hasTrippedDuneSaturation = true;
+            window.EventBus.emit('UI_LOG', '🏜️ [SATURATION] The desert’s weight remains within you.');
+        }
         this.lostArchives = [];
         // In a full implementation, this would also clear the 3D meshes spawned by DunesSystem
         if (window.DunesSystemInstance?.clearAll) {
             window.DunesSystemInstance.clearAll();
         }
     }
+
+
 
     /**
      * The player solves an endgame mystery in the Dunes.

@@ -33,6 +33,53 @@ window.EncounterDirector = {
         }
     },
 
+    processFractalIncursion: function(delta) {
+        if (!window.FractalIncursionLogic || !window.GameCore) return;
+
+        const worldHour = (window.EngineParams?.worldDay || 0) * 24 + (window.EngineParams?.timeOfDay || 0);
+        const intensity = window.FractalIncursionLogic.calculateIntensity(worldHour);
+        
+        if (intensity >= 0.01 && !this.incursionActive) {
+            this.incursionActive = true;
+            window.EventBus.emit('UI_LOG', '🌌 [INCURSION] The air begins to fracture. The Void is leaking.');
+        } else if (intensity < 0.01 && this.incursionActive) {
+            this.incursionActive = false;
+            window.EventBus.emit('UI_LOG', '🌌 [INCURSION] The fractures have sealed. For now.');
+        }
+
+        const entities = window.GameCore.activeEntities || [];
+        if (window.FractalIncursionLogic.shouldSpawn(worldHour, entities.length)) {
+            const spawnType = window.FractalIncursionLogic.getSpawnType(intensity);
+            this.spawnFractalEntity(spawnType);
+        }
+    },
+
+    spawnFractalEntity: function(type) {
+        const pPos = window.GameCore.playerObj.visual.position;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 30 + Math.random() * 20;
+        const x = pPos.x + Math.cos(angle) * dist;
+        const z = pPos.z + Math.sin(angle) * dist;
+        
+        const ent = window.GameCore.instantiatePrefab(type, x, window.WorldGenerator.getTerrainHeight(x, z), z);
+        if (ent) {
+            ent.isFractal = true;
+            window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'VOID SHARD', pos: ent.visual.position, color: '#a855f7' });
+        }
+    },
+
+    recordFractalKill: function() {
+        // Safe initialization to prevent NaN errors
+        this.fractalKillQuota = (this.fractalKillQuota || 0) + 1;
+        this.fractalKillTarget = this.fractalKillTarget || 50; 
+
+        if (this.fractalKillQuota >= this.fractalKillTarget) {
+            window.EventBus?.emit('UI_LOG', '⚔️ [ACHIEVEMENT] The Fractal Blade has tasted enough void. Achievement: FRACTAL_SLAYER.');
+            window.EventBus?.emit('EPOCH_ACHIEVEMENT_UNLOCKED', { id: 'FRACTAL_SLAYER', title: 'Fractal Slayer' });
+            this.fractalKillQuota = 0; // Reset for next tier
+        }
+    },
+
     // --- PHASE 1: COLLISION SYSTEM ---
     processTaskCollisions: function() {
         if (!window.GameCore?.activeEntities) return;

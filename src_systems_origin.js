@@ -6,6 +6,14 @@
  * Tracks the evolution of historical models regarding the Great Fracture.
  */
 
+export const birthright_pool = [
+    { id: 'STORM_BORN', title: 'Storm-Born', description: 'Born during the Great Static. Affinity for atmospheric shifts.', logic: 'RESIST_FOG' },
+    { id: 'HOUSE_REMNANT', title: 'House Remnant', description: 'The last of a shattered lineage. Social capital floor is higher.', logic: 'NOBLE_BLOOD' },
+    { id: 'CHAMPION_KIN', title: 'Champion’s Kin', description: 'A distant echo of the one who broke the world.', logic: 'RUNE_SENSITIVE' },
+    { id: 'ECHO_OF_SEAL', title: 'Echo of the Seal', description: 'Your heartbeat is synced to the world-grid.', logic: 'GRID_AWARE' },
+    { id: 'VOID_DRIFTER', title: 'Void Drifter', description: 'Partially phased during the Fracture.', logic: 'PHASE_SHIFT' }
+];
+
 class OriginMysterySystem {
     constructor() {
         this.categories = {
@@ -38,10 +46,18 @@ class OriginMysterySystem {
 
         window.EventBus.on('ENGINE_READY', () => this.init());
         window.EventBus.on('DUNE_FRAGMENT_RECOVERED', (fragment) => this.processFragment(fragment));
+        
+        // Listen for entity initialization to inject birthrights
+        window.EventBus.on('ENTITY_INITIALIZED', (entity) => this.injectBirthright(entity));
     }
 
-    init() {
+        init() {
         window.EventBus.emit('UI_LOG', '[Origin] The Zero Horizon is Visible');
+        
+        // Inject player birthright if not already set
+        if (window.GameCore?.playerObj && !window.GameCore.playerObj.birthright) {
+            this.injectBirthright(window.GameCore.playerObj);
+        }
     }
 
     /**
@@ -49,6 +65,7 @@ class OriginMysterySystem {
      * Bible: "Discoveries should not reveal answers. They should update models."
      */
     processFragment(fragment) {
+
         const category = this.categories[fragment.originCategory];
         if (!category) return;
 
@@ -63,6 +80,22 @@ class OriginMysterySystem {
 
         window.EventBus.emit('UI_LOG', `[ORIGIN] Historical model updated: ${category.title}`);
         window.EventBus.emit('ORIGIN_MODEL_UPDATED', category);
+    }
+
+    /**
+     * Assigns a birthright to an entity at t=0.
+     * Bible §2: "Circumstances, not destiny."
+     */
+    injectBirthright(entity) {
+        if (!entity || entity.birthright) return;
+
+        const roll = Math.floor(Math.random() * birthright_pool.length);
+        entity.birthright = birthright_pool[roll];
+        
+        if (entity.id === 'player' || entity.isPlayer) {
+            window.EventBus.emit('UI_LOG', `🧬 [BIRTHRIGHT] You are ${entity.birthright.title}: ${entity.birthright.description}`);
+            window.EventBus.emit('PLAYER_BIRTHRIGHT_ASSIGNED', entity.birthright);
+        }
     }
 
     pivotModel(category, fragment) {
@@ -85,6 +118,7 @@ class OriginMysterySystem {
     getDossier() {
         return Object.values(this.categories);
     }
+
 }
 
 window.OriginEngine = new OriginMysterySystem();

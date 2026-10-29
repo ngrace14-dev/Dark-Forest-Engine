@@ -31,7 +31,7 @@ window.ChronicleManager = {
         });
     },
 
-    purgeInsignificantMemories: function() {
+        purgeInsignificantMemories: function() {
         const threshold = 20; // Events below 20 significance score fade
         const oldLength = this.worldLedger.length;
 
@@ -54,12 +54,56 @@ window.ChronicleManager = {
         }
     },
 
-
-        /**
-     * Records a significant event into the world's memory.
-     * Bible §1: Action -> Intent -> Event -> Chronicle.
+    /**
+     * Epoch-Class Achievement Detection (Phase 2)
      */
-    recordEvent: function(event) {
+    checkEpochAchievements: function(nodeId) {
+
+            const weight = this.npcHistoricalWeights.get(nodeId) || 0;
+            const records = this.entityRecords.get(nodeId) || [];
+        
+            // Threshold for Epoch Achievement
+            if (weight > 1000 && !this.hasEpochAchievement(nodeId, 'LEGEND_OF_AGES')) {
+                this.recordEpochAchievement(nodeId, {
+                    id: 'LEGEND_OF_AGES',
+                    title: 'Legend of Ages',
+                    detail: 'Your actions have reached the critical mass of an Epoch.'
+                });
+            }
+        
+            const kills = records.filter(e => e.type === 'entity_death' && e.significance > 50).length;
+            if (kills >= 12 && !this.hasEpochAchievement(nodeId, 'TWELVE_LABORS')) {
+                this.recordEpochAchievement(nodeId, {
+                    id: 'TWELVE_LABORS',
+                    title: 'The Twelve Labors',
+                    detail: 'Twelve high-significance foes have fallen by your hand.'
+                });
+            }
+        }
+
+        hasEpochAchievement(nodeId, achievementId) {
+            const records = this.entityRecords.get(nodeId) || [];
+            return records.some(r => r.type === 'EPOCH_ACHIEVEMENT' && r.achievementId === achievementId);
+        }
+
+        recordEpochAchievement(nodeId, achievement) {
+            this.recordEvent({
+                actorId: nodeId,
+                type: 'EPOCH_ACHIEVEMENT',
+                achievementId: achievement.id,
+                title: achievement.title,
+                detail: achievement.detail,
+                significance: 500,
+                historicalWeight: 200
+            });
+        
+            if (nodeId === 'player') {
+                window.EventBus.emit('EPOCH_ACHIEVEMENT_UNLOCKED', achievement);
+            }
+        }
+
+
+            recordEvent: function(event) {
         // 1. Validation & Enrichment
         event.id ??= 'evt_' + Math.random().toString(36).substr(2, 9);
         event.timestamp ??= {
@@ -93,6 +137,9 @@ window.ChronicleManager = {
             const newWeight = currentWeight + (event.historicalWeight || 1);
             this.npcHistoricalWeights.set(event.actorId, newWeight);
 
+            // Check for Epoch achievements after weight update
+            this.checkEpochAchievements(event.actorId);
+
             // LEGACY INTEGRATION: Feed weight into LegacyManager
             if (window.LegacyManager) {
                 window.LegacyManager.addSignificance(event.actorId, event.historicalWeight || 1);
@@ -115,6 +162,7 @@ window.ChronicleManager = {
 
         this.captureSnapshot();
     },
+
 
     getEventTypeModifier: function(type) {
         const modifiers = {
