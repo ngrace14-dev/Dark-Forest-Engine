@@ -25,6 +25,64 @@ class TotalWarSystem {
                 this.mobilizeHouse(data.houseId, 'PREPAREDNESS');
             }
         });
+
+        // 75.9 Tactical Coordination Loop
+        window.EventBus.on('HEARTBEAT_T6H', () => this.coordinateFronts());
+    }
+
+    coordinateFronts() {
+        const houses = window.DynastyManager?.houses || new Map();
+        houses.forEach(house => {
+            if (house.mobilizationState === 'TOTAL') {
+                this.executeTacticalPlan(house);
+            }
+        });
+    }
+
+    executeTacticalPlan(house) {
+        const houseVillages = window.VillageManager?.villages.filter(v => v.nobleHouse === house.name) || [];
+        if (houseVillages.length === 0) return;
+
+        // 1. Identify Strategic Target (Blessed Spot or Weak Rival)
+        const target = this.selectMilitaryTarget(house);
+        if (!target) return;
+
+        // 2. Marshall Forces
+        houseVillages.forEach(v => {
+            if (v.squads.length > 0 && !v.isBesieged) {
+                const squad = v.squads.find(s => s.status === 'patrolling');
+                if (squad) {
+                    this.dispatchSquad(squad, v, target);
+                }
+            }
+        });
+    }
+
+    selectMilitaryTarget(house) {
+        // Targets Blessed Spots of rivals first
+        const rivals = Array.from(window.DynastyManager.houses.values())
+            .filter(h => h.id !== house.id && h.isBlessed);
+        
+        if (rivals.length > 0) {
+            const targetHouse = rivals[0];
+            const targetVillage = window.VillageManager.villages.find(v => v.nobleHouse === targetHouse.name);
+            return targetVillage;
+        }
+        return null;
+    }
+
+    dispatchSquad(squad, originVillage, targetVillage) {
+        squad.status = 'marching';
+        squad.originId = originVillage.id;
+        squad.targetId = targetVillage.id;
+        
+        const start = new THREE.Vector3(originVillage.x, 0, originVillage.z);
+        const goal = new THREE.Vector3(targetVillage.x, 0, targetVillage.z);
+        
+        // Use the new Long-Range Marching logic (Step 9-3)
+        squad.marchRoute = window.Navigation?.findLongRangeRoute(start, goal) || [];
+        
+        window.EventBus.emit('UI_LOG_DEBUG', `[WAR] ${originVillage.nobleHouse} squad marching from ${originVillage.name} to ${targetVillage.name}.`);
     }
 
     /**

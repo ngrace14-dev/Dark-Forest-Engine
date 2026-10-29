@@ -653,14 +653,27 @@ class CrowsEyeSystem {
             }
         }
         
-        // 4. WORLD SCALE (Always visible)
+                // 4. WORLD SCALE (Always visible)
         // Villages, Capital, Major Institutions
         if (window.VillageManager?.villages) {
             window.VillageManager.villages.forEach(v => {
                 const isCapital = v.id === 'aethelgard' || v.nobleHouse === 'House Sterling'; // Assumption: Aethelgard is capital
                 entities.push({ type: isCapital ? 'C' : 'V', x: v.x, z: v.z, id: `village_${v.id}`, ref: v });
+                
+                // --- STEP 9-3: SQUAD VISUALIZATION ---
+                if (v.squads) {
+                    v.squads.forEach(s => {
+                        if (s.status === 'marching' || s.status === 'raiding') {
+                            // Interpolate position based on march progress or use squad.position
+                            const sX = s.position?.x || v.x;
+                            const sZ = s.position?.z || v.z;
+                            entities.push({ type: '🚩', x: sX, z: sZ, id: s.id, ref: { name: `${v.nobleHouse} Levy` } });
+                        }
+                    });
+                }
             });
         }
+
 
         return entities;
     }

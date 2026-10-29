@@ -268,22 +268,72 @@ window.Navigation = {
     /**
      * Fast raycast against Flow Field to check if two points can see each other
      */
-    hasLineOfSight: function(p1, p2) {
-        const dist = p1.distanceTo(p2);
-        const steps = Math.ceil(dist / (this.flowGridSize / 2));
-        const dir = new THREE.Vector3().subVectors(p2, p1).normalize();
-        
-        const checkPos = new THREE.Vector3();
-        for(let i = 1; i < steps; i++) {
-            checkPos.copy(p1).addScaledVector(dir, i * (this.flowGridSize / 2));
-            const cellKey = `${Math.round(checkPos.x / this.flowGridSize)},${Math.round(checkPos.z / this.flowGridSize)}`;
-            if (this.flowFieldGrid.has(cellKey) && this.flowFieldGrid.get(cellKey).cost === 255) {
-                return false;
+        /**
+     * Long-Range Marching (Bannerlord style)
+     * Combines Road-Graph A* with local Flow-Field steering.
+     */
+    findLongRangeRoute: function(start, goal) {
+        if (!start || !goal) return [];
+
+        // 1. High-level Graph Search (Village-to-Village)
+        // If start and goal are far apart, find the nearest village nodes
+        const villageGraph = window.VillageManager?.villages || [];
+        const startVillage = this.findNearestVillage(start, villageGraph);
+        const goalVillage = this.findNearestVillage(goal, villageGraph);
+
+        if (startVillage && goalVillage && startVillage.id !== goalVillage.id) {
+            // Find path through the village network (connections)
+            const villagePath = this.searchVillageGraph(startVillage.id, goalVillage.id);
+            if (villagePath.length > 1) {
+                // Convert village IDs to coordinates
+                return villagePath.map(vId => {
+                    const v = villageGraph.find(node => node.id === vId);
+                    return new THREE.Vector3(v.x, window.WorldGenerator?.getTerrainHeight(v.x, v.z) || 0, v.z);
+                });
             }
         }
-        return true;
-    }
-};
+
+        // Fallback to local A* if no graph path found or close range
+        return this.findRoute(start, goal);
+    },
+
+    findNearestVillage: function(pos, villages) {
+        let nearest = null;
+        let minDist = Infinity;
+        villages.forEach(v => {
+            const d = Math.hypot(v.x - pos.x, v.z - pos.z);
+            if (d < minDist) {
+                minDist = d;
+                nearest = v;
+            }
+        });
+        return nearest;
+    },
+
+    searchVillageGraph: function(startId, goalId) {
+        const villages = window.VillageManager?.villages || [];
+        const open = [[startId]];
+        const visited = new Set([startId]);
+
+        while (open.length > 0) {
+            const path = open.shift();
+            const currentId = path[path.length - 1];
+
+            if (currentId === goalId) return path;
+
+            const currentV = villages.find(v => v.id === currentId);
+            if (currentV && currentV.connections) {
+                currentV.connections.forEach(neighborId => {
+                    if (!visited.has(neighborId)) {
+                        visited.add(neighborId);
+                        open.push([...path, neighborId]);
+                    }
+                });
+            }
+        }
+        return [];
+    },
+
 
 window.Navigation.init();
 
