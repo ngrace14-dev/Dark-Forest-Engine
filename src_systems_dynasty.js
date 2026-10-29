@@ -957,66 +957,54 @@ class DynastyManagerSystem {
         }
     }
 
-        /**
-     * Node 1-4: Faction Victory & Reform (Phase 4)
-     */
-    resolveSchism(house, winnerId) {
-        const schism = house.activeSchism;
-        const winner = house.factions.get(winnerId);
-        if (!schism || !winner) return;
+        resolveSchism(house, winnerId) {
+            const schism = house.activeSchism;
+            const winner = house.factions.get(winnerId);
+            if (!schism || !winner) return;
 
-        window.EventBus.emit('UI_LOG', `[SCHISM RESOLVED] The fracture within ${house.name} has ended. The ${winnerId.toUpperCase()} faction is victorious.`);
+            window.EventBus.emit('UI_LOG', `[SCHISM RESOLVED] The fracture within ${house.name} has ended. The ${winnerId.toUpperCase()} faction is victorious.`);
         
-                // --- PLAYER IMPACT: CATALYZE REFORM (Node 1) ---
-        if (winnerId === 'reformist' || winnerId === 'radical') {
-            this.playerFootprint.reformsCatalyzed++;
-            this.playerFootprint.institutional += 20;
-            
-            // Link to causal chain if player influenced this house recently
-            const lastPlayerAction = this.playerFootprint.causalChains.find(c => c.consequence.includes(house.id));
-            this.recordCausalLink(
-                lastPlayerAction ? lastPlayerAction.action : "General Influence",
-                `Victory of ${winnerId} in ${house.name}`,
-                150,
-                "Schism Resolution"
-            );
+            // --- STEP 6-4: RE-ANCHORING ---
+            let doctrineShift = "";
+            switch(winnerId) {
+                case 'reformist':
+                    doctrineShift = this.applyReformVictory(house);
+                    break;
+                case 'traditionalist':
+                    doctrineShift = this.applyTraditionalistVictory(house);
+                    break;
+                case 'radical':
+                    doctrineShift = this.applyRadicalVictory(house);
+                    break;
+            }
+
+            // 1. Update Identity & Reset Discord
+            this.applyIdentityShift(house, winnerId);
+            house.internalConflictLevel = 0.1;
+            house.exposureAnxiety = 0.2;
+            house.activeSchism = null;
+
+            // 2. Player Impact
+            if (winnerId !== 'traditionalist') {
+                this.playerFootprint.reformsCatalyzed++;
+                this.playerFootprint.institutional += 25;
+                this.recordCausalLink("Institutional Influence", `Resolved Schism in ${house.name} (${winnerId} victory)`, 150);
+            }
+
+            // 3. Clear Losers (Institutional Purge)
+            house.factions.clear();
+
+            // 4. Record to Institutional Memory
+            this.recordHouseEvent(house.id, {
+                type: 'SCHISM_RESOLUTION',
+                detail: `Winner: ${winnerId.toUpperCase()}. Effect: ${doctrineShift}`,
+                significance: 150,
+                historicalWeight: 100
+            });
+
+            window.EventBus.emit('HOUSE_STATE_CHANGED', { houseId: house.id, event: 'SCHISM_RESOLVED', winner: winnerId });
         }
 
-        let detail = "";
-
-
-        switch(winnerId) {
-            case 'reformist':
-                detail = this.applyReformVictory(house);
-                break;
-            case 'traditionalist':
-                detail = this.applyTraditionalistVictory(house);
-                break;
-            case 'radical':
-                detail = this.applyRadicalVictory(house);
-                break;
-        }
-
-                // PURGE: Losing factions lose influence
-        house.factions.forEach((f, id) => {
-            if (id !== winnerId) f.influence *= 0.1;
-        });
-        winner.influence = 0.9;
-        house.internalConflictLevel = 0.1;
-        house.activeSchism = null;
-
-        // IDENTITY PRESSURE (Node 2)
-        this.applyIdentityShift(house, winnerId);
-
-        // INSTITUTIONAL MEMORY (Node 5/8)
-
-        this.recordHouseEvent(house.id, {
-            type: `SCHISM_END_${winnerId.toUpperCase()}`,
-            detail: `The ${winnerId} victory has reshaped ${house.name}. ${detail}`,
-            significance: 150,
-            historicalWeight: 100
-        });
-    }
 
     applyReformVictory(house) {
         // Update beliefs based on accumulated contradictions
@@ -1095,25 +1083,29 @@ class DynastyManagerSystem {
      * Node 5: Belief Civil War
      */
 
-        triggerInstitutionalCrisis(house) {
-            house.activeSchism = {
-                id: `schism_${Date.now()}`,
-                type: 'DOCTRINAL_CIVIL_WAR',
-                startDay: window.EngineParams?.worldDay || 0
-            };
+            triggerInstitutionalCrisis(house) {
+        house.activeSchism = {
+            id: `schism_${Date.now()}`,
+            type: 'DOCTRINAL_CIVIL_WAR',
+            startDay: window.EngineParams?.worldDay || 0,
+            duration: 0
+        };
 
-            window.EventBus.emit('UI_LOG', `[CRISIS] ${house.name.toUpperCase()} HAS ENTERED A STATE OF SCHISM! Internal conflict is paralyzing policy.`);
-            window.EventBus.emit('UI_LOG', `[ACTION] Traditionalists and Reformists are issuing competing decrees.`);
-        
-            // Update Player Footprint if they caused this
-            this.playerFootprint.schismsTriggered++;
-            this.playerFootprint.institutional += 15;
-            this.playerFootprint.institutionsInfluenced.add(house.id);
-        
-            // Manifest physical schism signs
-            window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: `🚨 INSTITUTIONAL SCHISM: ${house.name}`, pos: { x: 0, y: 30, z: 0 }, color: '#ef4444' });
+        // Initialize Factions (Traditionalist, Reformist, Radical)
+        this.initializeSchismFactions(house);
 
-        // Record in House Memory (Node 8)
+        window.EventBus.emit('UI_LOG', `[CRISIS] ${house.name.toUpperCase()} HAS ENTERED A STATE OF SCHISM! Internal conflict is paralyzing policy.`);
+        
+        // Immediate Recruitment
+        this.recruitMembersToFactions(house);
+
+        // Update Player Footprint
+        this.playerFootprint.schismsTriggered++;
+        this.playerFootprint.institutional += 15;
+        this.playerFootprint.institutionsInfluenced.add(house.id);
+    
+        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: `🚨 INSTITUTIONAL SCHISM: ${house.name}`, pos: { x: 0, y: 30, z: 0 }, color: '#ef4444' });
+
         this.recordHouseEvent(house.id, {
             type: 'SCHISM_START',
             detail: `A deep doctrinal divide has fractured the leadership of ${house.name}.`,
@@ -1121,6 +1113,92 @@ class DynastyManagerSystem {
             historicalWeight: 50
         });
     }
+
+    initializeSchismFactions(house) {
+        house.factions.set('traditionalist', { 
+            id: 'traditionalist', 
+            name: 'The Old Guard', 
+            influence: 0.5, 
+            members: new Set(),
+            doctrine: 'Preserve Founding Dogma' 
+        });
+        house.factions.set('reformist', { 
+            id: 'reformist', 
+            name: 'The New Dawn', 
+            influence: 0.2, 
+            members: new Set(),
+            doctrine: 'Adapt to Observed Reality' 
+        });
+        house.factions.set('radical', { 
+            id: 'radical', 
+            name: 'The Shattered Crown', 
+            influence: 0.05, 
+            members: new Set(),
+            doctrine: 'Dismantle the Institution' 
+        });
+    }
+
+    recruitMembersToFactions(house) {
+        if (!window.PersonhoodManager) return;
+        
+        // Find all NPCs belonging to this house
+        const houseMembers = Array.from(window.PersonhoodManager.profiles.values())
+            .filter(p => p.houseId === house.id);
+
+        houseMembers.forEach(profile => {
+            const side = this.evaluateFactionChoice(profile);
+            const faction = house.factions.get(side);
+            if (faction) {
+                faction.members.add(profile.id);
+            }
+        });
+
+        this.updateFactionPower(house);
+    }
+
+    evaluateFactionChoice(profile) {
+        const t = profile.traits;
+        // Traditionalist if: Loyalty is high or Ambition is low
+        if (t.loyalty > 0.7 || t.ambition < 0.3) return 'traditionalist';
+        // Radical if: Ambition is high and Loyalty is low
+        if (t.ambition > 0.8 && t.loyalty < 0.4) return 'radical';
+        // Reformist if: Intellectual/Skeptical traits predominate (using Archetype as proxy)
+        if (profile.identity === 'SKEPTIC' || profile.identity === 'SCHOLAR') return 'reformist';
+        
+        return 'traditionalist'; // Default to tradition
+    }
+
+    updateFactionPower(house) {
+        if (!house.activeSchism) return;
+
+        let totalWeight = 0;
+        house.factions.forEach(faction => {
+            let factionWeight = 0;
+            faction.members.forEach(memberId => {
+                const profile = window.PersonhoodManager?.getProfile(memberId);
+                // Weight = Significance + Seniority
+                const weight = (profile?.traits?.credibility || 0.5) * 50 + (profile?.age || 20) / 10;
+                factionWeight += weight;
+            });
+            faction.rawWeight = factionWeight;
+            totalWeight += factionWeight;
+        });
+
+        // Normalize influence
+        house.factions.forEach(faction => {
+            faction.influence = totalWeight > 0 ? (faction.rawWeight / totalWeight) : 0;
+        });
+
+        // Resolution Check
+        const reformist = house.factions.get('reformist');
+        const traditionalist = house.factions.get('traditionalist');
+        const radical = house.factions.get('radical');
+
+        if (reformist.influence > 0.6) this.resolveSchism(house, 'reformist');
+        else if (traditionalist.influence > 0.7 && house.internalConflictLevel < 0.3) this.resolveSchism(house, 'traditionalist');
+        else if (radical.influence > 0.5) this.resolveSchism(house, 'radical');
+    }
+
 
     /**
      * Manifestation Rule: Heralds of the Seed.
