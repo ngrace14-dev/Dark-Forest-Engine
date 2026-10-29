@@ -556,7 +556,12 @@ class WorldObservatory {
             pol: 1.0 - Math.abs(0.2 - (h.political?.powerConcentration || 0.2)),
             econ: (h.world?.prosperity || 0) / 100,
             narr: 1.0 - (h.significance?.giniCoefficient || 0),
-            fuel: h.fuel?.stability || 0
+            fuel: h.fuel?.stability || 0,
+            
+            // Expanded Info Metrics for UI
+            info_gini: h.information?.ownershipGini || 0,
+            info_scarcity: h.information?.scarcityIndex || 0,
+            info_silo: h.information?.siloRatio || 0
         };
 
         // Weighted Formula (Bible Weights)

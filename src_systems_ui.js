@@ -1121,7 +1121,42 @@ class InstitutionalReportUI {
                     </div>
                 </div>
 
+                                <!-- INFORMATION ECONOMY ANALYTICS -->
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <div class="bg-black/40 border border-blue-900/20 rounded p-3">
+                        <h3 class="text-[10px] text-blue-400 font-bold uppercase mb-2 border-b border-blue-900/10 pb-1">Epistemic Distribution (Gini)</h3>
+                        <div class="flex flex-col gap-2">
+                            <div class="flex justify-between items-end">
+                                <span class="text-[9px] text-gray-500 uppercase">Knowledge Concentration</span>
+                                <span class="text-xs font-bold text-blue-300">${(whdHealth.metrics.info_gini || 0).toFixed(2)}</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-gray-900 rounded-full overflow-hidden">
+                                <div class="h-full bg-blue-500" style="width: ${(whdHealth.metrics.info_gini || 0) * 100}%"></div>
+                            </div>
+                            <p class="text-[8px] text-gray-500 leading-tight italic">
+                                ${whdHealth.metrics.info_gini > 0.8 ? 'CRITICAL: Information Monopoly detected. Knowledge is held by less than 1% of nodes.' : 
+                                  whdHealth.metrics.info_gini > 0.5 ? 'WARNING: High siloing. Institutions are hoarding truth.' : 'STABLE: Healthy information distribution.'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-black/40 border border-amber-900/20 rounded p-3">
+                        <h3 class="text-[10px] text-amber-400 font-bold uppercase mb-2 border-b border-amber-900/10 pb-1">Market Dynamics</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="flex flex-col">
+                                <span class="text-[8px] text-gray-500 uppercase">Scarcity Index</span>
+                                <span class="text-sm font-bold text-amber-300">${(whdHealth.metrics.info_scarcity || 0).toFixed(2)}</span>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-[8px] text-gray-500 uppercase">Silo Ratio</span>
+                                <span class="text-sm font-bold text-purple-400">${(whdHealth.metrics.info_silo || 0).toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- HISTORICAL TREND ANALYSIS -->
+
                 <div class="mb-6 bg-black/40 border border-gray-800 rounded p-3">
                     <h3 class="text-[10px] text-gray-400 font-bold uppercase mb-2 border-b border-gray-800 pb-1">1000-Year Historical Continuity Analysis</h3>
                     <div class="flex items-end gap-1 h-20 w-full bg-gray-950/50 p-1">
