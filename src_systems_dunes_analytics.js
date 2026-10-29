@@ -51,6 +51,12 @@ class DunesAnalyticsSystem {
         // Track Wall Crossing
         this.successMetrics.wallCrossings++;
         
+        window.EventBus.emit('EXPEDITION_STARTED', {
+            expeditionId: id,
+            actorId,
+            profile: { traits, career }
+        });
+
         this._updateCorrelations(traits, career, false);
     }
 
@@ -64,9 +70,16 @@ class DunesAnalyticsSystem {
         if (!attempt) return;
 
         attempt.outcome = 'SUCCESS';
-        attempt.yield += (record.tier === 'EPOCH' ? 100 : 10);
+        const yieldVal = (record.tier === 'EPOCH' ? 100 : 10);
+        attempt.yield += yieldVal;
         this.successMetrics.totalSuccesses++;
         
+        window.EventBus.emit('EXPEDITION_RESOLVED', {
+            expeditionId: attempt.id,
+            outcome: 'SUCCESS',
+            yield: yieldVal
+        });
+
         this._updateCorrelations(attempt.traits, attempt.career, true, record.tier);
         this._recalculateGlobalMetrics();
     }
@@ -83,6 +96,13 @@ class DunesAnalyticsSystem {
         if (!attempt) return;
 
         attempt.outcome = 'FAILURE';
+
+        window.EventBus.emit('EXPEDITION_RESOLVED', {
+            expeditionId: attempt.id,
+            outcome: 'FAILURE',
+            yield: 0
+        });
+
         this._recalculateGlobalMetrics();
         
         window.EventBus.emit('UI_LOG_DEBUG', `[DRD] Expedition Failure Analysis: ${entity.id} succumbed to the sands.`);
@@ -158,9 +178,12 @@ class DunesAnalyticsSystem {
             .sort((a, b) => a[1].score - b[1].score)
             .slice(0, 3);
 
+        const motivationReport = window.EMO ? window.EMO.generateReport() : null;
+
         return {
             masterExplorers: topCareers.map(c => c[0]),
-            lethalTraits: deadlyTraits.map(t => t[0])
+            lethalTraits: deadlyTraits.map(t => t[0]),
+            motivationContext: motivationReport
         };
     }
 }

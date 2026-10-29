@@ -11,12 +11,13 @@
  */
 
 class DuneInvestigationSystem {
-    constructor() {
+        constructor() {
         this.lostArchives = [];
         this.recoveredRecords = []; // Array of { id, title, detail, tier, targetHistoryId }
         this.isOccupied = false;
-                this.recoveryChance = 0.05;
+        this.discoveryChance = 0.05;
         this.sandResistance = 0.0;
+
         
         // --- RELATIVE STAT SCALING (Plan B) ---
         this.scalingFactors = {
