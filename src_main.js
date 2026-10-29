@@ -25,6 +25,7 @@ import './src_core_asset_budget.js';
 
 // 1. Core Systems & World Managers
 import './src_epoch_manager.js';
+import './src_systems_civilizational_vitality_bureau.js';
 import './src_systems_institutional_continuity.js';
 import './src_systems_civilization_learning.js';
 import './src_systems_adversarial_learning.js';
