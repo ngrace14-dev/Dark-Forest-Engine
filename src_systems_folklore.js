@@ -14,9 +14,7 @@ class FolkloreEngineSystem {
             crystallizationCount: 0
         };
         // Rosetta Stone DNA from Bible §17
-        this.dna = {
-// ... existing dna entries ...
-
+                this.dna = {
             'OBSERVATIONAL': [
                 "Forest dark and ever cold. / Paths shifting never known.",
                 "14 days and 14 nights. / Then a shift when dawn breaks light.",
@@ -54,6 +52,7 @@ class FolkloreEngineSystem {
                 "The road forgets the names of old / When the rune-stones lose their hold."
             ]
         };
+
 
 
 
