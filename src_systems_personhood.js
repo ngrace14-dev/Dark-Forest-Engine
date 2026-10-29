@@ -579,8 +579,15 @@ class PersonhoodSystem {
          */
         simulateAging() {
             const currentDay = window.EngineParams?.worldDay || 0;
-            
+        
+            // --- INSTITUTIONAL AUDIT TRIGGER ---
+            if (currentDay % 14 === 0 && currentDay !== this._lastAuditDay) {
+                this._lastAuditDay = currentDay;
+                if (window.IIB) window.IIB.performAudit();
+            }
+
             // --- POPULATION SUBSTRATE: MIGRATION & GROWTH (Phase 4) ---
+
             if (currentDay % 14 === 0 && currentDay !== this._lastGlobalUpdate) {
                 this._lastGlobalUpdate = currentDay;
                 this.processDemographics();
