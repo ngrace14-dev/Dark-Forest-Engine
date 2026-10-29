@@ -172,6 +172,7 @@ class WorldObservatory {
         }
         
         const truthFidelity = totalGlobalBeliefs > 0 ? totalTrueBeliefs / totalGlobalBeliefs : 1.0;
+        const globalScarcity = Math.max(0, 1.0 - (registry.length / (window.VillageManager?.kingdomPopulation || 1)));
 
         // --- 1.2 KNOWLEDGE HALF-LIFE (APPROXIMATION) ---
         const day = window.EngineParams?.worldDay || 0;

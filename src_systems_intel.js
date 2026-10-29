@@ -516,7 +516,7 @@ window.IntelEconomy = {
      * Calculates the market value of an Intel_ID in Gold.
      * Factors in Significance, Rarity, Certainty, Generational Decay, Suppression, and Seller Credibility.
      */
-    calculateValue: function(intel, buyerNode, sellerNode = null) {
+        calculateValue: function(intel, buyerNode, sellerNode = null) {
         if (!intel || intel.persistence !== window.IntelEnums.PERSISTENCE.ACTIVE) return 0;
         
         // 1. Base Significance
@@ -546,7 +546,15 @@ window.IntelEconomy = {
         // 5. Plausibility & Certainty Penalty
         const confidenceMod = intel.certainty * intel.plausibility_score;
 
-        // 6. SELLER CREDIBILITY (Phase 1: Foundations)
+        // 6. SCARCITY MODIFIER (Bible §13)
+        // Global Scarcity index from Observatory
+        const globalScarcity = window.WorldObservatory?.getStatus()?.information?.scarcityIndex || 0.5;
+        // Local Scarcity: How many others know this specific ID?
+        const owners = window.IntelManager.ownershipRegistry.get(intel.intel_id)?.size || 1;
+        const localScarcity = Math.max(0.1, 1.0 - (owners / 50)); // Drops value as owners exceed 50
+        const scarcityMod = (globalScarcity + localScarcity) / 2;
+
+        // 7. SELLER CREDIBILITY (Phase 1: Foundations)
         let credibilityMod = 1.0;
         if (sellerNode && window.PersonhoodManager) {
             const profile = window.PersonhoodManager.getProfile(sellerNode.id);
@@ -557,7 +565,7 @@ window.IntelEconomy = {
         }
 
         // Final Calculation
-        let price = Math.floor(baseValue * rarityMult * suppressionPremium * decay * confidenceMod * credibilityMod);
+        let price = Math.floor(baseValue * rarityMult * suppressionPremium * decay * confidenceMod * scarcityMod * credibilityMod);
 
         // Asymmetry Check: If buyer already knows this, it's worth 0
         const buyerIntel = window.IntelManager.getIntelForNode(buyerNode.id);
@@ -567,6 +575,7 @@ window.IntelEconomy = {
 
         return Math.max(1, price);
     },
+
 
     /**
      * Player or NPC action to verify a rumor in the field.
