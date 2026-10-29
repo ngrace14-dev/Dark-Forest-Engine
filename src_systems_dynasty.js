@@ -234,116 +234,128 @@ class DynastyManagerSystem {
      * Seeds initial persistent beliefs for an institution.
      * Bible §36: Institutions are defined by what they protect.
      */
-    seedCoreBeliefs(house) {
+        seedCoreBeliefs(house) {
         const day = window.EngineParams?.worldDay || 0;
         
-        // Example: The Tree is Continuity (Node 3)
-        house.beliefs.set('TREE_CONTINUITY', {
-            confidence: 0.8,
+        // 1. UNIVERSAL DOGMA (Bible §1)
+        house.beliefs.set('FOREST_HOSTILITY', {
+            confidence: 1.0,
             doubtPressure: 0.0,
-            evidenceSources: ['TRADITION'],
-            originRecordId: 'INIT',
-            lastUpdated: day,
-            state: 'ESTABLISHED',
-            officialPosition: "The World Tree preserves our legacy.",
-            privateConcern: "The Roots must be protected.",
-            description: "The World Tree is the physical manifestation of our survival."
+            evidenceSources: ['INIT_TRADITION'],
+            state: 'DOGMA',
+            officialPosition: "The Forest is an apex predator; civilization is the prey.",
+            privateConcern: "The predator is learning our schedules.",
+            description: "The fundamental hostility of the woods."
         });
-
-        // Example: The Mountain Ring is Fixed
 
         house.beliefs.set('GEOGRAPHY_STABILITY', {
             confidence: 0.9,
             doubtPressure: 0.0,
-            evidenceSources: ['TRADITION', 'ARCHIVE'],
-            originRecordId: 'INIT',
-            lastUpdated: day,
-            state: 'DOGMA', // DOGMA, ESTABLISHED, PRIVATE_DOUBT, DOUBTED, SHATTERED
-            officialPosition: "The Mountain Ring is eternal.",
-            privateConcern: "No immediate concerns.",
-            description: "The Mountain Ring is the eternal, unchanging wall of our world."
+            evidenceSources: ['INIT_ARCHIVE'],
+            state: 'ESTABLISHED',
+            officialPosition: "The Mountain Ring is eternal and unchanging.",
+            privateConcern: "Wait, the star-charts from 100 years ago don't match.",
+            description: "The stability of the world's borders."
         });
 
-        // Example: Crown Sovereignty
-        const isSkeptical = house.culturalValues.crown === 'SKEPTICAL';
-        house.beliefs.set('CROWN_LEGITIMACY', {
-            confidence: isSkeptical ? 0.4 : 0.8,
-            doubtPressure: isSkeptical ? 0.3 : 0.0,
-            evidenceSources: ['ROYAL_DECREE'],
-            originRecordId: 'INIT',
-            lastUpdated: day,
-            state: isSkeptical ? 'DOUBTED' : 'ESTABLISHED',
-            officialPosition: "The Aethel line is the rightful ruler.",
-            privateConcern: isSkeptical ? "The lineage is fraying." : "Stability is paramount.",
-            description: "The Aethel line is the rightful ruler of the Redwood."
-        });
-
-        // House-specific Beliefs
-        if (house.name.includes('Terminus')) {
-            house.beliefs.set('THE_300_INVINCIBLE', {
+        // 2. MISSION-DRIVEN BELIEFS (Bible §36)
+        if (house.id === 'house_terminus') {
+            house.beliefs.set('OBSERVATIONAL_SUPREMACY', {
                 confidence: 1.0,
                 doubtPressure: 0.0,
-                evidenceSources: ['MILITARY_HISTORY'],
-                originRecordId: 'INIT',
-                lastUpdated: day,
+                evidenceSources: ['ANCIENT_LENS'],
                 state: 'DOGMA',
-                officialPosition: "The Elite 300 cannot fall.",
-                privateConcern: "The Pass is our lifeblood.",
-                description: "The Elite 300 cannot fall as long as the pass remains manned."
+                officialPosition: "We are the Eye. What we do not see does not exist.",
+                privateConcern: "There are shadows in the Churn that the lenses cannot resolve.",
+                description: "The infallibility of Terminus observations."
             });
         }
+
+        if (house.id === 'house_aethel') {
+            house.beliefs.set('CROWN_SOVEREIGNTY', {
+                confidence: 0.9,
+                doubtPressure: 0.0,
+                evidenceSources: ['FOUNDING_DECREE'],
+                state: 'DOGMA',
+                officialPosition: "The Aethel line is the only bridge to the Seed.",
+                privateConcern: "The Seed has been silent for three generations.",
+                description: "The divine right of the Crown."
+            });
+        }
+
+        // 3. CULTURAL DRIFT SEEDS
+        if (house.culturalValues.crown === 'SKEPTICAL') {
+            const belief = house.beliefs.get('CROWN_SOVEREIGNTY');
+            if (belief) {
+                belief.state = 'PRIVATE_DOUBT';
+                belief.confidence = 0.5;
+                belief.doubtPressure = 0.3;
+            }
+        }
     }
+
 
 
         /**
      * Node 2 -> 3: Credibility -> Institution
      * Updates institutional beliefs based on new reports.
      */
-    updateInstitutionalBeliefs(houseId, intelId) {
+        updateInstitutionalBeliefs(houseId, intelId) {
         const house = this.houses.get(houseId);
         const intel = window.IntelManager?.lookup(intelId);
         if (!house || !intel) return;
 
         const day = window.EngineParams?.worldDay || 0;
 
-        // BELIEF REINFORCEMENT (Node 3)
-        // Check if this intel affects any existing beliefs
         house.beliefs.forEach((belief, key) => {
             const relationship = this.getIntelBeliefRelationship(intel, key);
             
             if (relationship === 'REINFORCE') {
-                belief.confidence = Math.min(1.0, belief.confidence + (intel.certainty * 0.05));
-                belief.doubtPressure = Math.max(0.0, belief.doubtPressure - (intel.certainty * 0.03));
+                const gain = intel.certainty * (belief.state === 'DOGMA' ? 0.02 : 0.08);
+                belief.confidence = Math.min(1.0, belief.confidence + gain);
+                belief.doubtPressure = Math.max(0.0, belief.doubtPressure - (gain * 1.5));
                 belief.lastUpdated = day;
                 belief.evidenceSources.push(intelId);
-            } else if (relationship === 'CONTRADICT') {
+            } 
+            else if (relationship === 'CONTRADICT') {
                 // DOUBT ACCUMULATION (Node 3.1)
-                const doubtIncrease = (intel.certainty * 0.15) / (1.0 + house.legitimacy);
-                belief.doubtPressure = Math.min(1.0, belief.doubtPressure + doubtIncrease);
+                // Dogma is harder to doubt than standard beliefs
+                const resistance = belief.state === 'DOGMA' ? 4.0 : 1.0;
+                const doubtIncrease = (intel.certainty * 0.2) / (resistance * (1.0 + house.legitimacy));
                 
-                // FALLIBILITY AUDIT: Institutions are slow to change their official minds
-                const confidenceErosion = (intel.certainty * 0.05) / (1.0 + house.legitimacy);
-                belief.confidence -= confidenceErosion;
+                belief.doubtPressure = Math.min(1.0, belief.doubtPressure + doubtIncrease);
+                belief.confidence = Math.max(0.0, belief.confidence - (doubtIncrease * 0.5));
                 belief.lastUpdated = day;
                 belief.evidenceSources.push(intelId);
 
-                // PRIVATE DOUBT STATE (Node 3.2)
-                if (belief.doubtPressure > 0.3 && belief.state === 'ESTABLISHED') {
+                // --- INSTITUTIONAL STATE TRANSITIONS ---
+                
+                // 1. Established -> Private Doubt
+                if (belief.state === 'ESTABLISHED' && belief.doubtPressure > 0.3) {
                     belief.state = 'PRIVATE_DOUBT';
-                    belief.privateConcern = `Reports of ${intel.payload.title} contradict established dogma.`;
-                    window.EventBus.emit('UI_LOG_DEBUG', `[BELIEF] ${house.name} harbors private doubt regarding ${key}.`);
+                    window.EventBus.emit('UI_LOG_DEBUG', `[BELIEF] ${house.name} now harbors private doubts about ${key}.`);
                 }
-                
-                if (belief.doubtPressure > 0.6 && belief.state !== 'DOUBTED') {
+
+                // 2. Private Doubt -> Doubted (Exposure/Publicity usually forces this)
+                if (belief.state === 'PRIVATE_DOUBT' && belief.doubtPressure > 0.6) {
                     belief.state = 'DOUBTED';
-                    belief.officialPosition = `The status of ${key} is under review.`;
-                    window.EventBus.emit('UI_LOG', `[BELIEF] ${house.name} has begun to officially doubt: ${belief.description}`);
+                    belief.officialPosition = `The validity of ${key} is under internal review.`;
+                    window.EventBus.emit('UI_LOG', `[BELIEF] ${house.name} has officially begun to doubt: ${key}.`);
+                    house.internalConflictLevel += 0.1;
                 }
-                
-                if (belief.confidence < 0.1 && belief.state !== 'SHATTERED') {
+
+                // 3. Dogma -> Private Doubt (Extreme evidence required)
+                if (belief.state === 'DOGMA' && belief.doubtPressure > 0.5) {
+                    belief.state = 'PRIVATE_DOUBT';
+                    house.exposureAnxiety += 0.2; // Crisis point for Dogma
+                    window.EventBus.emit('UI_LOG', `[CRISIS] Foundations are shaking in ${house.name}. Dogma of ${key} is being questioned.`);
+                }
+
+                // 4. Shattered (Point of no return)
+                if (belief.confidence < 0.1 && belief.doubtPressure > 0.8) {
                     belief.state = 'SHATTERED';
-                    belief.officialPosition = "Previous dogmas have been proven false.";
-                    window.EventBus.emit('UI_LOG', `[BELIEF] A core belief of ${house.name} has been SHATTERED: ${belief.description}`);
+                    belief.officialPosition = `The old truth of ${key} has been discarded.`;
+                    window.EventBus.emit('UI_LOG', `[BELIEF SHATTERED] ${house.name} has abandoned the belief: ${key}.`);
                     this.triggerBeliefShatterAction(house, key);
                 }
             }
@@ -351,14 +363,55 @@ class DynastyManagerSystem {
     }
 
 
+
+        checkExposure(house, intelId) {
+        const intel = window.IntelManager?.lookup(intelId);
+        if (!intel) return;
+
+        house.beliefs.forEach((belief, key) => {
+            // If the world now knows a truth that the House is privately doubting/suppressing
+            if (belief.state === 'PRIVATE_DOUBT' || belief.state === 'DOUBTED') {
+                if (this.getIntelBeliefRelationship(intel, key) === 'CONTRADICT') {
+                    // EXPOSURE DETECTED
+                    const exposureSeverity = intel.certainty * (1.0 - house.publicTrust);
+                    house.exposureAnxiety = Math.min(1.0, house.exposureAnxiety + exposureSeverity);
+                    
+                    if (exposureSeverity > 0.3) {
+                        window.EventBus.emit('UI_LOG', `[SCANDAL] Public history has exposed ${house.name}'s contradictions regarding ${key}!`);
+                        house.legitimacy = Math.max(0, house.legitimacy - 0.05);
+                        house.publicTrust = Math.max(0, house.publicTrust - 0.1);
+                    }
+                }
+            }
+        });
+    }
+
     getIntelBeliefRelationship(intel, beliefKey) {
-        // Logic to determine if intel confirms or challenges a belief
-        if (beliefKey === 'GEOGRAPHY_STABILITY' && intel.payload.tags.includes('POST-SHIFT')) return 'CONTRADICT';
-        if (beliefKey === 'CROWN_LEGITIMACY' && intel.payload.tags.includes('SCANDAL') && intel.payload.tags.includes('CROWN')) return 'CONTRADICT';
-        if (beliefKey === 'THE_300_INVINCIBLE' && intel.payload.tags.includes('THREAT') && intel.significance.historical > 80) return 'CONTRADICT';
+        const tags = intel.payload.tags || [];
+        
+        // Dynamic Mapping
+        if (beliefKey === 'GEOGRAPHY_STABILITY') {
+            if (tags.includes('POST-SHIFT') || tags.includes('GEOGRAPHY_ANOMALY')) return 'CONTRADICT';
+            if (tags.includes('SURVEY') && !tags.includes('ANOMALY')) return 'REINFORCE';
+        }
+        
+        if (beliefKey === 'FOREST_HOSTILITY') {
+            if (tags.includes('ECOLOGY') && tags.includes('SYMBIOSIS')) return 'CONTRADICT';
+            if (tags.includes('MONSTER_ATTACK') || tags.includes('WENDIGO')) return 'REINFORCE';
+        }
+
+        if (beliefKey === 'CROWN_SOVEREIGNTY') {
+            if (tags.includes('SCANDAL') || tags.includes('BETRAYAL')) return 'CONTRADICT';
+            if (tags.includes('ROYAL_DECREE') || tags.includes('SUCCESSION_SMOOTH')) return 'REINFORCE';
+        }
+
+        if (beliefKey === 'OBSERVATIONAL_SUPREMACY') {
+            if (tags.includes('LOST_MEMORY') || tags.includes('UNRESOLVED_MYSTERY')) return 'CONTRADICT';
+        }
         
         return 'NEUTRAL';
     }
+
 
     triggerBeliefShatterAction(house, beliefKey) {
         // Knowledge does not create action. Belief creates action.
@@ -1088,13 +1141,21 @@ class DynastyManagerSystem {
 
 
                         processNarrative(narrative) {
-                // Record official history into house archives
-                const house = this.houses.get(narrative.bias);
-                if (house) {
-                    house.archives.push(narrative.id);
-                }
+                            // Record official history into house archives
+                            const house = this.houses.get(narrative.bias);
+                            if (house) {
+                                house.archives.push(narrative.id);
+                            }
 
-                // --- THE FOUNDERS' BETRAYAL CHECK (Plan A) ---
+                            // --- STEP 6-1: TRUTH EXPOSURE CHECK ---
+                            // Every house checks if this public history exposes their private doubts
+                            this.houses.forEach(h => {
+                                this.checkExposure(h, narrative.truthId);
+                            });
+
+                            // --- THE FOUNDERS' BETRAYAL CHECK (Plan A) ---
+// ... existing betrayal check ...
+
                 // If a Tier 9 Truth (The Betrayal) is published, all Noble Houses lose 50% Legitimacy
                 const truth = window.IntelManager?.lookup(narrative.truthId);
                 if (truth && (truth.tier >= 9 || truth.payload?.tags?.includes('BETRAYAL'))) {
