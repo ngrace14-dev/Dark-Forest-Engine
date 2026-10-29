@@ -1723,13 +1723,37 @@ window.VillageManager = {
             h._lastInstitutionalScore = totalScore; // For Crow's Eye display
         });
 
-        // 2. Identify Reassignment Candidates
+                // 2. Identify Reassignment Candidates
         const blessed = houses.filter(h => h.isBlessed).sort((a, b) => scores.get(a.id) - scores.get(b.id));
         const unblessed = houses.filter(h => !h.isBlessed).sort((a, b) => scores.get(b.id) - scores.get(a.id));
 
         if (blessed.length === 0 || unblessed.length === 0) return;
 
+        // --- CROWN STABILIZATION ENVOYS (§19 Tweak) ---
+        // Before revocation, the Crown sends envoys to "Critical" monopolies (Prosperity < 30)
+        blessed.forEach(h => {
+            const hScore = scores.get(h.id);
+                        const hVillages = this.villages.filter(v => v.nobleHouse === h.name);
+            const avgProsperity = hVillages.length > 0 ? (hVillages.reduce((sum, v) => sum + v.stats.prosperity, 0) / hVillages.length) : 50;
+
+            if (avgProsperity < 30 && !h.underStabilization) {
+
+                h.underStabilization = true;
+                h.prestige += 50; // Temporary prestige injection
+                window.EventBus.emit('UI_LOG', `[CROWN] Stabilization Envoys dispatched to ${h.name} to prevent monopoly collapse.`);
+                
+                // Buff associated villages
+                hVillages.forEach(v => {
+                    v.stats.gold += 200;
+                    v.stats.prosperity = Math.min(100, v.stats.prosperity + 15);
+                });
+            } else if (avgProsperity > 50) {
+                h.underStabilization = false; // Successfully stabilized
+            }
+        });
+
         const weakestBlessed = blessed[0];
+
         const strongestUnblessed = unblessed[0];
 
         const weakScore = scores.get(weakestBlessed.id);

@@ -25,6 +25,7 @@ class MarketSystem {
      * 25.3 Currency Devaluation & Inflation
      */
     updateVolatility() {
+        this.updateEssencePrice();
         if (Math.random() < 0.01) {
             const resource = ['food', 'essence'][Math.floor(Math.random() * 2)];
             const oldPrice = this.prices.get(resource);
@@ -50,6 +51,24 @@ class MarketSystem {
         const quarter = window.UrbanPlanning.getQuarterForLocation(villageId, playerPos.x, playerPos.z);
         return quarter.rumorRarity;
     }
+    /**
+     * Scales essence price based on Global Barrier Stress.
+     * Bible Doctrine: Scarcity drives value.
+     */
+    updateEssencePrice() {
+        if (!window.VillageManager?.villages) return;
+        
+        const villages = window.VillageManager.villages;
+        const avgIntegrity = villages.reduce((sum, v) => sum + (v.barrierIntegrity || 100), 0) / villages.length;
+        
+        // Stress 0.0 (Perfect) to 1.0 (Total Collapse)
+        const stress = 1.0 - (avgIntegrity / 100);
+        
+        // Base price 50. At 0 integrity (max stress), price reaches 250.
+        const newPrice = 50 + (stress * 200);
+        this.prices.set('essence', Math.floor(newPrice));
+    }
+
     simulateTransportRisk(caravan) {
         // 26.7 Transport Sabotage Risk
         const risk = 0.05;
