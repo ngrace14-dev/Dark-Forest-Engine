@@ -102,7 +102,8 @@ class WorldObservatory {
                 significance: this.probeSignificanceHealth(),
                 dunes: this.probeDuneHealth(),
                 emergent: this.probeEmergentHealth(),
-                adversarial: this.probeAdversarialHealth()
+                adversarial: this.probeAdversarialHealth(),
+                divergence: this.probeDivergenceHealth()
             }
         };
 
@@ -608,6 +609,11 @@ class WorldObservatory {
     probeAdversarialHealth() {
         if (!window.AED) return {};
         return window.AED.generateObservabilityReport();
+    }
+
+    probeDivergenceHealth() {
+        if (!window.CDO) return {};
+        return window.CDO.metrics;
     }
 
     /**

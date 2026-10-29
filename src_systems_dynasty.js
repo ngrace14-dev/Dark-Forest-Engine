@@ -1335,13 +1335,24 @@ class DynastyManagerSystem {
          * Updates the global state of a House based on simulation feedback.
          * Bible §Continuity: Institutions are dams against entropy.
          */
-                updateInstitutionalState(houseId) {
+        updateInstitutionalState(houseId) {
             const house = this.houses.get(houseId);
             if (!house) return;
 
             const day = window.EngineParams?.worldDay || 0;
 
+            // --- DIVERGENCE TRACKING (Ideology Shift) ---
+            if (house.beliefs.size > 0 && Math.random() < 0.05) {
+                // Randomly mutate a belief's privateConcern slightly to simulate drift
+                const keys = Array.from(house.beliefs.keys());
+                const randomBelief = house.beliefs.get(keys[Math.floor(Math.random() * keys.length)]);
+                if (randomBelief && randomBelief.state !== 'DOGMA') {
+                    randomBelief.confidence = Math.max(0, Math.min(1.0, randomBelief.confidence + (Math.random() * 0.1 - 0.05)));
+                }
+            }
+
             // 1. Calculate Narrative Gap
+
             // Measures the volume of contradictions held in archives
             const totalBeliefs = house.beliefs.size || 1;
             const contradictions = Array.from(house.beliefs.values()).filter(b => b.state === 'DOUBTED' || b.state === 'SHATTERED').length;

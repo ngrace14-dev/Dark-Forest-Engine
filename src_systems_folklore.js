@@ -62,13 +62,19 @@ class FolkloreEngineSystem {
     }
 
         init() {
-        this.persistentAnthology = this.loadCrossRunFolklore();
-        this.anthology = [...this.persistentAnthology];
-                // --- STEP 10-4: INJECT TOMBSTONE FOLKLORE ---
-                this.injectTombstoneFolklore();
+            this.persistentAnthology = this.loadCrossRunFolklore();
+            this.anthology = [...this.persistentAnthology];
+                    // --- STEP 10-4: INJECT TOMBSTONE FOLKLORE ---
+                    this.injectTombstoneFolklore();
 
-                window.EventBus.emit('UI_LOG', '[Folklore] Poem DNA Engine Active');
-    }
+                    window.EventBus.emit('UI_LOG', '[Folklore] Poem DNA Engine Active');
+        }
+
+        getAnthologyFor(entityId) {
+            // Returns poems related to a specific village/entity for CDO
+            return this.anthology.filter(p => p.originId === entityId || p.text.includes(entityId));
+        }
+
 
     injectTombstoneFolklore() {
                 const history = JSON.parse(localStorage.getItem('dark-forest-sim-history') || '[]');
@@ -219,11 +225,13 @@ class FolkloreEngineSystem {
     }
 
 
+            getRandomBark(pClass) {
         const stanzas = this.dna[pClass] || this.dna['OBSERVATIONAL'];
         const stanza = stanzas[Math.floor(Math.random() * stanzas.length)];
         // Take just the first line for a bark
         return stanza.split(' / ')[0];
     }
+
 
     /**
      * Cross-Run Persistence (§17, §BO)
