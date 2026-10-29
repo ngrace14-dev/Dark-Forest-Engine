@@ -19,12 +19,19 @@ class GuildSystem {
      * 29.2 Master-Apprentice Ratios
      */
     registerGuild(name, industry) {
+        const dna = window.GCO ? window.GCO.registerEntity(`guild_${name.toLowerCase().replace(/\s+/g, '_')}`, 'GUILD', {
+            industry,
+            traditions: ['Apprentice Trial', 'The Secret Handshake'],
+            culture: [['MERCANTILE', 0.7], ['SECRETIVE', 0.6]]
+        }) : null;
+
         this.guilds.set(name, {
             name,
             industry,
             secrets: new Set(),
             masters: [],
-            apprentices: []
+            apprentices: [],
+            dna
         });
     }
 

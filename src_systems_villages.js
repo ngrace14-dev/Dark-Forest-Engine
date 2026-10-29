@@ -118,13 +118,21 @@ window.VillageManager = {
                 feudalState: i === 19 ? 'PARTIALLY_SOVEREIGN' : 'DEPENDENT', // --- PHASE 11: FEUDAL DEPENDENCY ---
                 deepReserves: i === 19 ? { food: 500, essence: 100 } : null, // --- TERMINUS DEEP RESERVES ---
                 activeObjectives: [], // --- PHASE 5: INSTITUTIONAL AGENCY ---
-                // --- CULTURAL EVOLUTION (Phase 12) ---
+                                // --- PHASE 12: CULTURAL EVOLUTION & CONTINUITY ---
                 culture: {
-                    traits: new Map(), // traitName -> { weight, level, description }
+                    traits: new Map(), 
                     dominantTrait: 'NEUTRAL',
                     traditions: [],
                     lastAdaptationDay: 0
                 },
+                
+                // --- GENESIS CONTINUITY OFFICE (GCO) DNA ---
+                dna: window.GCO ? window.GCO.registerEntity(`village_${i}`, 'VILLAGE', {
+                    industry: profile.industry,
+                    traditions: ['Founding Rite', 'Harvest Feast'],
+                    culture: [['COLLECTIVISM', 0.5], ['SURVIVALISM', 0.8]]
+                }) : null,
+                
                 currentTask: 'Establishing', taskTarget: 'Local Region', taskReason: 'Settlement routine.', taskTimestamp: Date.now()
             });
         }

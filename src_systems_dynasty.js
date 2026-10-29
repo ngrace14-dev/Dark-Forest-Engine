@@ -129,9 +129,17 @@ class DynastyManagerSystem {
             'Duskmoor', 'Frostpeak', 'Shadowfell', 'Sunstride'
         ];
 
-        houseNames.forEach((name, index) => {
+                houseNames.forEach((name, index) => {
             const id = `house_${name.toLowerCase()}`;
-                                                this.houses.set(id, {
+            
+            // --- GCO DNA INTEGRATION ---
+            const dna = window.GCO ? window.GCO.registerEntity(id, 'HOUSE', {
+                foundingMyth: `The Rise of ${name}`,
+                traditions: ['Ancestral Vigil', 'Steel Naming'],
+                culture: [['NOBILITY', 0.9], ['LEGACY', 0.8]]
+            }) : null;
+
+            this.houses.set(id, {
                 id: id,
                 name: `House ${name}`,
                 founder: `Founder ${name}`,
@@ -142,7 +150,9 @@ class DynastyManagerSystem {
                 prestige: 100,
                 isBlessed: index < 9, // First 9 are "Blessed" (Bible §19)
                 
-                                                                                // --- PHASE 1A: INSTITUTIONAL STATS ---
+                dna, // Link to DNA model
+                
+                // --- PHASE 1A: INSTITUTIONAL STATS ---
                                 legitimacy: (name === 'Terminus') ? 0.9 : 0.6, // 0.0 to 1.0 (Bible §19)
                                 historicalContinuity: (name === 'Terminus') ? 18000 : 12000,
                                 informationalScarcity: (name === 'Terminus') ? 50 : 20,

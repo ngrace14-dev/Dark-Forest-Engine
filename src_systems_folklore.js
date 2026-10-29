@@ -64,8 +64,43 @@ class FolkloreEngineSystem {
         init() {
         this.persistentAnthology = this.loadCrossRunFolklore();
         this.anthology = [...this.persistentAnthology];
+                // --- STEP 10-4: INJECT TOMBSTONE FOLKLORE ---
+                this.injectTombstoneFolklore();
+
                 window.EventBus.emit('UI_LOG', '[Folklore] Poem DNA Engine Active');
     }
+
+    injectTombstoneFolklore() {
+                const history = JSON.parse(localStorage.getItem('dark-forest-sim-history') || '[]');
+                if (history.length === 0) return;
+
+                history.forEach((tomb, idx) => {
+                    const verse = {
+                        id: `tombstone_${idx}`,
+                        title: `The Tale of the ${tomb.category} Age`,
+                        text: `In the time of Epoch ${tomb.epoch}, when the ${tomb.choice} was chosen, the world was ${tomb.category.toLowerCase()}.`,
+                        class: 'MYTHIC',
+                        historicalWeight: 500,
+                        distortionLevel: 0.8,
+                        fidelity: 0.1
+                    };
+                    this.anthology.push(verse);
+            
+                    // Add legends as sub-verses
+                    tomb.legends.forEach(l => {
+                        this.anthology.push({
+                            id: `legend_memory_${l.name}`,
+                            title: `The Echo of ${l.name}`,
+                            text: `It is whispered that ${l.name}, known as ${l.title}, walked the woods before the Great Shift.`,
+                            class: 'MYTHIC',
+                            historicalWeight: 300,
+                            distortionLevel: 0.9,
+                            fidelity: 0.05
+                        });
+                    });
+                });
+    }
+
 
         /**
      * Verse Strand: Contextual Folklore Generation
