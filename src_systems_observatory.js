@@ -394,9 +394,9 @@ class WorldObservatory {
     calculateStability(yearData) {
         if (yearData.length === 0) return 1.0;
         
-        // Stability = 1.0 - (ExtinctionRisk + (1.0 - meanLegitimacy) + loopRisk) / 3
+        // Stability = 1.0 - (ExtinctionRisk + (1.0 - meanLegitimacy) + (latest.significance?.loopRisk || 0)) / 3
         const latest = yearData[yearData.length - 1].averages;
-        const risk = (latest.world.extinctionRisk + (1.0 - latest.political.meanLegitimacy) + latest.significance.loopRisk) / 3;
+        const risk = ((latest.world?.extinctionRisk || 0) + (1.0 - (latest.political?.meanLegitimacy || 1.0)) + (latest.significance?.loopRisk || 0)) / 3;
         
         return Math.max(0, 1.0 - risk);
     }
@@ -408,10 +408,10 @@ class WorldObservatory {
         const last = decadeData[decadeData.length - 1].averages;
         
         return {
-            prosperityDelta: last.world.prosperity - first.world.prosperity,
-            truthDecay: first.information.truthFidelity - last.information.truthFidelity,
-            legitimacyDrift: last.political.meanLegitimacy - first.political.meanLegitimacy,
-            significanceInflation: last.significance.inflationRate
+            prosperityDelta: (last.world?.prosperity || 0) - (first.world?.prosperity || 0),
+            truthDecay: (first.information?.truthFidelity || 0) - (last.information?.truthFidelity || 0),
+            legitimacyDrift: (last.political?.meanLegitimacy || 0) - (first.political?.meanLegitimacy || 0),
+            significanceInflation: last.significance?.inflationRate || 0
         };
     }
 
@@ -425,11 +425,11 @@ class WorldObservatory {
         
         const scores = {
             stability: Math.floor(this.calculateStability(this.reports.years.slice(-10)) * 100),
-            history: Math.floor(health.historical.archiveDensity * 100 + health.historical.knowledgeHalfLife),
-            civilization: Math.floor(health.world.popStability * 100 - health.world.extinctionRisk * 100),
-            information: Math.floor(health.information.truthFidelity * 100 - health.information.contamination * 100),
-            political: Math.floor(health.political.meanLegitimacy * 100 - health.political.crisisRatio * 100),
-            emergent: Math.floor(health.emergent.culturalDiversity * 100 + health.emergent.powerCenterCount * 5),
+            history: Math.floor((health.historical?.archiveDensity || 0) * 100 + (health.historical?.knowledgeHalfLife || 0)),
+            civilization: Math.floor((health.world?.popStability || 1) * 100 - (health.world?.extinctionRisk || 0) * 100),
+            information: Math.floor((health.information?.truthFidelity || 1) * 100 - (health.information?.contamination || 0) * 100),
+            political: Math.floor((health.political?.meanLegitimacy || 1) * 100 - (health.political?.crisisRatio || 0) * 100),
+            emergent: Math.floor((health.emergent?.culturalDiversity || 0) * 100 + (health.emergent?.powerCenterCount || 0) * 5),
         };
 
         // Overall Confidence calculation
@@ -453,12 +453,32 @@ class WorldObservatory {
 
     getStatus() {
         return {
-            activeReports: {
-                seasons: this.reports.seasons.length,
-                years: this.reports.years.length,
-                decades: this.reports.decades.length
-            },
-            currentHealth: this.dailyBuffer[this.dailyBuffer.length - 1]?.metrics || this.initializeHealthState()
+            world: this.probeWorldHealth(),
+            information: this.probeInformationHealth(),
+            political: this.probePoliticalHealth(),
+            historical: this.probeHistoricalHealth(),
+            significance: this.probeSignificanceHealth(),
+            dunes: this.probeDuneHealth(),
+            emergent: this.probeEmergentHealth()
+        };
+    }
+
+    probeHistoricalHealth() {
+        if (!window.ChronicleManager || !window.FolkloreEngine) return { mythicDrift: 0, knowledgeHalfLife: 0, archiveDensity: 0 };
+        
+        const poems = window.FolkloreEngine.anthology || [];
+        const avgDrift = poems.length > 0 ? 
+            poems.reduce((acc, p) => acc + (p.distortionLevel || 0), 0) / poems.length : 0;
+            
+        const totalIntel = window.IntelManager?.registry.size || 1;
+        const archivedIntel = window.IntelManager?.archive.size || 0;
+        
+        const legends = window.GameState?.legends?.length || 0;
+
+        return {
+            mythicDrift: avgDrift,
+            knowledgeHalfLife: archivedIntel / totalIntel,
+            archiveDensity: (archivedIntel + legends) / 100 // Density per century approx
         };
     }
 }
