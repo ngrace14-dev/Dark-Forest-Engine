@@ -175,20 +175,44 @@ class WorldObservatory {
     probeSignificanceHealth() {
         if (!window.ChronicleManager) return {};
         const weights = Array.from(window.ChronicleManager.npcHistoricalWeights.values());
-        if (weights.length === 0) return { giniCoefficient: 0 };
+        if (weights.length === 0) return { giniCoefficient: 0, totalSignificance: 0, inflationRate: 0, anchorDensity: 0 };
 
-        // Simple Gini Coefficient approximation
+        // 1. Gini Coefficient (Significance Inequality)
         weights.sort((a, b) => a - b);
         const n = weights.length;
         let sum = 0;
         for (let i = 1; i <= n; i++) {
             sum += (n + 1 - i) * weights[i - 1];
         }
-        const gini = (n + 1 - 2 * (sum / weights.reduce((a, b) => a + b, 0))) / n;
+        const totalSig = weights.reduce((a, b) => a + b, 0);
+        const gini = (n + 1 - 2 * (sum / (totalSig || 1))) / n;
+
+        // 2. Inflation Tracking
+        const lastTotal = this._lastTotalSignificance || totalSig;
+        const inflationRate = (totalSig - lastTotal) / (lastTotal || 1);
+        this._lastTotalSignificance = totalSig;
+
+        // 3. Anchor Density (Persistent Significant Entities)
+        // Count entities with significance > 500 (Legends)
+        const legends = weights.filter(w => w > 500).length;
+        const anchorDensity = legends / n;
+
+        // 4. Concentration Audit: Top 1% Share
+        const top1PercentCount = Math.max(1, Math.floor(n * 0.01));
+        const top1PercentSum = weights.slice(-top1PercentCount).reduce((a, b) => a + b, 0);
+        const topShare = top1PercentSum / (totalSig || 1);
+
+        // 5. Loop Risk: Detection of runaway narrative loops
+        // If inflation > 5% per day, something is broken
+        const loopRisk = inflationRate > 0.05 ? 1.0 : 0.0;
 
         return {
             giniCoefficient: isNaN(gini) ? 0 : gini,
-            totalSignificance: weights.reduce((a, b) => a + b, 0)
+            totalSignificance: totalSig,
+            inflationRate,
+            anchorDensity,
+            topShare,
+            loopRisk
         };
     }
 
