@@ -225,16 +225,20 @@ window.ForceManager = {
         force.strength = Math.floor((controlled / total) * 1000);
     },
 
-    recalculateForest: function() {
+        recalculateForest: function() {
         const force = this.forces['Forest'];
         if (!window.VillageManager) return;
         
         const occupied = window.VillageManager.villages.filter(v => v.territory.faction === 'forest').length;
         force.value = occupied;
-        force.strength = 300 + (occupied * 100);
+        
+        // AED Integration: Forest Pressure Index increases base strength
+        const aedBonus = window.AED ? (window.AED.metrics.forestPressureIndex * 200) : 0;
+        force.strength = 300 + (occupied * 100) + aedBonus;
     },
 
         recalculateHouses: function() {
+
         const force = this.forces['Houses'];
         if (!force || !window.VillageManager?.villages) return;
         
@@ -245,14 +249,18 @@ window.ForceManager = {
 
 
         recalculateWendigo: function() {
-            const force = this.forces['Wendigo'];
-            // Strength grows with fear (low prosperity) and deaths
-            const events = window.ChronicleManager?.worldLedger || [];
-            const deaths = events.filter(e => e.type === 'DEFEAT' || e.type === 'die').length;
+                const force = this.forces['Wendigo'];
+                // Strength grows with fear (low prosperity) and deaths
+                const events = window.ChronicleManager?.worldLedger || [];
+                const deaths = events.filter(e => e.type === 'DEFEAT' || e.type === 'die').length;
         
-            force.value = deaths;
-            force.strength = Math.min(1000, 100 + (deaths * 20));
-        },
+                // AED Integration: Innovation and Harvest Efficiency increase lethality
+                const aedBonus = window.AED ? (window.AED.metrics.predatorInnovationScore * 150 + window.AED.metrics.harvestEfficiencyScore * 100) : 0;
+
+                force.value = deaths;
+                force.strength = Math.min(1200, 100 + (deaths * 20) + aedBonus);
+            },
+
 
         /**
          * Spawns the Watchers during extreme significance events.

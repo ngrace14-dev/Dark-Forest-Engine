@@ -101,7 +101,8 @@ class WorldObservatory {
                 political: this.probePoliticalHealth(),
                 significance: this.probeSignificanceHealth(),
                 dunes: this.probeDuneHealth(),
-                emergent: this.probeEmergentHealth()
+                emergent: this.probeEmergentHealth(),
+                adversarial: this.probeAdversarialHealth()
             }
         };
 
@@ -191,7 +192,6 @@ class WorldObservatory {
 
         // 4. Misinformation Persistence
         // Average age of FALSE facts
-        const day = window.EngineParams?.worldDay || 0;
         const falseFacts = facts.filter(i => i.truth_state === 'FALSE');
         const avgMisinfoAge = falseFacts.reduce((acc, i) => acc + (day - i.payload.timestamp_day), 0) / (falseFacts.length || 1);
 
@@ -603,6 +603,11 @@ class WorldObservatory {
             legitimacyDrift: (last.political?.meanLegitimacy || 0) - (first.political?.meanLegitimacy || 0),
             significanceInflation: last.significance?.inflationRate || 0
         };
+    }
+
+    probeAdversarialHealth() {
+        if (!window.AED) return {};
+        return window.AED.generateObservabilityReport();
     }
 
     /**

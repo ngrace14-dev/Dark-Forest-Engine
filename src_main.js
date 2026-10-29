@@ -27,6 +27,7 @@ import './src_core_asset_budget.js';
 import './src_epoch_manager.js';
 import './src_systems_institutional_continuity.js';
 import './src_systems_civilization_learning.js';
+import './src_systems_adversarial_learning.js';
 import './src_systems_significance_economy.js';
 import './src_systems_political_observatory.js';
 import './src_systems_fuel_observatory.js';

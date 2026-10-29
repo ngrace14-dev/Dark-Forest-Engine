@@ -467,7 +467,13 @@ window.VillageManager = {
 
             // Re-evaluate dominant trait
             this.evaluateDominantCulture(village);
-        },
+        
+            // AED Integration: Stability Plateaus and Recaptures
+            if (eventType === 'RAID_REPELLED' && window.AED) {
+                window.AED.processAdaptation('Forest');
+            }
+    },
+
 
 
     reinforceCultureTrait: function(village, traitName, delta) {
@@ -739,9 +745,14 @@ window.VillageManager = {
     },
 
 
+            /**
+     * Simulation of a single village tick.
+     */
+    simulateVillage: function(village) {
         const cal = window.CalibrationFramework?.settings || {};
         const econCal = cal.economy || { consumption: 1.0, scarcity: 1.0, tradeEfficiency: 1.0 };
         const worldCal = cal.world || { growthRate: 1.0, spawnRate: 1.0 };
+
 
         village.currentTask = 'Simulating';
         village.taskReason = 'Economic cycle processing.';
@@ -1410,38 +1421,44 @@ window.VillageManager = {
     },
 
         /**
-     * Logic for local authority and dependency on the Crown.
-     * Bible Doctrine: Information determines who controls physical goods.
-     */
-    processFeudalLoyalty: function(village) {
-        if (village.capital) return;
+         * Logic for local authority and dependency on the Crown.
+         * Bible Doctrine: Information determines who controls physical goods.
+         */
+        processFeudalLoyalty: function(village) {
+            if (village.capital) return;
         
-        // --- HIDDEN VILLAGE EXCEPTION ---
-        if (village.name === 'Epitaph') {
-            village.feudalState = 'SOVEREIGN';
-            village.stats.essence = 999; // Lore: Runic Sovereignty
-            village.fuelRequested = false;
-            return;
-        }
-
-        const crownRelations = village.relations[0] || 0;
-        const memory = village.memoryProfile;
-
-        // 1. Dependency Calculation
-        // A village is "Independent" if its memoryProfile.trustInCrown is low but ambition is high.
-        if (memory.trustInCrown < 0.3 && memory.ambition > 0.7) {
-            if (village.feudalState !== 'INDEPENDENT') {
-                village.feudalState = 'INDEPENDENT';
-                window.EventBus.emit('UI_LOG', `[POLITICS] ${village.name} has declared economic independence from the Capital.`);
+            // --- HIDDEN VILLAGE EXCEPTION ---
+            if (village.name === 'Epitaph') {
+                village.feudalState = 'SOVEREIGN';
+                village.stats.essence = 999; // Lore: Runic Sovereignty
+                village.fuelRequested = false;
+                return;
             }
-        } else if (crownRelations < -20) {
-            village.feudalState = 'SEMI_AUTONOMOUS';
-        } else {
-            // Keep specialized states if they were set (e.g. Terminus)
-            if (village.feudalState !== 'PARTIALLY_SOVEREIGN') {
-                village.feudalState = 'DEPENDENT';
+
+            const crownRelations = village.relations[0] || 0;
+            const memory = village.memoryProfile;
+
+            // 1. Dependency Calculation
+            // A village is "Independent" if its memoryProfile.trustInCrown is low but ambition is high.
+            if (memory.trustInCrown < 0.3 && memory.ambition > 0.7) {
+                if (village.feudalState !== 'INDEPENDENT') {
+                    village.feudalState = 'INDEPENDENT';
+                    window.EventBus.emit('UI_LOG', `[POLITICS] ${village.name} has declared economic independence from the Capital.`);
+                
+                    // AED Integration: Rebellion increases Forest Pressure
+                    if (window.AED) {
+                        window.AED.processAdaptation('Forest');
+                    }
+                }
+            } else if (crownRelations < -20) {
+                village.feudalState = 'SEMI_AUTONOMOUS';
+            } else {
+                // Keep specialized states if they were set (e.g. Terminus)
+                if (village.feudalState !== 'PARTIALLY_SOVEREIGN') {
+                    village.feudalState = 'DEPENDENT';
+                }
             }
-        }
+
 
         // 2. Strategic Reserves
         // Independent/Cautious villages try to keep a local reserve of 20 Essence

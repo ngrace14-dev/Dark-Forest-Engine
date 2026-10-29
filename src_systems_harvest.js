@@ -143,6 +143,11 @@ class WendigoHarvestSystem {
 
         window.EventBus.emit('UI_LOG', `💀 [WENDIGO] A ${harvestType} HARVEST HAS BEGUN. TARGET: ${nodeId}`);
         
+        // --- AED INTEGRATION ---
+        if (window.AED) {
+            window.AED.processHarvest({ significance: candidate.pressureScore, difficulty: 1.0 }, 'Wendigo');
+        }
+
         // System 6: Consequences (Immediate pressure increase)
         window.ForceManager.forces['Wendigo'].strength += 50;
 
