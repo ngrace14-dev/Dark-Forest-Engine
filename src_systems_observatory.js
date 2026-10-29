@@ -672,6 +672,36 @@ class WorldObservatory {
      * Aggregates all telemetry into a final audit grade.
      */
     generateFinalAudit() {
+        const status = this.getStatus();
+        const health = status.currentHealth;
+        
+        const scores = {
+            stability: Math.floor(this.calculateStability(this.reports.years.slice(-10)) * 100),
+            history: Math.floor((health.historical?.archiveDensity || 0) * 100 + (health.historical?.knowledgeHalfLife || 0)),
+            civilization: Math.floor((health.world?.popStability || 1) * 100 - (health.world?.extinctionRisk || 0) * 100),
+            information: Math.floor((health.information?.truthFidelity || 1) * 100 - (health.information?.contamination || 0) * 100),
+            political: Math.floor((health.political?.meanLegitimacy || 1) * 100 - (health.political?.crisisRatio || 0) * 100),
+            emergent: Math.floor((health.emergent?.culturalDiversity || 0) * 100 + (health.emergent?.powerCenterCount || 0) * 5),
+        };
+
+        // Overall Confidence calculation
+        const overall = Math.floor(Object.values(scores).reduce((a, b) => a + b, 0) / 6);
+
+        console.log("%c ================================================= ", "color: #fbbf24; font-weight: bold;");
+        console.log("%c      1000 YEAR STRESS TEST SCORE (AUDIT)        ", "background: #1e1e1e; color: #fbbf24; font-weight: bold; padding: 5px;");
+        console.log("%c ================================================= ", "color: #fbbf24; font-weight: bold;");
+        console.log(`Simulation Stability:  ${scores.stability} / 100`);
+        console.log(`Historical Simulation: ${scores.history} / 100`);
+        console.log(`Civilization Evolution: ${scores.civilization} / 100`);
+        console.log(`Information Economy:   ${scores.information} / 100`);
+        console.log(`Political Simulation:  ${scores.political} / 100`);
+        console.log(`Emergent Behavior:     ${scores.emergent} / 100`);
+        console.log("%c ------------------------------------------------- ", "color: #4b5563;");
+        console.log(`%c OVERALL CONFIDENCE:   ${overall} / 100`, "font-weight: bold; color: #4ade80;");
+        console.log("%c ================================================= ", "color: #fbbf24; font-weight: bold;");
+
+        return { scores, overall };
+    }
 
     probeFuelHealth() {
         if (!window.VillageManager) return { globalEssence: 0, maintenanceCost: 0, stability: 1.0 };
