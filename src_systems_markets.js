@@ -34,9 +34,22 @@ class MarketSystem {
     }
 
     /**
-     * 26.1 Caravan Guard Allocation
-     * 26.5 Shipping Losses to Churn Rot
+     * Phase 4: Resource Bias & Rumor Rarity
+     * Market quality scales with proximity to the settlement Anchor.
      */
+    getMarketQuality(villageId, playerPos) {
+        if (!window.UrbanPlanning) return 1.0;
+        
+        const quarter = window.UrbanPlanning.getQuarterForLocation(villageId, playerPos.x, playerPos.z);
+        return quarter.resourceBias;
+    }
+
+    getRumorRarityForQuarter(villageId, playerPos) {
+        if (!window.UrbanPlanning) return 'COMMON';
+        
+        const quarter = window.UrbanPlanning.getQuarterForLocation(villageId, playerPos.x, playerPos.z);
+        return quarter.rumorRarity;
+    }
     simulateTransportRisk(caravan) {
         // 26.7 Transport Sabotage Risk
         const risk = 0.05;

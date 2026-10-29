@@ -41,6 +41,13 @@ export class PlayerCampComponent extends UIComponent {
                     <button class="build-base-item col-span-2 border border-cyan-700 px-2 py-2 text-xs hover:border-cyan-300" data-prefab="Rune Tower">Rune Tower: 12 Wood, 10 Stone, 5 Research</button>
                 </div>
             </div>
+            <div class="mt-4 border-t border-red-900 pt-3">
+                <div class="text-xs text-red-500 font-bold mb-2">FOUNDATION RITUAL</div>
+                <div class="text-[10px] text-gray-400 mb-2 italic">Burn your Core Integrity to permanently anchor this settlement against the shifting void. Cannot be undone.</div>
+                <button id="btn-burn-core" class="w-full border border-red-700 bg-red-900/30 px-3 py-2 text-xs font-bold text-red-300 hover:bg-red-800 hover:text-white transition-colors disabled:opacity-50" ${base.is_fuel_independent ? 'disabled' : ''}>
+                    ${base.is_fuel_independent ? 'ANCHOR ESTABLISHED' : 'SACRIFICE CORE (75%)'}
+                </button>
+            </div>
             <div class="mt-4 border-t border-gray-700 pt-3">
                 <div class="text-xs text-cyan-200 mb-1">SELECTED WORKERS</div>
                 <div class="text-[10px] text-gray-500 mb-2">${selectedNames}</div>
@@ -59,6 +66,15 @@ export class PlayerCampComponent extends UIComponent {
         this.element.querySelectorAll('.deposit-base-item').forEach(button => button.addEventListener('click', () => window.EventBus.emit('DEPOSIT_BASE_ITEM', Number(button.dataset.index))));
         this.element.querySelectorAll('.build-base-item').forEach(button => button.addEventListener('click', () => { window.EventBus.emit('BUILD_BASE_STRUCTURE', button.dataset.prefab); this.render(); }));
         this.element.querySelectorAll('.assign-base-job').forEach(button => button.addEventListener('click', () => window.EventBus.emit('ASSIGN_BASE_JOB', button.dataset.job)));
+        
+        const btnBurnCore = this.element.querySelector('#btn-burn-core');
+        if (btnBurnCore && !base.is_fuel_independent) {
+            btnBurnCore.addEventListener('click', () => {
+                window.EventBus.emit('SACRIFICE_CORE_RITUAL');
+                this.render();
+            });
+        }
+        
         this.element.querySelector('#btn-close-base').addEventListener('click', window.closeCompanionDialogue);
     }
 }

@@ -17,6 +17,47 @@ class WorldEventDirectorSystem {
 
     init() {
         window.EventBus.emit('UI_LOG', '[WorldEvents] Simulation Director Active');
+        
+        // Phase 5: Burn Core Ritual Hook
+        window.EventBus.on('SACRIFICE_CORE_RITUAL', () => this.executeCoreSacrifice());
+    }
+
+    /**
+     * Executes the Phase 5 Sacrifice Ritual.
+     * Drains 75% core integrity to make the settlement fuel independent.
+     */
+    executeCoreSacrifice() {
+        if (!window.playerHealth || !window.GameState?.base) return;
+
+        if (window.playerHealth.core_integrity < 75) {
+            window.EventBus.emit('UI_LOG', '⚠️ [RITUAL] Insufficient Core Integrity to perform the foundation sacrifice.');
+            return;
+        }
+
+        window.playerHealth.damageCore(75);
+        
+        const base = window.GameState.base;
+        base.is_fuel_independent = true;
+        
+        // Make player a static node
+        if (window.GameCore?.playerObj) {
+            window.GameCore.playerObj.is_static_node = true;
+        }
+
+        window.EventBus.emit('UI_LOG', `🌀 [SACRIFICE] Core shattered into the earth. The settlement is permanently anchored.`);
+        window.EventBus.emit('SPAWN_FLOATING_TEXT', { text: 'ANCHORED', pos: window.GameCore.playerObj.visual.position, color: '#fcd34d' });
+        
+        // Record in Chronicle
+        if (window.ChronicleManager) {
+            window.ChronicleManager.recordEvent({
+                actorId: 'player',
+                type: 'FOUNDATION_RITUAL',
+                detail: 'The Wanderer sacrificed their core to anchor a Beacon City against the Void.',
+                significance: 500,
+                historicalWeight: 200,
+                location: { x: base.position.x, z: base.position.z }
+            });
+        }
     }
 
     /**

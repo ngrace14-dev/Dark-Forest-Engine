@@ -48,7 +48,7 @@ window.VillageManager = {
         { itemId: 'cullfield_hunter_brew', name: 'Cullfield Hunter Brew', heal: 76, buff: 'dodge', amount: 5, duration: 180 },
         { itemId: 'terminus_war_brew', name: 'Terminus War Brew', heal: 90, buff: 'strength', amount: 7, duration: 240 }
     ],
-    generateWeb: function() {
+        generateWeb: function() {
         this.villages = []; 
         const capitalPopulation = Math.floor(this.kingdomPopulation * this.capitalPopulationShare);
         const settlementPopulation = Math.floor((this.kingdomPopulation - capitalPopulation) / 19);
@@ -64,7 +64,7 @@ window.VillageManager = {
             const profile = this.settlementProfiles[i];
             const provision = this.provisionProfiles[i];
             
-                        this.villages.push({ 
+            this.villages.push({ 
                 id: i, 
                 name: i === 0 ? 'The Capital' : this.names[i - 1], 
                 x: 0, z: 0, // Placeholder, set by shiftLocations
@@ -94,19 +94,20 @@ window.VillageManager = {
                     }
                 }, 
                 population: { current: population, capacity: Math.ceil(population * 1.2) }, 
-                                expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [],
-                                // --- PHYSICAL LEGACY: PROPERTY REGISTRY (Phase 14) ---
+                expansionLevel: 0, squads: [], caravans: [], assignedModel: null, layout: [], residents: [],
+                // --- PHASE 4: QUARTER ENGINE ---
+                quarters: new Map(), // QuarterID -> { inhabitants: [], density: 0 }
+                // --- PHYSICAL LEGACY: PROPERTY REGISTRY (Phase 14) ---
                 propertyRegistry: new Map(), // id -> { type, ownerId, occupantId, houseId, genCount, history: [], anchoredKnowledge: [] }
                 
                 // --- PHASE 3: ARCHIVE PHYSICALITY ---
                 archiveAccessControl: new Map(), // node_id -> access_level (0:Public, 1:Citizen, 2:Noble, 3:Elite)
 
                 relations: {}, 
- 
                 diplomaticState: {}, 
                 tensions: 0,
                 crisisLog: [], // --- GOVERNANCE MEMORY ---
-                                memoryProfile: { // --- PHASE 3: MEMORY PROFILE ---
+                memoryProfile: { // --- PHASE 3: MEMORY PROFILE ---
                     caution: 0.2,
                     ambition: 0.5,
                     trustInCrown: 0.8,
@@ -116,7 +117,7 @@ window.VillageManager = {
                 fuelNeed: 0, // Projected demand
                 feudalState: i === 19 ? 'PARTIALLY_SOVEREIGN' : 'DEPENDENT', // --- PHASE 11: FEUDAL DEPENDENCY ---
                 deepReserves: i === 19 ? { food: 500, essence: 100 } : null, // --- TERMINUS DEEP RESERVES ---
-                                activeObjectives: [], // --- PHASE 5: INSTITUTIONAL AGENCY ---
+                activeObjectives: [], // --- PHASE 5: INSTITUTIONAL AGENCY ---
                 // --- CULTURAL EVOLUTION (Phase 12) ---
                 culture: {
                     traits: new Map(), // traitName -> { weight, level, description }
@@ -124,11 +125,10 @@ window.VillageManager = {
                     traditions: [],
                     lastAdaptationDay: 0
                 },
-                // Action Ledger Requirement
-
                 currentTask: 'Establishing', taskTarget: 'Local Region', taskReason: 'Settlement routine.', taskTimestamp: Date.now()
             });
         }
+
         
         // Initialize mutual relations
         this.villages.forEach(v1 => {
@@ -216,12 +216,21 @@ window.VillageManager = {
             village.z = baseZ + (deviationDirZ * deviationAmount);
         }
 
-        // 4. Anchor Analysis: Sync with Force Manager
+                        // 4. Anchor Analysis: Sync with Force Manager
         if (window.ForceManager) {
             window.ForceManager.update(0);
         }
+
+        // --- PHASE 4: REGISTER ANCHORS ---
+        if (window.UrbanPlanning) {
+            this.villages.forEach(v => {
+                window.UrbanPlanning.registerAnchor(v.id, v.x, v.z);
+            });
+        }
         
         // 5. Regenerate the road network to match the new coordinates
+
+
                 if (window.RoadManager && window.RoadManager.generateRoads) {
             window.RoadManager.generateRoads(this.villages);
         }
@@ -274,13 +283,15 @@ window.VillageManager = {
         this.simulationIndex = (this.simulationIndex + 1) % this.villages.length;
     },
 
-    initScheduler: function() {
+        initScheduler: function() {
         // Tier 5: Institutional Review (Every 6 hours)
         window.EventBus.on('HEARTBEAT_T6H', () => {
             this.auditMonopolies();
+            this.processBeaconMigration(); // Phase 5 Hook
         });
 
         // Tier 2: Belief/Intel Exchange (Every 5 minutes)
+
         window.EventBus.on('HEARTBEAT_T5M', () => {
             this.simulateNextVillage();
         });
@@ -366,7 +377,7 @@ window.VillageManager = {
     /**
      * Records successful periods to improve institutional confidence.
      */
-    recordSuccess: function(village, type) {
+        recordSuccess: function(village, type) {
         const mem = village.memoryProfile;
         switch(type) {
             case 'PROSPERITY':
@@ -382,10 +393,31 @@ window.VillageManager = {
         }
     },
 
+    /**
+     * Phase 5: Beacon City Migration
+     * Independent settlements attract refugees rapidly.
+     */
+    processBeaconMigration: function() {
+        if (!window.GameState?.base?.is_fuel_independent) return;
+        
+        const base = window.GameState.base;
+        if (Math.random() < 0.1) { // 10% chance per shift to attract a refugee
+            const refugeeCount = 1 + Math.floor(Math.random() * 3);
+            base.population = (base.population || 0) + refugeeCount;
+            window.EventBus.emit('UI_LOG', `🌟 [BEACON] ${refugeeCount} refugees drawn to your anchored light have arrived at camp.`);
+            
+            // Generate a labor/quest opportunity
+            if (window.ArchiveManager) {
+                window.ArchiveManager.generateLaborQuest(base);
+            }
+        }
+    },
+
         /**
          * Node 1 & 7: Cultural Adaptation
          * Culture is inherited memory made habitual.
          */
+
         updateVillageCulture: function(village, eventType, impact) {
             if (!village.culture) return;
         
@@ -1284,9 +1316,40 @@ window.VillageManager = {
         window.EventBus.emit('UI_LOG_DEBUG', `[ECONOMY] Capital issued high-priority hunt contract.`);
     },
 
-    /**
-     * Dispatches a caravan from a village to the Capital to deliver raw materials.
+        /**
+     * Phase 4: Social Gravity & Quarter Housing
+     * Bible §Urban: NPCs choose housing based on SocialCapital.
      */
+    assignNPCToQuarter: function(npc, villageId) {
+        if (!window.UrbanPlanning) return;
+
+        const village = this.villages.find(v => v.id === villageId);
+        if (!village) return;
+
+        // Score potential quarters based on NPC social capital
+        const quarters = ['NOBLE', 'ARTISAN', 'SLUMS'];
+        let chosenQuarter = 'SLUMS';
+
+        for (const qId of quarters) {
+            const qDef = window.UrbanPlanning.QuarterType[qId];
+            if (npc.socialCapital >= qDef.capitalFloor) {
+                chosenQuarter = qId;
+                break; // Highest first
+            }
+        }
+
+        // Register inhabitant
+        if (!village.quarters.has(chosenQuarter)) {
+            village.quarters.set(chosenQuarter, { inhabitants: [], density: 0 });
+        }
+        
+        const qData = village.quarters.get(chosenQuarter);
+        qData.inhabitants.push(npc.id);
+        qData.density = qData.inhabitants.length / 20; // Arbitrary density logic
+        
+        window.EventBus.emit('UI_LOG_DEBUG', `[SOCIAL GRAVITY] ${npc.name} moved to the ${chosenQuarter} quarter.`);
+    },
+
     launchRefinementSupplyCaravan: function(village) {
         const stock = village.stats.refinementStock;
         const cargo = stock.beast_bones > 0 ? 'beast_bones' : (stock.corrupted_resin > 0 ? 'corrupted_resin' : 'flesh_pods');

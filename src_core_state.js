@@ -57,8 +57,9 @@ window.GameState = {
     combatRecord: { wins: 0, losses: 0, fame: 0, injuries: [] },
     renown: { score: 0, infamy: 0, title: 'Unknown', history: [] },
     coop: { sessionId: null, localPlayerId: null, partyMode: 'solo' },
-    base: { owned: false, name: 'Wayfarer Camp', position: null, storage: [], structures: [], farms: [], research: [] },
+        base: { owned: false, name: 'Wayfarer Camp', position: null, storage: [], structures: [], farms: [], research: [], is_fuel_independent: false },
     party: { 
+ 
         command: 'follow', selectedMembers: ['lyra-scout'], escortCaravanId: null, formation: 'line', 
         resonanceLevel: 0,
         tacticalLearning: { aggression: 0.5, flanking: 0.5, skillPreference: {}, averageEngagementDist: 10 },
@@ -147,7 +148,7 @@ window.GameState = {
         ]
     },
 
-        // --- WENDIGO SPECTRUM: EVOLUTION ---
+                // --- WENDIGO SPECTRUM: EVOLUTION ---
         monsterState: {
             isWendigo: false,
             evolutionStage: 'NONE', // LESSER, VAMPIRE, HIGHER, BERZERKER, HERALD
@@ -161,6 +162,16 @@ window.GameState = {
             fedToday: false,
             highestConsumedTier: 'NONE' // Tracks the highest 'class' of victim consumed
         },
+
+    // --- APPLE OF EDEN HOOK ---
+    consumeAppleOfEden: function() {
+        if (!window.playerHealth) return;
+        
+        window.playerHealth.repairCore(100);
+        window.EventBus.emit('UI_LOG', '🍎 [EDEN] The Core is restored to its original blueprint.');
+        window.EventBus.emit('PLAY_SOUND', { url: 'https://tonejs.github.io/audio/drum-samples/CRASH_1.mp3', vol: 5 });
+    },
+
 
 
         forestBlessing: {

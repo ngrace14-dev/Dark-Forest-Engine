@@ -172,7 +172,6 @@ class MountainArchiveSystem {
 
     init() {
 
-
         // Initialize Terminus Theories (Bible §8)
         this.activeTheories.set('static_mountain_theory', {
             name: 'The Fixed Bedrock',
@@ -181,11 +180,47 @@ class MountainArchiveSystem {
             flaw: 'Ignores the 5% absolute reference frame of the Dunes.'
         });
 
+        // Track completed Labors (Phase 5)
+        this.completedLabors = 0;
+
         window.EventBus.emit('UI_LOG', '[Archives] Mountain Observation Post Active');
     }
 
     /**
+     * Phase 5: The 12 Labors State-Machine
+     * Manages procedural generation of high-level quests for Beacon Cities.
+     */
+    generateLaborQuest(base) {
+        if (!window.GameState) return;
+        
+        if (this.completedLabors >= 12) return; // Labors complete
+
+        const activeLabor = window.GameState.questBoard.find(q => q.type === 'LABOR');
+        if (activeLabor) return; // Only one labor active at a time
+
+        const laborId = this.completedLabors + 1;
+        
+        const targets = ['Greater Wendigo', 'Fractal Sentinel', 'First Flame Zealot'];
+        const target = targets[Math.floor(Math.random() * targets.length)];
+
+        const laborQuest = {
+            id: `labor-${laborId}`,
+            type: 'LABOR',
+            issuer: 'The Refugees',
+            title: `Labor ${laborId}: Slay the ${target}`,
+            purpose: 'Securing the Beacon',
+            targetName: target,
+            reward: 'Apple of Eden', // The Core Restoration item
+            status: 'OPEN'
+        };
+
+        window.GameState.questBoard.push(laborQuest);
+        window.EventBus.emit('UI_LOG', `📜 [THE 12 LABORS] Labor ${laborId} has been decreed by the refugees: Slay the ${target}.`);
+    }
+
+    /**
      * Captures long-term data impossible to find in the Forest.
+
      * Bible §12: Preserving continuity and measurement.
      */
     recordLongitudinalData() {
