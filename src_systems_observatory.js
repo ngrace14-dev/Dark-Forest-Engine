@@ -266,7 +266,13 @@ class WorldObservatory {
         const houses = Array.from(window.DynastyManager.houses.values());
         if (houses.length === 0) return { meanLegitimacy: 0, powerConcentration: 0 };
 
+        // --- STEP 9-4: WAR TELEMETRY ---
+        const totalWarExhaustion = window.TotalWar?.stats.warExhaustion || 0;
+        const totalCasualties = window.TotalWar?.stats.totalCasualties || 0;
+        const activeSieges = window.TotalWar?.sieges.size || 0;
+
         const totalPrestige = houses.reduce((acc, h) => acc + (h.prestige || 0), 0) || 1;
+// ... existing metrics ...
         const hhi = houses.reduce((acc, h) => acc + Math.pow((h.prestige || 0) / totalPrestige, 2), 0);
         
         const meanLegitimacy = houses.reduce((acc, h) => acc + (h.legitimacy || 0), 0) / houses.length;
@@ -310,7 +316,10 @@ class WorldObservatory {
             narrativeGap,
             identityDrift,
             successionStability,
-            sovereigntyIndex
+            sovereigntyIndex,
+            warExhaustion: totalWarExhaustion,
+            casualties: totalCasualties,
+            activeSieges
         };
     }
 

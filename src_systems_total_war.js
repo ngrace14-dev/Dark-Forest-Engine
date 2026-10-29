@@ -11,8 +11,35 @@ class TotalWarSystem {
         this.sieges = new Map(); // Map<village_id, SiegeObject>
         this.insurgencies = new Map(); // Map<house_id, InsurgencyObject>
         this.migrations = new Map(); // Map<migration_id, MigrationObject>
+        
+        // --- STEP 9-4: THE WAR LEDGER ---
+        this.stats = {
+            totalCasualties: 0,
+            villagesConquered: 0,
+            activeFronts: 0,
+            warExhaustion: 0 // Global factor
+        };
 
         window.EventBus.on('ENGINE_READY', () => this.init());
+    }
+
+    /**
+     * Records casualties and updates global exhaustion.
+     * Bible §75.5: Total War Attrition
+     */
+    recordCasualties(count, houseId = null) {
+        this.stats.totalCasualties += count;
+        // War exhaustion increases with casualties
+        this.stats.warExhaustion = Math.min(1.0, this.stats.warExhaustion + (count / 10000));
+        
+        if (houseId) {
+            const house = window.DynastyManager?.houses.get(houseId);
+            if (house) {
+                house.prestige = Math.max(0, house.prestige - (count * 0.1));
+            }
+        }
+
+        window.EventBus.emit('WAR_CASUALTIES_REPORTED', { count, total: this.stats.totalCasualties });
     }
 
     init() {
@@ -212,6 +239,7 @@ class TotalWarSystem {
         const defender = window.DynastyManager?.houses.get(oldHouseId);
 
         if (result === 'CONQUEST') {
+            this.stats.villagesConquered++;
             window.EventBus.emit('UI_LOG', `[WAR] ${village.name} HAS FALLEN to ${attacker.name}!`);
             
             // Transfer Ownership
