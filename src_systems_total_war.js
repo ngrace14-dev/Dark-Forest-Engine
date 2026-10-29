@@ -17,6 +17,14 @@ class TotalWarSystem {
 
     init() {
         window.EventBus.emit('UI_LOG', '[Total War] Mobilization & Geopolitical Conflict Engines Active');
+        
+        // Listen for institutional decisions from Phase 6
+        window.EventBus.on('HOUSE_STATE_CHANGED', (data) => {
+            if (data.event === 'SCHISM_RESOLVED' && data.winner === 'traditionalist') {
+                // Traditionalist victories often lead to defensive preparedness
+                this.mobilizeHouse(data.houseId, 'PREPAREDNESS');
+            }
+        });
     }
 
     /**
@@ -28,13 +36,50 @@ class TotalWarSystem {
         const house = window.DynastyManager?.houses.get(houseId);
         if (!house) return;
 
+        house.mobilizationState = intensity; // PEACE, PREPAREDNESS, TOTAL
+        
         // 75.3 Emergency Requisition Taxes
-        house.prestige -= 20;
-        house.internalConflictLevel += 0.2;
+        if (intensity === 'TOTAL') {
+            house.prestige -= 20;
+            house.internalConflictLevel += 0.2;
+            window.EventBus.emit('UI_LOG', `[WAR] ${house.name} has declared TOTAL MOBILIZATION. Peasants are being drafted.`);
+        } else if (intensity === 'PREPAREDNESS') {
+            house.prestige -= 5;
+            window.EventBus.emit('UI_LOG', `[WAR] ${house.name} has entered a state of military preparedness.`);
+        } else {
+            house.mobilizationState = 'PEACE';
+            window.EventBus.emit('UI_LOG', `[WAR] ${house.name} has returned to a state of peace.`);
+        }
         
         // 75.8 Logistics Train Strain: High mobilization reduces trade efficiency
+        // This is handled in VillageManager via the labor penalty hook
+    }
+
+    /**
+     * Returns the labor efficiency based on mobilization intensity.
+     * Bible §75.1: Conscription reduces civilian output.
+     */
+    getLaborEfficiency(houseId) {
+        const house = window.DynastyManager?.houses.get(houseId);
+        if (!house) return 1.0;
+
+        switch(house.mobilizationState) {
+            case 'TOTAL': return 0.6; // 40% labor loss
+            case 'PREPAREDNESS': return 0.9; // 10% labor loss
+            default: return 1.0;
+        }
+    }
+
+    /**
+     * Siphons a percentage of village gold to the House War Chest.
+     */
+    siphonWarTax(house, amount) {
+        if (!house || house.mobilizationState === 'PEACE') return 0;
         
-        window.EventBus.emit('UI_LOG', `[WAR] ${house.name} has declared TOTAL MOBILIZATION. Peasants are being drafted.`);
+        const rate = house.mobilizationState === 'TOTAL' ? 0.5 : 0.15;
+        const tax = amount * rate;
+        house.warChest = (house.warChest || 0) + tax;
+        return tax;
     }
 
     /**

@@ -784,7 +784,19 @@ window.VillageManager = {
 
         
                 const production = Math.max(1, Math.floor((village.population.current / 1500) * worldCal.growthRate));
-                village.stats[village.industry.produces] += production;
+        
+                // --- STEP 9-1: WAR ECONOMY LABOR PENALTY ---
+                const houseId = `house_${village.nobleHouse.toLowerCase().replace('house ', '')}`;
+                const efficiency = window.TotalWar?.getLaborEfficiency(houseId) || 1.0;
+                const netProduction = Math.max(1, Math.floor(production * efficiency));
+
+                village.stats[village.industry.produces] += netProduction;
+        
+                // --- WAR TAX SIPHON ---
+                const rawGoldProd = (village.population.current / 2000);
+                const warTax = window.TotalWar?.siphonWarTax(window.DynastyManager?.houses.get(houseId), rawGoldProd) || 0;
+                village.stats.gold += (rawGoldProd - warTax);
+
         
                 // --- PHASE 1: SCALING MAINTENANCE ---
                 // Base cost * (1 + expansionLevel)
