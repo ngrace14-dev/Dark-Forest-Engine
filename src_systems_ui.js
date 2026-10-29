@@ -1075,9 +1075,9 @@ class InstitutionalReportUI {
         render() {
             if (!window.WorldObservatory) return;
             const report = window.WorldObservatory.generateDiagnosticReport();
-            const health = window.WorldObservatory.calculateWorldHealth();
+            const whdHealth = window.WorldObservatory.calculateWorldHealth();
             const decades = window.WorldObservatory.reports.decades;
-            
+        
             const categoryColors = {
                 'EXCELLENT': 'text-emerald-400',
                 'STABLE': 'text-blue-400',
@@ -1102,26 +1102,26 @@ class InstitutionalReportUI {
                     <!-- SPEEDOMETER -->
                     <div class="col-span-1 bg-gray-900/50 rounded border border-gray-800 p-4 flex flex-col items-center justify-center relative overflow-hidden">
                         <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Civilization Viability</div>
-                        <div class="text-5xl font-black ${categoryColors[health.category]}">${health.score}</div>
-                        <div class="text-sm font-bold mt-1 ${categoryColors[health.category]} tracking-widest">${health.category}</div>
+                        <div class="text-5xl font-black ${categoryColors[whdHealth.category]}">${whdHealth.score}</div>
+                        <div class="text-sm font-bold mt-1 ${categoryColors[whdHealth.category]} tracking-widest">${whdHealth.category}</div>
                         <div class="w-full h-1 bg-gray-800 rounded-full mt-4 overflow-hidden">
-                            <div class="h-full bg-gradient-to-r from-red-600 via-yellow-500 to-emerald-500" style="width: ${health.score}%"></div>
+                            <div class="h-full bg-gradient-to-r from-red-600 via-yellow-500 to-emerald-500" style="width: ${whdHealth.score}%"></div>
                         </div>
                     </div>
 
                     <!-- METRIC GRID -->
                     <div class="col-span-2 grid grid-cols-4 gap-2">
-                        ${this.generateMetricMiniCard('POP', health.metrics.pop, 'souls')}
-                        ${this.generateMetricMiniCard('INST', health.metrics.inst, 'houses')}
-                        ${this.generateMetricMiniCard('INFO', health.metrics.info, 'truth')}
-                        ${this.generateMetricMiniCard('POL', health.metrics.pol, 'order')}
-                        ${this.generateMetricMiniCard('ECON', health.metrics.econ, 'gold')}
-                        ${this.generateMetricMiniCard('NARR', health.metrics.narr, 'legend')}
-                        ${this.generateMetricMiniCard('FUEL', health.metrics.fuel, 'rune')}
+                        ${this.generateMetricMiniCard('POP', whdHealth.metrics.pop, 'souls')}
+                        ${this.generateMetricMiniCard('INST', whdHealth.metrics.inst, 'houses')}
+                        ${this.generateMetricMiniCard('INFO', whdHealth.metrics.info, 'truth')}
+                        ${this.generateMetricMiniCard('POL', whdHealth.metrics.pol, 'order')}
+                        ${this.generateMetricMiniCard('ECON', whdHealth.metrics.econ, 'gold')}
+                        ${this.generateMetricMiniCard('NARR', whdHealth.metrics.narr, 'legend')}
+                        ${this.generateMetricMiniCard('FUEL', whdHealth.metrics.fuel, 'rune')}
                     </div>
                 </div>
 
-                <!-- STEP 5: HISTORICAL TREND ANALYSIS (1000-YEAR TIMELINE) -->
+                <!-- HISTORICAL TREND ANALYSIS -->
                 <div class="mb-6 bg-black/40 border border-gray-800 rounded p-3">
                     <h3 class="text-[10px] text-gray-400 font-bold uppercase mb-2 border-b border-gray-800 pb-1">1000-Year Historical Continuity Analysis</h3>
                     <div class="flex items-end gap-1 h-20 w-full bg-gray-950/50 p-1">
@@ -1137,6 +1137,7 @@ class InstitutionalReportUI {
                         <span>Millennial Horizon (1000 Years)</span>
                     </div>
                 </div>
+
 
                 <div class="flex-1 bg-black/40 rounded border border-red-900/20 p-4 custom-scrollbar overflow-y-auto max-h-[200px]">
                     <h3 class="text-[10px] text-red-400 font-bold uppercase mb-3 border-b border-red-900/10 pb-1">Diagnostic Intelligence Output</h3>
