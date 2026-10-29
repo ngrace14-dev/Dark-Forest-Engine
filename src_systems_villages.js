@@ -1717,9 +1717,15 @@ window.VillageManager = {
         const strongScore = scores.get(strongestUnblessed.id);
 
         // 3. Reassign if Candidate > Blessed by 20%
-        if (strongScore > weakScore * 1.20) {
+                if (strongScore > weakScore * 1.20) {
             window.EventBus.emit('UI_LOG', `[POLITICS] The Crown is reviewing the Blessed Spots...`);
             
+            // --- CGB CAUSAL RECORDING ---
+            if (window.PoliticalObservatory) {
+                window.PoliticalObservatory.recordCausalEvent(weakestBlessed.id, 'MONOPOLY_LOSS', 'INSTITUTIONAL_WEAKNESS', 'Revocation');
+                window.PoliticalObservatory.recordCausalEvent(strongestUnblessed.id, 'MONOPOLY_GAIN', 'INSTITUTIONAL_STRENGTH', 'Ascension');
+            }
+
             // Reassignment (Limit: 1 per Shift)
             window.DynastyManager.setBlessedStatus(weakestBlessed.id, false);
             window.DynastyManager.setBlessedStatus(strongestUnblessed.id, true);
