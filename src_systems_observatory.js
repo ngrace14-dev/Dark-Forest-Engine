@@ -392,13 +392,63 @@ class WorldObservatory {
     }
 
     calculateStability(yearData) {
-        // Stability is inverse of variance in prosperity and population
-        return 0.95; // Implementation detail for Phase 2
+        if (yearData.length === 0) return 1.0;
+        
+        // Stability = 1.0 - (ExtinctionRisk + (1.0 - meanLegitimacy) + loopRisk) / 3
+        const latest = yearData[yearData.length - 1].averages;
+        const risk = (latest.world.extinctionRisk + (1.0 - latest.political.meanLegitimacy) + latest.significance.loopRisk) / 3;
+        
+        return Math.max(0, 1.0 - risk);
     }
 
     calculateTrends(decadeData) {
-        // Linear regression or simple delta over 10 years
-        return {}; 
+        if (decadeData.length < 2) return {};
+        
+        const first = decadeData[0].averages;
+        const last = decadeData[decadeData.length - 1].averages;
+        
+        return {
+            prosperityDelta: last.world.prosperity - first.world.prosperity,
+            truthDecay: first.information.truthFidelity - last.information.truthFidelity,
+            legitimacyDrift: last.political.meanLegitimacy - first.political.meanLegitimacy,
+            significanceInflation: last.significance.inflationRate
+        };
+    }
+
+    /**
+     * SECTION H: 1000 YEAR STRESS TEST SCORE
+     * Aggregates all telemetry into a final audit grade.
+     */
+    generateFinalAudit() {
+        const status = this.getStatus();
+        const health = status.currentHealth;
+        
+        const scores = {
+            stability: Math.floor(this.calculateStability(this.reports.years.slice(-10)) * 100),
+            history: Math.floor(health.historical.archiveDensity * 100 + health.historical.knowledgeHalfLife),
+            civilization: Math.floor(health.world.popStability * 100 - health.world.extinctionRisk * 100),
+            information: Math.floor(health.information.truthFidelity * 100 - health.information.contamination * 100),
+            political: Math.floor(health.political.meanLegitimacy * 100 - health.political.crisisRatio * 100),
+            emergent: Math.floor(health.emergent.culturalDiversity * 100 + health.emergent.powerCenterCount * 5),
+        };
+
+        // Overall Confidence calculation
+        const overall = Math.floor(Object.values(scores).reduce((a, b) => a + b, 0) / 6);
+
+        console.log("%c ================================================= ", "color: #fbbf24; font-weight: bold;");
+        console.log("%c      1000 YEAR STRESS TEST SCORE (AUDIT)        ", "background: #1e1e1e; color: #fbbf24; font-weight: bold; padding: 5px;");
+        console.log("%c ================================================= ", "color: #fbbf24; font-weight: bold;");
+        console.log(`Simulation Stability:  ${scores.stability} / 100`);
+        console.log(`Historical Simulation: ${scores.history} / 100`);
+        console.log(`Civilization Evolution: ${scores.civilization} / 100`);
+        console.log(`Information Economy:   ${scores.information} / 100`);
+        console.log(`Political Simulation:  ${scores.political} / 100`);
+        console.log(`Emergent Behavior:     ${scores.emergent} / 100`);
+        console.log("%c ------------------------------------------------- ", "color: #4b5563;");
+        console.log(`%c OVERALL CONFIDENCE:   ${overall} / 100`, "font-weight: bold; color: #4ade80;");
+        console.log("%c ================================================= ", "color: #fbbf24; font-weight: bold;");
+
+        return { scores, overall };
     }
 
     getStatus() {
