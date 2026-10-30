@@ -1,5 +1,6 @@
 // File: src/systems/SystemRegistry.js
 
+import { TraitSystem } from './systems/personhood/TraitSystem.js';
 import { DemographicDirectorate } from './DemographicDirectorate.js';
 import { HazardCascade } from './hazard/HazardCascade.js';
 import { MortalitySystem } from './mortality/MortalitySystem.js';
@@ -34,6 +35,10 @@ export class SystemRegistry {
         this.social.administration = this.administration;
         
         this.administration.init();
+        
+        // Expose systems globally for legacy support if needed
+        window.TraitSystem = TraitSystem;
+        window.DemographicDirectorate = this.demographics;
     }
 
     update(delta) {

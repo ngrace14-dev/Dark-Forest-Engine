@@ -304,20 +304,35 @@ window.VillageManager = {
         // 3. Link Lineage & Inheritance
         profile.ancestry.parents = [data.parentA, data.parentB];
         if (parentA && parentB) {
-            // House Inheritance
+                        // House Inheritance
             profile.houseId = parentA.houseId;
             
             // Significance Inheritance (Bible §22)
             // Children start with a fraction of parents' significance
             profile.significance = ( (parentA.significance || 0) + (parentB.significance || 0) ) * 0.1;
             
-            // --- TRAIT RECOMBINATION (PHASE 2) ---
-            Object.keys(profile.traits).forEach(trait => {
-                if (trait === 'credibility') return;
-                const parentAvg = (parentA.traits[trait] + parentB.traits[trait]) / 2;
-                const mutation = (Math.random() - 0.5) * 0.1; // +/- 5% mutation
-                profile.traits[trait] = Math.max(0, Math.min(1, parentAvg + mutation));
-            });
+            // --- LEGACY HOUSE ANCHORING (PHASE 2) ---
+            if (parentA.houseId) {
+                const house = window.DynastyManager?.getHouse(parentA.houseId);
+                if (house) {
+                    // Register child in House members
+                    if (!house.members.includes(childId)) house.members.push(childId);
+                }
+            }
+
+            
+                        // --- TRAIT RECOMBINATION (PHASE 2) ---
+            if (window.TraitSystem) {
+                profile.traits = window.TraitSystem.calculateInheritedTraits(parentA, parentB);
+            } else {
+                Object.keys(profile.traits).forEach(trait => {
+                    if (trait === 'credibility') return;
+                    const parentAvg = (parentA.traits[trait] + parentB.traits[trait]) / 2;
+                    const mutation = (Math.random() - 0.5) * 0.1; // +/- 5% mutation
+                    profile.traits[trait] = Math.max(0, Math.min(1, parentAvg + mutation));
+                });
+            }
+
             
             // --- KINSHIP SYNC ---
             if (window.KinshipManager) {
@@ -331,16 +346,25 @@ window.VillageManager = {
                 }
             }
             
-            // --- INTEL LEGACY (PHASE 2) ---
+                        // --- INTEL LEGACY (PHASE 2) ---
             if (window.IntelManager) {
                 // Family Secrets: Children inherit ownership of some "Family Secrets"
                 const parentAIntel = window.IntelManager.getIntelForNode(data.parentA);
-                parentAIntel.forEach(intel => {
-                    if (intel.payload.tags?.includes('FAMILY_SECRET')) {
+                const parentBIntel = window.IntelManager.getIntelForNode(data.parentB);
+                
+                const combinedIntel = [...parentAIntel, ...parentBIntel];
+                
+                combinedIntel.forEach(intel => {
+                    // Logic: Inherit if it's a FAMILY_SECRET or if parents are SCHOLARS (Bible §36)
+                    const isScholar = parentA.identity === 'SCHOLAR' || parentB.identity === 'SCHOLAR';
+                    const isFamilySecret = intel.payload.tags?.includes('FAMILY_SECRET');
+                    
+                    if (isFamilySecret || (isScholar && Math.random() < 0.2)) {
                         window.IntelManager.grantOwnership(intel.intel_id, childId);
                     }
                 });
             }
+
         }
         
         // 4. Update Village Population

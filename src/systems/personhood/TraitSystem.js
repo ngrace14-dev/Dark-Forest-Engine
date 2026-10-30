@@ -25,6 +25,28 @@ export class TraitSystem {
         }
     }
 
+    static calculateInheritedTraits(parentA, parentB) {
+        const childTraits = {};
+        const mutationChance = 0.05;
+        const mutationRange = 0.1;
+
+        // Iterate through all known traits from Parent A
+        Object.keys(parentA.traits).forEach(trait => {
+            if (trait === 'credibility') return; // Credibility is earned, not inherited
+
+            const baseValue = (parentA.traits[trait] + parentB.traits[trait]) / 2;
+            let mutation = 0;
+            
+            if (Math.random() < mutationChance) {
+                mutation = (Math.random() - 0.5) * mutationRange;
+            }
+
+            childTraits[trait] = this.clampTrait(baseValue + mutation);
+        });
+
+        return childTraits;
+    }
+
     static calculateInheritedConstitution(parent1Const, parent2Const) {
         const base = (parent1Const + parent2Const) / 2;
         // Normal distribution approximation: sum of 3 randoms
