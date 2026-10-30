@@ -8,6 +8,7 @@ import { SocialDynamicsSystem } from './SocialDynamicsSystem.js';
 import { SubversiveReactionPipeline } from './underground/SubversiveReactionPipeline.js';
 
 import { JurisprudenceSystem } from './underground/JurisprudenceSystem.js';
+import { AdminBureau } from './administration/AdminBureau.js';
 
 /**
  * SystemRegistry
@@ -21,12 +22,16 @@ export class SystemRegistry {
         this.epidemic = new EpidemicSystem(this.mortality);
         this.underground = new SubversiveReactionPipeline(this.social);
         this.jurisprudence = new JurisprudenceSystem(this.social);
+        this.administration = new AdminBureau();
         
         // Link settlement back to systems
         this.social.mortalitySystem = this.mortality;
         this.social.hazardCascade = this.hazards;
         this.social.underground = this.underground;
         this.social.jurisprudence = this.jurisprudence;
+        this.social.administration = this.administration;
+        
+        this.administration.init();
     }
 
     update(delta) {
