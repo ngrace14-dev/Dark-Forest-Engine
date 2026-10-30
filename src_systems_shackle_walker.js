@@ -93,7 +93,7 @@ class ShackledWalkerSystem {
     }
 
     processWalking() {
-        if (!this.walkerEntity || !window.VillageManager) return;
+        if (!this.walkerEntity || !window.VillageManager || !window.RoadManager) return;
 
         const villages = window.VillageManager.villages;
         const targetVillage = villages[this.currentVillageIndex];
@@ -103,22 +103,23 @@ class ShackledWalkerSystem {
             return;
         }
 
-        const dx = targetVillage.x - this.walkerEntity.visual.position.x;
-        const dz = targetVillage.z - this.walkerEntity.visual.position.z;
-        const dist = Math.hypot(dx, dz);
+        // --- HARDENING: STRICT ROAD NAVIGATION ---
+        // Shackle must stay on the Road Geometry.
+        const currentPos = this.walkerEntity.visual.position;
+        const nextPathNode = window.RoadManager.getNextNodeToward(currentPos, targetVillage);
+        
+        if (!nextPathNode) {
+            this.shambleToward(targetVillage); // Fallback
+        } else {
+            this.shambleToward(nextPathNode);
+        }
 
-        if (dist < 5) {
-            // Arrived at village
+        const distToVillage = Math.hypot(targetVillage.x - currentPos.x, targetVillage.z - currentPos.z);
+        if (distToVillage < 5) {
             this.triggerVillageMutation(targetVillage);
             this.applyCreepedOutDebuff(targetVillage);
             this.currentVillageIndex++;
-            
-            if (this.currentVillageIndex >= villages.length) {
-                this.finishWalking();
-            }
-        } else {
-            // Move toward next village on "Safe Paths" (Roads)
-            this.shambleToward(targetVillage);
+            if (this.currentVillageIndex >= villages.length) this.finishWalking();
         }
     }
 
@@ -187,8 +188,11 @@ class ShackledWalkerSystem {
         for (let i = 0; i < mutationCount; i++) {
             const target = eligible[i];
             if (target) {
-                this.executeHeresyInversion(target, villageMeans);
-                mutatedCount++;
+                // --- HARDENING: MUTATION DROP TO 0.5% ---
+                if (Math.random() < 0.005) {
+                    this.executeHeresyInversion(target, villageMeans);
+                    mutatedCount++;
+                }
             }
         }
 

@@ -57,7 +57,20 @@ window.GameState = {
     combatRecord: { wins: 0, losses: 0, fame: 0, injuries: [] },
     renown: { score: 0, infamy: 0, title: 'Unknown', history: [] },
     coop: { sessionId: null, localPlayerId: null, partyMode: 'solo' },
-        base: { owned: false, name: 'Wayfarer Camp', position: null, storage: [], structures: [], farms: [], research: [], is_fuel_independent: false },
+            // --- VILLAGE SOVEREIGN SYSTEM (Restoration & Management) ---
+    ownedVillages: new Map(), // villageId -> { level, taxRate, specialty, staff: [] }
+    
+    base: { 
+        owned: false, 
+        name: 'Wayfarer Camp', 
+        position: null, 
+        storage: [], 
+        structures: [], 
+        farms: [], 
+        research: [], 
+        is_fuel_independent: false 
+    },
+
     party: { 
  
         command: 'follow', selectedMembers: ['lyra-scout'], escortCaravanId: null, formation: 'line', 

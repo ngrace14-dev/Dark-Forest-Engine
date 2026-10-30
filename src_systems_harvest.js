@@ -10,10 +10,11 @@ class WendigoHarvestSystem {
     constructor() {
         this.harvestCandidates = new Map(); // nodeId -> { pressureScore, orbAttention, huntsmanCultivation }
         this.activeHarvests = [];
-        
+        this._pendingSimResolutions = [];
+
         window.EventBus.on('ENGINE_READY', () => this.init());
         window.EventBus.on('HEARTBEAT_T1', (data) => this.evaluatePressures(data));
-        window.EventBus.on('HEARTBEAT_T12H', (data) => this.updateSimResolutions());
+        window.EventBus.on('HEARTBEAT_T12H', () => this.updateSimResolutions());
     }
 
     init() {
@@ -27,13 +28,13 @@ class WendigoHarvestSystem {
      */
     evaluatePressures(data = {}) {
         if (!window.ChronicleManager || !window.ForceManager) return;
-
         const entities = window.GameCore?.activeEntities || [];
         const scale = data.simScale || 1.0;
-        
-        entities.forEach(en => {
-            if (en.def.type !== 'npc' && en.id !== 'player') return;
 
+        entities.forEach(en => {
+            // Rule 5: Null Safety
+            if (!en || !en.def || (en.def.type !== 'npc' && en.id !== 'player')) return;
+            
             const score = this.calculateHarvestPressure(en.id);
             if (score > 100) {
                 // Apply scaling to cultivation speed in accelerated mode
@@ -48,16 +49,14 @@ class WendigoHarvestSystem {
     calculateHarvestPressure(nodeId) {
         // System 1: Unified Significance Calculation (§1, §BN)
         if (!window.ChronicleManager?.calculateSignificance) return 0;
-        
-        const significance = window.ChronicleManager.calculateSignificance(nodeId);
-        
+        const significance = window.ChronicleManager.calculateSignificance(nodeId) || 0;
+
         // Add Dream/Corruption modifiers (Physical Influence)
         let modifier = 1.0;
         const dream = window.DreamManager?.getNPCState(nodeId);
         if (dream) {
             modifier += (dream.intensity * 0.1) + (dream.corruption * 0.5);
         }
-
         return significance * modifier;
     }
 
@@ -72,7 +71,6 @@ class WendigoHarvestSystem {
         candidate.pressureScore = score;
 
         // --- PHASE: GRADUAL ESCALATION (§5) ---
-
         // Stage 1: Curiosity (Low Significance)
         if (score > 100 && candidate.status === 'NONE') {
             candidate.status = 'CURIOSITY';
@@ -83,7 +81,6 @@ class WendigoHarvestSystem {
             // SCALE APPLIED: Increment cultivation by scale factor
             const inc = 0.05 * scale; 
             candidate.huntsmanCultivation = Math.min(1.0, candidate.huntsmanCultivation + inc);
-            
             if (candidate.huntsmanCultivation > 0.6 && candidate.status === 'CURIOSITY') {
                 candidate.status = 'TRACKING';
                 window.EventBus.emit('UI_LOG_DEBUG', `[HUNTSMAN] Tracking rising significance in ${nodeId}.`);
@@ -122,18 +119,16 @@ class WendigoHarvestSystem {
      * System 5: Wendigo Targeting
      */
     checkHarvestThresholds() {
-        const isAccelerated = window.EngineParams.isAccelerated;
-        const sov = window.GameState.paleSovereign;
+        const isAccelerated = window.EngineParams?.isAccelerated || false;
+        const sov = window.GameState?.paleSovereign;
 
         this.harvestCandidates.forEach((candidate, nodeId) => {
             // System 5: THE SOVEREIGN IGNORES WEAK PREY
             // Bible: Must be strictly stronger than his previously recorded highest meal.
             const significance = candidate.pressureScore;
-            
             if (significance > (sov?.highestConsumedSignificance || 800)) {
                 if (Math.random() < 0.05) {
                     const harvestId = this.triggerHarvest(nodeId, candidate);
-                    
                     // SIMULATION RESOLVER: In accelerated mode, resolve harvest after a delay
                     if (isAccelerated && harvestId) {
                         this._scheduleSimulationResolution(harvestId);
@@ -151,15 +146,13 @@ class WendigoHarvestSystem {
     _scheduleSimulationResolution(harvestId) {
         // In a simulation, we don't wait for 3D physics. We resolve after ~3 sim-days.
         const resolutionDay = (window.EngineParams?.worldDay || 0) + 3;
-        
-        if (!this._pendingSimResolutions) this._pendingSimResolutions = [];
         this._pendingSimResolutions.push({ harvestId, resolutionDay });
     }
 
     updateSimResolutions() {
-        if (!this._pendingSimResolutions) return;
+        if (!this._pendingSimResolutions || this._pendingSimResolutions.length === 0) return;
         const currentDay = window.EngineParams?.worldDay || 0;
-        
+
         for (let i = this._pendingSimResolutions.length - 1; i >= 0; i--) {
             const res = this._pendingSimResolutions[i];
             if (currentDay >= res.resolutionDay) {
@@ -171,9 +164,9 @@ class WendigoHarvestSystem {
 
     triggerHarvest(nodeId, candidate) {
         if (this.activeHarvests.some(h => h.targetId === nodeId)) return null;
-
-        const harvestType = candidate.pressureScore > 1500 ? 'EPOCH' : (candidate.pressureScore > 1000 ? 'LEGENDARY' : 'MINOR');
         
+        const harvestType = candidate.pressureScore > 1500 ? 'EPOCH' : (candidate.pressureScore > 1000 ? 'LEGENDARY' : 'MINOR');
+
         // --- HARVEST MECHANICS: CONVERSION TO RESOURCE (Plan D) ---
         // Harvested Significance becomes "Runic Ink" or "Spectral Ash"
         const harvest = {
@@ -185,16 +178,17 @@ class WendigoHarvestSystem {
         };
 
         this.activeHarvests.push(harvest);
-
         window.EventBus.emit('UI_LOG', `💀 [WENDIGO] A ${harvestType} HARVEST HAS BEGUN. TARGET: ${nodeId}`);
-        
+
         // --- AED INTEGRATION ---
         if (window.AED) {
             window.AED.processHarvest({ significance: candidate.pressureScore, difficulty: 1.0 }, 'Wendigo');
         }
 
         // System 6: Consequences (Immediate pressure increase)
-        window.ForceManager.forces['Wendigo'].strength += 50;
+        if (window.ForceManager?.forces?.['Wendigo']) {
+            window.ForceManager.forces['Wendigo'].strength += 50;
+        }
 
         window.ChronicleManager?.recordEvent({
             actorId: nodeId,
@@ -206,6 +200,7 @@ class WendigoHarvestSystem {
 
         // Trigger the 3D Wendigo stalker logic for this specific ID
         window.EventBus.emit('WENDIGO_ASSIGN_TARGET', nodeId);
+        return harvest.id;
     }
 
     /**
@@ -224,11 +219,10 @@ class WendigoHarvestSystem {
             
             // --- CAUSAL LINK: REDUCE TARGET SIGNIFICANCE ---
             // A harvest consumes the "Beacon". The entity's significance is drained.
-            if (window.LegacyManager && window.LegacyManager.activeLegacies.has(harvest.targetId)) {
+            if (window.LegacyManager && window.LegacyManager.activeLegacies?.has(harvest.targetId)) {
                 const legacy = window.LegacyManager.activeLegacies.get(harvest.targetId);
                 const originalDensity = legacy.storyDensity || 0;
                 legacy.storyDensity = Math.floor(originalDensity * 0.1); // 90% Drain
-                
                 window.EventBus.emit('UI_LOG_DEBUG', `[HARVEST] ${harvest.targetId} drained from ${originalDensity} to ${legacy.storyDensity} significance.`);
             }
 
@@ -243,7 +237,6 @@ class WendigoHarvestSystem {
     triggerOrbLament() {
         const detail = "I'm sorry. I did try to warn you...";
         window.EventBus.emit('UI_LOG', `👁️ [ORB] "${detail}"`);
-        
         window.ChronicleManager?.recordEvent({
             actorId: 'ORB',
             type: 'ORIGIN_LAMENT',
@@ -259,5 +252,89 @@ class WendigoHarvestSystem {
     }
 }
 
+// Singleton instantiation to prevent listener leaks (Rule 8/13)
 window.HarvestEngine = new WendigoHarvestSystem();
+
+window.HarvestSystem = {
+    updateIntervalDays: 1,
+    lastUpdateDay: 0,
+    
+    init: function() {
+        window.EventBus.on('HEARTBEAT_T1', () => this.dailyCultivationCheck());
+        window.EventBus.on('ENTITY_DEATH', (data) => this.handleRelevantDeaths(data));
+    },
+
+    dailyCultivationCheck: function() {
+        const day = window.EngineParams?.worldDay || 0;
+        if (day === this.lastUpdateDay) return;
+        this.lastUpdateDay = day;
+
+        const mantle = window.GameState?.huntsmanMantle;
+        if (!mantle || !mantle.activeHuntsman) return;
+
+        const huntsmanEntity = window.GameCore?.activeEntities?.find(e => e.id === mantle.activeHuntsman);
+        const orb = window.ForceManager?.orbMessenger;
+
+        // If the Orb is witnessing a target, evaluate their growth
+        if (orb && orb.attachedToId && orb.state === 'WITNESSING') {
+            this.evaluateCandidateGrowth(huntsmanEntity, orb.attachedToId);
+        }
+    },
+
+    evaluateCandidateGrowth: function(huntsman, candidateId) {
+        const candidate = window.GameCore?.activeEntities?.find(e => e.id === candidateId) || (candidateId === 'player' ? window.GameCore.playerObj : null);
+        if (!candidate) return;
+
+        const mantle = window.GameState?.huntsmanMantle;
+        if (!mantle) return;
+
+        const candidateSignificance = window.ChronicleManager?.calculateSignificance?.(candidateId) || 0;
+
+        // 1. CHECK SAFEGUARD: Is the target growing too strong for the Sovereign?
+        const isTooStrong = window.ForceManager?.checkHuntsmanVoluntaryEnd?.(huntsman, candidateId);
+        if (isTooStrong) return; // ForceManager handles the Huntsman's self-termination
+
+        // 2. CHECK RESCUE: Is the target dying to mundane threats before they are ripe?
+        const hpPercent = (candidate.hp || 100) / (candidate.maxHp || 100);
+        window.ForceManager?.checkIntervention?.(candidateId, hpPercent);
+
+        // 3. CHECK HARVEST READINESS: Has the target surpassed the Huntsman's old baseline?
+        if (candidateSignificance > (mantle.targetSignificanceFloor || 0) && !mantle.isCultivationComplete) {
+            mantle.isCultivationComplete = true;
+            window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "The vintage is refined. I come for you now."`);
+            
+            // The Huntsman actively begins hunting the candidate for the climax
+            if (huntsman && huntsman.brain) {
+                huntsman.brain.setTarget(candidate);
+                huntsman.brain.overrideState('HUNT_TO_KILL');
+            }
+        }
+    },
+
+    handleRelevantDeaths: function(data) {
+        if (!data) return;
+        const { victimId, killerId } = data;
+        const mantle = window.GameState?.huntsmanMantle;
+        if (!mantle) return;
+
+        // SCENARIO A: The Huntsman is killed in combat (The Climax)
+        if (victimId === mantle.activeHuntsman) {
+            window.EventBus.emit('UI_LOG', `[REVELATION] The Shepherd falls. The true predator awakens.`);
+            
+            if (window.ForceManager?.executeHuntsmanSuccession) {
+                // If the candidate kills the Huntsman, they trigger the succession
+                window.ForceManager.executeHuntsmanSuccession(killerId, null);
+            }
+        }
+
+        // SCENARIO B: The Sovereign is killed
+        const sov = window.GameState?.paleSovereign;
+        if (victimId === 'pale_sovereign_entity' || (window.GameCore?.activeEntities?.find(e => e.id === victimId)?.isSovereign)) {
+            window.ForceManager?.handleSovereignDeath?.(killerId);
+        }
+    }
+};
+
+window.HarvestSystem.init();
+
 export default window.HarvestEngine;
