@@ -15,6 +15,79 @@ class HouseholdSystem {
 
     init() {
         window.EventBus.emit('UI_LOG', '[Household] Micro-Sociology & Family Units Active');
+        window.EventBus.on('HEARTBEAT_T1', () => this.processDailySurvival());
+    }
+
+    /**
+     * Daily Survival Cycle for all Households.
+     * Bible §18: Survival requires risk. Household is the unit of survival.
+     */
+    processDailySurvival() {
+        // Run once per game day (assuming T1 triggers at 1Hz, we check worldDay)
+        const day = window.EngineParams?.worldDay || 0;
+        if (this.lastProcessDay === day) return;
+        this.lastProcessDay = day;
+
+        this.households.forEach(household => {
+            // 1. Calculate Caloric Need
+            const consumptionPerMember = 5.0; // Configurable
+            const totalNeed = household.members.length * consumptionPerMember;
+
+            // 2. Consume from Pantry
+            if (household.assets.food >= totalNeed) {
+                household.assets.food -= totalNeed;
+                // Members are healthy
+                this.updateMemberHealth(household, 1.0);
+            } else {
+                // Household is Starving
+                const ratio = household.assets.food / totalNeed;
+                household.assets.food = 0;
+                this.handleHouseholdStarvation(household, ratio);
+            }
+
+            // 3. Wealth/Trade Production
+            // Residual income from household labor
+            const laborIncome = household.members.length * 0.5; 
+            household.assets.wealth += laborIncome;
+        });
+    }
+
+    updateMemberHealth(household, saturation) {
+        household.members.forEach(id => {
+            const entity = window.GameCore?.activeEntities?.find(e => e.id === id);
+            if (entity) {
+                entity.lastFedDay = window.EngineParams?.worldDay || 0;
+                // Healing bonus if fully saturated
+                if (saturation >= 1.0) entity.hp = Math.min(entity.maxHp, entity.hp + 2);
+            }
+        });
+    }
+
+    handleHouseholdStarvation(household, ratio) {
+        window.EventBus.emit('UI_LOG_DEBUG', `[HOUSEHOLD] ${household.id} is starving (Supply: ${Math.floor(ratio*100)}%).`);
+        
+        household.members.forEach(id => {
+            const entity = window.GameCore?.activeEntities?.find(e => e.id === id);
+            if (entity) {
+                // Direct HP damage from starvation
+                const starvationDamage = 10 * (1.0 - ratio);
+                entity.hp -= starvationDamage;
+                
+                // BEHAVIORAL OVERRIDE (Bible §18)
+                // NPCs shift from CAREER tasks to SURVIVAL desperation
+                if (ratio < 0.3) {
+                    entity.currentTask = 'Desperate Search';
+                    entity.aiMode = 'aggressive'; // Desperate NPCs may steal or hunt dangerously
+                }
+
+                if (entity.hp <= 0 && window.defeatNpc) {
+                    window.defeatNpc(entity, 'starvation');
+                }
+            }
+        });
+
+        // Disaster Recovery Adjustment
+        household.riskTolerance = Math.min(1.0, household.riskTolerance + 0.1);
     }
 
     /**
