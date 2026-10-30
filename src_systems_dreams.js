@@ -156,5 +156,96 @@ class DreamManagerSystem {
     }
 }
 
+// ==========================================
+// PHASE 3-2: THE CROW'S EYE (STRATEGIC INTERFACE)
+// Implements the "Editor" Actions from the Builder Manifesto
+// ==========================================
+
+window.CrowsEyeActions = {
+    /**
+     * PUBLISH: Broadcast to the world.
+     * Effect: Destroys institutional legitimacy, increases global truth.
+     */
+    publish: function(intelId) {
+        const intel = window.IntelManager?.lookup(intelId);
+        if (!intel) return;
+
+        window.EventBus.emit('UI_LOG', `📢 [CROW'S EYE] PUBLISHING: ${intel.payload.title}`);
+        
+        // 1. Global Fidelity Increase
+        if (window.WorldObservatory) {
+            window.WorldObservatory.metrics.globalFidelity += 0.05;
+        }
+
+        // 2. Institutional Blowback
+        const houseId = intel.provenance.origin?.source_faction;
+        if (houseId && houseId.startsWith('house_') && window.DynastyManager) {
+            const house = window.DynastyManager.getHouse(houseId);
+            if (house) {
+                house.legitimacy = Math.max(0, house.legitimacy - 0.2);
+                house.prestige = Math.max(0, house.prestige - 50);
+                window.EventBus.emit('UI_LOG', `⚠️ [REACTION] ${house.name} legitimacy has cratered following the leak.`);
+            }
+        }
+
+        // 3. Mark as Public Fact
+        intel.type = 'FACT';
+        intel.isPublic = true;
+
+        window.ChronicleManager?.recordEvent({
+            actorId: 'CROW',
+            type: 'WORLD_REVELATION',
+            detail: `The truth of ${intel.payload.title} has been revealed to all.`,
+            significance: 500,
+            historicalWeight: 300
+        });
+    },
+
+    /**
+     * LEAK: Give the truth to a specific House.
+     * Effect: Triggers targeted feuds.
+     */
+    leak: function(intelId, targetHouseId) {
+        if (window.IntelEconomy) {
+            window.IntelEconomy.executeLeak({ id: 'CROW', faction: 'CROW' }, targetHouseId, intelId);
+            window.EventBus.emit('UI_LOG', `🤐 [CROW'S EYE] LEAKED to ${targetHouseId}.`);
+        }
+    },
+
+    /**
+     * SUPPRESS: Bury the truth.
+     * Effect: Consumes significance to remove intel from active registry.
+     */
+    suppress: function(intelId) {
+        const intel = window.IntelManager?.lookup(intelId);
+        if (!intel) return;
+
+        window.EventBus.emit('UI_LOG', `🤫 [CROW'S EYE] SUPPRESSING: ${intel.payload.title}`);
+        
+        // 1. Increase Suppression Burden for the associated house
+        const houseId = intel.provenance.origin?.source_faction;
+        if (houseId && window.DynastyManager) {
+            const house = window.DynastyManager.getHouse(houseId);
+            if (house) {
+                house.suppressionBurden = (house.suppressionBurden || 0) + 0.1;
+            }
+        }
+
+        // 2. Archive and remove from registry
+        intel.persistence = 'ARCHIVED';
+        window.IntelManager.registry.delete(intelId);
+        window.IntelManager.archive.set(intelId, intel);
+
+        window.ChronicleManager?.recordEvent({
+            actorId: 'CROW',
+            type: 'TRUTH_SUPPRESSION',
+            detail: `A dangerous record of ${intel.payload.title} has been removed from the public ledger.`,
+            significance: 200,
+            historicalWeight: 100
+        });
+    }
+};
+
 window.DreamManager = new DreamManagerSystem();
 export default window.DreamManager;
+
