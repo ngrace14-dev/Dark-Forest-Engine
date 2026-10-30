@@ -57,8 +57,10 @@ class FolkloreEngineSystem {
 
 
         window.EventBus.on('ENGINE_READY', () => this.init());
-        window.EventBus.on('LEGEND_CREATED', (legend) => this.generatePoem(legend));
+                window.EventBus.on('LEGEND_CREATED', (legend) => this.generatePoem(legend));
+        window.EventBus.on('HEARTBEAT_T365D', () => this.syncFolkloreToWorldRules());
     }
+
 
         init() {
             this.persistentAnthology = this.loadCrossRunFolklore();
@@ -391,7 +393,7 @@ class FolkloreEngineSystem {
         return `The ${sym} of ${legend.title.split(' ').pop()}`;
     }
 
-    generateContextualVerse(legend) {
+        generateContextualVerse(legend) {
         const templates = [
             `When ${legend.title} came to pass, the world did sigh.`,
             `The story of ${legend.title} shall never die.`,
@@ -400,6 +402,53 @@ class FolkloreEngineSystem {
         ];
         return templates[Math.floor(Math.random() * templates.length)];
     }
+
+    /**
+     * PHASE 3-1: FOLKLORE DNA INTEGRATION
+     * Bible §17: "The numbers are logic ciphers."
+     */
+    syncFolkloreToWorldRules() {
+        const activeMyths = this.anthology.filter(p => p.class === 'INSTITUTIONAL' || p.class === 'MYTHIC');
+        
+        activeMyths.forEach(myth => {
+            // Cipher Logic 1: Poem #4 (19 houses vs 10 blessed)
+            if (myth.text.includes('19') && myth.text.includes('10')) {
+                this.enforceMonopolyBottleneck();
+            }
+            
+            // Cipher Logic 2: Poem #1 (Roads/Denary distortion)
+            if (myth.text.includes('Denary')) {
+                this.applySpatialDistortion(myth.distortionLevel);
+            }
+        });
+    }
+
+    enforceMonopolyBottleneck() {
+        if (!window.DynastyManager) return;
+        const houses = Array.from(window.DynastyManager.houses.values());
+        const blessedCount = houses.filter(h => h.isBlessed).length;
+
+        if (blessedCount > 10) {
+            window.EventBus.emit('UI_LOG', '⚖️ [Folklore DNA] "19 houses and 19 men / fighting to be the blessed 10." - A house must fall.');
+            // Trigger a conflict to reduce the blessed count back to the "Holy 10"
+            const surplus = blessedCount - 10;
+            const victims = houses.filter(h => h.isBlessed).sort((a,b) => a.prestige - b.prestige).slice(0, surplus);
+            
+            victims.forEach(v => {
+                window.EventBus.emit('TRIGGER_INSTITUTIONAL_SCHISM', { houseId: v.id });
+                v.isBlessed = false; // The world enforces the poem's limit
+            });
+        }
+    }
+
+    applySpatialDistortion(level) {
+        // Folklore dictates spatial rules in the Dark Forest
+        if (window.WorldGenerator) {
+            // A "Denary" (10x) shift in road fidelity based on mythic strength
+            window.EngineParams.spatialDistortion = 1.0 + (level * 9.0);
+        }
+    }
+
 
         /**
      * Run Summary Epitaph

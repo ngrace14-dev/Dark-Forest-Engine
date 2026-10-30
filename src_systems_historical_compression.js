@@ -113,6 +113,32 @@ class HistoricalCompressionSystem {
             // Legends are Level 5
             window.ChronicleManager.evolveNarrative(event);
             event.isFolklore = true;
+            
+            // --- PHASE 3-1: PHYSICAL ANCHORING ---
+            // High-significance events attempt to crystallize into physical monuments
+            this.crystallizePhysicalPillar(event);
+        }
+    }
+
+    crystallizePhysicalPillar(event) {
+        if (!window.GameCore?.instantiatePrefab) return;
+        
+        // Determine monument type based on event detail
+        let prefab = 'Ancient Monument';
+        if (event.type === 'WAR' || event.type === 'SCHISM') prefab = 'Rune Tower';
+        if (event.type === 'BETRAYAL') prefab = 'Cursed Altar';
+        
+        const loc = event.location || { x: (Math.random()-0.5)*500, z: (Math.random()-0.5)*500 };
+        const surfaceY = window.WorldGenerator?.getTerrainHeight?.(loc.x, loc.z) || 0;
+        
+        const pillar = window.GameCore.instantiatePrefab(prefab, loc.x, surfaceY, loc.z, 'persistent');
+        if (pillar) {
+            pillar.is_static_node = true;
+            pillar.is_anchored = true;
+            pillar.lore_id = event.id;
+            pillar.description = `The Pillar of ${event.type}: ${event.detail}`;
+            
+            window.EventBus.emit('UI_LOG', `🗿 [GHO] A truth has physically crystallized at ${loc.x.toFixed(0)}, ${loc.z.toFixed(0)}.`);
         }
     }
 
