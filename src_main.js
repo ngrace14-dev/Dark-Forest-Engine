@@ -68,6 +68,7 @@ import './src_systems_folklore.js';
 import './src_systems_history_office.js';
 import './src_systems_dynasty.js';
 import './src_systems_dynastic_continuity.js';
+import './src_systems_political_pressure.js';
 import './src_systems_harvest.js';
 import './src_systems_instability.js';
 import './src_systems_events.js';
