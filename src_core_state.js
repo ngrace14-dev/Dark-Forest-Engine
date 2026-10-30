@@ -185,7 +185,7 @@ window.GameState = {
         combatLuck: 0,
         teleportLuck: 0
     },
-        playerLegacy: {
+                playerLegacy: {
         id: 'player',
         bloodlineId: 'bloodline_wanderer',
         storyDensity: 0,
@@ -193,7 +193,14 @@ window.GameState = {
         generation: 1,
         karmicDebt: 0,
         significanceLevel: 'UNKNOWN',
-        isOriginNative: true // Bible §BL: Origin Immunity
+        isOriginNative: true, // Bible §BL: Origin Immunity
+        
+        // --- PHASE 3: MULTIVERSAL SCALING ---
+        multiversalMetadata: {
+            originTimestamp: Date.now(),
+            importedStats: {},
+            realityExceptionFlags: ['UN_HACKABLE', 'RUNIC_PROTECTION']
+        }
     }
 };
 

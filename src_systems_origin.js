@@ -115,11 +115,44 @@ class OriginMysterySystem {
         category.confidence = Math.min(1.0, category.confidence + 0.05);
     }
 
-    getDossier() {
-        return Object.values(this.categories);
+        /**
+     * FINAL EPOCH RESOLUTION: The Renunciation Choice
+     * Bible Addendum BM: Facing the Trinity of Choice at Year 1000.
+     */
+    resolveMillennium() {
+        const dossier = this.getDossier();
+        const champion = dossier.find(d => d.title === 'The Champion');
+        const founders = dossier.find(d => d.title === 'The Founders');
+        
+        const isBetrayalProven = champion.model === 'THE_VICTIM' && founders.model === 'THE_TRAITORS';
+        const truthFidelity = window.WorldObservatory?.metrics?.globalFidelity || 0.5;
+
+        window.EventBus.emit('UI_LOG', '🌌 [ORIGIN] The simulation has reached the Zero Horizon.');
+
+        if (isBetrayalProven && truthFidelity > 0.8) {
+            this.triggerTrinityChoice();
+        } else {
+            this.triggerOuroborosLoop();
+        }
     }
 
-}
+    triggerTrinityChoice() {
+        window.EventBus.emit('OPEN_TRINITY_DIALOG', {
+            choices: [
+                { id: 'CLAIM_THRONE', title: 'Claim the Throne', desc: 'Become the Sovereign. Restart the harvest.' },
+                { id: 'REFUSE_THRONE', title: 'Refuse the Throne', desc: 'Become the Custodian. Break the loop.' },
+                { id: 'WALK_AWAY', title: 'Walk Away', desc: 'Cease the observation. Free the world.' }
+            ]
+        });
+    }
+
+    triggerOuroborosLoop() {
+        window.EventBus.emit('UI_LOG', '🌀 [OUROBOROS] The truth remains obscured. The cycle begins again.');
+        setTimeout(() => {
+            window.location.reload(); // The loop hard-reset
+        }, 5000);
+    }
+
 
 window.OriginEngine = new OriginMysterySystem();
 export default window.OriginEngine;
