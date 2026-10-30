@@ -34,15 +34,17 @@ export class AlternativeCivilizationFramework {
     }
 
     evaluatePillarRejection() {
-        // High rejection if active historical pillars are ignored or intentionally desecrated
+        // High rejection if active historical pillars are ignored
         const history = this.settlement.history;
-        if (!history || history.pillars.length === 0) {
-            this.divergenceFactors.pillarRejection = 0.5; // Neutral - no pillars to reject
+        if (!history || !history.pillars || history.pillars.length === 0) {
+            this.divergenceFactors.pillarRejection = 0.2; // Baseline - no pillars to reject
             return;
         }
 
-        // Logic: Rejection scales with lack of historical echo influence on decisions
-        this.divergenceFactors.pillarRejection = 0.8; // Mock high rejection for independent groups
+        // In a rogue settlement, people ignore the 'lessons' of history
+        // Logic: If cynicism is high, pillar rejection is high
+        const avgCynicism = this.settlement.getAverageTrait ? this.settlement.getAverageTrait('cynicism') : 0.5;
+        this.divergenceFactors.pillarRejection = Math.max(0.1, avgCynicism);
     }
 
     evaluateAlternativeFaith() {
@@ -78,14 +80,19 @@ export class AlternativeCivilizationFramework {
     generateDivergenceReport() {
         const cdi = this.calculateCDI();
         const pop = this.settlement.getActors().length;
-        const isThriving = pop > 20 && cdi > 0.6;
+        const isIndependent = cdi > 0.6;
+        const isMainstream = cdi < 0.4;
+        
+        let thrivingStatus = "Unstable";
+        if (isIndependent) thrivingStatus = pop > 20 ? "Independent Success" : "Struggling Rogue";
+        else if (isMainstream) thrivingStatus = pop > 30 ? "Thriving Mainstream" : "Declining Mainstream";
 
         return {
             title: "Alternative Civilization Framework Report",
             metrics: {
                 civilizationDivergenceIndex: cdi.toFixed(3),
-                isParticipatingInMainstream: cdi < 0.4,
-                thrivingStatus: isThriving ? "Independent Success" : "Struggling Outlier"
+                isParticipatingInMainstream: isMainstream,
+                thrivingStatus: thrivingStatus
             },
             divergenceProfile: {
                 pillarRejection: this.divergenceFactors.pillarRejection.toFixed(2),
@@ -93,9 +100,9 @@ export class AlternativeCivilizationFramework {
                 alternativeEconomy: this.divergenceFactors.alternativeEconomy.toFixed(2),
                 alternativePower: this.divergenceFactors.alternativePower.toFixed(2)
             },
-            conclusion: isThriving ? 
-                "A successful Rogue Civilization detected. It maintains a stable population while rejecting external economic and historical anchors." :
-                "An unstable outlier. Divergence from mainstream pillars is leading to biological or economic attrition."
+            conclusion: isIndependent ? 
+                (pop > 20 ? "A successful Rogue Civilization detected. It maintains stability while rejecting mainstream anchors." : "A precarious rogue group fighting systemic attrition.") :
+                "Standard Civilizational Unit: Operates within global economic and historical norms."
         };
     }
 }
