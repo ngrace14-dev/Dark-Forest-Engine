@@ -452,36 +452,56 @@ window.ForceManager = {
             }
         },
 
-        /**
-         * Permanent end of the cultivation phase.
-         */
-        executeHuntsmanSacrifice: function(huntsman) {
-            const mantle = window.GameState.huntsmanMantle;
-            mantle.isCultivationComplete = true;
+                /**
+     * Mandatory succession (Target becomes the NEXT Huntsman)
+     * Bible: Most recent victim inherits the Mantle.
+     */
+    executeHuntsmanSuccession: function(victorId, deadHuntsman) {
+        const mantle = window.GameState.huntsmanMantle;
+        const sov = window.GameState.paleSovereign;
         
-            // Remove Scorn immediately
-            this.huntsman.scornedIds.delete('player');
-            window.EventBus.emit('UI_LOG', `[THE MARK] The Huntsman's protection has vanished. You are exposed.`);
-        
-            // Silent Orb
-            window.GameState.orbMessenger.isSilent = true;
+        mantle.lastVictimId = victorId;
+        mantle.currentHuntsmanId = victorId;
+        mantle.isCultivationComplete = false; 
 
-            // Huntsman Dies
-            window.EventBus.emit('UI_LOG', `[NARRATIVE] The shadowed shepherd falls to his knees and dissolves into the roots.`);
+        // Orb leaves to inform the Pale Wendigo (Sovereign)
+        this.orbMessenger.attachedToId = null;
+        window.EventBus.emit('UI_LOG', `👁️ [ORB] ".......I tried to warn you."`);
         
-            window.Input.frozen = false;
-            this.huntsman.activeIntervention = false;
+        // --- SOVEREIGN HARVEST (The Growth Step) ---
+        // The Sovereign doesn't fight the target yet; he eats the 'Yield' of the succession
+        const significance = window.ChronicleManager?.calculateSignificance(victorId) || 0;
         
-            if (window.GameCore?.scene && huntsman.visual) window.GameCore.scene.remove(huntsman.visual);
-            if (window.GameCore?.world && huntsman.body) {
-                window.PhysicsQueue.enqueue(() => window.GameCore.world.removeRigidBody(huntsman.body));
-            }
-            if (window.GameCore?.activeEntities) {
-                window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => e !== huntsman);
-            }
+        // Permanent Growth for Sovereign
+        sov.significance += (significance * 0.2); 
+        sov.highestConsumedSignificance = Math.max(sov.highestConsumedSignificance, significance);
+        sov.harvestHistory.push({ targetId: victorId, yield: significance, day: window.EngineParams.worldDay });
 
-            window.EventBus.emit('HARVEST_CYCLE_BEGINS');
-        },
+        window.EventBus.emit('UI_LOG', `🩸 [SOVEREIGN] A worthy seed has been sown. The First Wendigo grows stronger.`);
+        window.EventBus.emit('UI_LOG', `💀 [SUCCESSION] ${victorId} has inherited the Mantle. The shepherd's debt is paid.`);
+        
+        this.cleanupPhysicalEntity(deadHuntsman);
+    },
+
+    /**
+     * VOLUNTARY TERMINATION: The Huntsman's Limit
+     * If the target grows too strong, the Huntsman removes themselves to force the Sovereign's focus.
+     */
+    checkHuntsmanVoluntaryEnd: function(huntsman, targetId) {
+        const significance = window.ChronicleManager?.calculateSignificance(targetId) || 0;
+        const sovLimit = window.GameState.paleSovereign?.significance || 1000;
+
+        if (significance >= sovLimit * 0.85) {
+            window.EventBus.emit('UI_LOG', `[THE HUNTSMAN] "The light is too bright. I must return to the root."`);
+            
+            // Suicide/Dissolve logic
+            this.executeHuntsmanSuccession(targetId, huntsman);
+            return true;
+        }
+        return false;
+    },
+
+
 
 
 
