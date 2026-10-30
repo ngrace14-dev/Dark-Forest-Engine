@@ -2,31 +2,39 @@
  * DARK FOREST ENGINE - SIGNIFICANCE ECONOMY AUDIT
  * Crow Observatory (CO)
  * 
- * Audits the distribution of narrative relevance to prevent the "Significance Trap."
+ * Audits the distribution of narrative relevance as a finite civilization resource.
+ * Enforces "Significance Thermodynamics" to prevent infinite narrative wealth.
  */
 
 class SignificanceEconomyAuditSystem {
     constructor() {
         this.metrics = {
-            giniCoefficient: 0.0,       // 0.0 (Equality) to 1.0 (Monopoly)
-            narrativeConcentration: 0.0, // % of total significance held by top 5 entities
-            heroDistribution: 0.0,      // Ratio of Legendary/Mythic entities to total population
-            storyDensityAverage: 0.0,   // Average story density per active entity
-            narrativeDiversity: 1.0,    // Variety of career/house sources of significance
-            legendBirthRate: 0.0,       // Legends per Epoch
-            legendDeathRate: 0.0,       // Deaths per Epoch
-            narrativeTurnover: 0.0,      // Ratio of births to deaths
-            totalDecayApplied: 0        // Amount of significance purged to preserve scarcity
+            giniCoefficient: 0.0,       
+            narrativeConcentration: 0.0, 
+            heroDistribution: 0.0,      
+            storyDensityAverage: 0.0,   
+            narrativeDiversity: 1.0,    
+            legendBirthRate: 0.0,       
+            legendDeathRate: 0.0,       
+            narrativeTurnover: 0.0,      
+            totalDecayApplied: 0,
+            globalSignificanceSupply: 0, // NEW: Finite Pool Tracking
+            inflationRate: 0.0           // NEW: Rate of creation vs decay
         };
 
         this.history = {
             legendBirths: [],
             legendDeaths: [],
-            significanceSnapshots: []
+            significanceSnapshots: [],
+            totalSignificanceHistory: [] // NEW: Supply tracking
         };
 
-        this.houseSignificance = new Map(); // HouseID -> Total Significance
-        this.forceAttractionPressure = new Map(); // EntityID -> Pressure Value
+        this.houseSignificance = new Map(); 
+        this.forceAttractionPressure = new Map(); 
+
+        // FINITE RESOURCE CONSTANTS
+        this.SUPPLY_CAP = 1000000; // The "Historical Bandwidth" of the world
+        this.LAST_TOTAL_SUPPLY = 0;
 
         window.EventBus.on('ENGINE_READY', () => this.init());
         window.EventBus.on('SHIFT_COMPLETE', () => this.performAudit());
@@ -35,27 +43,11 @@ class SignificanceEconomyAuditSystem {
     }
 
     init() {
-        window.EventBus.emit('UI_LOG', '👁️ [Crow Significance Directorate] Monitoring Narrative Equilibrium');
-    }
-
-    recordBirth(legend) {
-        this.history.legendBirths.push({
-            day: window.EngineParams?.worldDay || 0,
-            id: legend.id,
-            actorId: legend.actorId
-        });
-    }
-
-    recordDeath(legacy) {
-        this.history.legendDeaths.push({
-            day: window.EngineParams?.worldDay || 0,
-            id: legacy.bloodlineId,
-            significance: legacy.significance
-        });
+        window.EventBus.emit('UI_LOG', '👁️ [Crow Economic Office] Monitoring Narrative Scarcity');
     }
 
     /**
-     * Performs a full audit of all active legacies.
+     * Performs a full audit of all active legacies and calculates supply thermodynamics.
      */
     performAudit() {
         if (!window.LegacyManager) return;
@@ -65,31 +57,31 @@ class SignificanceEconomyAuditSystem {
 
         if (legacies.length === 0) return;
 
-        // 1. GINI COEFFICIENT (Bible §BN)
+        // 1. CALCULATE GLOBAL SUPPLY
+        const currentTotal = legacies.reduce((sum, l) => sum + (l.storyDensity || 0), 0);
+        this.metrics.globalSignificanceSupply = currentTotal;
+        
+        // 2. CALCULATE INFLATION
+        if (this.LAST_TOTAL_SUPPLY > 0) {
+            this.metrics.inflationRate = (currentTotal - this.LAST_TOTAL_SUPPLY) / this.LAST_TOTAL_SUPPLY;
+        }
+        this.LAST_TOTAL_SUPPLY = currentTotal;
+
+        // 3. GINI COEFFICIENT
         this.metrics.giniCoefficient = this._calculateGini(legacies.map(l => l.storyDensity));
 
-        // 2. NARRATIVE CONCENTRATION
+        // 4. NARRATIVE CONCENTRATION
         const sorted = legacies.sort((a, b) => b.storyDensity - a.storyDensity);
-        const totalStory = sorted.reduce((sum, l) => sum + l.storyDensity, 0);
         const top5Count = Math.max(1, Math.ceil(legacies.length * 0.05));
         const top5Story = sorted.slice(0, top5Count).reduce((sum, l) => sum + l.storyDensity, 0);
-        this.metrics.narrativeConcentration = top5Story / (totalStory || 1);
-        this.metrics.storyDensityAverage = totalStory / legacies.length;
+        this.metrics.narrativeConcentration = top5Story / (currentTotal || 1);
+        this.metrics.storyDensityAverage = currentTotal / legacies.length;
 
-        // 3. HERO DISTRIBUTION
+        // 5. HERO DISTRIBUTION
         const legends = legacies.filter(l => l.storyDensity >= 1500).length;
         this.metrics.heroDistribution = legends / legacies.length;
 
-        // 4. TURNOVER TRACKING
-        const epochWindow = 14; // Bible §5
-        const recentBirths = this.history.legendBirths.filter(b => b.day > day - epochWindow).length;
-        const recentDeaths = this.history.legendDeaths.filter(d => d.day > day - epochWindow).length;
-        
-        this.metrics.legendBirthRate = recentBirths;
-        this.metrics.legendDeathRate = recentDeaths;
-        this.metrics.narrativeTurnover = (recentBirths + recentDeaths) / (legacies.length || 1);
-
-        // 5. HOUSE SIGNIFICANCE OWNERSHIP
+        // 6. HOUSE OWNERSHIP
         this.houseSignificance.clear();
         legacies.forEach(l => {
             if (l.bloodlineId) {
@@ -98,20 +90,17 @@ class SignificanceEconomyAuditSystem {
             }
         });
 
-        // 6. NARRATIVE DIVERSITY
-        const sources = new Set(legacies.map(l => l.bloodlineId).filter(id => id !== null));
-        this.metrics.narrativeDiversity = sources.size / 19; // 19 Noble Houses (Bible §19)
-
-        // 7. DETECT ANOMALIES & APPLY STABILIZATION
+        // 7. DETECT ANOMALIES & APPLY THERMODYNAMIC PRESSURE
         const anomalies = this._detectAnomalies();
         
-        // Active stabilization (Bible §BN)
-        if (anomalies.includes("SIGNIFICANCE_STARVATION") || this.metrics.narrativeConcentration > 0.7) {
-            this._applySignificanceDecay();
+        // FORCED SCARCITY: If supply exceeds cap, accelerate decay
+        if (currentTotal > this.SUPPLY_CAP || this.metrics.narrativeConcentration > 0.8) {
+            this._applyAggressiveSignificanceDecay();
+        } else {
+            this._applySignificanceDecay(); // Standard maintenance
         }
 
         // --- THERMODYNAMICS SYNC ---
-        // Ensure Thermodynamics is updated after audit
         if (window.Thermodynamics && window.Thermodynamics.calculateMetrics) {
             window.Thermodynamics.calculateMetrics();
         }
@@ -121,6 +110,8 @@ class SignificanceEconomyAuditSystem {
             metrics: { ...this.metrics },
             anomalies: anomalies
         });
+
+        this.history.totalSignificanceHistory.push({ day, total: currentTotal });
 
         window.EventBus.emit('SIGNIFICANCE_AUDIT_COMPLETE', {
             metrics: this.metrics,
@@ -133,24 +124,15 @@ class SignificanceEconomyAuditSystem {
     _detectAnomalies() {
         const anomalies = [];
 
-        // SIGNIFICANCE INFLATION: Too many legends, story density average rising too fast
-        if (this.metrics.heroDistribution > 0.2) {
-            anomalies.push("SIGNIFICANCE_INFLATION");
-        }
-
-        // SIGNIFICANCE STARVATION: Concentration is so high that new legends can't form
-        if (this.metrics.narrativeConcentration > 0.8 && this.metrics.legendBirthRate === 0) {
-            anomalies.push("SIGNIFICANCE_STARVATION");
-        }
-
-        // HERO SCARCITY: Too few legends to anchor history
-        if (this.metrics.heroDistribution < 0.02) {
-            anomalies.push("HERO_SCARCITY");
-        }
-
-        // NARRATIVE OSCILLATION: Rapid turnover with no persistence
-        if (this.metrics.legendBirthRate > 5 && this.metrics.legendDeathRate > 5) {
-            anomalies.push("NARRATIVE_OSCILLATION");
+        if (this.metrics.heroDistribution > 0.2) anomalies.push("SIGNIFICANCE_INFLATION");
+        if (this.metrics.narrativeConcentration > 0.8) anomalies.push("SIGNIFICANCE_MONOPOLY");
+        if (this.metrics.globalSignificanceSupply > this.SUPPLY_CAP * 0.9) anomalies.push("SUPPLY_CRITICAL");
+        
+        // DETECT SIGNIFICANCE FARMING
+        // Rule: If an entity's significance grew significantly without a corresponding history record
+        const counterfeits = this.detectCounterfeitSignificance();
+        if (counterfeits.length > 0) {
+            anomalies.push("SIGNIFICANCE_FARMING_DETECTED");
         }
 
         return anomalies;
@@ -161,19 +143,31 @@ class SignificanceEconomyAuditSystem {
         
         let totalDecayed = 0;
         window.LegacyManager.activeLegacies.forEach(legacy => {
-            if (legacy.storyDensity > 2000) {
-                const decay = Math.floor(legacy.storyDensity * 0.05);
-                legacy.storyDensity -= decay;
-                totalDecayed += decay;
-                window.EventBus.emit('UI_LOG_DEBUG', `[BALANCING] ${legacy.id} significance decayed by ${decay} to preserve scarcity.`);
-            }
+            // Natural Evaporation (Entropy)
+            const decay = Math.floor((legacy.storyDensity || 0) * 0.02);
+            legacy.storyDensity = Math.max(0, legacy.storyDensity - decay);
+            totalDecayed += decay;
         });
         this.metrics.totalDecayApplied += totalDecayed;
     }
 
+    _applyAggressiveSignificanceDecay() {
+        if (!window.LegacyManager) return;
+        
+        let totalDecayed = 0;
+        window.LegacyManager.activeLegacies.forEach(legacy => {
+            // Aggressive purge for "Historical Bandwidth" safety
+            const decay = Math.floor((legacy.storyDensity || 0) * 0.1); 
+            legacy.storyDensity = Math.max(0, legacy.storyDensity - decay);
+            totalDecayed += decay;
+        });
+        this.metrics.totalDecayApplied += totalDecayed;
+        window.EventBus.emit('UI_LOG', '📉 [SCARCITY] Global Significance Supply exceeded capacity. Purging redundant history.');
+    }
+
     _emitAuditLog(anomalies) {
-        const status = anomalies.length === 0 ? "EQUILIBRIUM" : "DISTURBED";
-        window.EventBus.emit('UI_LOG', `👁️ [CO] Directorate Status: ${status} | Gini: ${this.metrics.giniCoefficient.toFixed(2)} | Anomalies: ${anomalies.join(', ') || 'None'}`);
+        const status = anomalies.length === 0 ? "STABLE" : "UNSTABLE";
+        window.EventBus.emit('UI_LOG', `👁️ [CEO] Supply: ${this.metrics.globalSignificanceSupply.toLocaleString()} | Gini: ${this.metrics.giniCoefficient.toFixed(2)} | Status: ${status}`);
     }
 
     _calculateGini(values) {
@@ -191,61 +185,44 @@ class SignificanceEconomyAuditSystem {
     }
 
     /**
-     * Generates the Long-term Significance Equilibrium Report
+     * Determine: Can significance be farmed?
+     * Detects entities with high significance but zero witnesses/participants in their records.
      */
-    generateReport() {
-        const anomalies = this._detectAnomalies();
-        const equilibrium = anomalies.length === 0 ? "STABLE" : "UNSTABLE";
-        
+    detectCounterfeitSignificance() {
+        const anomalies = [];
+        if (!window.LegacyManager || !window.ChronicleManager || !window.LegacyManager.activeLegacies) return anomalies;
+
+        window.LegacyManager.activeLegacies.forEach(legacy => {
+            const records = window.ChronicleManager.getHistoryFor(legacy.id);
+            if (legacy.storyDensity > 1000 && records.length === 0) {
+                anomalies.push({ id: legacy.id, reason: 'GHOST_HISTORY' });
+                
+                // Active Correction: Punish ghost history
+                legacy.storyDensity = Math.floor(legacy.storyDensity * 0.5);
+                window.EventBus.emit('UI_LOG_DEBUG', `[CEO] Correction: ${legacy.id} significance halved due to Ghost History.`);
+            }
+        });
+        return anomalies;
+    }
+
+    generateSignificanceReport() {
         return {
-            title: "LONG-TERM SIGNIFICANCE EQUILIBRIUM REPORT",
-            status: equilibrium,
-            timestamp: window.EngineParams?.worldDay || 0,
-            core_metrics: {
-                gini: this.metrics.giniCoefficient,
-                concentration: this.metrics.narrativeConcentration,
-                hero_density: this.metrics.heroDistribution,
-                turnover: this.metrics.narrativeTurnover
-            },
-            tracking: {
-                births: this.history.legendBirths.length,
-                deaths: this.history.legendDeaths.length,
-                decay_pressure: this.metrics.totalDecayApplied
-            },
-            detections: anomalies,
-            conclusion: this._getConclusion(equilibrium, anomalies)
+            title: "SIGNIFICANCE THERMODYNAMICS REPORT",
+            global_supply: this.metrics.globalSignificanceSupply,
+            supply_cap: this.SUPPLY_CAP,
+            inflation_rate: this.metrics.inflationRate,
+            concentration: this.metrics.narrativeConcentration,
+            verdict: this._getVerdict()
         };
     }
 
-    _getConclusion(equilibrium, anomalies) {
-        if (equilibrium === "STABLE") return "Significance remains meaningful. The churn is healthy.";
-        if (anomalies.includes("SIGNIFICANCE_STARVATION")) return "The past is consuming the future. Narrative entropy is critical.";
-        if (anomalies.includes("SIGNIFICANCE_INFLATION")) return "Legends are becoming common. Scarcity must be enforced.";
-        return "Narrative stability is compromised. Monitor turnover rates.";
-    }
-
-    /**
-     * Candidate Identification Check
-     * Can the 4 Great Forces still find meaningful candidates?
-     */
-    checkCandidatePool() {
-        const poolSize = Array.from(window.LegacyManager.activeLegacies.values())
-            .filter(l => l.storyDensity < 500).length;
-            
-        const results = {
-            crow: this.metrics.narrativeConcentration < 0.9,
-            huntsman: poolSize > 5,
-            tree: this.metrics.narrativeDiversity > 0.3,
-            sovereign: this.metrics.giniCoefficient < 0.7
-        };
-
-        if (!results.huntsman) {
-            window.EventBus.emit('UI_LOG', '[CO] WARNING: The Huntsman has no unrefined sparks to cultivate.');
-        }
-
-        return results;
+    _getVerdict() {
+        if (this.metrics.globalSignificanceSupply > this.SUPPLY_CAP) return "CRITICAL OVERFLOW: History is saturated. New events cannot take root.";
+        if (this.metrics.giniCoefficient > 0.9) return "SIGNIFICANCE MONOPOLY: One House has captured 90% of existence.";
+        return "NARRATIVE EQUILIBRIUM: Significance is finite and circulating.";
     }
 }
 
 window.CrowObservatory = new SignificanceEconomyAuditSystem();
 export default window.CrowObservatory;
+
