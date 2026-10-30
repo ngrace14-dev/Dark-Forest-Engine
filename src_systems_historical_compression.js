@@ -41,11 +41,16 @@ class HistoricalCompressionSystem {
     /**
      * Primary Compression Loop: Promotes and Prunes the Ledger.
      */
-    processCompressionCycle() {
+    processCompressionCycle(forceCataclysmPurge = false) {
         if (!window.ChronicleManager) return;
 
         const ledger = window.ChronicleManager.worldLedger;
         const day = window.EngineParams.worldDay;
+
+        if (forceCataclysmPurge) {
+            this._executeDeepTimeErasure();
+            return;
+        }
 
         // 1. IMPORTANCE SCORING & PROMOTION
         ledger.forEach(event => {
@@ -167,6 +172,54 @@ class HistoricalCompressionSystem {
         if (oldSize > newSize) {
             window.EventBus.emit('UI_LOG_DEBUG', `[GHO] Memory Compression complete. ${oldSize - newSize} events converted to higher-order structures or purged.`);
         }
+    }
+
+    /**
+     * Level 7 Compression: THE GREAT ERASURE
+     * Wipes all history and buries physical pillars to reset the world's story space.
+     */
+    _executeDeepTimeErasure() {
+        window.EventBus.emit('UI_LOG', "⚡ [GHO] LEVEL 7 COMPRESSION INITIATED. EXECUTING DEEP TIME ERASURE.");
+
+        // 1. Wipe Ledger
+        window.ChronicleManager.worldLedger = [];
+        window.ChronicleManager.npcHistoricalWeights.clear();
+        window.ChronicleManager.historicalEssence.clear();
+
+        // 2. Bury Pillars (Move to Underworld/Layer -1)
+        if (window.GameCore?.activeEntities) {
+            window.GameCore.activeEntities.forEach(ent => {
+                if (ent.is_static_node && (ent.lore_id || ent.isChampion)) {
+                    // Physical Erasure: Move 100m underground
+                    if (ent.body) {
+                        const pos = ent.body.translation();
+                        window.PhysicsQueue.enqueue(() => {
+                            ent.body.setTranslation({ x: pos.x, y: -100, z: pos.z }, true);
+                        });
+                    }
+                    ent.is_buried = true; // Flag for future "Archeology" mechanics
+                }
+            });
+        }
+
+        // 3. Institutional Collapse
+        if (window.DynastyManager) {
+            window.DynastyManager.houses.forEach(house => {
+                house.archives = [];
+                house.prestige = 10; // Residual prestige
+                house.legitimacy = 0.1;
+                house.beliefs.clear(); // Dogma is lost
+                window.DynastyManager.seedCoreBeliefs(house); // Re-seed with fresh doubt
+            });
+        }
+
+        // 4. Reset Global Entropy
+        if (window.NarrativeThermodynamics) {
+            window.NarrativeThermodynamics.omega = 0.0;
+            window.NarrativeThermodynamics.championSpawned = false;
+        }
+
+        window.EventBus.emit('UI_LOG', "✨ [GHO] Era successfully archived. The world is fresh for new legends.");
     }
 }
 

@@ -1509,9 +1509,10 @@ class DynastyManagerSystem {
 
 
 
-        getFeuds() {
-        return this.feuds;
-    }
+        getHouse(id) {
+            return this.houses.get(id);
+        }
+
 
     /**
      * Updates the Blessed status of a House (Bible §19).
