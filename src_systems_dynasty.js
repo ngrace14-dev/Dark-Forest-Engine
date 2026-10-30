@@ -526,8 +526,14 @@ class DynastyManagerSystem {
      * Handles the death of a notable NPC.
      * Bible §36: "Individuals die; institutions persist."
      */
-    handleDeath(entity) {
+        handleDeath(entity) {
+        if (!entity) return;
+
+        // --- PHASE 1: CHRONOS REFRACTION PREP ---
+        window.ChronicleManager?.snapshotEssence(entity);
+
         if (!entity.houseId) return;
+
 
         const house = this.houses.get(entity.houseId);
         if (!house) return;

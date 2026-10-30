@@ -10,10 +10,15 @@ window.ChronicleManager = {
     // Playback snapshots
     snapshots: new Map(), // day -> snapshot
 
-    // Per-Entity History (Scoped to ID)
+        // Per-Entity History (Scoped to ID)
     entityRecords: new Map(),
     
-        // LEGEND ENGINE: Tracking weight for individuals (Bible §1)
+    // --- PHASE 1: CHRONOS REFRACTION SNAPSHOTTING ---
+    // Stores the "Essence" of significant dead actors for future Shade manifestation
+    historicalEssence: new Map(), // nodeId -> { hp, maxHp, level, archetype, strength, toughness }
+    
+    // LEGEND ENGINE: Tracking weight for individuals (Bible §1)
+
     npcHistoricalWeights: new Map(), // nodeId -> totalWeight
 
     // --- PHASE 7: OFFICIAL HISTORY LAYER ---
@@ -329,6 +334,7 @@ window.ChronicleManager = {
         return isLegend ? score * 1.5 : score;
     },
 
+    identifyArchetype: function(ent, weight) {
         // Bible §22: Based on Drives and Force influence
         const profile = window.PersonhoodManager?.getProfile(ent.id);
         if (!profile) return 'UNSPECIAL';
@@ -342,6 +348,7 @@ window.ChronicleManager = {
     },
 
     captureSnapshot: function() {
+
         const day = window.EngineParams?.worldDay || 0;
         // Bible §5: Reality Shift every 14 days. Capture on shifts and every 5 days for granularity.
         if (day % 5 !== 0 || this.snapshots.has(day)) return;
@@ -379,10 +386,37 @@ window.ChronicleManager = {
     },
 
         getHistoryFor: function(actorId) {
-        return this.entityRecords.get(actorId) || [];
-    },
+            return this.entityRecords.get(actorId) || [];
+        },
 
-    // --- PHASE 7: NARRATIVE AUTHORITY METHODS ---
+        /**
+         * Snapshots an entity's physical stats before they are removed from memory.
+         * Bible §1: Action -> Legend -> Shade.
+         */
+        snapshotEssence: function(entity) {
+            if (!entity || !entity.id) return;
+        
+            const weight = this.npcHistoricalWeights.get(entity.id) || 0;
+            const isSignificant = weight > 100 || (window.GameState.legends && window.GameState.legends.some(l => l.actorId === entity.id));
+        
+            if (isSignificant) {
+                const profile = window.PersonhoodManager?.getProfile(entity.id);
+                this.historicalEssence.set(entity.id, {
+                    maxHp: entity.maxHp || 100,
+                    attackDamage: entity.def?.attackDamage || 15,
+                    speed: entity.def?.speed || 5,
+                    level: entity.level || 1,
+                    archetype: this.identifyArchetype(entity, weight),
+                    traits: profile ? { ...profile.traits } : null,
+                    dayOfDeath: window.EngineParams?.worldDay || 0
+                });
+                window.EventBus.emit('UI_LOG_DEBUG', `[GHO] Essence of ${entity.name || entity.id} cached for deep-time refraction.`);
+            }
+        },
+
+
+        // --- PHASE 7: NARRATIVE AUTHORITY METHODS ---
+
 
     /**
      * Registers an "Official Version" of a historical event.

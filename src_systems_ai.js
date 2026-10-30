@@ -230,11 +230,13 @@ function defeatNpc(entity, cause = 'combat') {
     }
     if (window.GameCore.playEntityAnimation) window.GameCore.playEntityAnimation(entity, 'die');
     if (window.GameCore.spawnGroundLoot) window.GameCore.spawnGroundLoot(entity.def.faction === 'forest' ? 'corrupted_resin' : 'beast_bones', entity.visual.position);
-    setTimeout(() => {
+        setTimeout(() => {
+        window.EventBus.emit('ENTITY_DEATH', { victim: entity }); // Added for Refraction/Harvest logic
         window.GameCore.scene.remove(entity.visual);
         window.GameCore.world.removeRigidBody(entity.body);
         window.GameCore.activeEntities = window.GameCore.activeEntities.filter(candidate => candidate.id !== entity.id);
     }, 2000);
+
 }
 
 function attackNpc(attacker, target) {
