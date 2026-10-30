@@ -32,13 +32,27 @@ class ShackledWalkerSystem {
     update() {
         this.checkTimeOfDay();
         
-        if (this.isNight && !this.hasCompletedShiftCycle && !this.active) {
+        const shouldSpawn = this.evaluateStagnationTrigger();
+
+        if (this.isNight && !this.hasCompletedShiftCycle && !this.active && shouldSpawn) {
             this.startWalking();
         }
 
         if (this.active) {
             this.processWalking();
         }
+    }
+
+    /**
+     * Lore-Grounded Triggering (Immune Response)
+     * The Shade only spawns if the world's Trait Diversity is too low.
+     */
+    evaluateStagnationTrigger() {
+        if (!window.TraitEvolution) return true; // Fallback to timer if observatory missing
+
+        const diversity = window.TraitEvolution.stats.diversityIndex;
+        // If diversity is below 0.15, the world is too homogenous, drawing the shadow.
+        return diversity < 0.15;
     }
 
     checkTimeOfDay() {

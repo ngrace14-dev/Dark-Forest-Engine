@@ -40,6 +40,18 @@ class PersonhoodSystem {
     }
 
 
+        /**
+     * Intrinsic Inheritance Variance (Gaussian Noise)
+     * Bible §BN: Reproduction is not duplication.
+     */
+        _gaussianRandom(mean = 0, stdev = 1) {
+        let u = 0, v = 0;
+        while(u === 0) u = Math.random(); // Converting [0,1) to (0,1]
+        while(v === 0) v = Math.random();
+        let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        return z * stdev + mean;
+    }
+
     /**
      * Substrate Population Engine: Births, Growth, and Sigmoid Logic.
      */
@@ -64,30 +76,29 @@ class PersonhoodSystem {
                 v.population.current += births;
                 
                                 // Create new personhood profiles for newborns
-                for (let i = 0; i < Math.min(births, 5); i++) { // Sample new profiles to save memory
-                    const childId = `npc_${v.id}_gen${v.expansionLevel}_${Date.now()}_${i}`;
+                                for (let i = 0; i < Math.min(births, 5); i++) { // Sample new profiles to save memory
+                                    const childId = `npc_${v.id}_gen${v.expansionLevel}_${Date.now()}_${i}`;
                     
-                    // --- TRAIT INHERITANCE (Node 1) ---
-                    // Newborns inherit traits from the general village pool (Cultural DNA)
-                    const profile = this.getProfile(childId);
+                                    // --- FIX 1: GAUSSIAN INHERITANCE ---
+                                    const profile = this.getProfile(childId);
                     
-                    if (v.residents && v.residents.length > 0) {
-                        const parent = v.residents[Math.floor(Math.random() * v.residents.length)];
-                        const parentProfile = this.profiles.get(parent.id);
-                        if (parentProfile) {
-                            Object.keys(profile.traits).forEach(k => {
-                                if (k === 'credibility') return;
-                                // Crossover + Mutation (5%)
-                                const mutation = (Math.random() * 0.1) - 0.05;
-                                profile.traits[k] = Math.max(0, Math.min(1, parentProfile.traits[k] + mutation));
-                            });
-                        }
-                    }
+                                    if (v.residents && v.residents.length > 0) {
+                                        const parent = v.residents[Math.floor(Math.random() * v.residents.length)];
+                                        const parentProfile = this.profiles.get(parent.id);
+                                        if (parentProfile) {
+                                            Object.keys(profile.traits).forEach(k => {
+                                                if (k === 'credibility') return;
+                                                // Trait_child = Parent_avg + N(0, 0.05)
+                                                const noise = this._gaussianRandom(0, 0.05);
+                                                profile.traits[k] = Math.max(0, Math.min(1, parentProfile.traits[k] + noise));
+                                            });
+                                        }
+                                    }
 
-                    profile.age = 0;
-                    profile.lifeStage = 'CHILD';
-                    profile.property.homeVillageId = v.id;
-                }
+                                    profile.age = 0;
+                                    profile.lifeStage = 'CHILD';
+                                    profile.property.homeVillageId = v.id;
+                                }
             }
 
             // 2. MIGRATION MODEL: The Opportunity Gradient
@@ -117,34 +128,71 @@ class PersonhoodSystem {
 
 
         /**
-     * System 45: Memory Registration & Trauma Retention
-     * Enforces Bible §1: Action -> Legend -> History -> Trauma.
-     */
-    registerTrauma(nodeId, intensity, triggerTag, description) {
-        const profile = this.profiles.get(nodeId);
-        if (!profile) return;
+         * Experiential Personality Drift (Nurture over Nature)
+         * Bible §BN: Experiences reshape the self.
+         */
+        applyExperientialDrift(nodeId, triggerType, severity) {
+            const profile = this.profiles.get(nodeId);
+            if (!profile || !profile.traits) return;
 
-        const day = window.EngineParams?.worldDay || 0;
-        const traumaId = `trauma_${day}_${triggerTag}`;
+            switch(triggerType) {
+                case 'FAMINE':
+                    // Famine increases greed (cynicism) and fear
+                    profile.traits.cynicism = Math.min(1.0, profile.traits.cynicism + (0.1 * severity));
+                    profile.traits.fear = Math.min(1.0, profile.traits.fear + (0.05 * severity));
+                    break;
+                case 'BETRAYAL':
+                    // Betrayal reduces loyalty and increases cynicism
+                    profile.traits.loyalty = Math.max(0, profile.traits.loyalty - (0.2 * severity));
+                    profile.traits.cynicism = Math.min(1.0, profile.traits.cynicism + (0.15 * severity));
+                    break;
+                case 'SUCCESSFUL_TRADE':
+                    // Success increases ambition and risk tolerance
+                    profile.traits.ambition = Math.min(1.0, profile.traits.ambition + (0.05 * severity));
+                    profile.traits.riskTolerance = Math.min(1.0, profile.traits.riskTolerance + (0.03 * severity));
+                    break;
+                case 'COMBAT_VICTORY':
+                    // Victory increases aggression and reduces fear
+                    profile.traits.aggression = Math.min(1.0, profile.traits.aggression + (0.08 * severity));
+                    profile.traits.fear = Math.max(0, profile.traits.fear - (0.05 * severity));
+                    break;
+            }
+        }
+
+        /**
+         * System 45: Memory Registration & Trauma Retention
+         * Enforces Bible §1: Action -> Legend -> History -> Trauma.
+         */
+        registerTrauma(nodeId, intensity, triggerTag, description) {
+            const profile = this.profiles.get(nodeId);
+            if (!profile) return;
+
+            const day = window.EngineParams?.worldDay || 0;
+            const traumaId = `trauma_${day}_${triggerTag}`;
         
-        // 45.2 Trauma Encoding
-        const existing = profile.memory.traumaEncoded.get(traumaId) || { intensity: 0, day, triggerTag, description };
-        existing.intensity = Math.min(100, existing.intensity + intensity);
-        profile.memory.traumaEncoded.set(traumaId, existing);
+            // 45.2 Trauma Encoding
+            const existing = profile.memory.traumaEncoded.get(traumaId) || { intensity: 0, day, triggerTag, description };
+            existing.intensity = Math.min(100, existing.intensity + intensity);
+            profile.memory.traumaEncoded.set(traumaId, existing);
 
-        // 42.5 Stress Accumulation
-        profile.survival.stress += (intensity * 0.5);
+            // 42.5 Stress Accumulation
+            profile.survival.stress += (intensity * 0.5);
 
-        // 45.3 Trauma Trigger Flashes
-        if (existing.intensity > this.TRAUMA_THRESHOLDS.SEVERE) {
-            window.EventBus.emit('UI_LOG_DEBUG', `[PSYCHOLOGY] ${nodeId} has developed a permanent trauma trigger for ${triggerTag}.`);
+            // --- EXPERIENTIAL DRIFT INTEGRATION ---
+            if (triggerTag === 'FAMINE' || triggerTag === 'MONSTER_ATTACK') {
+                this.applyExperientialDrift(nodeId, triggerTag === 'FAMINE' ? 'FAMINE' : 'BETRAYAL', intensity / 100);
+            }
+
+            // 45.3 Trauma Trigger Flashes
+            if (existing.intensity > this.TRAUMA_THRESHOLDS.SEVERE) {
+                window.EventBus.emit('UI_LOG_DEBUG', `[PSYCHOLOGY] ${nodeId} has developed a permanent trauma trigger for ${triggerTag}.`);
+            }
+
+            // 45.8 Trauma Transposition (Shared Trauma)
+            if (intensity > 50) {
+                this.broadcastTrauma(nodeId, triggerTag, intensity * 0.3);
+            }
         }
-
-        // 45.8 Trauma Transposition (Shared Trauma)
-        if (intensity > 50) {
-            this.broadcastTrauma(nodeId, triggerTag, intensity * 0.3);
-        }
-    }
 
     /**
      * System 42: The Will to Live & Survival Physics
@@ -829,10 +877,6 @@ class PersonhoodSystem {
         }
     }
 }
-
-
-window.PersonhoodManager = new PersonhoodSystem();
-export default window.PersonhoodManager;
 
 
 window.PersonhoodManager = new PersonhoodSystem();
