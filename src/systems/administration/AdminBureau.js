@@ -114,11 +114,16 @@ export class AdminBureau {
 
     triggerCollapse(inst, id) {
         const EventBus = getEventBus();
+        const EngineParams = getEngineParams();
+
         if (EventBus) {
             EventBus.emit('UI_LOG', `🔥 [COLLAPSE] The ${inst.name} has buckled under its own weight. Total administrative failure.`);
             EventBus.emit('INSTITUTION_COLLAPSED', id);
         }
 
+        // Hard reset complexity metrics
+        inst.lastReformDay = EngineParams?.worldDay || 0; 
+        
         // Wipe governors and treasury
         inst.governingIds = [];
         inst.treasury = 0;
