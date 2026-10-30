@@ -115,7 +115,9 @@ export class JurisprudenceSystem {
         }
 
         // Diversity Penalty
-        this.settlement.diversityPurgeTracker += PersonhoodConstants.SENTENCE_DIVERSITY_PENALTY;
+        if (this.settlement.justiceSystem) {
+            this.settlement.justiceSystem.diversityPurgeTracker += PersonhoodConstants.SENTENCE_DIVERSITY_PENALTY;
+        }
         
         // Martyr Trigger
         if (actor.tags && actor.tags.includes('TouchedByTheShade')) {

@@ -67,7 +67,7 @@ export function runHazardSimulation() {
 
     console.log("\n--- PHASE 2: Execution & Martyrdom ---");
     if (testActor.isDead) {
-        console.log("Actor was executed. Diversity Purge Tracker:", settlement.diversityPurgeTracker);
+        console.log("Actor was executed. Diversity Purge Tracker:", settlement.justiceSystem.diversityPurgeTracker);
     }
 
     console.log("\n--- PHASE 3: Penal Labor Hazard ---");

@@ -13,13 +13,21 @@ export class SocialDynamicsSystem {
         this.hasWaterCisterns = false;
         this.failedMitigation = false;
         
-        // Justice & Penal State
-        this.diversityPurgeTracker = 0.0;
-        this.stocksCapacity = 4;
+        // Justice & Penal Data Architecture
+        this.justiceSystem = {
+            activeDoctrine: 'Banishment',
+            enforcementCapacity: 0.75,
+            incarceratedActors: [],
+            diversityPurgeTracker: 0.0,
+            stocksOccupancy: 0,
+            stocksCapacity: 4
+        };
     }
 
     update(delta) {
         const alive = this.getActors();
+        this.justiceSystem.incarceratedActors = [];
+        this.justiceSystem.stocksOccupancy = 0;
         
         for (const actor of alive) {
             // Process Subversive Pipeline
@@ -30,9 +38,13 @@ export class SocialDynamicsSystem {
             // Process Sentences
             if (actor.penalRecord?.currentSentence) {
                 this.jurisprudence?.processSentenceTick(actor);
+                this.justiceSystem.incarceratedActors.push(actor.id);
+                if (actor.penalRecord.currentSentence.type === 'Pillory') {
+                    this.justiceSystem.stocksOccupancy++;
+                }
             }
 
-            // Penal Labor Fatigue
+            // Penal Labor Fatigue Floor
             if (actor.socialRole === 'PenalLaborer') {
                 actor.fatigue = Math.max(PersonhoodConstants.PENAL_LABOR_FATIGUE_FLOOR, actor.fatigue || 0);
             }
@@ -49,7 +61,6 @@ export class SocialDynamicsSystem {
         const alive = this.getActors();
         if (alive.length < 2) return 1.0;
         
-        // Simplified TDI: average standard deviation of core traits
         const traits = ['riskTolerance', 'ambition', 'conscientiousness', 'cynicism', 'aggression'];
         let totalStdDev = 0;
 
@@ -63,8 +74,7 @@ export class SocialDynamicsSystem {
         }
 
         const rawTdi = (totalStdDev / traits.length);
-        // Apply purges
-        return Math.max(0, rawTdi - (this.diversityPurgeTracker || 0));
+        return Math.max(0, rawTdi - (this.justiceSystem.diversityPurgeTracker || 0));
     }
 
     triggerWalkerSummons() {
@@ -79,7 +89,10 @@ export class SocialDynamicsSystem {
     getAverageTrait(traitName) {
         const alive = this.getActors();
         if (alive.length === 0) return 0.5;
-        const sum = alive.reduce((acc, a) => acc + (a.traits[traitName] || 0.5), 0);
+        const sum = alive.reduce((acc, a) => {
+            const val = (a.traits && a.traits[traitName] !== undefined) ? a.traits[traitName] : 0.5;
+            return acc + val;
+        }, 0);
         return sum / alive.length;
     }
 
