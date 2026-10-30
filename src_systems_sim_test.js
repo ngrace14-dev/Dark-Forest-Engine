@@ -53,18 +53,41 @@ class SimulationTestSystem {
         window.EngineParams.worldDay++;
         const currentDay = window.EngineParams.worldDay;
 
-        // Trigger System Heartbeats manually to bypass real-time wait
-        // T1: Daily updates
-        window.EventBus.emit('HEARTBEAT_T1');
+        // --- PHASE 1-1: HEARTBEAT INJECTION ---
+        // Purpose: Activate dormant civilizational systems by replicating the production clock metabolic tiers.
+
+        // T1: High-frequency logic (Aliased to 1/day, scaling handled in Phase 1-2)
+        window.EventBus.emit('HEARTBEAT_T1', { worldDay: currentDay });
         
-        // T2: Weekly (approx) updates
+        // T6H: 2x per game day (assuming 12h real = 1d game). Political/Resource logic.
+        window.EventBus.emit('HEARTBEAT_T6H', { worldDay: currentDay });
+        window.EventBus.emit('HEARTBEAT_T6H', { worldDay: currentDay });
+
+        // T12H: 1x per game day. Dynastic/Information logic.
+        window.EventBus.emit('HEARTBEAT_T12H', { worldDay: currentDay });
+
+        // T24H: 1x per game day. Institutional audits.
+        window.EventBus.emit('HEARTBEAT_T24H', { worldDay: currentDay });
+
+        // T2: Weekly updates
         if (currentDay % 7 === 0) {
-            window.EventBus.emit('HEARTBEAT_T2');
+            window.EventBus.emit('HEARTBEAT_T2', { worldDay: currentDay });
         }
 
-        // T3: Monthly (approx) updates
+        // T3: Monthly updates (Approx)
         if (currentDay % 30 === 0) {
-            window.EventBus.emit('HEARTBEAT_T3');
+            window.EventBus.emit('HEARTBEAT_T3', { worldDay: currentDay });
+            window.EventBus.emit('HEARTBEAT_T30D', { worldDay: currentDay }); // Longitudinal Decay
+        }
+
+        // Seasonal updates
+        if (currentDay % 90 === 0) {
+            window.EventBus.emit('HEARTBEAT_T90D', { worldDay: currentDay });
+        }
+
+        // Annual updates
+        if (currentDay % 365 === 0) {
+            window.EventBus.emit('HEARTBEAT_T365D', { worldDay: currentDay });
         }
 
         // Epoch Shifts (Every 14 days)
@@ -125,6 +148,21 @@ class SimulationTestSystem {
     generateReport() {
         console.log("%c --- 1000 YEAR SIMULATION REPORT --- ", "background: #1e1e1e; color: #4ade80; font-weight: bold; padding: 10px;");
         
+        // 0. SYSTEMIC ACTIVATION AUDIT (Phase 1 Validation)
+        console.group("Category 0: Systemic Activation Audit");
+        const poly = window.PoliticalObservatory;
+        if (poly) {
+            console.log(`Political Audits Executed: ${poly.causalRegistry.length + poly.houseHistory.size * (window.EngineParams.worldDay / 14)} (Estimated)`);
+            console.log(`Political Fragmentation (Gini): ${poly.globalMetrics.politicalFragmentation.toFixed(3)}`);
+            console.log(`Causal Events Recorded: ${poly.causalRegistry.length}`);
+        }
+        const sig = window.CrowObservatory;
+        if (sig) {
+            console.log(`Global Significance Supply: ${sig.metrics.globalSignificanceSupply.toLocaleString()} / ${sig.SUPPLY_CAP.toLocaleString()}`);
+            console.log(`Narrative Concentration: ${(sig.metrics.narrativeConcentration * 100).toFixed(1)}%`);
+        }
+        console.groupEnd();
+
         // 1. Major World Events
         console.group("Category 1: Major World Events");
         console.table(this.stats.majorEvents.slice(-20).map(e => ({ Day: e.day, Type: e.type, Significance: e.historicalWeight, Detail: e.detail })));
