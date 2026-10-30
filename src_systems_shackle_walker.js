@@ -31,11 +31,14 @@ class ShackledWalkerSystem {
 
     update() {
         this.checkTimeOfDay();
-        
-        const shouldSpawn = this.evaluateStagnationTrigger();
 
-        if (this.isNight && !this.hasCompletedShiftCycle && !this.active && shouldSpawn) {
-            this.startWalking();
+        if (this.isNight && !this.hasCompletedShiftCycle && !this.active) {
+            // SHADE TRIGGER HARDENING: Only spawn if ANY village is stagnant
+            const stagnantVillage = window.VillageManager?.villages.find(v => this.evaluateVillageStagnation(v.id));
+            
+            if (stagnantVillage) {
+                this.startWalking();
+            }
         }
 
         if (this.active) {
@@ -138,43 +141,97 @@ class ShackledWalkerSystem {
         this.walkerEntity.visual.position.y = 5;
     }
 
+    /**
+     * Determines whether a village's diversity is low enough to trigger the Walker.
+     */
+    evaluateVillageStagnation(villageId) {
+        if (!window.TraitEvolution) return false;
+        
+        // Fetch regional diversity from Trait Evolution Bureau
+        const regionalStats = window.TraitEvolution.stats.regionalDiversity?.get(villageId);
+        if (!regionalStats) return window.TraitEvolution.stats.diversityIndex < 0.15;
+
+        return regionalStats.diversityIndex < 0.15;
+    }
+
     triggerVillageMutation(village) {
-        if (!window.PersonhoodManager) return;
+        if (!window.PersonhoodManager || !window.TraitEvolution) return;
 
         const profiles = Array.from(window.PersonhoodManager.profiles.values())
             .filter(p => p.property.homeVillageId === village.id);
         
-        const mutationCount = Math.ceil(profiles.length * 0.025);
-        let mutated = 0;
+        if (profiles.length === 0) return;
+
+        // 1. TARGET SELECTION PIPELINE
+        // Filter out Elders (age >= 250)
+        const eligible = profiles.filter(p => p.age < 250);
+        
+        // Score Candidates: w1*(1-Social) + w2*IsUnbonded + w3*IsAdolescent
+        eligible.forEach(p => {
+            const isUnbonded = p.relationships.size === 0 ? 1 : 0;
+            const isAdolescent = p.lifeStage === 'ADOLESCENT' ? 1 : 0;
+            const socialStatus = (p.traits.credibility || 0.5);
+            
+            p._shacklePriority = (0.5 * (1.0 - socialStatus)) + (0.3 * isUnbonded) + (0.2 * isAdolescent);
+        });
+
+        eligible.sort((a, b) => b._shacklePriority - a._shacklePriority);
+
+        // Select 5% to 8% of population
+        const targetRate = 0.05 + (Math.random() * 0.03);
+        const mutationCount = Math.ceil(eligible.length * targetRate);
+        
+        const villageMeans = window.TraitEvolution.getVillageMeans(village.id);
+        let mutatedCount = 0;
 
         for (let i = 0; i < mutationCount; i++) {
-            const p = profiles[Math.floor(Math.random() * profiles.length)];
-            if (p) {
-                this.mutateTraits(p);
-                mutated++;
+            const target = eligible[i];
+            if (target) {
+                this.executeHeresyInversion(target, villageMeans);
+                mutatedCount++;
             }
         }
 
-        if (mutated > 0) {
-            window.EventBus.emit('UI_LOG_DEBUG', `[THE SHACKLE] The Walker's presence mutated ${mutated} souls in ${village.name}.`);
+        if (mutatedCount > 0) {
+            window.EventBus.emit('UI_LOG_DEBUG', `[THE SHACKLE] Executed Heresy Inversion on ${mutatedCount} souls in ${village.name}.`);
             window.ChronicleManager?.recordEvent({
                 actorId: 'THE_SHACKLE',
-                type: 'SPONTANEOUS_MUTATION',
-                detail: `The Bound Walker passed through ${village.name}, twisting the threads of destiny.`,
-                significance: 30,
-                historicalWeight: 15
+                type: 'HERESY_INVERSION',
+                detail: `The Bound Walker inverted the intent of the youth in ${village.name}.`,
+                significance: 50,
+                historicalWeight: 25
             });
         }
     }
 
-    mutateTraits(profile) {
+    /**
+     * Executes targeted polarity inversion.
+     */
+    executeHeresyInversion(profile, villageMeans) {
         if (!profile || !profile.traits) return;
-        const traits = Object.keys(profile.traits);
-        const traitToMutate = traits[Math.floor(Math.random() * traits.length)];
+        const traitKeys = Object.keys(profile.traits);
         
-        // Random shift (mutation)
-        const shift = (Math.random() * 0.4) - 0.2; // +/- 20%
-        profile.traits[traitToMutate] = Math.max(0, Math.min(1, (profile.traits[traitToMutate] || 0.5) + shift));
+        traitKeys.forEach(k => {
+            if (k === 'credibility') return;
+            
+            const mean = (villageMeans && villageMeans[k] !== undefined) ? villageMeans[k] : 0.5;
+            // Trait_new = Clamp((1.0 - Mean) + N(0, 0.10))
+            const noise = (window.PersonhoodManager && window.PersonhoodManager._gaussianRandom) ? 
+                window.PersonhoodManager._gaussianRandom(0, 0.10) : 0;
+            profile.traits[k] = Math.max(0, Math.min(1, (1.0 - mean) + noise));
+        });
+
+        // Apply State Tag: TouchedByTheShade
+        if (!profile.statusTags) profile.statusTags = {};
+        profile.statusTags.TouchedByTheShade = {
+            cycleAcquired: window.EngineParams?.worldDay || 0,
+            generationOrigin: profile.generation || 1,
+            charismaModifierYouth: 0.35,
+            unalteredTrustPenalty: -0.40
+        };
+        
+        // Permanent Behavioral Flag
+        profile.identity = 'SKEPTIC'; // Forced archetype shift
     }
 
     applyCreepedOutDebuff(village) {

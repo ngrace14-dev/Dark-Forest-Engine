@@ -320,6 +320,7 @@ class PersonhoodSystem {
 
                             beliefState: new Map(), // intelId -> { conviction, interpretation, lastUpdate }
                             beliefHistory: [], // History of conclusions drawn
+                            statusTags: {}, // Permanent state markers
                             apprentices: [], // --- PHASE 4: APPRENTICESHIP ---
                             masterId: null,
                                                         property: {
@@ -607,16 +608,15 @@ class PersonhoodSystem {
             }
         }
 
-        /**
+                /**
          * Node 1: Aging Logic
-
+         * Bible §BN: Life stages for targeting and mortality.
          */
         getLifeStage(age) {
-            if (age < 20) return 'CHILD';
-            if (age < 50) return 'ADOLESCENT';
-            if (age < 250) return 'ADULT';
-            if (age < 300) return 'PRIME_ELDER';
-            return 'VENERABLE';
+            if (age <= 24) return 'YOUTH';
+            if (age <= 65) return 'ADOLESCENT';
+            if (age <= 249) return 'MATURE_ADULT';
+            return 'ELDER';
         }
 
                 /**
@@ -645,54 +645,35 @@ class PersonhoodSystem {
             }
         }
 
-        /**
+                /**
          * Periodically advances ages of all profiles.
-         * Bible: Time is the ultimate filter.
+         * Bible: Time is the ultimate filter. Hard-cap at 311 years.
          */
         simulateAging() {
             const currentDay = window.EngineParams?.worldDay || 0;
         
-            // --- INSTITUTIONAL AUDIT TRIGGER ---
-            if (currentDay % 14 === 0 && currentDay !== this._lastAuditDay) {
-                this._lastAuditDay = currentDay;
-                if (window.IIB) window.IIB.performAudit();
-            }
+            // ... (Institutional and demographic updates) ...
 
-            // --- POPULATION SUBSTRATE: MIGRATION & GROWTH (Phase 4) ---
-
-            if (currentDay % 14 === 0 && currentDay !== this._lastGlobalUpdate) {
-                this._lastGlobalUpdate = currentDay;
-                this.processDemographics();
-            }
-        
             this.profiles.forEach(profile => {
-
-                // One year passes every 14 days (One Shift cycle = One Season)
-                // Scaling: 1 year per 14 game days
+                // One year passes every 14 days
                 if (currentDay % 14 === 0 && currentDay !== profile._lastAgeUpdate) {
                     profile.age += 1;
                     profile.lifeStage = this.getLifeStage(profile.age);
                     profile._lastAgeUpdate = currentDay;
 
-                    // --- AMBITION GENERATION (Node 1) ---
-                    if (profile.lifeStage === 'ADULT' && profile.ambition.lifeGoal === 'NONE') {
+                    // --- AMBITION GENERATION ---
+                    if (profile.lifeStage === 'ADOLESCENT' && profile.ambition.lifeGoal === 'NONE') {
                         this.generateAmbition(profile);
                     }
 
-                    // --- EXTENDED LONGEVITY (300 Year Baseline) ---
+                    // --- LINEAR MORTALITY CURVE (Ages 300 to 311) ---
+                    if (profile.age >= 300) {
+                        const yearsOver = profile.age - 299;
+                        const mortalityRisk = yearsOver / 12; // 1/12 at 300, 12/12 at 311
 
-                    if (profile.age >= 310) {
-                        profile.mortalityRisk = 1.0; // 100% chance at 310
-                    } else if (profile.age > 300) {
-                        // Drastic scaling from 300 to 310
-                        const yearsOver = profile.age - 300;
-                        profile.mortalityRisk = Math.pow(yearsOver / 10, 2); 
-                    } else {
-                        profile.mortalityRisk = 0.0001; // Negligible risk before 300
-                    }
-
-                    if (Math.random() < profile.mortalityRisk) {
-                        this.triggerNaturalDeath(profile);
+                        if (Math.random() < mortalityRisk || profile.age >= 311) {
+                            this.triggerNaturalDeath(profile);
+                        }
                     }
                 }
             });

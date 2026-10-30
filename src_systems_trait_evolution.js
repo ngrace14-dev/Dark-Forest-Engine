@@ -90,9 +90,10 @@ class TraitEvolutionObservatory {
                 discipline: { avg: 0.5, variance: 0, extinction: false },
                 riskTolerance: { avg: 0.5, variance: 0, extinction: false }
             },
-            diversityIndex: 1.0,      // 0.0 (Clones) to 1.0 (Unique)
-            behavioralEntropy: 1.0,   // Randomness of actions
-            evolutionVelocity: 0.0    // Rate of trait change per decade
+            regionalDiversity: new Map(), // VillageID -> { diversityIndex, means }
+            diversityIndex: 1.0,      
+            behavioralEntropy: 1.0,   
+            evolutionVelocity: 0.0    
         };
 
         this.history = []; // Snapshots over time
@@ -122,6 +123,7 @@ class TraitEvolutionObservatory {
         const count = profiles.length;
         if (count === 0) return;
 
+        // 1. GLOBAL STATS
         const traitKeys = Object.keys(this.stats.populationTraits);
         const sums = {};
         const sqSums = {};
@@ -143,11 +145,10 @@ class TraitEvolutionObservatory {
             const variance = (sqSums[k] / count) - (avg * avg);
             this.stats.populationTraits[k].avg = avg;
             this.stats.populationTraits[k].variance = variance;
-            this.stats.populationTraits[k].extinction = variance < 0.001; // Trait is effectively flat
+            this.stats.populationTraits[k].extinction = variance < 0.001;
             totalVariance += variance;
         });
 
-        // 1. DIVERSITY INDEX: Mean Variance across all traits
         this.stats.diversityIndex = totalVariance / traitKeys.length;
 
         // 2. EVOLUTION VELOCITY
@@ -159,7 +160,42 @@ class TraitEvolutionObservatory {
             this.stats.evolutionVelocity = totalDelta / traitKeys.length;
         }
 
+        // 3. REGIONAL STATS (Village-specific)
+        if (window.VillageManager) {
+            window.VillageManager.villages.forEach(v => {
+                const villageProfiles = profiles.filter(p => p.property.homeVillageId === v.id);
+                if (villageProfiles.length > 0) {
+                    const means = {};
+                    let regionalTotalVariance = 0;
+                    
+                    traitKeys.forEach(k => {
+                        const villageSum = villageProfiles.reduce((s, p) => s + (p.traits[k] ?? 0.5), 0);
+                        const villageAvg = villageSum / villageProfiles.length;
+                        means[k] = villageAvg;
+                        
+                        const villageVariance = villageProfiles.reduce((s, p) => s + Math.pow((p.traits[k] ?? 0.5) - villageAvg, 2), 0) / villageProfiles.length;
+                        regionalTotalVariance += villageVariance;
+                    });
+
+                    this.stats.regionalDiversity.set(v.id, {
+                        diversityIndex: regionalTotalVariance / traitKeys.length,
+                        means: means
+                    });
+                }
+            });
+        }
+
         this.lastSnapshot = JSON.parse(JSON.stringify(this.stats));
+    }
+
+    /**
+     * Returns the mean trait values for a specific village.
+     */
+    getVillageMeans(villageId) {
+        return this.stats.regionalDiversity.get(villageId)?.means || {
+            ambition: 0.5, fear: 0.5, curiosity: 0.5, aggression: 0.5,
+            loyalty: 0.5, adaptability: 0.5, discipline: 0.5, riskTolerance: 0.5
+        };
     }
 
     recordSnapshot() {
