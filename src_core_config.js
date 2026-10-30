@@ -6,6 +6,30 @@ window.EngineConfig = {
     performance: { lodThresholdSq: 900, maxEntities: 1000 },
     simulation: { simScale: 1.0, isAccelerated: false },
 
+    // --- KINSHIP & RELATIONSHIP CONFIGURATION ---
+    kinship: {
+        courtship: {
+            minAge: 18,
+            maxAge: 45,
+            attractionChance: 0.05, // 5% per month
+            progressionBase: 10,
+            marriageThreshold: 100
+        },
+        procreation: {
+            maxAge: 50,
+            birthChance: 0.02 // 2% per month
+        },
+        grief: {
+            durationMonths: 6,
+            productivityModifier: 0.2, // 80% drop
+            recoveryRate: 1
+        },
+        economy: {
+            successionLossEntropy: 0.5 // 50% wealth lost if no heir
+        }
+    },
+
+
     // --- PHASE 1: CORE INTEGRITY MULTIPLIERS ---
     getCoreMultipliers: function(integrity) {
         if (integrity <= 0) return { speed: 0.5, perception: 0.2, damage: 0.1 };
