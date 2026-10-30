@@ -121,16 +121,44 @@ class WendigoHarvestSystem {
      * System 5: Wendigo Targeting
      */
     checkHarvestThresholds() {
+        const isAccelerated = window.SimTest && window.EngineParams.timeScale === 0;
+
         this.harvestCandidates.forEach((candidate, nodeId) => {
             // System 5: Priority is Significance and Story Density
             if (candidate.pressureScore > 800 && Math.random() < 0.05) {
-                this.triggerHarvest(nodeId, candidate);
+                const harvestId = this.triggerHarvest(nodeId, candidate);
+                
+                // SIMULATION RESOLVER: In accelerated mode, resolve harvest after a delay
+                if (isAccelerated && harvestId) {
+                    this._scheduleSimulationResolution(harvestId);
+                }
             }
         });
     }
 
+    _scheduleSimulationResolution(harvestId) {
+        // In a simulation, we don't wait for 3D physics. We resolve after ~3 sim-days.
+        const resolutionDay = (window.EngineParams?.worldDay || 0) + 3;
+        
+        if (!this._pendingSimResolutions) this._pendingSimResolutions = [];
+        this._pendingSimResolutions.push({ harvestId, resolutionDay });
+    }
+
+    updateSimResolutions() {
+        if (!this._pendingSimResolutions) return;
+        const currentDay = window.EngineParams?.worldDay || 0;
+        
+        for (let i = this._pendingSimResolutions.length - 1; i >= 0; i--) {
+            const res = this._pendingSimResolutions[i];
+            if (currentDay >= res.resolutionDay) {
+                this.resolveHarvest(res.harvestId, true);
+                this._pendingSimResolutions.splice(i, 1);
+            }
+        }
+    }
+
     triggerHarvest(nodeId, candidate) {
-        if (this.activeHarvests.some(h => h.targetId === nodeId)) return;
+        if (this.activeHarvests.some(h => h.targetId === nodeId)) return null;
 
         const harvestType = candidate.pressureScore > 1500 ? 'EPOCH' : (candidate.pressureScore > 1000 ? 'LEGENDARY' : 'MINOR');
         
@@ -181,6 +209,17 @@ class WendigoHarvestSystem {
 
         if (success) {
             window.EventBus.emit('UI_LOG', `[HARVEST] Harvest ${harvestId} complete. Collected ${harvest.projectedYield} Runic Residue.`);
+            
+            // --- CAUSAL LINK: REDUCE TARGET SIGNIFICANCE ---
+            // A harvest consumes the "Beacon". The entity's significance is drained.
+            if (window.LegacyManager && window.LegacyManager.activeLegacies.has(harvest.targetId)) {
+                const legacy = window.LegacyManager.activeLegacies.get(harvest.targetId);
+                const originalDensity = legacy.storyDensity || 0;
+                legacy.storyDensity = Math.floor(originalDensity * 0.1); // 90% Drain
+                
+                window.EventBus.emit('UI_LOG_DEBUG', `[HARVEST] ${harvest.targetId} drained from ${originalDensity} to ${legacy.storyDensity} significance.`);
+            }
+
             // Grant residue to the 'Harvest Forces' or the Player if they participated
             window.EventBus.emit('SIGNIFICANCE_RESOURCE_GAINED', { amount: harvest.projectedYield });
         }

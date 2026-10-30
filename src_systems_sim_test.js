@@ -115,6 +115,11 @@ class SimulationTestSystem {
 
         // Track Dune Proximity
         this.trackDuneProximity(currentDay);
+
+        // Update Sim Resolvers (Phase 2-2)
+        if (window.HarvestEngine?.updateSimResolutions) {
+            window.HarvestEngine.updateSimResolutions();
+        }
     }
 
     snapshotForces(day) {

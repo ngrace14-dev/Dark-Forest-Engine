@@ -20,7 +20,7 @@ class ShiftDirectorSystem {
         window.EventBus.emit('UI_LOG', '[ShiftDirector] Reality Cycle Monitor Active');
     }
 
-    /**
+        /**
      * Checks if it's time for the 14-day Shift.
      */
     checkCycle() {
@@ -31,9 +31,30 @@ class ShiftDirectorSystem {
         // Cycle Length: 14 Days (Bible §5)
         // We trigger at the end of the 14th day
         if (day > 0 && day % 14 === 0) {
-            this.beginShift();
+            // DETECTOR: Accelerated mode requires instant shift, no setInterval
+            if (window.SimTest && window.EngineParams.timeScale === 0) {
+                this.executeInstantShift();
+            } else {
+                this.beginShift();
+            }
         }
     }
+
+    /**
+     * PHASE 2-2 VALIDATION: Instant Shift for Simulation Acceleration
+     * Bypasses the 7-second real-world interval skip.
+     */
+    executeInstantShift() {
+        this.isShifting = true;
+        window.EventBus.emit('UI_LOG', '⚪ [VOID] ACCELERATED SHIFT: Deconstructing...');
+        
+        // Skip exactly 7 days
+        window.EngineParams.worldDay += 7;
+        
+        this.executeReconfiguration();
+        this.completeShift();
+    }
+
 
         /**
      * Triggers the transition from Forest to White Void.
