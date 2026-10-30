@@ -26,6 +26,10 @@ class SimulationTestSystem {
         const daysPerYear = 365;
         const totalDays = totalYears * daysPerYear;
         
+        // Reset world state for clean test
+        window.EngineParams.worldDay = 0;
+        window.EngineParams.worldEpoch = 0;
+
         // Disable rendering/VFX for speed
         const originalTimeScale = window.EngineParams.timeScale;
         window.EngineParams.timeScale = 0; // Pause visual engine
@@ -188,6 +192,14 @@ class SimulationTestSystem {
         if (wendigo) {
             console.log(`Wendigo Harvests Initiated: ${wendigo.activeHarvests.length + (window.ChronicleManager?.worldLedger.filter(e => e.type === 'WENDIGO_HARVEST').length || 0)}`);
             console.log(`Top Candidate Pressure: ${wendigo.getCandidates()[0]?.[1]?.pressureScore.toFixed(0) || 0}`);
+        }
+        const demog = window.DemographicDirectorate;
+        if (demog) {
+            const m = demog.metrics;
+            const h = demog.getObservatoryMetrics();
+            console.log(`Demographic Stability: ${m.demographicStability.toFixed(2)} (${h.health.populationHealth})`);
+            console.log(`Extinct Houses: ${h.status.extinctHouses} / Houses at Risk: ${h.status.housesAtRisk}`);
+            console.log(`Birth/Death Rate: ${m.birthRate.toFixed(2)} / ${m.deathRate.toFixed(2)} per day`);
         }
         console.groupEnd();
 
