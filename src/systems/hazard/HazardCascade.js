@@ -29,15 +29,27 @@ export class HazardCascade {
         const pBase = environment.baseHazardRisk || 0.05;
 
         const traits = actor.traits;
-        const phi = (1.0 + 0.6 * traits.riskTolerance) * 
-                    (1.0 + 0.4 * traits.ambition) * 
-                    (1.0 - 0.5 * traits.conscientiousness);
+        let phi = (1.0 + 0.6 * traits.riskTolerance) * 
+                  (1.0 + 0.4 * traits.ambition) * 
+                  (1.0 - 0.5 * traits.conscientiousness);
+
+        // Penal Labor Synergy: Effective traits are doubled
+        if (actor.socialRole === 'PenalLaborer') {
+            phi *= 2.0;
+        }
 
         const fatigueFactor = 1.0 + Math.pow(fatigue, 1.5);
         const decayFactor = 1.0 + tileDecay;
         const weatherFactor = 1.0 + weather;
 
-        return pBase * fatigueFactor * decayFactor * weatherFactor * phi;
+        let probability = pBase * fatigueFactor * decayFactor * weatherFactor * phi;
+
+        // Penal Laborer baseline multiplier
+        if (actor.socialRole === 'PenalLaborer') {
+            probability *= PersonhoodConstants.PENAL_LABOR_CASCADE_MULT;
+        }
+
+        return probability;
     }
 
     triggerStage1(actor, environment) {
@@ -90,7 +102,7 @@ export class HazardCascade {
             return;
         }
 
-        this.triggerStage3(actor, environment);
+        thise.triggerStage3(actor, environment);
     }
 
     triggerStage3(actor, environment) {

@@ -1,0 +1,79 @@
+// File: src/systems/hazard/HazardSimulationTest.js
+import { HazardCascade } from './HazardCascade.js';
+import { MortalitySystem } from '../mortality/MortalitySystem.js';
+import { SocialDynamicsSystem } from '../SocialDynamicsSystem.js';
+import { SubversiveReactionPipeline } from '../underground/SubversiveReactionPipeline.js';
+import { PersonhoodConstants } from '../../constants/PersonhoodConstants.js';
+
+export function runHazardSimulation() {
+    console.log("--- Starting Hazard Cascade & Subversive Simulation ---");
+
+    const settlement = new SocialDynamicsSystem();
+    const mortality = new MortalitySystem(settlement);
+    const hazards = new HazardCascade(mortality);
+    const underground = new SubversiveReactionPipeline(settlement);
+    
+    settlement.mortalitySystem = mortality;
+    settlement.hazardCascade = hazards;
+    settlement.underground = underground;
+
+    const testActor = {
+        id: "Actor_001",
+        age: 260,
+        fatigue: 0.9,
+        prestige: 0.1, // Low prestige
+        wealth: 0.05,  // Poor
+        status: 'Active',
+        traits: {
+            riskTolerance: 1.0, 
+            ambition: 1.0,      
+            conscientiousness: 0.0, 
+            constitution: 0.2,
+            sociability: 0.5,
+            cynicism: 0.9,      // Very cynical
+            fear: 0.0,
+            aggression: 0.8,
+            superstition: 0.7,
+            charisma: 0.6,
+            loyalty: 0.1
+        },
+        tags: ['TouchedByTheShade'],
+        isDead: false
+    };
+
+    settlement.actors.push(testActor);
+
+    const environment = {
+        tileDecay: 0.8,
+        weatherSeverity: 0.5,
+        baseHazardRisk: 0.1,
+        catastropheSeverity: 1.0
+    };
+
+    console.log(`Initial State: Age ${testActor.age}, Traits: RT ${testActor.traits.riskTolerance}, CYN ${testActor.traits.cynicism}, AGGR ${testActor.traits.aggression}`);
+    
+    // Simulate Hazard leading to Indigent status
+    console.log("\n--- PHASE 1: Hazard & Survival ---");
+    hazards.processActivity(testActor, environment);
+
+    if (testActor.isDead || testActor.status !== 'Indigent') {
+        console.log("Forcing Indigent status for Subversive Path testing.");
+        testActor.isDead = false;
+        testActor.status = 'Indigent';
+        testActor.socialRole = 'DestituteDependent';
+    }
+
+    // Simulate Underground Paths
+    console.log("\n--- PHASE 2: Subversive Selection ---");
+    console.log(`Actor Status: ${testActor.status}, Role: ${testActor.socialRole}`);
+    
+    // Process multiple ticks to see drift and role selection
+    for(let i=0; i<3; i++) {
+        console.log(`--- Month ${i+1} ---`);
+        underground.processIndigentTick(testActor);
+    }
+
+    console.log("\nFinal State:", JSON.stringify(testActor, null, 2));
+    console.log("Settlement Food Supply:", settlement.foodSupply);
+    console.log("--- Simulation Complete ---");
+}

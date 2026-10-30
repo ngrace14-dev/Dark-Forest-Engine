@@ -1,8 +1,13 @@
 // File: src/systems/SystemRegistry.js
+
 import { HazardCascade } from './hazard/HazardCascade.js';
 import { MortalitySystem } from './mortality/MortalitySystem.js';
 import { EpidemicSystem } from './mortality/EpidemicSystem.js';
 import { SocialDynamicsSystem } from './SocialDynamicsSystem.js';
+
+import { SubversiveReactionPipeline } from './underground/SubversiveReactionPipeline.js';
+
+import { JurisprudenceSystem } from './underground/JurisprudenceSystem.js';
 
 /**
  * SystemRegistry
@@ -14,10 +19,14 @@ export class SystemRegistry {
         this.mortality = new MortalitySystem(this.social);
         this.hazards = new HazardCascade(this.mortality);
         this.epidemic = new EpidemicSystem(this.mortality);
+        this.underground = new SubversiveReactionPipeline(this.social);
+        this.jurisprudence = new JurisprudenceSystem(this.social);
         
         // Link settlement back to systems
         this.social.mortalitySystem = this.mortality;
         this.social.hazardCascade = this.hazards;
+        this.social.underground = this.underground;
+        this.social.jurisprudence = this.jurisprudence;
     }
 
     update(delta) {

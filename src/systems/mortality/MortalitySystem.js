@@ -106,8 +106,13 @@ export class MortalitySystem {
         const ageVuln = TraitSystem.calculateAgeVulnerability(actor.age);
         const malnutrition = actor.isMalnourished ? PersonhoodConstants.MALNUTRITION_PENALTY : 0;
         
+        let multiplier = 1.0;
+        if (actor.penalRecord?.currentSentence?.type === 'Pillory') {
+            multiplier = PersonhoodConstants.PILLORY_DISEASE_VULN_MULT;
+        }
+
         const pDeath = disease.baseVirulence * 
-                       ageVuln * 
+                       (ageVuln * multiplier) * 
                        (1.0 - actor.traits.constitution) * 
                        (1.0 + malnutrition);
 
