@@ -1,6 +1,6 @@
 // File: src/systems/SystemRegistry.js
 
-import { TraitSystem } from './systems/personhood/TraitSystem.js';
+import { TraitSystem } from './personhood/TraitSystem.js';
 import { DemographicDirectorate } from './DemographicDirectorate.js';
 import { HazardCascade } from './hazard/HazardCascade.js';
 import { MortalitySystem } from './mortality/MortalitySystem.js';
@@ -26,6 +26,9 @@ export class SystemRegistry {
         this.jurisprudence = new JurisprudenceSystem(this.social);
         this.administration = new AdminBureau();
         this.demographics = new DemographicDirectorate(this);
+        
+        // --- PHASE 2: GENETIC ANCHORING ---
+        this.traits = TraitSystem;
         
         // Link settlement back to systems
         this.social.mortalitySystem = this.mortality;
