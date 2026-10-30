@@ -45,7 +45,14 @@ export class AdminBureau {
             let nonProductivePenalty = 0;
             if (window.PersonhoodManager) {
                 // If it's a village-linked institution, calculate burden
-                const villageId = id.startsWith('village_') ? parseInt(id.split('_')[1]) : null;
+                // Corrected villageId extraction: id can be `village_${i}`
+                let villageId = null;
+                if (typeof id === 'string' && id.startsWith('village_')) {
+                    villageId = parseInt(id.split('_')[1]);
+                } else if (typeof id === 'number') {
+                    villageId = id;
+                }
+
                 const village = window.VillageManager?.villages.find(v => v.id === villageId);
                 if (village) {
                     let nonProductiveCount = 0;

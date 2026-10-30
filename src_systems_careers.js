@@ -16,6 +16,7 @@ window.CareerManager = {
         farmer: { name: "Farmer", tier: 1, produces: ["Crops", "Livestock"], ranks: ["Peasant", "Tiller", "Husbandman", "Yeoman", "Estate Baron"] },
         scribe: { name: "Scribe", tier: 1, produces: ["Records", "Ink"], ranks: ["Copyist", "Ledger-Keeper", "Clerk", "Senior Scribe", "Master Scribe"] },
         teacher: { name: "Teacher", tier: 1, produces: ["Skill Transfer"], ranks: ["Tutor", "Teacher", "Master Instructor", "Professor", "Dean"] },
+        scholar: { name: "Scholar", tier: 2, produces: ["Maturation Boost"], ranks: ["Student", "Scholar", "Educator", "Senior Scholar", "Sage"] },
         lorekeeper: { name: "Lorekeeper", tier: 1, produces: ["Cultural Memory"], ranks: ["Storyteller", "Lorekeeper", "Songkeeper", "Ritual Keeper", "Story Elder"] },
         registrar: { name: "Registrar", tier: 1, produces: ["Legitimacy"], ranks: ["Clerk", "Registrar", "Census Master", "Royal Registrar", "Keeper of Records"] },
         

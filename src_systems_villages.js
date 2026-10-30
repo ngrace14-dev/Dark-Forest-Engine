@@ -301,10 +301,15 @@ window.VillageManager = {
         profile.role = 'INFANT';
         profile.property.homeVillageId = village.id;
         
-        // 3. Link Lineage & Inheritance
+                // 3. Link Lineage & Inheritance
         profile.ancestry.parents = [data.parentA, data.parentB];
         if (parentA && parentB) {
-                        // House Inheritance
+            // Update Parents' Children Registry (Genetic Drift Traceability)
+            if (!parentA.ancestry.children.includes(childId)) parentA.ancestry.children.push(childId);
+            if (!parentB.ancestry.children.includes(childId)) parentB.ancestry.children.push(childId);
+
+            // House Inheritance
+
             profile.houseId = parentA.houseId;
             
             // Significance Inheritance (Bible §22)
@@ -371,7 +376,20 @@ window.VillageManager = {
         village.population.current++;
         village.residents.push({ id: childId, prefab: 'Commoner', ox: 0, oz: 0 }); 
 
+        // --- CHRONICLE INTEGRATION (PHASE 1) ---
+        if (window.ChronicleManager) {
+            window.ChronicleManager.recordEvent({
+                actorId: childId,
+                type: 'NPC_BORN',
+                detail: `A new generation rises. ${childId} was born to ${data.parentA} and ${data.parentB} in ${village.name}.`,
+                significance: 40,
+                historicalWeight: 10,
+                location: { x: village.x, z: village.z }
+            });
+        }
+
         window.EventBus.emit('UI_LOG', `👶 [VILLAGE] A new life has begun in ${village.name}: ${childId}.`);
+
     },
 
 

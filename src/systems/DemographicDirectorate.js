@@ -43,12 +43,14 @@ export class DemographicDirectorate {
                 if (village) {
                     const scholars = village.residents.filter(r => {
                         const p = window.PersonhoodManager.profiles.get(r.id);
-                        return p && p.role === 'SCHOLAR';
+                        return p && (p.role === 'scholar' || p.role === 'teacher');
                     }).length;
                     
                     if (scholars > 0) {
-                        const educationBonus = scholars * 0.05; // 5% boost per scholar
-                        profile.maturationProgress += (1 / 252) * educationBonus;
+                        // Bonus scales with scholar density relative to population
+                        const scholarRatio = scholars / Math.max(1, village.population.current / 100);
+                        const educationBonus = Math.min(2.0, 1.0 + scholarRatio); // Up to 2x speed
+                        profile.maturationProgress += (1 / 252) * (educationBonus - 1.0);
                     }
                 }
 
@@ -97,24 +99,23 @@ export class DemographicDirectorate {
         profile.property.homeVillageId = villageId;
         profile.statusTags = profile.statusTags || {};
         profile.statusTags.DRIFTER = true;
+        profile.significance = 10; // Drifters start with low global significance
 
         // Career Integration: Assign based on village deficit
-        if (window.CareerSystem) {
-            window.CareerSystem.assignDeficitRole(drifterId, villageId);
+        // Using definitions from src_systems_careers.js
+        if (village.stats.food < village.population.current * 10) {
+            profile.role = 'farmer';
+            profile.skills.farming.level += 10;
+        } else if (village.barrierIntegrity < 70) {
+            profile.role = 'rune_engineer';
         } else {
-            // Manual fallback: if food low, become farmer
-            if (village.stats.food < village.population.current * 10) {
-                profile.role = 'FARMER';
-                profile.skills.farming.level += 10;
-            } else {
-                profile.role = 'LABORER';
-            }
+            profile.role = 'hunter';
         }
 
         village.population.current++;
         village.residents.push({ id: drifterId, prefab: 'Commoner', ox: 0, oz: 0 });
 
-        window.EventBus.emit('UI_LOG', `🚶 [IMMIGRATION] A drifter has arrived at ${village.name} seeking a new life.`);
+        window.EventBus.emit('UI_LOG', `🚶 [IMMIGRATION] A drifter has arrived at ${village.name} seeking a new life as a ${profile.role}.`);
     }
 
     /**
