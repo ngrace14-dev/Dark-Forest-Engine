@@ -123,15 +123,26 @@ class WendigoHarvestSystem {
      */
     checkHarvestThresholds() {
         const isAccelerated = window.EngineParams.isAccelerated;
+        const sov = window.GameState.paleSovereign;
 
         this.harvestCandidates.forEach((candidate, nodeId) => {
-            // System 5: Priority is Significance and Story Density
-            if (candidate.pressureScore > 800 && Math.random() < 0.05) {
-                const harvestId = this.triggerHarvest(nodeId, candidate);
-                
-                // SIMULATION RESOLVER: In accelerated mode, resolve harvest after a delay
-                if (isAccelerated && harvestId) {
-                    this._scheduleSimulationResolution(harvestId);
+            // System 5: THE SOVEREIGN IGNORES WEAK PREY
+            // Bible: Must be strictly stronger than his previously recorded highest meal.
+            const significance = candidate.pressureScore;
+            
+            if (significance > (sov?.highestConsumedSignificance || 800)) {
+                if (Math.random() < 0.05) {
+                    const harvestId = this.triggerHarvest(nodeId, candidate);
+                    
+                    // SIMULATION RESOLVER: In accelerated mode, resolve harvest after a delay
+                    if (isAccelerated && harvestId) {
+                        this._scheduleSimulationResolution(harvestId);
+                    }
+                }
+            } else {
+                // Scorn logic: Sovereign doesn't even notice them.
+                if (significance > 500 && Math.random() < 0.01) {
+                    window.EventBus.emit('UI_LOG_DEBUG', `[SOVEREIGN] The First Wendigo senses ${nodeId} but scorns the weak soul.`);
                 }
             }
         });

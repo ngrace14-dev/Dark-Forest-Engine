@@ -124,7 +124,7 @@ window.GameState = {
         crowsBlessingEarned: false 
     },
 
-                        // --- CULTIVATION & CONSUMPTION: THE MANTLE ---
+                                // --- CULTIVATION & CONSUMPTION: THE MANTLE ---
         huntsmanMantle: {
             currentHuntsmanId: 'huntsman_init',
             lastVictimId: 'none',
@@ -138,27 +138,31 @@ window.GameState = {
             targetSignificanceFloor: 0 
         },
 
-                // --- THE PALE SOVEREIGN: CONSUMPTION LOGIC ---
+        // --- THE PALE SOVEREIGN: CONSUMPTION LOGIC ---
         paleSovereign: {
             significance: 1000, 
             highestConsumedSignificance: 0, 
             totalResidue: 0,
             isHarvestReady: false,
             growthMultiplier: 1.0,
-            harvestHistory: [] 
+            harvestHistory: [],
+            isDead: false,
+            returnDay: -1, 
+            stats: { strength: 100, toughness: 100, speed: 100 }
         },
 
-    // --- THE MESSENGER: ORB COMPANION ---
-    orbMessenger: {
-        boundTargetId: null,
-        state: 'IDLE', // IDLE, WITNESSING, RETURNING_TO_SOVEREIGN
-        dialoguePool: [
-            "The forest remembers your hunger...",
-            "A shift is coming. The trees are restless.",
-            "You are being watched, little spark.",
-            "The Great Lake is deeper than your history."
-        ]
-    },
+        // --- THE ORB: THE WITNESS ---
+        orbMessenger: {
+            boundTargetId: null,
+            state: 'IDLE', // IDLE, WITNESSING, RETURNING_TO_SOVEREIGN
+            dialoguePool: [
+                "The forest remembers your hunger...",
+                "A shift is coming. The trees are restless.",
+                "You are being watched, little spark.",
+                "The Great Lake is deeper than your history."
+            ]
+        },
+
 
 
                 // --- WENDIGO SPECTRUM: EVOLUTION ---
