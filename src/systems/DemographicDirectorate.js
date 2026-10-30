@@ -66,10 +66,15 @@ export class DemographicDirectorate {
         if (!window.VillageManager) return;
 
         window.VillageManager.villages.forEach(village => {
+            if (village.isCollapsed) return;
+
             // High Prestige and Runic Barrier Strength, but low Population
             const prestige = village.stats.prosperity; // Proxy for prestige for now
             const barrier = village.barrierIntegrity;
-            const popRatio = village.population.current / village.population.capacity;
+            
+            const currentPop = village.population.current || 0;
+            const capacity = village.population.capacity || 100;
+            const popRatio = currentPop / capacity;
 
             if (prestige > 70 && barrier > 80 && popRatio < 0.6) {
                 if (Math.random() < 0.15 * this.worldVitality) {
@@ -117,13 +122,52 @@ export class DemographicDirectorate {
      * Higher vitality increases fertility and immigration.
      */
     updateWorldVitality() {
-        // Logic will be expanded as other systems integrate
-        // For now, baseline is stable.
-        this.worldVitality = 1.0; 
+        if (!window.VillageManager || window.VillageManager.villages.length === 0) {
+            this.worldVitality = 1.0;
+            return;
+        }
+
+        // Global Vitality is the average of all villages' prosperity and safety
+        let totalProsperity = 0;
+        let totalSafety = 0;
+        const activeVillages = window.VillageManager.villages.filter(v => !v.isCollapsed);
+        const count = activeVillages.length;
+
+        if (count === 0) {
+            this.worldVitality = 0.5; // Despair if all villages collapsed
+            return;
+        }
+
+        activeVillages.forEach(v => {
+            totalProsperity += v.stats.prosperity || 50;
+            totalSafety += v.barrierIntegrity || 50;
+        });
+
+        const avgProsperity = totalProsperity / count;
+        const avgSafety = totalSafety / count;
+
+        // Vitality ranges from 0.5 to 1.5
+        this.worldVitality = 0.5 + (avgProsperity / 100) * 0.5 + (avgSafety / 100) * 0.5;
     }
 
     processVillageCapacities() {
-        // Reserved for PHASE 3: Immigration logic
+        if (!window.VillageManager) return;
+
+        window.VillageManager.villages.forEach(village => {
+            if (village.isCollapsed) return;
+
+            // Use a stable base capacity
+            // If village.population.baseCapacity doesn't exist, initialize it
+            if (village.population.baseCapacity === undefined) {
+                village.population.baseCapacity = village.population.capacity || 100;
+            }
+
+            const prosperityBonus = Math.floor(village.stats.prosperity / 10);
+            const stabilityBonus = village.barrierIntegrity > 90 ? 10 : 0;
+            
+            // Calculate current capacity from base + bonuses
+            village.population.capacity = village.population.baseCapacity + prosperityBonus + stabilityBonus;
+        });
     }
 
     calculateFertility(profile) {
@@ -219,8 +263,8 @@ export class DemographicDirectorate {
         const village = window.VillageManager.villages.find(v => v.id === villageId);
         if (!village) return false;
 
-        const population = village.population?.length || 0;
-        const capacity = village.stats?.capacity || 50; // Default capacity
+        const population = village.population.current || 0;
+        const capacity = village.population.capacity || 100;
 
         return population < capacity;
     }
