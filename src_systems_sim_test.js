@@ -157,7 +157,7 @@ class SimulationTestSystem {
     generateReport() {
         console.log("%c --- 1000 YEAR SIMULATION REPORT --- ", "background: #1e1e1e; color: #4ade80; font-weight: bold; padding: 10px;");
         
-        // 0. SYSTEMIC ACTIVATION AUDIT (Phase 1 Validation)
+        // 0. SYSTEMIC ACTIVATION AUDIT (Phase 1 & 2 Validation)
         console.group("Category 0: Systemic Activation Audit");
         const poly = window.PoliticalObservatory;
         if (poly) {
@@ -169,6 +169,20 @@ class SimulationTestSystem {
         if (sig) {
             console.log(`Global Significance Supply: ${sig.metrics.globalSignificanceSupply.toLocaleString()} / ${sig.SUPPLY_CAP.toLocaleString()}`);
             console.log(`Narrative Concentration: ${(sig.metrics.narrativeConcentration * 100).toFixed(1)}%`);
+        }
+        const intel = window.IntelManager;
+        if (intel) {
+            const activeCount = intel.registry.size;
+            const archiveCount = intel.archive.size;
+            const totalOwners = Array.from(intel.ownershipRegistry.values()).reduce((sum, s) => sum + s.size, 0);
+            console.log(`Intel Registry Size: ${activeCount} (Active) / ${archiveCount} (Archived)`);
+            console.log(`Knowledge Propagation: ${totalOwners} physical ownership links`);
+            console.log(`Intel Density: ${(totalOwners / (window.GameCore?.activeEntities?.length || 1)).toFixed(2)} facts/NPC`);
+        }
+        const wendigo = window.HarvestEngine;
+        if (wendigo) {
+            console.log(`Wendigo Harvests Initiated: ${wendigo.activeHarvests.length + (window.ChronicleManager?.worldLedger.filter(e => e.type === 'WENDIGO_HARVEST').length || 0)}`);
+            console.log(`Top Candidate Pressure: ${wendigo.getCandidates()[0]?.[1]?.pressureScore.toFixed(0) || 0}`);
         }
         console.groupEnd();
 

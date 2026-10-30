@@ -12,7 +12,7 @@ class WendigoHarvestSystem {
         this.activeHarvests = [];
         
         window.EventBus.on('ENGINE_READY', () => this.init());
-        window.EventBus.on('HEARTBEAT_T1', () => this.evaluatePressures());
+        window.EventBus.on('HEARTBEAT_T1', (data) => this.evaluatePressures(data));
     }
 
     init() {
