@@ -53,11 +53,20 @@ class SimulationTestSystem {
         window.EngineParams.worldDay++;
         const currentDay = window.EngineParams.worldDay;
 
-        // --- PHASE 1-1: HEARTBEAT INJECTION ---
-        // Purpose: Activate dormant civilizational systems by replicating the production clock metabolic tiers.
+        // --- PHASE 1-1 & 1-2: HEARTBEAT INJECTION & SCALING ---
+        // Purpose: Activate dormant civilizational systems and scale high-frequency accumulation logic.
+        
+        // T1 Scaling Factor: 
+        // In production, T1 fires 43,200x per day. 
+        // We provide a scale object so systems can "catch up" high-frequency logic in one tick.
+        const t1Payload = { 
+            worldDay: currentDay, 
+            simScale: 43200, 
+            isAccelerated: true 
+        };
 
-        // T1: High-frequency logic (Aliased to 1/day, scaling handled in Phase 1-2)
-        window.EventBus.emit('HEARTBEAT_T1', { worldDay: currentDay });
+        // T1: High-frequency logic (Harvest, Instability, etc.)
+        window.EventBus.emit('HEARTBEAT_T1', t1Payload);
         
         // T6H: 2x per game day (assuming 12h real = 1d game). Political/Resource logic.
         window.EventBus.emit('HEARTBEAT_T6H', { worldDay: currentDay });

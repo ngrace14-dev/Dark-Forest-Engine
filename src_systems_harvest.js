@@ -24,17 +24,19 @@ class WendigoHarvestSystem {
      * System 2: Orb Recognition
      * System 3: Huntsman Cultivation
      */
-    evaluatePressures() {
+    evaluatePressures(data = {}) {
         if (!window.ChronicleManager || !window.ForceManager) return;
 
         const entities = window.GameCore?.activeEntities || [];
+        const scale = data.simScale || 1.0;
         
         entities.forEach(en => {
             if (en.def.type !== 'npc' && en.id !== 'player') return;
 
             const score = this.calculateHarvestPressure(en.id);
             if (score > 100) {
-                this.updateCandidate(en.id, score);
+                // Apply scaling to cultivation speed in accelerated mode
+                this.updateCandidate(en.id, score, scale);
             }
         });
 
@@ -58,12 +60,12 @@ class WendigoHarvestSystem {
         return significance * modifier;
     }
 
-    updateCandidate(nodeId, score) {
+    updateCandidate(nodeId, score, scale = 1.0) {
         let candidate = this.harvestCandidates.get(nodeId) || { 
             pressureScore: 0, 
             orbAttention: 0, 
             huntsmanCultivation: 0,
-            status: 'CURIOSITY'
+            status: 'NONE'
         };
 
         candidate.pressureScore = score;
@@ -77,7 +79,10 @@ class WendigoHarvestSystem {
 
         // Stage 2: Tracking (Medium Significance / Huntsman identification)
         if (score > 300 && candidate.huntsmanCultivation < 1.0) {
-            candidate.huntsmanCultivation = Math.min(1.0, candidate.huntsmanCultivation + 0.05);
+            // SCALE APPLIED: Increment cultivation by scale factor
+            const inc = 0.05 * scale; 
+            candidate.huntsmanCultivation = Math.min(1.0, candidate.huntsmanCultivation + inc);
+            
             if (candidate.huntsmanCultivation > 0.6 && candidate.status === 'CURIOSITY') {
                 candidate.status = 'TRACKING';
                 window.EventBus.emit('UI_LOG_DEBUG', `[HUNTSMAN] Tracking rising significance in ${nodeId}.`);

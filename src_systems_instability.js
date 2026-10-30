@@ -12,7 +12,7 @@ class InstitutionalInstabilitySystem {
         this.movements = new Map(); // Map<movementId, { id, type, leaderId, strength, doctrine }>
         
         window.EventBus.on('ENGINE_READY', () => this.init());
-        window.EventBus.on('HEARTBEAT_T1', () => this.evaluatePressure());
+                window.EventBus.on('HEARTBEAT_T1', (data) => this.evaluatePressure(data));
     }
 
     init() {
@@ -23,18 +23,25 @@ class InstitutionalInstabilitySystem {
      * Monitors the world for systemic tensions.
      * Answers: Why did this civilization create its own problem?
      */
-    evaluatePressure() {
+    evaluatePressure(data = {}) {
         if (!window.DynastyManager || !window.HistoryOffice) return;
+
+        const scale = data.simScale || 1.0;
 
         window.DynastyManager.houses.forEach(house => {
             // 1. SCHISM CHECK: Truth Divergence vs Conviction
-            const officialRecords = window.HistoryOffice.officialLedger.filter(n => n.bias === house.id);
+            const officialRecords = window.HistoryOffice?.officialLedger?.filter(n => n.bias === house.id) || [];
             const totalDivergence = officialRecords.reduce((sum, r) => sum + (r.divergence || 0), 0);
             const avgDivergence = totalDivergence / (officialRecords.length || 1);
 
-            if (avgDivergence > 0.6 && house.prestige > 50) {
+            // SCALE APPLIED: Instability triggers are more likely to hit during high-velocity simulation
+            // In accelerated mode, we increase the probability or lower the threshold slightly to ensure emergence
+            const thresholdModifier = data.isAccelerated ? 0.8 : 1.0;
+
+            if (avgDivergence > (0.6 * thresholdModifier) && house.prestige > 50) {
                 this.triggerSchism(house);
             }
+
 
             // 2. POLITICAL COVERUP: Low stability leads to truth suppression
             if (house.prestige < 30 && !this.isCrisisActive(house.id, 'COVERUP')) {
