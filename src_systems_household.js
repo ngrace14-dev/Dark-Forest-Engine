@@ -135,18 +135,19 @@ class HouseholdSystem {
         if (!household) return;
 
         // Elder members (Venerable) pass skills to children in the household
-        const elders = household.members.map(id => window.PersonhoodManager.getProfile(id))
-            .filter(p => p.lifeStage === 'VENERABLE');
+        const elders = household.members.map(id => window.PersonhoodManager?.getProfile(id))
+            .filter(p => p && p.lifeStage === 'VENERABLE');
         
-        const children = household.members.map(id => window.PersonhoodManager.getProfile(id))
-            .filter(p => p.lifeStage === 'CHILD' || p.lifeStage === 'ADOLESCENT');
+        const children = household.members.map(id => window.PersonhoodManager?.getProfile(id))
+            .filter(p => p && (p.lifeStage === 'CHILD' || p.lifeStage === 'ADOLESCENT'));
 
         elders.forEach(elder => {
             children.forEach(child => {
                 // Pass a portion of skills (52.5)
-                Object.keys(elder.skills).forEach(skill => {
-                    const gain = elder.skills[skill].level * 0.05;
-                    window.PersonhoodManager.updateSkill(child.id, skill, gain);
+                Object.keys(elder.skills).forEach(skillName => {
+                    const elderSkill = elder.skills[skillName];
+                    const gain = (elderSkill.level || 0) * 0.05;
+                    window.PersonhoodManager?.updateSkill(child.id, skillName, gain);
                 });
             });
         });
