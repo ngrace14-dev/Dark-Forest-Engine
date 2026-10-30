@@ -899,7 +899,7 @@ window.SystemDefinitions = [
         implementation_classification: "Shared Framework Logic"
     },
     {
-        id: 04,
+        id: 4,
         name: "Narrative Gravity",
         tier: "Epistemology",
         framework: "ScalarFlux",
@@ -910,7 +910,7 @@ window.SystemDefinitions = [
         triggers: { SIGNIFICANCE_DENSITY: ">0.3" }
     },
     {
-        id: 05,
+        id: 5,
         name: "Folklore",
         tier: "Epistemology",
         framework: "EpistemicFilter",
@@ -921,7 +921,7 @@ window.SystemDefinitions = [
         triggers: null
     },
     {
-        id: 09,
+        id: 9,
         name: "Social Contagion",
         tier: "Epistemology",
         framework: "ScalarFlux",
