@@ -38,9 +38,31 @@ export class AdminBureau {
         this.institutions.forEach((inst, id) => {
             // 1. COMPLEXITY: Scales with population size, physical span, and time since last reform
             const daysSinceReform = currentDay - (inst.lastReformDay || 0);
+            
+            // --- PHASE 4: THE BURDEN OF YOUTH ---
+            // Non-productive population (Infants/Elderly) increases InstitutionalComplexity 
+            // without increasing Competence.
+            let nonProductivePenalty = 0;
+            if (window.PersonhoodManager) {
+                // If it's a village-linked institution, calculate burden
+                const villageId = id.startsWith('village_') ? parseInt(id.split('_')[1]) : null;
+                const village = window.VillageManager?.villages.find(v => v.id === villageId);
+                if (village) {
+                    let nonProductiveCount = 0;
+                    village.residents.forEach(r => {
+                        const profile = window.PersonhoodManager.profiles.get(r.id);
+                        if (profile && (profile.role === 'INFANT' || profile.lifeStage === 'ELDER')) {
+                            nonProductiveCount++;
+                        }
+                    });
+                    nonProductivePenalty = nonProductiveCount * AdminConstants.COMPLEXITY_SCALARS.POPULATION * 1.5;
+                }
+            }
+
             const complexity = (inst.population * AdminConstants.COMPLEXITY_SCALARS.POPULATION) + 
                                (inst.distanceToHub * AdminConstants.COMPLEXITY_SCALARS.DISTANCE) + 
-                               (daysSinceReform * AdminConstants.COMPLEXITY_SCALARS.TIME);
+                               (daysSinceReform * AdminConstants.COMPLEXITY_SCALARS.TIME) +
+                               nonProductivePenalty;
 
             // 2. COMPETENCE: The combined sum of INT and ADMIN for all assigned governors
             let competence = 0;

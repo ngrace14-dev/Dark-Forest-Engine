@@ -36,95 +36,30 @@ class PersonhoodSystem {
 
         this.wendigoCandidates = []; // Array of { profile, lastPosition }
 
-        window.EventBus.on('ENGINE_READY', () => this.init());
-    }
-
-
-        /**
-     * Intrinsic Inheritance Variance (Gaussian Noise)
-     * Bible §BN: Reproduction is not duplication.
-     */
-        _gaussianRandom(mean = 0, stdev = 1) {
-        let u = 0, v = 0;
-        while(u === 0) u = Math.random(); // Converting [0,1) to (0,1]
-        while(v === 0) v = Math.random();
-        let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-        return z * stdev + mean;
-    }
-
-    /**
-     * Substrate Population Engine: Births, Growth, and Sigmoid Logic.
-     */
-    processDemographics() {
-        if (!window.VillageManager) return;
-        
-        const villages = window.VillageManager.villages;
-        const globalPop = villages.reduce((sum, v) => sum + v.population.current, 0);
-        const softCap = 250000;
-
-        villages.forEach(v => {
-            // 1. BIRTH MODEL: Prosperity-Linked Sigmoid
-            const capacityRatio = globalPop / softCap;
-            const prosperityMult = v.stats.prosperity / 100;
-            const foodSecurity = Math.min(1.0, v.stats.food / Math.max(1, v.population.current * 10));
-            
-            // Base growth rate slows as we hit cap (Sigmoid Brake)
-            const growthRate = 0.02 * (1.0 - capacityRatio) * prosperityMult * foodSecurity;
-            
-            if (growthRate > 0) {
-                const births = Math.floor(v.population.current * growthRate);
-                v.population.current += births;
-                
-                                // Create new personhood profiles for newborns
-                                for (let i = 0; i < Math.min(births, 5); i++) { // Sample new profiles to save memory
-                                    const childId = `npc_${v.id}_gen${v.expansionLevel}_${Date.now()}_${i}`;
-                    
-                                    // --- FIX 1: GAUSSIAN INHERITANCE ---
-                                    const profile = this.getProfile(childId);
-                    
-                                    if (v.residents && v.residents.length > 0) {
-                                        const parent = v.residents[Math.floor(Math.random() * v.residents.length)];
-                                        const parentProfile = this.profiles.get(parent.id);
-                                        if (parentProfile) {
-                                            Object.keys(profile.traits).forEach(k => {
-                                                if (k === 'credibility') return;
-                                                // Trait_child = Parent_avg + N(0, 0.05)
-                                                const noise = this._gaussianRandom(0, 0.05);
-                                                profile.traits[k] = Math.max(0, Math.min(1, parentProfile.traits[k] + noise));
-                                            });
-                                        }
-                                    }
-
-                                    profile.age = 0;
-                                    profile.lifeStage = 'CHILD';
-                                    profile.property.homeVillageId = v.id;
-                                }
-            }
-
-            // 2. MIGRATION MODEL: The Opportunity Gradient
-            // Simple logic: NPCs move toward villages with higher prosperity/safety
-            if (v.population.current > 100 && Math.random() < 0.05) {
-                const attractors = villages.filter(other => other.id !== v.id && other.stats.prosperity > v.stats.prosperity + 20);
-                if (attractors.length > 0) {
-                    const target = attractors[Math.floor(Math.random() * attractors.length)];
-                    const migratoryGroup = Math.floor(v.population.current * 0.02);
-                    v.population.current -= migratoryGroup;
-                    target.population.current += migratoryGroup;
-                    window.EventBus.emit('UI_LOG_DEBUG', `[DEMOGRAPHICS] ${migratoryGroup} souls migrated from ${v.name} to ${target.name}.`);
+                /**
+                 * Intrinsic Inheritance Variance (Gaussian Noise)
+                 * Bible §BN: Reproduction is not duplication.
+                 */
+                _gaussianRandom(mean = 0, stdev = 1) {
+                    let u = 0, v = 0;
+                    while(u === 0) u = Math.random(); // Converting [0,1) to (0,1]
+                    while(v === 0) v = Math.random();
+                    let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+                    return z * stdev + mean;
                 }
-            }
-        });
-    }
 
+                init() {
 
-
-        init() {
         // --- PLAYER INTEGRATION (Node 0) ---
         // Ensure the player has a profile in the Personhood System
         this.getProfile('player_node');
         
-        window.EventBus.emit('UI_LOG', '[Personhood] Cognitive Filters Active');
+                window.EventBus.emit('UI_LOG', '[Personhood] Cognitive Filters Active');
+        
+        // --- PHASE 1: AGING & REPRODUCTION ---
+        window.EventBus.on('HEARTBEAT_T30D', () => this.simulateAging());
     }
+
 
 
         /**

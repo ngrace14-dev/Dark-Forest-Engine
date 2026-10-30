@@ -17,6 +17,8 @@ export const PersonhoodConstants = {
 
     // Age
     MAX_AGE: 311,
+    MIN_BIRTH_AGE: 16,
+    MAX_BIRTH_AGE: 50,
     PRIME_AGE_START: 25,
     TWILIGHT_AGE_START: 250,
 

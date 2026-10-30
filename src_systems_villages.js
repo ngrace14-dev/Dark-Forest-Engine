@@ -268,8 +268,89 @@ window.VillageManager = {
             });
         }
         
-        window.EventBus.emit('UI_LOG', "🌲 The Village Chain has repositioned.");
+                window.EventBus.on('NPC_BORN', (data) => this.handleBirthEvent(data));
+                window.EventBus.on('VILLAGE_COLLAPSED', (data) => {
+                    if (window.ChronicleManager) {
+                        window.ChronicleManager.recordEvent({
+                            actorId: `village_${data.villageId}`,
+                            type: 'VILLAGE_COLLAPSED',
+                            detail: `The settlement has succumbed to entropy and the forest.`,
+                            significance: 100
+                        });
+                    }
+                });
+        
+                window.EventBus.emit('UI_LOG', "🌲 The Village Chain has repositioned.");
+
     },
+
+        handleBirthEvent: function(data) {
+        const village = this.villages.find(v => v.id === data.villageId);
+        if (!village) return;
+
+        const childId = `npc_child_${data.parentA}_${Date.now()}`;
+        
+        // 1. Register in Personhood (handled via getProfile side-effect)
+        const profile = window.PersonhoodManager.getProfile(childId);
+        const parentA = window.PersonhoodManager.profiles.get(data.parentA);
+        const parentB = window.PersonhoodManager.profiles.get(data.parentB);
+
+        // 2. Initialize Child State
+        profile.age = 0;
+        profile.lifeStage = 'CHILD';
+        profile.role = 'INFANT';
+        profile.property.homeVillageId = village.id;
+        
+        // 3. Link Lineage & Inheritance
+        profile.ancestry.parents = [data.parentA, data.parentB];
+        if (parentA && parentB) {
+            // House Inheritance
+            profile.houseId = parentA.houseId;
+            
+            // Significance Inheritance (Bible §22)
+            // Children start with a fraction of parents' significance
+            profile.significance = ( (parentA.significance || 0) + (parentB.significance || 0) ) * 0.1;
+            
+            // --- TRAIT RECOMBINATION (PHASE 2) ---
+            Object.keys(profile.traits).forEach(trait => {
+                if (trait === 'credibility') return;
+                const parentAvg = (parentA.traits[trait] + parentB.traits[trait]) / 2;
+                const mutation = (Math.random() - 0.5) * 0.1; // +/- 5% mutation
+                profile.traits[trait] = Math.max(0, Math.min(1, parentAvg + mutation));
+            });
+            
+            // --- KINSHIP SYNC ---
+            if (window.KinshipManager) {
+                window.KinshipManager.addRelation(data.parentA, childId, 'CHILD', 100);
+                window.KinshipManager.addRelation(data.parentB, childId, 'CHILD', 100);
+                
+                // Household sync
+                const house = window.KinshipManager.getHouseholdOf(data.parentA);
+                if (house) {
+                    if (!house.members.includes(childId)) house.members.push(childId);
+                }
+            }
+            
+            // --- INTEL LEGACY (PHASE 2) ---
+            if (window.IntelManager) {
+                // Family Secrets: Children inherit ownership of some "Family Secrets"
+                const parentAIntel = window.IntelManager.getIntelForNode(data.parentA);
+                parentAIntel.forEach(intel => {
+                    if (intel.payload.tags?.includes('FAMILY_SECRET')) {
+                        window.IntelManager.grantOwnership(intel.intel_id, childId);
+                    }
+                });
+            }
+        }
+        
+        // 4. Update Village Population
+        village.population.current++;
+        village.residents.push({ id: childId, prefab: 'Commoner', ox: 0, oz: 0 }); 
+
+        window.EventBus.emit('UI_LOG', `👶 [VILLAGE] A new life has begun in ${village.name}: ${childId}.`);
+    },
+
+
 
 
     // --- SIMULATION SLICING (Kenshi Style) ---
@@ -1166,11 +1247,17 @@ window.VillageManager = {
             village.stats.prosperity = Math.max(0, village.stats.prosperity - 2);
             village.population.current = Math.max(10, village.population.current - Math.ceil(village.population.current * 0.01));
         } else {
-            village.crises = village.crises.filter(c => c !== 'Famine');
+                        village.crises = village.crises.filter(c => c !== 'Famine');
+        }
+
+        // 3. VILLAGE COLLAPSE CHECK (PHASE 3)
+        if (village.population.current < 50 && village.stats.prosperity < 10 && village.barrierIntegrity < 5) {
+            this.handleVillageCollapse(village);
         }
 
 
         // 2. Resource Monopoly Bonus/Malus
+
         // If a village produces a resource that everyone wants but no one else has
         const industry = village.industry.produces;
         const competitors = this.villages.filter(v => v.id !== village.id && v.industry.produces === industry).length;
@@ -1188,8 +1275,10 @@ window.VillageManager = {
         window.GameState.questBoard.push({ type: 'fetch', issuer: village.id, resource, amount, purpose, reward: Math.max(20, amount * 2) });
         window.EventBus.emit('UI_LOG', `[REQUEST] ${village.name} needs ${amount} ${resource} for ${purpose}.`);
     },
-    canFundVillageAction: function(village, cost, purpose) {
+        canFundVillageAction: function(village, cost, purpose) {
+        if (village.isCollapsed) return false;
         for (const [resource, amount] of Object.entries(cost)) {
+
             if ((village.stats[resource] || 0) < amount) {
                 this.postVillageNeed(village, resource, amount - (village.stats[resource] || 0), purpose);
                 return false;

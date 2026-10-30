@@ -48,7 +48,7 @@ class KinshipSystem {
             if (profile.age >= config.courtship.minAge && profile.age <= config.courtship.maxAge && !this.hasRelation(profile.id, 'SPOUSE')) {
                 this.evaluateCourtship(profile, profiles, relations);
             } else if (this.hasRelation(profile.id, 'SPOUSE') && profile.age <= config.procreation.maxAge) {
-                this.evaluateProcreation(profile, relations);
+                // Defer to DemographicDirectorate for actual conception
             }
 
             // Emotional Decay/Recovery

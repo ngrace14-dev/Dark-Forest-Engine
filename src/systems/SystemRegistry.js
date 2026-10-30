@@ -1,5 +1,6 @@
 // File: src/systems/SystemRegistry.js
 
+import { DemographicDirectorate } from './DemographicDirectorate.js';
 import { HazardCascade } from './hazard/HazardCascade.js';
 import { MortalitySystem } from './mortality/MortalitySystem.js';
 import { EpidemicSystem } from './mortality/EpidemicSystem.js';
@@ -23,6 +24,7 @@ export class SystemRegistry {
         this.underground = new SubversiveReactionPipeline(this.social);
         this.jurisprudence = new JurisprudenceSystem(this.social);
         this.administration = new AdminBureau();
+        this.demographics = new DemographicDirectorate(this);
         
         // Link settlement back to systems
         this.social.mortalitySystem = this.mortality;
