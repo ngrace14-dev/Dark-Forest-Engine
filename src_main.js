@@ -120,6 +120,9 @@ import './src_systems_navigation_v2.js';
 import './src_systems_roads.js';
 import './src_systems_road_renderer.js';     // Procedural Road Decor & Lanterns
 import './src_systems_villages.js';
+import './src_systems_village_demographics.js';
+import './src_systems_village_economy.js';
+import './src_systems_village_institutions.js';
 import './src_systems_adventurers.js';
 import './src_systems_ai.js';
 import './src_systems_assets.js';
