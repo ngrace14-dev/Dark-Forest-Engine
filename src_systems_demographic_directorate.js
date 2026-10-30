@@ -39,7 +39,14 @@ class DemographicDirectorate {
         window.EventBus.on('CULTURAL_SHIFT', (data) => this.recordCulturalImpact(data));
         
         // Tier 2: Periodic Sampling (Shift-based)
-        window.EventBus.on('HEARTBEAT_T6H', () => this.samplePopulation());
+        window.EventBus.on('HEARTBEAT_T6H', (data) => {
+            const scale = data.simScale || 1.0;
+            // Accelerated simulation means we need to simulate births/deaths to keep up with SimScale
+            if (data.isAccelerated && scale > 1.0) {
+                this._simulateAcceleratedEvents(scale);
+            }
+            this.samplePopulation();
+        });
         window.EventBus.on('SHIFT_COMPLETE', () => this.analyzeVitality());
 
         window.EventBus.emit('UI_LOG', '[Directorate] Demographic Evolution Monitoring Online');
@@ -218,6 +225,40 @@ class DemographicDirectorate {
             type: 'CULTURAL_IMPACT',
             detail: data.detail
         });
+    }
+
+    /**
+     * TIER 4: ACCELERATED SIMULATION LOGIC
+     */
+    _simulateAcceleratedEvents(scale) {
+        // In millennium mode, individual entity ticks are too slow.
+        // We simulate "Batch Deaths" and "Batch Births" based on current stability.
+        const baseDeathRate = 0.005; // 0.5% daily mortality
+        const currentStability = this.metrics.demographicStability || 1.0;
+        
+        const population = this.history.population[this.history.population.length - 1]?.total || 100;
+        
+        // Scale probability by simScale (e.g. 10x scale means 10x the death/birth chance per real tick)
+        const deaths = Math.floor(population * baseDeathRate * scale * (1.0 / currentStability));
+        const births = Math.floor(population * baseDeathRate * scale * currentStability);
+
+        if (deaths > 0 && window.VillageManager) {
+            // Apply deaths across random villages
+            for(let i=0; i<deaths; i++) {
+                const v = window.VillageManager.villages[Math.floor(Math.random()*window.VillageManager.villages.length)];
+                if (v && v.population.current > 0) {
+                    v.population.current--;
+                    this.recordDeath({ id: 'sim_death', cause: 'SIMULATED_ATTRITION' });
+                }
+            }
+        }
+
+        if (births > 0 && window.VillageManager) {
+            for(let i=0; i<births; i++) {
+                const v = window.VillageManager.villages[Math.floor(Math.random()*window.VillageManager.villages.length)];
+                if (v) v.population.current++;
+            }
+        }
     }
 }
 

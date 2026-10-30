@@ -29,7 +29,7 @@ class PoliticalObservatorySystem {
         };
 
         window.EventBus.on('ENGINE_READY', () => this.init());
-        window.EventBus.on('HEARTBEAT_T6H', () => this.performAudit());
+        window.EventBus.on('HEARTBEAT_T6H', (data) => this.performAudit(data));
         window.EventBus.on('SHIFT_COMPLETE', () => this.recordLongitudinalData());
         window.EventBus.on('SUCCESSION', (data) => this.recordSuccession(data));
     }
@@ -96,8 +96,9 @@ class PoliticalObservatorySystem {
     /**
      * Performs a political audit of the realm.
      */
-    performAudit() {
+    performAudit(data = {}) {
         if (!window.DynastyManager) return;
+        const scale = data.simScale || 1.0;
 
         const houses = Array.from(window.DynastyManager.houses.values());
         let totalStability = 0;
@@ -124,7 +125,7 @@ class PoliticalObservatorySystem {
             if (house.internalConflictLevel > 0.7) deadlockedCount++;
 
             // Detect Specific Decay Patterns
-            this._detectDecayPatterns(house);
+            this._detectDecayPatterns(house, scale);
             this._detectStateTransitions(house);
         });
 
@@ -141,11 +142,11 @@ class PoliticalObservatorySystem {
         window.EventBus.emit('POLITICAL_AUDIT_COMPLETE', this.globalMetrics);
     }
 
-    _detectDecayPatterns(house) {
+    _detectDecayPatterns(house, scale = 1.0) {
         const obs = house._observatory;
         
-        // 1. Slow Legitimacy Loss
-        if (obs.legitimacyGradient < this.decayThresholds.SLOW_LEGITIMACY_LOSS) {
+        // 1. Slow Legitimacy Loss: Scale the impact of decay in accelerated mode
+        if (obs.legitimacyGradient < (this.decayThresholds.SLOW_LEGITIMACY_LOSS / scale)) {
             this.recordCausalEvent(house.id, 'DECAY_DETECTION', 'SLOW_LEGITIMACY_LOSS', `Legitimacy dropping at ${obs.legitimacyGradient.toFixed(4)}/day`);
         }
 
