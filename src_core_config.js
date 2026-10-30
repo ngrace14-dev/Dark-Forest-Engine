@@ -4,6 +4,7 @@ window.EngineConfig = {
     crowsEyeMode: false,
     showSystemReasoning: false, // DEV ONLY: Exposes internal logic and conclusions (§BQ)
     performance: { lodThresholdSq: 900, maxEntities: 1000 },
+    simulation: { simScale: 1.0, isAccelerated: false },
 
     // --- PHASE 1: CORE INTEGRITY MULTIPLIERS ---
     getCoreMultipliers: function(integrity) {

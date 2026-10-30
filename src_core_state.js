@@ -224,6 +224,11 @@ window.Input = {
 window.EngineParams = {
     playMode: true, brushActive: false, selectedPrefab: 'Village Hub', isPlayerHidden: false,
     bloom: 0.35, vignette: 1.1, filterColor: '#2b4461', filterIntensity: 0.65,
+    simScale: 1.0, isAccelerated: false, worldDay: 0, worldHour: 0, timeOfDay: 0,
+    dayLengthSeconds: 1200, worldSeed: 1337, chunkRadius: 5, cycleLengthDays: 14,
+    godMode: false, offPathCaptureCooldown: 0, suppressChunkLoading: false, arenaMode: false,
+    arenaWave: 0,
+
     timeOfDay: 14.0, worldDay: 0,         dayLengthSeconds: 43200, // 24 in-game hours = 12 real-life hours (12 * 60 * 60)
     offPathCaptureCooldown: 0, chunkRadius: 6,
     mapTileSizeMeters: 8046.72, visitedMapTiles: [], currentMapTile: null, sandReaverEncountered: false,

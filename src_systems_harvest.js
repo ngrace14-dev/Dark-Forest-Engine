@@ -13,6 +13,7 @@ class WendigoHarvestSystem {
         
         window.EventBus.on('ENGINE_READY', () => this.init());
         window.EventBus.on('HEARTBEAT_T1', (data) => this.evaluatePressures(data));
+        window.EventBus.on('HEARTBEAT_T12H', (data) => this.updateSimResolutions());
     }
 
     init() {
@@ -121,7 +122,7 @@ class WendigoHarvestSystem {
      * System 5: Wendigo Targeting
      */
     checkHarvestThresholds() {
-        const isAccelerated = window.SimTest && window.EngineParams.timeScale === 0;
+        const isAccelerated = window.EngineParams.isAccelerated;
 
         this.harvestCandidates.forEach((candidate, nodeId) => {
             // System 5: Priority is Significance and Story Density
