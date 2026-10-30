@@ -1244,7 +1244,7 @@ window.SystemDefinitions = [
         }
     },
     {
-        id: 03,
+        id: 3,
         name: "Information Entropy",
         tier: "Epistemology",
         framework: "EpistemicFilter",
