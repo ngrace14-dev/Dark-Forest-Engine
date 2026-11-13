@@ -1,0 +1,17 @@
+# Project Map & Guardrails
+Before planning or editing any simulation code, read these root source-of-truth files as needed for the task:
+- `rules.md` — hard coding standards, architecture contracts, and constraints
+- `Builder Manifesto` — core engine philosophy and system boundaries
+- `Design bible` — world mechanics, simulation rules, and design invariants
+- `Local Lore Codex` — canonical entities, history, and narrative consistency
+
+## Hard Constraints
+- Treat the 4 files above as read-only reference unless explicitly instructed to update them.
+- Never read, reference, or modify anything inside `archive/` or `src_systems_editor_backup.js`.
+- Follow the existing `src_core_*`, `src_consequence_*`, `src_systems_*`, and `src_workers_*` naming and registry patterns.
+
+## Communication & Execution Protocol
+- **The Nervous Nelly Rule:** Do not execute long, silent loops of tool calls. Pause every few actions to report progress, summarize findings, and state the next planned steps.
+- **Fail Fast:** If a tool call or command fails repeatedly, stop and ask the user for guidance rather than brute-forcing the same approach.
+- **Chunked Execution:** Break large tasks (like codebase refactors or massive log reviews) into smaller, verifiable milestones.
+
