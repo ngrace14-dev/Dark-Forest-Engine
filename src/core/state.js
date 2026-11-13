@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 
+
 const runPotentialTiers = [
     { name: 'Common', chance: 55, bonus: 1, color: '#9ca3af' },
     { name: 'Uncommon', chance: 23, bonus: 2, color: '#4ade80' },

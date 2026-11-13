@@ -514,77 +514,11 @@ class PersonhoodSystem {
         /**
          * Node 2 & 3: Ambition Progress & Satisfaction
          */
-        updateAmbitionProgress(nodeId, delta) {
-            const profile = this.getProfile(nodeId);
-            if (!profile || profile.ambition.lifeGoal === 'NONE') return;
-
-            profile.ambition.goalProgress = Math.min(1.0, profile.ambition.goalProgress + delta);
-
-            // Update satisfaction state
-            if (profile.ambition.goalProgress >= 1.0 && profile.ambition.satisfaction !== 'FULFILLED') {
-                profile.ambition.satisfaction = 'FULFILLED';
-                window.EventBus.emit('UI_LOG', `[AMBITION] ${profile.id} has fulfilled their life goal: ${profile.ambition.lifeGoal}!`);
-                window.ChronicleManager?.recordEvent({
-                    actorId: profile.id,
-                    type: 'AMBITION_FULFILLED',
-                    detail: `${profile.id} achieved their goal of ${profile.ambition.lifeGoal}.`,
-                    significance: 100,
-                    historicalWeight: 50
-                });
-            }
-
-            // DREAM INTEGRATION (Node 6)
-            if (window.DreamManager) {
-                const dreamMod = window.DreamManager.getNPCDriveModifier(nodeId, 'ambition') || 1.0;
-                if (dreamMod > 1.2) {
-                    profile.ambition.goalImportance = Math.min(1.0, profile.ambition.goalImportance + 0.05);
-                    if (profile.ambition.goalImportance > 0.9) profile.ambition.satisfaction = 'OBSESSED';
-                }
-            }
-        }
-
-                /**
-         * Node 1: Aging Logic
-         * Bible §BN: Life stages for targeting and mortality.
-         */
-        getLifeStage(age) {
-            if (age <= 24) return 'YOUTH';
-            if (age <= 65) return 'ADOLESCENT';
-            if (age <= 249) return 'MATURE_ADULT';
-            return 'ELDER';
-        }
-
-                /**
-         * Safe Villager Rule Logic
-         * Bible: NPCs in safe villages cannot exceed 50% skill cap.
-         */
-        updateSkill(nodeId, skillName, amount) {
-            const profile = this.getProfile(nodeId);
-            if (!profile || !profile.skills[skillName]) return;
-
-            const skill = profile.skills[skillName];
-            
-            // Apply Skill Cap (50%) if not an Adventurer
-            const cap = profile.isAdventurer ? 100 : 50;
-            
-            if (skill.level < cap) {
-                skill.xp += amount;
-                if (skill.xp >= (skill.level + 1) * 10) {
-                    skill.level = Math.min(cap, skill.level + 1);
-                    skill.xp = 0;
-                    
-                    if (skill.level === 50 && !profile.isAdventurer) {
-                        window.EventBus.emit('UI_LOG_DEBUG', `[MASTERY] ${nodeId} has reached their safe potential in ${skillName}. Hardship required for further growth.`);
-                    }
-                }
-            }
-        }
-
-                /**
-         * Periodically advances ages of all profiles.
-         * Bible: Time is the ultimate filter. Hard-cap at 311 years.
-         */
-        simulateAging() {
+    updateAmbitionProgress(nodeId, delta) {
+    }
+    updateSkill(nodeId, skillName, amount) {
+    }
+    simulateAging() {
             const currentDay = window.EngineParams?.worldDay || 0;
         
             // ... (Institutional and demographic updates) ...

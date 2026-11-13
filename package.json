@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "coop-server": "node server/coop-server.mjs"
+    "coop-server": "node server/coop-server.mjs",
+    "sim-test": "node tools/headless_sim_test.mjs"
   },
   "dependencies": {
     "alea": "^1.0.1",

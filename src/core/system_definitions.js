@@ -1286,7 +1286,9 @@ window.SystemLoader = {
 
         // For each active system, apply scalar nudges
         this.activeSystems.forEach(sys => {
-            window.ScalarFlux.applySystemNudge(sys.id, sys.vectors);
+            if (sys.vectors && sys.vectors.scalar_to_scalar) {
+                window.ScalarFlux.applySystemNudge(sys.id, sys.vectors);
+            }
         });
 
         // Emit active systems for Profiler and other Frameworks
