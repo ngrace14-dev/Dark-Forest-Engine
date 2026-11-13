@@ -7,18 +7,18 @@ import RAPIER from 'rapier';
 import alea from 'alea';
 
 // Your AAA system imports
-import WetlandsSystem from './src_systems_wetlands.js';
-import MountainSystem from './src_systems_mountains.js';
-import DunesSystem from './src_systems_dunes.js';
-import TidewaterSystem from './src_systems_tidewater.js';
+import WetlandsSystem from './systems/wetlands.js';
+import MountainSystem from './systems/mountains.js';
+import DunesSystem from './systems/dunes.js';
+import TidewaterSystem from './systems/tidewater.js';
 
 
 // Redwood Ecosystem imports
-import RedwoodGenerator from './src_generators_redwood.js';
-import ForestRenderer from './src_systems_forest_renderer.js';
-import ForestImpostorSystem from './src_systems_forest_impostors.js';
-import VolumetricFogSystem from './src_systems_volumetric_fog.js';
-import BlockTerrainSystem from './src_systems_block_terrain.js';
+import RedwoodGenerator from './generators/redwood.js';
+import ForestRenderer from './systems/forest_renderer.js';
+import ForestImpostorSystem from './systems/forest_impostors.js';
+import VolumetricFogSystem from './systems/volumetric_fog.js';
+import BlockTerrainSystem from './systems/block_terrain.js';
 
 window.THREE = THREE;
 window.SkeletonUtils = SkeletonUtils;
