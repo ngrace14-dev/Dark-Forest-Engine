@@ -39,8 +39,9 @@ class FuelEconomyObservatory {
         // Define the supply chain topology (§Model)
         this.topology = {
             producers: ['House Mire', 'House Widow', 'House Blackwood', 'House Cull', 'House Hollow', 'House Bleak'],
+            containment: ['House Gloom'],
             refiners: ['House Shadowfen'],
-            distributors: ['The Royal Family'] // House Aethel
+            distributors: ['House Aethel'] // The Crown (Royal Crucible)
         };
     }
 
@@ -56,20 +57,27 @@ class FuelEconomyObservatory {
         let totalRaw = 0;
         let totalEssence = 0;
 
-        // 1. COLLECT DATA
-        villages.forEach(v => {
+        // 1. COLLECT DATA (Forest & Mountain Ring settlements)
+        const forestSettlements = villages.filter(v => v.region !== 'dunes');
+        forestSettlements.forEach(v => {
             totalConsumption += (v.fuelNeed || 0);
             totalEssence += (v.stats.essence || 0);
-            totalRaw += (v.stats.refinementStock.beast_bones || 0) + 
-                        (v.stats.refinementStock.corrupted_resin || 0) + 
-                        (v.stats.refinementStock.flesh_pods || 0);
+            
+            const stock = v.stats.refinementStock || {};
+            const rawSum = (stock.toxic_fungi || 0) + 
+                           (stock.cold_resin || 0) + 
+                           (stock.weevil_fluid || 0) + 
+                           (stock.cardiac_catalysts || 0) + 
+                           (stock.gator_leather || 0) + 
+                           (stock.pale_caps || 0) + 
+                           (stock.gloom_glass || 0) + 
+                           (stock.beast_bones || 0);
+            totalRaw += rawSum;
 
             // Track individual house contributions
             const house = v.nobleHouse;
             const current = this.houseStockpiles.get(house) || { raw: 0, essence: 0 };
-            current.raw = (v.stats.refinementStock.beast_bones || 0) + 
-                          (v.stats.refinementStock.corrupted_resin || 0) + 
-                          (v.stats.refinementStock.flesh_pods || 0);
+            current.raw = rawSum;
             current.essence = (v.stats.essence || 0);
             this.houseStockpiles.set(house, current);
 

@@ -283,31 +283,132 @@ this.executeSovereignKillAndBind(victorId);
 // 6. PALE SOVEREIGN (FIRST WENDIGO)
 // ==========================================
 executeSovereignKillAndBind: function(targetId) {
-const sov = window.GameState.paleSovereign;
-const mantle = window.GameState.huntsmanMantle || window.GameState.huntsman;
-const target = window.GameCore.activeEntities.find(e => e.id === targetId) || (targetId === 'player' ? window.GameCore.playerObj : null);
-if (!target) return;
-const significance = window.ChronicleManager?.calculateSignificance(targetId) || 0;
+const sov = window.GameState?.paleSovereign;
+if (!sov) return;
+const mantle = window.GameState?.huntsmanMantle || window.GameState?.huntsman || {};
+const target = (window.GameCore?.activeEntities?.find(e => e.id === targetId)) || 
+               (window.AdventurerManager?.records?.find(r => r.id === targetId)) || 
+               (targetId === 'player' ? window.GameCore?.playerObj : null) || 
+               { id: targetId, name: targetId, role: 'Commander', significance: 50 };
+
+const significance = window.ChronicleManager?.calculateSignificance(targetId) || target.significance || 40;
+
 // Progressive Consumption Check
 if (significance > sov.highestConsumedSignificance) {
 sov.significance += (significance * 0.5); // 50% permanent absorption
 sov.highestConsumedSignificance = significance;
-window.EventBus.emit('UI_LOG', `🩸 [SOVEREIGN] The First Wendigo has feasted upon ${target.name || targetId}.`);
+if (window.EventBus) window.EventBus.emit('UI_LOG', `🩸 [SOVEREIGN] The First Wendigo has feasted upon ${target.name || targetId}.`);
 } else {
-window.EventBus.emit('UI_LOG', `🦴 [SOVEREIGN] The First Wendigo scorns the weak offering. No value gained.`);
+if (window.EventBus) window.EventBus.emit('UI_LOG', `🦴 [SOVEREIGN] The First Wendigo scorns the weak offering. No value gained.`);
 }
+
+if (!sov.harvestHistory) sov.harvestHistory = [];
 sov.harvestHistory.push({
 targetId: targetId,
 yield: significance,
 day: window.EngineParams?.worldDay || 0
 });
+
+// --- THE MACABRE COMMUNION (Codex §II) ---
+// Force-feeds frozen fungal flesh to mutate fallen commanders into intelligent Herald Wendigos
+if (!sov.heralds) sov.heralds = [];
+const isCommanderOrLegend = significance >= 20 || target.role === 'commander' || target.tier === 'elite' || target.tier === 'war_master';
+if (isCommanderOrLegend) {
+const herald = {
+id: `herald_${targetId}`,
+formerId: targetId,
+formerName: target.name || targetId,
+formerRole: target.role || 'Commander',
+villageId: target.villageId ?? null,
+mutationDay: window.EngineParams?.worldDay || 0,
+significance: significance,
+tacticalIntellect: 0.95,
+isHerald: true,
+isSentient: true
+};
+sov.heralds.push(herald);
+if (window.EventBus) {
+window.EventBus.emit('HERALD_WENDIGO_MUTATION', herald);
+window.EventBus.emit('UI_LOG', `🥩 [COMMUNION] Korvan force-feeds frozen fungal flesh to ${target.name || targetId}. Mutated into a Herald Wendigo!`);
+}
+}
+
 // Binding: Victim is reborn as the new Huntsman
 mantle.activeHuntsman = targetId;
 mantle.lastVictimId = targetId;
 mantle.targetSignificanceFloor = significance;
+if (window.EventBus) {
 window.EventBus.emit('UI_LOG', `💀 [MANTLE] ${target.name || targetId} has been bound to the Sovereign's service. They are the new Huntsman.`);
 if (targetId === 'player') {
 window.EventBus.emit('PLAYER_WENDIGO_TRANSFORM');
+}
+}
+},
+
+// ==========================================
+// 6B. AUTONOMOUS HEADLESS PREDATOR & CULTIVATION CYCLE (Bible Addendum BX)
+// ==========================================
+tickPredatorCycle: function() {
+const sov = window.GameState?.paleSovereign;
+if (!sov || sov.isDead) return;
+
+// 1. HUNTSMAN CULTIVATION (Addendum BX)
+const candidates = [];
+if (window.AdventurerManager?.records) {
+candidates.push(...window.AdventurerManager.records);
+}
+if (window.GameCore?.activeEntities) {
+candidates.push(...window.GameCore.activeEntities.filter(e => e.def?.type === 'adventurer' || e.role === 'scout' || e.role === 'guardian' || e.role === 'commander' || e.tier === 'elite' || e.tier === 'war_master'));
+}
+
+// A new generation of mortal champions rises across the centuries
+if (candidates.length === 0 && window.GameCore?.activeEntities) {
+const day = window.EngineParams?.worldDay || 0;
+const newChampion = {
+id: `champion_gen_${day}`,
+name: `Champion of Generation ${Math.floor(day / 365)}`,
+role: 'commander',
+tier: 'elite',
+significance: 35,
+power: 60 + Math.floor(Math.random() * 30),
+villageId: (day % 19) + 1
+};
+window.GameCore.activeEntities.push(newChampion);
+candidates.push(newChampion);
+}
+
+if (candidates.length === 0) return;
+
+candidates.sort((a, b) => ((b.power || b.significance || 0) - (a.power || a.significance || 0)));
+const primeCandidate = candidates[0];
+
+if (primeCandidate) {
+primeCandidate.significance = (primeCandidate.significance || 20) + 5;
+if (window.EventBus) {
+window.EventBus.emit('HUNTSMAN_CULTIVATION', { targetId: primeCandidate.id, name: primeCandidate.name, significance: primeCandidate.significance });
+}
+}
+
+// 2. PALE SOVEREIGN HARVEST CLASH (Codex §II)
+if (primeCandidate && primeCandidate.significance >= 35) {
+sov.stalkTargetId = primeCandidate.id;
+if (window.EventBus) {
+window.EventBus.emit('SOVEREIGN_HUNT_BEGINS', { targetId: primeCandidate.id, targetName: primeCandidate.name });
+}
+
+const targetPower = primeCandidate.power || primeCandidate.significance || 35;
+const sovPower = (sov.stats?.strength || 100) * 0.8;
+const victimSubdued = (sovPower >= targetPower) || Math.random() < 0.75;
+
+if (victimSubdued) {
+this.executeSovereignKillAndBind(primeCandidate.id);
+} else {
+if (sov.stats) sov.stats.strength = Math.max(50, sov.stats.strength - 5);
+primeCandidate.significance += 15;
+if (window.EventBus) {
+window.EventBus.emit('UI_LOG', `⚔️ [CLASH] ${primeCandidate.name || primeCandidate.id} repelled the Pale Sovereign's ambush!`);
+}
+}
 }
 },
 handleSovereignDeath: function(killerId) {
@@ -441,6 +542,7 @@ this.recalculateHouses();
 this.recalculateWendigo();
 this.recalculateTree();
 this.recalculateShackle();
+this.tickPredatorCycle();
 },
 recalculateTree: function() {
 const force = this.forces['Tree'];

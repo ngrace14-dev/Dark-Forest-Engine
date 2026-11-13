@@ -12,27 +12,64 @@ class ShiftDirectorSystem {
         this.isShifting = false;
         this.shiftProgress = 0;
         
-        window.EventBus.on('ENGINE_READY', () => this.init());
-        window.EventBus.on('HEARTBEAT_T1', () => this.checkCycle());
+        // --- DUAL TIMELINES (Bible §5, Codex §I) ---
+        // Objective Timeline: 18,000 Years AF (True universe age, preserved by Terminus & Epitaph)
+        // Perceived Timeline: 12,000 Years AF (Common mortal memory, 6,000-year blind spot)
+        this.timelines = {
+            objectiveStartYear: 18000,
+            perceivedStartYear: 12000,
+            objectiveDays: 18000 * 365,
+            perceivedDays: 12000 * 365,
+            missingGapDays: 6000 * 365,
+            cyclesCompleted: 0
+        };
+
+        if (typeof window !== 'undefined' && window.EventBus) {
+            window.EventBus.on('ENGINE_READY', () => this.init());
+            window.EventBus.on('HEARTBEAT_T1', () => this.checkCycle());
+        }
     }
 
     init() {
-        window.EventBus.emit('UI_LOG', '[ShiftDirector] Reality Cycle Monitor Active');
+        if (typeof window !== 'undefined' && window.EventBus) {
+            window.EventBus.emit('UI_LOG', `[ShiftDirector] Reality Cycle Monitor Active. Objective Year: ${this.getObjectiveYear()} AF | Perceived Year: ${this.getPerceivedYear()} AF`);
+        }
     }
 
-        /**
+    getObjectiveYear() {
+        return Math.floor(this.timelines.objectiveDays / 365);
+    }
+
+    getPerceivedYear() {
+        return Math.floor(this.timelines.perceivedDays / 365);
+    }
+
+    getMissingGapYears() {
+        return this.getObjectiveYear() - this.getPerceivedYear();
+    }
+
+    advanceTimelines(objectiveDaysDelta, perceivedDaysDelta) {
+        this.timelines.objectiveDays += objectiveDaysDelta;
+        this.timelines.perceivedDays += perceivedDaysDelta;
+        this.timelines.missingGapDays = this.timelines.objectiveDays - this.timelines.perceivedDays;
+    }
+
+    /**
      * Checks if it's time for the 14-day Shift.
      */
     checkCycle() {
         if (this.isShifting) return;
+
+        // Advance 1 regular day on daily tick
+        this.advanceTimelines(1, 1);
 
         const day = window.EngineParams?.worldDay || 0;
         
         // Cycle Length: 14 Days (Bible §5)
         // We trigger at the end of the 14th day
         if (day > 0 && day % 14 === 0) {
-            // DETECTOR: Accelerated mode requires instant shift, no setInterval
-            if (window.SimTest && window.EngineParams.timeScale === 0) {
+            const isHeadless = typeof window !== 'undefined' && (!window.document || window.isHeadless || window.SimTest || window.EngineParams?.timeScale === 0);
+            if (isHeadless) {
                 this.executeInstantShift();
             } else {
                 this.beginShift();
@@ -46,10 +83,24 @@ class ShiftDirectorSystem {
      */
     executeInstantShift() {
         this.isShifting = true;
-        window.EventBus.emit('UI_LOG', '⚪ [VOID] ACCELERATED SHIFT: Deconstructing...');
+        this.timelines.cyclesCompleted++;
+
+        if (window.EventBus) {
+            window.EventBus.emit('SHIFT_START', { 
+                epoch: window.EngineParams?.worldEpoch || 0,
+                objectiveYear: this.getObjectiveYear(),
+                perceivedYear: this.getPerceivedYear()
+            });
+            window.EventBus.emit('UI_LOG', '⚪ [VOID] ACCELERATED SHIFT: Deconstructing...');
+        }
         
-        // Skip exactly 7 days
-        window.EngineParams.worldDay += 7;
+        // 7-Day Perception Skip in the White Void:
+        // Objective timeline advances by 7 full days
+        // Perceived timeline advances by 0 days (Mortal Perception Skip)
+        this.advanceTimelines(7, 0);
+        if (window.EngineParams) {
+            window.EngineParams.worldDay += 7;
+        }
         
         this.executeReconfiguration();
         this.completeShift();
@@ -147,42 +198,56 @@ class ShiftDirectorSystem {
             window.IntelManager.applyShiftDecay();
         }
 
-        // 2. Civilizational Disruption (Bible §10, §19)
+        // 2. Civilizational Disruption (Bible §10, §19 - Forest Settlements Only)
         if (window.VillageManager) {
             window.VillageManager.villages.forEach(v => {
+                if (v.region === 'dunes') return; // Endless Dunes are immune to Shift disruption!
+
                 // Prosperity drops due to trade link destruction
                 v.stats.prosperity = Math.max(0, v.stats.prosperity - 15);
                 v.tradeDisruptionUntil = (window.EngineParams?.worldDay || 0) + 2;
                 
                 // Disconnected villages risk becoming "Lost"
-                if (v.barrierIntegrity < 20) {
+                if (v.barrierIntegrity < 20 || v.isDisconnected) {
                     v.isLost = true;
-                    window.EventBus.emit('UI_LOG', `💀 [VOID] ${v.name} has disconnected from the Chain and is LOST.`);
+                    if (window.EventBus) {
+                        window.EventBus.emit('UI_LOG', `💀 [VOID] ${v.name} has disconnected from the Chain and is LOST.`);
+                    }
                 }
             });
         }
 
-        // 3. Regenerate Road Network for the new geography
+        // 3. Regenerate Road Network for the chained Forest geography
         if (window.RoadManager && window.VillageManager) {
-            window.RoadManager.generateRoads(window.VillageManager.villages);
+            const chained = window.VillageManager.villages.filter(v => v.region !== 'dunes');
+            window.RoadManager.generateRoads(chained);
         }
 
         // 4. Force full chunk refresh
-        window.EventBus.emit('WORLD_REGENERATE');
+        if (window.EventBus) {
+            window.EventBus.emit('WORLD_REGENERATE');
+        }
 
-                // --- PHASE 1A: CHRONICLE ACTIVATION ---
+        // --- PHASE 1A: CHRONICLE ACTIVATION ---
         window.ChronicleManager?.recordEvent({
             actorId: 'WORLD',
             type: 'SHIFT_COMPLETE',
-            detail: `The World has stabilized. Epoch ${window.EngineParams?.worldEpoch || 0} has begun.`,
+            detail: `The World has stabilized. Epoch ${window.EngineParams?.worldEpoch || 0} has begun. Objective: Year ${this.getObjectiveYear()} AF | Perceived: Year ${this.getPerceivedYear()} AF (Missing Gap: ${this.getMissingGapYears()} years).`,
             significance: 150,
             historicalWeight: 100,
             location: { x: 0, z: 0 },
             witnesses: window.VillageManager ? window.VillageManager.villages.map(v => `village_${v.id}`) : []
         });
 
-        window.EventBus.emit('SHIFT_COMPLETE', { epoch: window.EngineParams?.worldEpoch || 0 });
-        window.EventBus.emit('UI_LOG', `[STABILIZATION] Current Epoch: ${window.EngineParams?.worldEpoch || 0}.`);
+        if (window.EventBus) {
+            window.EventBus.emit('SHIFT_COMPLETE', { 
+                epoch: window.EngineParams?.worldEpoch || 0,
+                objectiveYear: this.getObjectiveYear(),
+                perceivedYear: this.getPerceivedYear(),
+                missingGapYears: this.getMissingGapYears()
+            });
+            window.EventBus.emit('UI_LOG', `[STABILIZATION] Current Epoch: ${window.EngineParams?.worldEpoch || 0}. Objective: ${this.getObjectiveYear()} AF.`);
+        }
     }
 
 }

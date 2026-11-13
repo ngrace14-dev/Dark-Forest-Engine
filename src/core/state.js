@@ -152,14 +152,17 @@ window.GameState = {
             targetSignificanceFloor: 0 
         },
 
-        // --- THE PALE SOVEREIGN: CONSUMPTION LOGIC ---
+        // --- THE PALE SOVEREIGN: CONSUMPTION LOGIC (Codex §II, Korvan the Variable) ---
         paleSovereign: {
+            originGladiator: 'Korvan the Variable',
             significance: 1000, 
             highestConsumedSignificance: 0, 
             totalResidue: 0,
             isHarvestReady: false,
             growthMultiplier: 1.0,
             harvestHistory: [],
+            heralds: [], // Intelligent Herald Wendigos created via Macabre Communion
+            stalkTargetId: null,
             isDead: false,
             returnDay: -1, 
             stats: { strength: 100, toughness: 100, speed: 100 }

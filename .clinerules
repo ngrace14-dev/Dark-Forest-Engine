@@ -1,17 +1,58 @@
-# Project Map & Guardrails
-Before planning or editing any simulation code, read these root source-of-truth files as needed for the task:
-- `rules.md` � hard coding standards, architecture contracts, and constraints
-- `Builder Manifesto` � core engine philosophy and system boundaries
-- `Design bible` � world mechanics, simulation rules, and design invariants
-- `Local Lore Codex` � canonical entities, history, and narrative consistency
+# Dark Forest Engine — Project Map & Guardrails
+## Root Sources of Truth (Strict Read-Only Reference)
+- `rules.md` — Hard coding standards, active runtime path rules, investigation budgets.
+- `Builder Manifesto` — Simulation philosophy, The Anatomy of a Fact, Dangerous Understanding, Career Integrity.
+- `Design bible` — World mechanics, 14-day Shift, Dunes Expansion (Addenda Z–AG, CA-13–16), Inverted Progression.
+- `Local Lore Codex` — Canonical entities, 19 Noble Houses, Runic Fuel Pipeline, 6k Gap, Pale Sovereign.
+- `Dark Forest Folk Anthology` — Canonical folklore poems, 20 vs. 40 settlement cipher.
+- `Isomorphic 4D Fractal Cosmology` — Nested self-similar 4D container, the 6 cosmological pillars, micro-macro scale ladder.
+�
+� 
+� 
+� 
 
-## Hard Constraints
-- Treat the 4 files above as read-only reference unless explicitly instructed to update them.
-- Never read, reference, or modify anything inside `archive/` or `src_systems_editor_backup.js`.
-- Follow the existing `src_core_*`, `src_consequence_*`, `src_systems_*`, and `src_workers_*` naming and registry patterns.
+## Strict Process & Scope Rules
+1. **Strict Topic Isolation Rule (NO MULTI-TOPIC DRIFT):**
+   - NEVER mix different topics in the same implementation phase.
+   - If a phase is about settlements, we touch ONLY settlements and their direct data.
+   - Every topic must be built, verified headlessly, and confirmed with the user before moving sequentially to the next.
+2. **Simulation-First & Headless Capable:**
+   - All core simulation systems must run headlessly in pure Node.js environments without DOM or WebGL canvas dependencies.
+   - Every simulation tick must be deterministic, null-safe, and leak-free across multi-century runs (1,000+ years).
+3. **Player-Facing Systems Frozen (July Push):**
+   - Do NOT touch or refactor player controllers (`PlayerController.js`), camera rigs, player visuals, character UI, or player HUD stacks until the scheduled July milestone.
+4. **Additive Architecture (No Disruptive Refactors):**
+   - Adhere strictly to existing conventions: `src_core_*`, `src_systems_*`, `src_consequence_*`, `src_workers_*`.
+   - Build additively through system registries rather than rewriting existing functioning modules.
+5. **Progress & Reporting Protocol:**
+   - Report back to the user after completing each step before continuing to the next.
+   - If any step or simulation run takes longer than expected, immediately pause and inform the user.
 
-## Communication & Execution Protocol
-- **The Nervous Nelly Rule:** Do not execute long, silent loops of tool calls. Pause every few actions to report progress, summarize findings, and state the next planned steps.
-- **Fail Fast:** If a tool call or command fails repeatedly, stop and ask the user for guidance rather than brute-forcing the same approach.
-- **Chunked Execution:** Break large tasks (like codebase refactors or massive log reviews) into smaller, verifiable milestones.
+## Cosmological & World Invariants
+1. **The Laniakea & Great Attractor Cosmology:**
+   - **The Center ($r = 0$): The Dark Forest (The Great Attractor).** The gravitational and reality singularity. Subject to fortnightly spatial rot (the 14-day Shift) and reconstruction during the 7-day White Void.
+   - **The Mid-Ring ($r \approx 100\text{–}280\text{km}$): The Mountain Ring (The Event Horizon).** 100-mile wide optical mirage where time skips 7 days (the 6,000-year blind spot), guarded by House Terminus and the 300 Guardians at the World's End Gate.
+   - **The Outer Expanse ($r > 280\text{km}$): The Endless Dunes (The Laniakea Web).** A vast, slow-moving ocean of sand where subterranean rivers and sand currents flow inward along dendritic streamlines toward the central Forest Attractor.
+2. **The 40-Settlement World Reality:**
+   - **The First 20:** 1 Royal Capital + 19 Chained Noble House settlements in the Forest/Mountain Ring, bolted to bedrock with 50-ton chains and fueled by weekly Runic Barrier Fuel deliveries.
+   - **The Hidden 20:** 20 Lost Settlements in the Endless Dunes, moored to subterranean aquifers and drifting like galaxy clusters along inward-flowing hydraulic streamlines toward the Mountain Event Horizon.
+3. **Crow's Eye Vision (Ascended State):**
+   - Starts as a local tactical view, upgrading progressively to a full 3D cosmic map (rendered in July) displaying Aethelgard as a living Laniakea supercluster: glowing dendritic river filaments draining toward the Forest Attractor.
+4. **Lore ↔ System Parity:**
+   - No generic videogame commodities (`wood`, `stone`, `gold` abstractions). Systems must use canonical monopolies (Ironbark dust, Siphon-Vine cold resins, Slag-weevil fluids, Pale Cap extracts, Basalt tablets).
+   - Engine Law #5: Apply 70% scalar-to-scalar flux and 30% scalar-to-framework vector pressure on every systemic nudge.
+
+## Investigation & Execution Guardrails
+- **Hard Constraints:** Never reference, read, or edit files in `archive/` or `src_systems_editor_backup.js`.
+- **The Nervous Nelly Rule:** Never run silent tool loops. Pause every few actions to report progress, summarize findings, and state next planned steps.
+- **Fail Fast Protocol:** If a tool call or command fails repeatedly, stop and ask the user for guidance rather than brute-forcing.
+- **Investigation Budget:** 1 Problem → 1 Root Cause → 1 Fix → 1 Validation.
+
+
+
+
+
+
+
+
 

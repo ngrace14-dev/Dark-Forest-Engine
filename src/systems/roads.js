@@ -40,7 +40,8 @@ class RoadManager {
         
         // Bible §6: The Chain of Villages
         // Villages are connected in a specific sequence: Capital (0) -> V1 -> ... -> Terminus (19)
-        const waypoints = villages.map(v => new THREE.Vector3(v.x, 0, v.z));
+        const chainedVillages = villages.filter(v => v.region !== 'dunes');
+        const waypoints = (chainedVillages.length > 0 ? chainedVillages : villages).map(v => new THREE.Vector3(v.x, 0, v.z));
         
                 // Create a C-shape chain anchoring to the Capital and ending at Terminus
         const curve = new THREE.CatmullRomCurve3(waypoints, false); // false = Open chain, not a loop

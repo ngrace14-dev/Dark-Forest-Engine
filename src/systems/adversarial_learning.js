@@ -79,9 +79,20 @@ class AdversarialLearningSystem {
         // Listen for events that drive adversarial learning
         window.EventBus.on('PLAYER_DEATH', (data) => this.processHarvest(data, 'Wendigo'));
         window.EventBus.on('HUNTSMAN_INTERVENTION', () => this.processAdaptation('Huntsman'));
+        window.EventBus.on('HUNTSMAN_CULTIVATION', (data) => this.processCultivation(data));
+        window.EventBus.on('HERALD_WENDIGO_MUTATION', (data) => this.processHeraldCreation(data));
         window.EventBus.on('VILLAGE_RECAPTURED', () => this.processAdaptation('Forest'));
         window.EventBus.on('DISCOVERY_TIER_INCREASED', () => this.processAdaptation('Orb'));
         window.EventBus.on('HARVEST_CYCLE_BEGINS', () => this.processAdaptation('Pale Sovereign'));
+    }
+
+    processHeraldCreation(herald) {
+        this.metrics.predatorInnovationScore = Math.min(1.0, this.metrics.predatorInnovationScore + 0.15);
+        this.processAdaptation('Pale Sovereign');
+    }
+
+    processCultivation(candidate) {
+        this.processAdaptation('Huntsman');
     }
 
     /**

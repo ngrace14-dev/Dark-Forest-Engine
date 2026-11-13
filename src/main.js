@@ -111,6 +111,7 @@ import './systems/forest_impostors.js';   // 3km Distant Canopy Impostor System
 import WetlandsSystem from './src_systems_wetlands.js';
 import MountainSystem from './src_systems_mountains.js';
 import DunesSystem from './src_systems_dunes.js';
+import './systems/dune_drift.js';
 import TidewaterSystem from './src_systems_tidewater.js';
 
 import './systems/input.js';
@@ -164,6 +165,7 @@ import './systems/rogue_civilization_bureau.js';
 import './systems/truth_recovery_observatory.js';
 import './systems/physical_realism_audit_office.js';
 import './systems/information_velocity_observatory.js';
+import './systems/shadow_institutions.js';
 
 
 
