@@ -78,6 +78,7 @@ class FolkloreEngineSystem {
 
 
     injectTombstoneFolklore() {
+                if (typeof localStorage === 'undefined') return;
                 const history = JSON.parse(localStorage.getItem('dark-forest-sim-history') || '[]');
                 if (history.length === 0) return;
 
@@ -239,6 +240,7 @@ class FolkloreEngineSystem {
      * Boilerplate: Retrieves previous run epitaphs from local storage.
      */
     loadCrossRunFolklore() {
+        if (typeof localStorage === 'undefined') return [];
         const stored = localStorage.getItem('dark-forest-persistent-folklore');
         if (stored) {
             try {
@@ -251,6 +253,7 @@ class FolkloreEngineSystem {
     }
 
     saveCrossRunFolklore(poem) {
+        if (typeof localStorage === 'undefined') return;
         const existing = this.loadCrossRunFolklore();
         existing.push(poem);
         // Limit to last 5 deaths to keep flavor text rare and impactful

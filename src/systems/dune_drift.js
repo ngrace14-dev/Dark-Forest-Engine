@@ -34,6 +34,12 @@ class DuneDriftSystem {
         this.auditWaterQuotas();
     }
 
+    _rng() {
+        return (typeof window !== 'undefined' && window.EpochManagerInstance?.prng)
+            ? window.EpochManagerInstance.prng()
+            : Math.random();
+    }
+
     /**
      * Daily Drift & Economic Tick
      */
@@ -53,8 +59,8 @@ class DuneDriftSystem {
         duneSettlements.forEach(v => {
             if (v.isLostInChurn) {
                 // Flotilla has severed moorings: dragged away into deep sand Churn
-                v.x += (Math.random() - 0.5) * 50;
-                v.z += (Math.random() - 0.5) * 50;
+                v.x += (this._rng() - 0.5) * 50;
+                v.z += (this._rng() - 0.5) * 50;
                 v.currentTask = 'Lost in the Sand Churn';
                 return;
             }
@@ -270,12 +276,12 @@ class DuneDriftSystem {
     processRelicDredging(duneSettlements) {
         duneSettlements.forEach(v => {
             if (v.isLostInChurn) return;
-            if (Math.random() < 0.10) {
-                const dredgedRelicCount = 1 + Math.floor(Math.random() * 3);
+            if (this._rng() < 0.10) {
+                const dredgedRelicCount = 1 + Math.floor(this._rng() * 3);
                 v.stats.dredgedRelics = (v.stats.dredgedRelics || 0) + dredgedRelicCount;
                 this.metrics.totalDredgedRelics += dredgedRelicCount;
 
-                if (Math.random() < 0.3) {
+                if (this._rng() < 0.3) {
                     v.stats.preFractureVellum = (v.stats.preFractureVellum || 0) + 1;
                     this.metrics.totalVellumRecovered += 1;
                 }

@@ -1,5 +1,5 @@
-import { ConsequenceEvents } from './src_consequence_types/events.js';
-import { DecayProfile, FactState } from './src_consequence_types/enums.js';
+import { ConsequenceEvents } from '../../src_consequence_types/events.js';
+import { DecayProfile, FactState } from '../../src_consequence_types/enums.js';
 
 /**
  * ModelDriftProcessor: The Entropy Manager

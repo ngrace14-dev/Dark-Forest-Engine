@@ -1,6 +1,6 @@
-import { ConsequenceEvents } from './src_consequence_types/events.js';
-import { Fact } from './src_consequence_types/fact.js';
-import { FactState } from './src_consequence_types/enums.js';
+import { ConsequenceEvents } from '../../src_consequence_types/events.js';
+import { Fact } from '../../src_consequence_types/fact.js';
+import { FactState } from '../../src_consequence_types/enums.js';
 
 /**
  * EpistemologyController: The Sole Authority (Law #1)
@@ -71,8 +71,11 @@ class EpistemologyController {
 
         // Revision Friction Logic
         const friction = this._calculateRevisionFriction(existing, packet, inventory);
+        const rng = (typeof window !== 'undefined' && window.EpochManagerInstance?.prng)
+            ? window.EpochManagerInstance.prng()
+            : Math.random();
         
-        if (Math.random() > friction) {
+        if (rng > friction) {
             this._commitUpdate(inventory, packet);
         } else {
             window.EventBus.emit(ConsequenceEvents.BELIEF_SUPPRESSED, { 

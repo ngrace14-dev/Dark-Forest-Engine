@@ -1,5 +1,5 @@
-import { ConsequenceEvents } from './src_consequence_types/events.js';
-import { FactionIntent } from './src_consequence_types/enums.js';
+import { ConsequenceEvents } from '../../src_consequence_types/events.js';
+import { FactionIntent } from '../../src_consequence_types/enums.js';
 
 /**
  * StrategicProcessor: The Decision Engine

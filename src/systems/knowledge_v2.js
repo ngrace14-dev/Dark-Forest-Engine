@@ -4,6 +4,14 @@
  * Enforces Bible §13, §14, §16 and CA-1 through CA-4.
  */
 
+function _kRng() {
+    return (typeof window !== 'undefined' && window.EpochManagerInstance?.prng)
+        ? window.EpochManagerInstance.prng()
+        : Math.random();
+}
+
+let _packetCounter = 0;
+
 class KnowledgeInventory {
     constructor(factionId) {
         this.factionId = factionId;
@@ -151,7 +159,7 @@ class KnowledgeInventory {
 
     integrate(intelId, data) {
         const existing = this.records.get(intelId);
-        if (existing && Math.random() < this.calculateRevisionFriction(existing, data)) return false;
+        if (existing && _kRng() < this.calculateRevisionFriction(existing, data)) return false;
         this.records.set(intelId, {
             value: data.value,
             confidence: data.confidence || 0.5,
@@ -203,7 +211,7 @@ class SeekerPipeline {
         const fidelityMult = isPhysical ? 1.0 : (lens[truthType] || 0.1);
         const costMult = isPhysical ? 2.0 : (lens.cost || 1.0); 
 
-        if (!isPhysical && Math.random() > fidelityMult + 0.2) return null;
+        if (!isPhysical && _kRng() > fidelityMult + 0.2) return null;
         if (seekerEntity.stats) seekerEntity.stats.stamina = Math.max(0, seekerEntity.stats.stamina - (10 * costMult));
         
         const packet = {
@@ -216,10 +224,11 @@ class SeekerPipeline {
 
     deliver(packet, factionId) {
         const inventory = window.ModelLayer.getInventory(factionId);
-        if (!inventory || (inventory.shockLevel > 80 && Math.random() < 0.5)) return;
+        if (!inventory || (inventory.shockLevel > 80 && _kRng() < 0.5)) return;
 
         // System 9: Artifact Delivery bypasses Revision (Physical Proof)
         if (packet.isArtifact) {
+            inventory.artifacts = inventory.artifacts || new Set();
             inventory.artifacts.add(packet.intelId);
             inventory.integrate(packet.intelId, { ...packet.data, confidence: 1.0 });
             this.activePackets = this.activePackets.filter(p => p !== packet);
@@ -241,7 +250,7 @@ class BeliefRevisionEngine {
         const fearMod = (inventory.records.size > 50) ? 1.5 : 1.0; 
         const finalFriction = (friction + fidelityBonus) * fearMod;
 
-        if (Math.random() > finalFriction) {
+        if (_kRng() > finalFriction) {
             return inventory.integrate(packet.intelId, { ...packet.data, confidence: packet.fidelity });
         }
         return false;
@@ -254,7 +263,7 @@ class ModelDriftProcessor {
             inventory.records.forEach((record, intelId) => {
                 record.age++;
                 record.confidence *= 0.995; 
-                if (record.age % 100 === 0 && Math.random() < 0.1) record.confidence *= 0.8;
+                if (record.age % 100 === 0 && _kRng() < 0.1) record.confidence *= 0.8;
             });
         });
     }

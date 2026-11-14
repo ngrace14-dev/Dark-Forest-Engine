@@ -4,9 +4,11 @@ import { PacketState, PacketType } from './enums.js';
  * KnowledgePacket
  * Immutable unit of information moving through the Seeker Pipeline.
  */
+let _packetIdSeq = 0;
+
 export class KnowledgePacket {
     constructor(intelId, data = {}) {
-        this.packetId = data.packetId || `pkt_${Math.random().toString(36).slice(2, 7)}_${Date.now()}`;
+        this.packetId = data.packetId || `pkt_${++_packetIdSeq}_${window.EngineParams?.worldDay || 0}`;
         
         this.version = data.version || 1;
         this.intelId = intelId;

@@ -1,5 +1,5 @@
-import { ConsequenceEvents } from './src_consequence_types/events.js';
-import { ContractState } from './src_consequence_types/enums.js';
+import { ConsequenceEvents } from '../../src_consequence_types/events.js';
+import { ContractState } from '../../src_consequence_types/enums.js';
 
 /**
  * ContractDispatcher: The Labor Allocator
@@ -20,12 +20,19 @@ class ContractDispatcher {
         // 2. Sort & Filter by Priority
         const openContracts = inventory.contracts
             .filter(c => c.status === ContractState.GENERATED || 
+                         c.status === 'OPEN' ||
                          c.status === ContractState.RECRUITING || 
                          c.status === ContractState.WAITING)
             .sort((a, b) => b.priority - a.priority);
 
         // 3. Process Recruitment for each
         for (const contract of openContracts) {
+            // Framework 3 Integration: Intercept contract & labor parameters
+            if (window.ConsequenceInterceptor) {
+                const intercepted = window.ConsequenceInterceptor.interceptContract(contract);
+                contract.violationChance = intercepted.violationChance;
+                contract.enforcementWeight = intercepted.enforcementWeight;
+            }
             this._recruitForContract(contract, idleNPCs, worldDay);
         }
     }
@@ -55,16 +62,23 @@ class ContractDispatcher {
                     secondary.status = ContractState.ABANDONED;
                     window.EventBus.emit('CONTRACT_ABANDONED', { 
                         factionId: inventory.factionId, 
-                        contractId: secondary.contractId 
+                        contractId: secondary.contractId || secondary.id 
                     });
                 }
-                console.log(`[Dispatcher] Merged ${redundant.length} contracts for ${primary.targetIntelId}.`);
+                if (!window.isHeadless) {
+                    console.log(`[Dispatcher] Merged ${redundant.length} contracts for ${primary.targetIntelId}.`);
+                }
             }
         });
     }
 
     _recruitForContract(contract, idleNPCs, worldDay) {
-        if (contract.status === ContractState.GENERATED) {
+        contract.contractId = contract.contractId || contract.id;
+        contract.teamMembers = contract.teamMembers || [];
+        contract.minimumTeam = contract.minimumTeam || [];
+        contract.idealTeam = contract.idealTeam || contract.minimumTeam;
+
+        if (contract.status === ContractState.GENERATED || contract.status === 'OPEN') {
             this._transitionContract(contract, ContractState.RECRUITING);
         }
 
@@ -108,6 +122,15 @@ class ContractDispatcher {
     }
 
     _assignNPCToContract(npc, contract) {
+        if (window.ConsequenceInterceptor) {
+            const labor = window.ConsequenceInterceptor.interceptLabor({
+                npcId: npc.id,
+                contractId: contract.contractId,
+                successChance: 1.0
+            });
+            contract.costMultiplier = labor.costMultiplier;
+            contract.baseSuccessChance = labor.baseSuccessChance;
+        }
         npc.assignedContractId = contract.contractId;
         contract.teamMembers.push({
             id: npc.id,
@@ -126,7 +149,9 @@ class ContractDispatcher {
 
         contract.status = newState;
         
-        console.log(`[Dispatcher] Contract ${contract.contractId} transitioned: ${oldState} -> ${newState}`);
+        if (!window.isHeadless) {
+            console.log(`[Dispatcher] Contract ${contract.contractId} transitioned: ${oldState} -> ${newState}`);
+        }
         
         // Finalized states trigger cleanup or start
         if (newState === ContractState.ASSIGNED) {

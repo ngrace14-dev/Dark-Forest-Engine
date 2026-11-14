@@ -265,9 +265,11 @@ class AttractorSystem {
             timestamp: Date.now()
         };
 
-        const history = JSON.parse(localStorage.getItem('dark-forest-sim-history') || '[]');
-        history.push(tombstone);
-        localStorage.setItem('dark-forest-sim-history', JSON.stringify(history.slice(-10))); // Keep last 10 ages
+        if (typeof localStorage !== 'undefined') {
+            const history = JSON.parse(localStorage.getItem('dark-forest-sim-history') || '[]');
+            history.push(tombstone);
+            localStorage.setItem('dark-forest-sim-history', JSON.stringify(history.slice(-10))); // Keep last 10 ages
+        }
         
         console.log("%c[ETERNAL RECORD] Simulation sealed. This age will be remembered.", "color: #10b981; font-weight: bold;");
     }

@@ -308,12 +308,20 @@ targetId: targetId,
 yield: significance,
 day: window.EngineParams?.worldDay || 0
 });
+if (sov.harvestHistory.length > 500) {
+sov.harvestHistory.shift();
+}
+
+target.isHarvested = true;
+target.alive = false;
 
 // --- THE MACABRE COMMUNION (Codex §II) ---
 // Force-feeds frozen fungal flesh to mutate fallen commanders into intelligent Herald Wendigos
 if (!sov.heralds) sov.heralds = [];
 const isCommanderOrLegend = significance >= 20 || target.role === 'commander' || target.tier === 'elite' || target.tier === 'war_master';
-if (isCommanderOrLegend) {
+const alreadyHerald = sov.heralds.some(h => h.formerId === targetId);
+if (isCommanderOrLegend && !alreadyHerald) {
+target.isHerald = true;
 const herald = {
 id: `herald_${targetId}`,
 formerId: targetId,
@@ -352,26 +360,33 @@ tickPredatorCycle: function() {
 const sov = window.GameState?.paleSovereign;
 if (!sov || sov.isDead) return;
 
+const rng = (typeof window !== 'undefined' && window.EpochManagerInstance?.prng)
+    ? () => window.EpochManagerInstance.prng()
+    : () => Math.random();
+
 // 1. HUNTSMAN CULTIVATION (Addendum BX)
 const candidates = [];
 if (window.AdventurerManager?.records) {
-candidates.push(...window.AdventurerManager.records);
+candidates.push(...window.AdventurerManager.records.filter(r => r.alive !== false && !r.isHarvested && !r.isHerald));
 }
 if (window.GameCore?.activeEntities) {
-candidates.push(...window.GameCore.activeEntities.filter(e => e.def?.type === 'adventurer' || e.role === 'scout' || e.role === 'guardian' || e.role === 'commander' || e.tier === 'elite' || e.tier === 'war_master'));
+// Prune harvested generational champions to prevent multi-century memory leaks
+window.GameCore.activeEntities = window.GameCore.activeEntities.filter(e => !(e.isGeneratedChampion && e.isHarvested));
+candidates.push(...window.GameCore.activeEntities.filter(e => !e.isHarvested && !e.isHerald && e.alive !== false && (e.def?.type === 'adventurer' || e.role === 'scout' || e.role === 'guardian' || e.role === 'commander' || e.tier === 'elite' || e.tier === 'war_master')));
 }
 
 // A new generation of mortal champions rises across the centuries
-if (candidates.length === 0 && window.GameCore?.activeEntities) {
 const day = window.EngineParams?.worldDay || 0;
+if (candidates.length === 0 && window.GameCore?.activeEntities && (day <= 5 || day % 90 === 0)) {
 const newChampion = {
 id: `champion_gen_${day}`,
 name: `Champion of Generation ${Math.floor(day / 365)}`,
 role: 'commander',
 tier: 'elite',
-significance: 35,
-power: 60 + Math.floor(Math.random() * 30),
-villageId: (day % 19) + 1
+significance: 20,
+power: 60 + Math.floor(rng() * 30),
+villageId: (day % 19) + 1,
+isGeneratedChampion: true
 };
 window.GameCore.activeEntities.push(newChampion);
 candidates.push(newChampion);
@@ -398,7 +413,7 @@ window.EventBus.emit('SOVEREIGN_HUNT_BEGINS', { targetId: primeCandidate.id, tar
 
 const targetPower = primeCandidate.power || primeCandidate.significance || 35;
 const sovPower = (sov.stats?.strength || 100) * 0.8;
-const victimSubdued = (sovPower >= targetPower) || Math.random() < 0.75;
+const victimSubdued = (sovPower >= targetPower) || rng() < 0.75;
 
 if (victimSubdued) {
 this.executeSovereignKillAndBind(primeCandidate.id);

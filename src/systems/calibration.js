@@ -51,16 +51,20 @@ window.CalibrationFramework = {
     init: function() {
         console.log('[CALIBRATION] Simulation Laboratory initialized.');
         // Load from localStorage if available
-        const saved = localStorage.getItem('dark-forest-calibration');
-        if (saved) {
-            try {
-                this.settings = JSON.parse(saved);
-            } catch(e) {}
+        if (typeof localStorage !== 'undefined') {
+            const saved = localStorage.getItem('dark-forest-calibration');
+            if (saved) {
+                try {
+                    this.settings = JSON.parse(saved);
+                } catch(e) {}
+            }
         }
     },
 
     save: function() {
-        localStorage.setItem('dark-forest-calibration', JSON.stringify(this.settings));
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('dark-forest-calibration', JSON.stringify(this.settings));
+        }
     },
 
     reset: function() {

@@ -4,6 +4,12 @@
  * Implements Bible Addenda Z, AA, AB, CA-16.
  */
 
+function _simRng() {
+    return (typeof window !== 'undefined' && window.EpochManagerInstance?.prng)
+        ? window.EpochManagerInstance.prng()
+        : Math.random();
+}
+
 class ObsidianCitadelProtocol {
     constructor() {
         this.director = {
@@ -34,10 +40,10 @@ class ObsidianCitadelProtocol {
         this.director.auditsCompleted++;
         
         // Audit anomaly containment
-        if (Math.random() < 0.25) {
+        if (_simRng() < 0.25) {
             this.vault.containedAnomalies++;
-            const reportId = `12B-${Date.now().toString().slice(-4)}`;
             this.director.incidentReportsFiled++;
+            const reportId = `12B-${String(this.director.incidentReportsFiled).padStart(4, '0')}`;
             this.vault.form12BLedgers.push({
                 reportId,
                 anomalyType: "Non-Euclidean Spatial Fragment",
@@ -99,7 +105,7 @@ class ScribalOrdersDirectorate {
 
     processScribalClashes() {
         // 1. Iron Chantry inquisitors raid Flayed Quill cells
-        if (Math.random() < 0.2) {
+        if (_simRng() < 0.2) {
             this.ironChantry.hereticsCaptured++;
             this.flayedQuill.activeFleshScribes = Math.max(1, this.flayedQuill.activeFleshScribes - 1);
             if (typeof window !== 'undefined' && window.EventBus) {
@@ -108,7 +114,7 @@ class ScribalOrdersDirectorate {
         }
 
         // 2. Dust-Wardens scrub a forbidden monument with vinegar-ash
-        if (Math.random() < 0.25) {
+        if (_simRng() < 0.25) {
             this.dustWardens.scrubbedMonuments++;
             if (typeof window !== 'undefined' && window.EventBus) {
                 window.EventBus.emit('MONUMENT_SCRUBBED', { order: "Dust-Wardens", count: this.dustWardens.scrubbedMonuments });
@@ -126,7 +132,7 @@ class EcologyOfNuisanceSystem {
 
     processNuisanceTick(forestSettlements) {
         // 1. Echo-Walkers sell fake shift-maps
-        if (Math.random() < 0.3) {
+        if (_simRng() < 0.3) {
             this.echoWalkers.fakeMapsSold += 3;
             if (typeof window !== 'undefined' && window.EventBus) {
                 window.EventBus.emit('NUISANCE_RUMOR_DISTORTION', { type: "Echo-Walker Distortion", mapsSold: this.echoWalkers.fakeMapsSold });
@@ -135,15 +141,15 @@ class EcologyOfNuisanceSystem {
 
         // 2. Fuel-Leeches micro-siphon fuel from vulnerable villages
         const vulnerable = forestSettlements.filter(v => (v.stats.essence || 0) > 5 && !v.capital);
-        if (vulnerable.length > 0 && Math.random() < 0.25) {
-            const target = vulnerable[Math.floor(Math.random() * vulnerable.length)];
+        if (vulnerable.length > 0 && _simRng() < 0.25) {
+            const target = vulnerable[Math.floor(_simRng() * vulnerable.length)];
             const siphoned = 2;
             target.stats.essence = Math.max(0, target.stats.essence - siphoned);
             this.fuelLeeches.fuelStolenTotal += siphoned;
         }
 
         // 3. Runic-Scabs loot ruins
-        if (Math.random() < 0.3) {
+        if (_simRng() < 0.3) {
             this.runicScabs.lootedRelicsTotal += 2;
         }
     }

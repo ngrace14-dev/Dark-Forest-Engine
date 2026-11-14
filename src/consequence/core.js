@@ -1,8 +1,8 @@
-import { ConsequenceEvents } from './src_consequence_types/events.js';
-import { DriftProcessor } from './src_consequence_drift.js';
-import { ObservationLayer } from './src_consequence_observation.js';
-import { Strategist } from './src_consequence_strategy.js';
-import { Dispatcher } from './src_consequence_dispatch.js';
+import { ConsequenceEvents } from '../../src_consequence_types/events.js';
+import { DriftProcessor } from './drift.js';
+import { ObservationLayer } from './observation.js';
+import { Strategist } from './strategy.js';
+import { Dispatcher } from './dispatch.js';
 
 /**
  * ConsequenceEngine: The Orchestrator
@@ -44,8 +44,45 @@ class ConsequenceEngine {
                     value: latentTruth.value,
                     type: latentTruth.type,
                     fidelity: data.fidelity,
-                    timestamp: Date.now()
+                    sourceId: data.seekerId,
+                    version: (latentTruth.version || 1),
+                    timestamp: window.EngineParams?.worldDay || 0
                 }
+            });
+        });
+
+        // Headless / Abstract Expedition Completion Bridge
+        window.EventBus.on(ConsequenceEvents.EXPEDITION_DEPART, ({ contract }) => {
+            if (!contract || !window.ModelLayer) return;
+            const targetId = contract.targetIntelId;
+            const seekerId = contract.teamMembers?.[0]?.id || 'seeker_agent';
+
+            if (!window.ModelLayer.latentRegistry.has(targetId)) {
+                window.ModelLayer.updateLatent(targetId, {
+                    type: contract.type || 'historical',
+                    value: { type: contract.type || 'historical', x: 0, z: 0, amount: 80 },
+                    magnitude: 85,
+                    version: (window.EngineParams?.worldDay || 1)
+                });
+            }
+
+            window.EventBus.emit(ConsequenceEvents.TRUTH_EXTRACTED, {
+                seekerId,
+                intelId: targetId,
+                fidelity: 0.85
+            });
+
+            contract.status = 'DELIVERED';
+            if (window.GameCore?.activeEntities) {
+                contract.teamMembers?.forEach(m => {
+                    const npc = window.GameCore.activeEntities.find(e => e.id === m.id);
+                    if (npc) npc.assignedContractId = null;
+                });
+            }
+
+            window.EventBus.emit('WORLD_STATE_CHANGE', {
+                name: `Expedition resolved ${targetId}`,
+                baseSignificance: 0.65
             });
         });
     }
@@ -63,9 +100,13 @@ class ConsequenceEngine {
         this.isProcessing = true;
 
         try {
+            if (!window.ModelLayer) return;
             const inventories = Array.from(window.ModelLayer.inventories.values());
-            const activeEntities = window.GameCore.activeEntities;
-            const ticks = window.Heartbeat.ticks;
+            const activeEntities = window.GameCore?.activeEntities || [];
+            const ticks = window.Heartbeat?.ticks || { t12h: true, t30s: true, t30m: true, t2h: true };
+            const simTime = (typeof performance !== 'undefined' && !window.isHeadless)
+                ? performance.now()
+                : ((worldDay || window.EngineParams?.worldDay || 0) * 86400000);
 
             // 1. DECAY: Erosion (Daily Gated - Tier 6)
             if (ticks.t12h) {
@@ -74,7 +115,7 @@ class ConsequenceEngine {
 
             // 2. OBSERVATION: Perception (Tier 1: 30s)
             if (ticks.t30s) {
-                ObservationLayer.processObservation(activeEntities, window.ModelLayer.latentRegistry, performance.now());
+                ObservationLayer.processObservation(activeEntities, window.ModelLayer.latentRegistry, simTime);
             }
 
             // 3 & 4. STRATEGY & DEMAND (Tier 3: 30m)
@@ -87,11 +128,11 @@ class ConsequenceEngine {
 
             // 5. DISPATCH: Labor Allocation (Tier 4: 2h)
             if (ticks.t2h) {
-                const baseIdleNPCs = activeEntities.filter(en => en.def.type === 'npc' && !en.assignedContractId);
+                const baseIdleNPCs = activeEntities.filter(en => (en.def?.type === 'npc' || en.role) && !en.assignedContractId && !en.isHarvested && en.alive !== false);
                 
                 inventories.forEach(inv => {
                     const factionIdleNPCs = baseIdleNPCs.filter(npc => 
-                        npc.villageId === inv.factionId || npc.houseId === inv.factionId
+                        npc.villageId === inv.factionId || npc.houseId === inv.factionId || inv.factionId === 'House Aethel'
                     );
                     
                     Dispatcher.processDispatcher(inv, factionIdleNPCs, worldDay);

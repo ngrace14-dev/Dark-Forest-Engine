@@ -6,10 +6,26 @@
  */
 
 window.ChronicleEngine = {
+    historyCount: 0,
+    folkloreCount: 0,
+    activeModifiers: {},
+
     init: function() {
         console.log("%c🟢 Framework 4: Chronicle Engine Initialized", "color: #10b981; font-weight: bold;");
         
         window.EventBus.on('WORLD_STATE_CHANGE', (event) => this.processEvent(event));
+        window.EventBus.on('ACTIVE_SYSTEMS_UPDATED', (systems) => this.updateModifiers(systems));
+    },
+
+    updateModifiers: function(systems) {
+        this.activeModifiers = {};
+        systems.forEach(sys => {
+            if (sys.vectors && sys.vectors.scalar_to_framework) {
+                for (const [mod, val] of Object.entries(sys.vectors.scalar_to_framework)) {
+                    this.activeModifiers[mod] = (this.activeModifiers[mod] || 0) + val;
+                }
+            }
+        });
     },
 
     /**
@@ -30,10 +46,13 @@ window.ChronicleEngine = {
     },
 
     archiveAsHistory: function(event, weight) {
-        console.log(`%c[CHRONICLE] Archiving as History: ${event.name} (Weight: ${weight.toFixed(2)})`, "color: #fbbf24;");
+        this.historyCount++;
+        if (!window.isHeadless) {
+            console.log(`%c[CHRONICLE] Archiving as History: ${event.name} (Weight: ${weight.toFixed(2)})`, "color: #fbbf24;");
+        }
         
         const historyPacket = {
-            id: `hist_${Date.now()}`,
+            id: `hist_${window.EngineParams?.worldDay || 0}_${this.historyCount}`,
             name: event.name,
             weight: weight,
             scalars_at_time: { ...window.CivilizationState.scalars },
@@ -44,10 +63,13 @@ window.ChronicleEngine = {
     },
 
     archiveAsFolklore: function(event, weight) {
-        console.log(`%c[CHRONICLE] Archiving as Folklore: ${event.name} (Weight: ${weight.toFixed(2)})`, "color: #60a5fa;");
+        this.folkloreCount++;
+        if (!window.isHeadless) {
+            console.log(`%c[CHRONICLE] Archiving as Folklore: ${event.name} (Weight: ${weight.toFixed(2)})`, "color: #60a5fa;");
+        }
         
         const lorePacket = {
-            id: `lore_${Date.now()}`,
+            id: `lore_${window.EngineParams?.worldDay || 0}_${this.folkloreCount}`,
             name: event.name,
             weight: weight,
             type: "Folklore"
