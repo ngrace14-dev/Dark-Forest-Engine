@@ -66,7 +66,7 @@ window.VillageEconomy = {
         if (village.stats.refinementStock) {
             const materialYield = Math.floor(village.population.current / 5000);
             if (materialYield > 0) {
-                const materialType = village.industry.produces === 'wood' ? 'corrupted_resin' : 'beast_bones';
+                const materialType = village.industry.produces === 'wood' ? 'siphon_vine_resin' : 'slag_weevil_fluid';
                 village.stats.refinementStock[materialType] += materialYield;
             }
         }

@@ -70,75 +70,7 @@ class KnowledgeInventory {
         }
     }
 
-    generateContracts() {
-        const deficits = this.getKnowledgeDeficits();
-        deficits.slice(0, 3).forEach(deficit => {
-            if (!this.contracts.find(c => c.targetIntelId === deficit.id && c.status !== 'FAILED')) {
-                this.generateExpeditionPacket(deficit.id);
-            }
-        });
-        if (this.stabilityScore >= this.curiosityThreshold) this.generateCuriosityContracts();
-    }
-
-    generateExpeditionPacket(deficitId) {
-        const deficit = this.records.get(deficitId);
-        if (!deficit) return null;
-        const type = deficit.value?.type || 'historical';
-        const isTerminus = this.factionId === 'House Terminus';
-        
-        // System 9: Check if this deficit requires a physical artifact
-        const requiresArtifact = deficitId.startsWith('artifact_');
-        
-        const packet = {
-            id: `packet_${Math.random().toString(36).substr(2, 5)}`,
-            origin: this.factionId,
-            goal: requiresArtifact ? `Retrieve ${deficitId}` : `Resolve deficit in ${deficitId}`,
-            targetIntelId: deficitId,
-            isRetrieval: requiresArtifact,
-            requiredLenses: isTerminus ? ['terminus_scout'] : this.determineRequiredLenses(type),
-            minimumTeam: isTerminus ? ['terminus_scout'] : [this.determineRequiredLenses(type)[0]],
-            idealTeam: isTerminus ? ['terminus_scout', 'surveyor', 'recorder'] : [...this.determineRequiredLenses(type), 'adventurer', 'recorder'],
-            expirationCondition: 'NEXT_SHIFT',
-            owner: this.factionId,
-            status: 'OPEN',
-            teamMembers: [],
-            priority: requiresArtifact ? 80 : 50
-        };
-        this.contracts.push(packet);
-        return packet;
-    }
-
-    generateCuriosityContracts() {
-        const curiosityTargets = [
-            { id: 'truth_mountain_rotation', type: 'temporal', priority: 50 },
-            { id: 'truth_fracture_origin', type: 'origin', priority: 60 },
-            { id: 'truth_champion_identity', type: 'origin', priority: 70 },
-            { id: 'truth_void_mechanics', type: 'cosmological', priority: 80 }
-        ];
-        curiosityTargets.forEach(target => {
-            if (this.contracts.find(c => c.targetIntelId === target.id)) return;
-            if (this.consecutiveStableShifts >= Math.floor(target.priority / 10)) {
-                const packet = {
-                    id: `curiosity_${Math.random().toString(36).substr(2, 5)}`,
-                    origin: this.factionId,
-                    goal: `Determine ${target.id.replace('truth_', '')}`,
-                    targetIntelId: target.id,
-                    type: target.type,
-                    requiredLenses: this.determineRequiredLenses(target.type),
-                    minimumTeam: this.determineRequiredLenses(target.type),
-                    idealTeam: [...this.determineRequiredLenses(target.type), 'recorder', 'scholar'],
-                    expirationCondition: 'STABILITY_LOSS', 
-                    owner: this.factionId,
-                    status: 'OPEN',
-                    priority: target.priority,
-                    isCuriosity: true
-                };
-                this.contracts.push(packet);
-            }
-        });
-    }
-
-    determineRequiredLenses(type) {
+        determineRequiredLenses(type) {
         const mapping = {
             'hostile': ['adventurer'], 'spatial': ['surveyor', 'explorer'],
             'runic': ['scholar'], 'historical': ['historian'],
@@ -295,4 +227,18 @@ class ModelLayerSystem {
 }
 
 window.ModelLayer = new ModelLayerSystem();
-export default window.ModelLayer;
+export default window.ModelLayer;    generateContracts() {
+        // Prune completed or abandoned contracts to keep memory bounded across centuries
+        if (this.contracts.length > 25) {
+            this.contracts = this.contracts.filter(c => c.status !== 'DELIVERED' && c.status !== 'ABANDONED' && c.status !== 'FAILED');
+        }
+        const deficits = this.getKnowledgeDeficits();
+        deficits.slice(0, 3).forEach(deficit => {
+            if (!this.contracts.find(c => c.targetIntelId === deficit.id && c.status !== 'FAILED' && c.status !== 'DELIVERED' && c.status !== 'ABANDONED')) {
+                this.generateExpeditionPacket(deficit.id);
+            }
+        });
+        if (this.stabilityScore >= this.curiosityThreshold) this.generateCuriosityContracts();
+    }
+
+

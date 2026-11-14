@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dark Forest Engine | Crow's Eye</title>
+    <style>body { background: #040608; color: #94a3b8; font-family: monospace; margin: 0; }</style>
+</head>
+<body>
+    <div id="crows-eye-status"></div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+        }
+    }
+    </script>
+    <script type="module" src="src/main.js"></script>
+    <script>
+        // Soft launch: Boot headless mode
+        window.isHeadless = true;
+        window.EngineConfig = { crowsEyeMode: true };
+    </script>
+</body>
+</html>

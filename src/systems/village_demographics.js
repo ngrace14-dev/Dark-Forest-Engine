@@ -54,6 +54,9 @@ window.VillageDemographics = {
     processMortality: function(village) {
         const consumptionBase = Math.ceil(village.population.current / 24);
         const foodReserves = village.stats.food || 0;
+        const rng = (typeof window !== 'undefined' && window.EpochManagerInstance?.prng)
+            ? () => window.EpochManagerInstance.prng()
+            : () => Math.random();
         
         // Starvation Logic
         if (foodReserves < village.population.current * 2) {
@@ -69,7 +72,7 @@ window.VillageDemographics = {
                 remaining: village.population.current 
             });
 
-            if (Math.random() < 0.1) {
+            if (rng() < 0.1) {
                 window.EventBus.emit('UI_LOG', `💀 [STARVATION] ${village.name} is losing citizens to hunger. Deaths: ${deaths}.`);
             }
         }

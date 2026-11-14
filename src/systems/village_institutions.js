@@ -112,12 +112,12 @@ window.VillageInstitutions = {
 
     processCrownGovernance: function(capital) {
         const stock = capital.stats.refinementStock;
-        const totalMaterials = (stock.beast_bones || 0) + (stock.corrupted_resin || 0) + (stock.flesh_pods || 0);
+        const totalMaterials = (stock.slag_weevil_fluid || 0) + (stock.siphon_vine_resin || 0) + (stock.flesh_pods || 0);
         
         if (totalMaterials >= 10) {
             let processed = 0;
-            if (stock.beast_bones >= 10) { stock.beast_bones -= 10; processed = 1; }
-            else if (stock.corrupted_resin >= 10) { stock.corrupted_resin -= 10; processed = 1; }
+            if (stock.slag_weevil_fluid >= 10) { stock.slag_weevil_fluid -= 10; processed = 1; }
+            else if (stock.siphon_vine_resin >= 10) { stock.siphon_vine_resin -= 10; processed = 1; }
             
             if (processed > 0) capital.stats.essence += processed;
         }
@@ -162,7 +162,7 @@ window.VillageInstitutions = {
         window.GameState.questBoard.push({
             type: 'hunt',
             issuer: 'CAPITAL',
-            resource: 'beast_bones',
+            resource: 'slag_weevil_fluid',
             amount: 20,
             purpose: 'fueling civilization',
             reward: 100 + urgencyBonus
@@ -192,16 +192,25 @@ window.VillageInstitutions = {
 
     generateObjective: function(village, type, target) {
         village.activeObjectives ??= [];
-        village.activeObjectives.push({ id: `obj-${village.id}-${Date.now()}`, type, target, progress: 0, status: 'ACTIVE' });
+        const cid = (typeof window !== 'undefined' && window.EngineParams) 
+            ? `obj-${village.id}-${window.EngineParams.worldDay}-${Date.now()}`
+            : `obj-${village.id}-${Math.random()}`;
+        village.activeObjectives.push({ id: cid, type, target, progress: 0, status: 'ACTIVE' });
     },
 
     manifestVillageStates: function(village) {
-        if (village.culture?.dominantTrait !== 'NEUTRAL' && Math.random() < 0.05) {
-            window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
-                text: `[${village.culture.dominantTrait}]`, 
-                pos: { x: village.x, y: 12, z: village.z }, 
-                color: '#fbbf24' 
-            });
+        const rng = (typeof window !== 'undefined' && window.EpochManagerInstance?.prng)
+            ? () => window.EpochManagerInstance.prng()
+            : () => Math.random();
+
+        if (village.culture?.dominantTrait !== 'NEUTRAL' && rng() < 0.05) {
+            if (!window.isHeadless) {
+                window.EventBus.emit('SPAWN_FLOATING_TEXT', { 
+                    text: `[${village.culture.dominantTrait}]`, 
+                    pos: { x: village.x, y: 12, z: village.z }, 
+                    color: '#fbbf24' 
+                });
+            }
         }
     }
 };

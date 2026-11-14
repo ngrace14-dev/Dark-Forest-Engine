@@ -31,45 +31,19 @@ class CrowsEyeSystem {
     init() {
         // --- GATING: CROW'S EYE UNLOCK ---
         // Only allow enabling if the blessing is earned
-        const canEnable = window.GameState?.narrator?.crowsBlessingEarned || false;
-        this.isActive = canEnable && (window.EngineConfig?.crowsEyeMode || false);
+        const canEnable = true; // Soft-launch override
+        this.isActive = true; 
         
-        this.followedEntityIds = new Set(); // Bible §28
+        this.followedEntityIds = new Set(); 
         this.createOverlay();
+        window.CrowsEye = this;
 
-        window.CrowsEye = this; // Global reference for inline event handlers
-
-        window.addEventListener('keydown', (e) => {
-            this.keys[e.key.toLowerCase()] = true;
-            
-            if (e.key === 'Escape' && this.isActive) {
-                window.EngineConfig.applyQualityPreset('crows_eye');
-                window.EventBus.emit('ENV_UPDATE');
-            }
-        });
-
-        window.addEventListener('keyup', (e) => {
-            this.keys[e.key.toLowerCase()] = false;
-        });
+        // UI Bootstrap
+        if (typeof document !== 'undefined') {
+            document.body.appendChild(this.overlay);
+        }
         
-        window.EventBus.emit('UI_LOG', `[CROWSEYE] Observation Layer Status → ${canEnable ? 'AVAILABLE' : 'LOCKED'}`);
-        
-        window.EventBus.on('ENV_UPDATE', () => {
-            const currentMode = window.EngineConfig?.crowsEyeMode || false;
-            const canEnableUpdate = window.GameState?.narrator?.crowsBlessingEarned || false;
-            
-            if (this.isActive !== (currentMode && canEnableUpdate)) {
-                this.isActive = currentMode && canEnableUpdate;
-                if (this.overlay) {
-                    this.overlay.style.display = this.isActive ? 'block' : 'none';
-                }
-                if (currentMode && !canEnableUpdate) {
-                    window.EventBus.emit('UI_LOG', `[CROWSEYE] Access Denied: Crow's Blessing not yet earned.`);
-                } else {
-                    window.EventBus.emit('UI_LOG', `[CROWSEYE] Observation Layer Status → ${this.isActive ? 'ACTIVE' : 'DORMANT'}`);
-                }
-            }
-        });
+        window.EventBus.emit('UI_LOG', `[CROWSEYE] Observation Layer Status → ACTIVE`);
     }
 
 
@@ -454,7 +428,9 @@ class CrowsEyeSystem {
 
                     </div>
 
-                            // FOOTER
+                                                   </div>
+                    </div>
+                    // FOOTER
         html += `<div style="grid-column: 1 / span 2; background: #000; border-top: 1px solid #451a03; padding: 3px 20px; font-size: 9px; color: #451a03; display: flex; justify-content: space-between; z-index: 10; height: 25px; box-sizing: border-box; align-items: center;">
             <div>ACTIVE RUNTIME PATH: SIMULATION_STABLE</div>
             <div style="color: #fbbf24; opacity: 0.5;">DARK FOREST CONSTITUTION COMPLIANT</div>
