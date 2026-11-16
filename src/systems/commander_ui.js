@@ -180,19 +180,15 @@ export const CommanderUI = {
         const revealed = CommanderEngine.ShadowInfluenceEngine?.isEpitaphRevealed?.() || false;
         const list = CommanderEngine.CampaignManager.getBedrockTelemetry({ allowTwentyFirst: revealed }) || [];
         let text = "================================================================================\n";
-        text += `🏛️ THE ${list.length} BEDROCK CHAINED SETTLEMENTS (FOREST & MOUNTAIN RING)\n`;
+        text += `🏛️ THE ${list.length} BEDROCK CHAINED SETTLEMENTS (ROYAL CENSUS ROLL)\n`;
         text += "================================================================================\n\n";
         list.forEach((v, i) => {
-            const tag = v.hiddenGapKeeper ? ' [⚠️ 21st NODE: 18k AF FALLEN-ERA RUNES]' : '';
+            const tag = v.hiddenGapKeeper ? ' [⚠️ UNINDEXED 21st PARISH]' : '';
             text += `${String(i + 1).padStart(2, ' ')}. ${v.name.padEnd(22, ' ')} | House: ${v.house.padEnd(24, ' ')} | Fuel: ${String(v.barrierFuel).padStart(3, ' ')}u | Chains: ${v.chainsIntegrity}%${tag}\n`;
         });
-        if (!revealed) {
-            text += "\n[CENSUS NOTE: Surface registry reports 'a score of places' (20 nodes: 1 Crown Seat + 19 Competing Houses).\n";
-            text += " Sensor anomalies inside Mountain Event Horizon (r = 100–280km) suppressed while Blind Spot Entropy < 85%.]\n";
-        } else {
-            text += "\n[⚠️ REALITY LEAK BREACH: Fallen-Era Illusion Runes fractured! Settlement #7 (Epitaph) exposed as 21st node!]\n";
+        if (revealed) {
+            text += "\n[⚠️ ARCHIVE ANOMALY: Scraped vellum layers have exposed an unindexed 21st settlement record!]\n";
         }
-        text += "(Note: The 20 Dune Flotillas remain forgotten/lost beneath the sand horizon.)\n";
         this.setReaderContent(text);
     },
 
@@ -261,7 +257,7 @@ export const CommanderUI = {
         const directives = [
             [`window.viewTelemetry()`, '🏛️ 20 Bedrock Settlements'],
             [`window.viewWarBoard()`, '🏰 19-House War Board'],
-            [`window.viewShadowLedger()`, '🕵️ General Ledger Audit (Relativity & Skew)'],
+            [`window.viewShadowLedger()`, '🕵️ General Ledger Audit'],
             [`window.interrogateSuspect()`, '⚖️ Inquest / Interrogate'],
             [`window.dispatchCmd('PATROL')`, 'Patrol Mist'],
             [`window.dispatchCmd('REQUISITION_FUEL')`, 'Requisition Fuel'],
@@ -272,11 +268,10 @@ export const CommanderUI = {
             [`window.dispatchCmd('AUDIT_ANOMALY')`, 'Audit Anomaly (12-B)'],
             [`window.dispatchCmd('SCRUB_MONUMENT')`, 'Scrub Monolith'],
             [`window.dispatchCmd('SMUGGLE_RESIN')`, 'Smuggle Resin'],
-            [`window.dispatchCmd('CONDENSE_WATER')`, 'Scrape Condensers'],
+            [`window.dispatchCmd('EXTORT_HOUSE')`, 'Extort House'],
             [`window.dispatchCmd('TRANSMIT_DREAM')`, 'Whisper Dream'],
             [`window.dispatchCmd('SUMMON_HUNTSMAN')`, 'Summon Huntsman'],
-            [`window.dispatchCmd('HIBERNATE',100)`, 'Hibernate (100y)'],
-            [`window.dispatchCmd('ASCEND_SOVEREIGN')`, 'Ascend Sovereign']
+            [`window.dispatchCmd('MACABRE_COMMUNION')`, 'Macabre Communion']
         ].map(([fn, label]) => `<button class="cmd-btn" onclick="${fn}">${label}</button>`).join('');
 
         container.innerHTML = `

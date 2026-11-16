@@ -267,7 +267,7 @@ const LogDispatchManager = rootScope.LogDispatchManager || {
                 type: 'OCP FORM 12-B',
                 sender: 'Directorate of Site Operations',
                 title: 'Containment Audit: Ledger Anomaly #77',
-                body: `Scribe Elyse flagged a discrepancy in the harvest rolls of 12,414 AF. The parchment was scraped thin and re-inked. The erased line named a settlement called 'Epitaph' inside the mountain mirage. The page is now sealed in basalt under three locks.`
+                body: `Scribe Elyse flagged a discrepancy in the harvest rolls of 12,414 AF. The parchment was scraped thin and re-inked over a twenty-first parish line. The page is now sealed in basalt under three locks.`
             });
         } else if (campaignMode === 'DUNE') {
             newItems.push({
@@ -283,9 +283,9 @@ const LogDispatchManager = rootScope.LogDispatchManager || {
                 id: `disp_${worldDay}_syn`,
                 day: worldDay,
                 type: 'SMUGGLER MANIFEST',
-                sender: 'Barge-Master Vance (Salt-Marrow Locks)',
+                sender: 'Barge-Master Vance (Gallows-Gate Sluices)',
                 title: 'Unstamped Resin Shipment Cleared',
-                body: `Three flat-bottomed skiffs slipped past the Gallows toll-chain under heavy river fog. Casks repacked in brine-salt barrels bound for the outer marshes.`
+                body: `Three flat-bottomed skiffs slipped past the Gallows toll-chain under heavy river fog. Casks repacked in tallow barrels bound for the outer marshes.`
             });
         } else {
             newItems.push({
@@ -648,8 +648,8 @@ export const ROLE_CATALOG = {
         roleId: 'TERMINUS',
         title: '2. Terminus Warden & 300 Guardians',
         campaignMode: 'HOUSE',
-        subtitle: "Guard World's End Gate, Cultivate the 300 Guardians & Contain the 6,000-Year Gap",
-        desc: "Command House Terminus at the Mountain Event Horizon. Manage Crown Favor plus legal Horizon Dispensation and 3-Stage Bone-Carving Runic Cultivation."
+        subtitle: "Guard World's End Gate, Cultivate the 300 Guardians & Hold the Mountain Pass",
+        desc: "Command House Terminus at the World-Wall frontier. Manage Crown Favor plus legal Horizon Dispensation and 3-Stage Bone-Carving Runic Cultivation."
     },
     GUILD: {
         roleId: 'GUILD',
@@ -670,14 +670,14 @@ export const ROLE_CATALOG = {
         title: '5. Crime Syndicate Boss',
         campaignMode: 'SYNDICATE',
         subtitle: 'Smuggle Unstamped Crown Resin, Extort Houses & Collect Gallows Tolls',
-        desc: 'Rule the Salt Syndicate from the brine-locks. Divert midnight resin barges, build blackmail dossiers on Noble Houses, and profit from scarcity.'
+        desc: 'Rule the Under-Chain Contraband Ring from the lower-bailey sluices. Divert midnight resin barges, build blackmail dossiers on Noble Houses, and profit from scarcity.'
     },
     SOVEREIGN: {
         roleId: 'SOVEREIGN',
-        title: '6. The Pale Sovereign (Korvan the Variable)',
+        title: '6. The Pale Sovereign',
         campaignMode: 'SOVEREIGN',
-        subtitle: 'Summon the Bound Huntsman, Mutate Heralds & Endure 1,000 Years to Shatter the Chains',
-        desc: 'Play as the betrayed Champion chained beneath the mountain peaks. Harvest Significance from marked nobles and evolve into the True Pale Sovereign.'
+        subtitle: 'Command the Bound Huntsman, Harvest Significance & Mutate the Frost Heralds',
+        desc: 'Brood within the deep mountain frost. Dispatch the Bound Huntsman to stalk high-significance prey across the Dark Forest and perform the Macabre Communion.'
     }
 };
 
@@ -713,11 +713,11 @@ const CampaignManager = rootScope.CampaignManager || {
             activeCaravans: []
         },
         order: { orderName: "Order of the Basalt Quill & OCP", containedAnomalies: 4, form12BReports: 2, dustWardenScrubs: 5, blindSpotEntropy: 12 },
-        syndicate: { syndicateName: "Salt Syndicate", baseSettlement: "Salt-Marrow", mineralSaltStock: 150, contrabandResin: 45, gallowsTollCollected: 80 },
+        syndicate: { syndicateName: "Under-Chain Contraband Ring", baseSettlement: "Gallows-Gate Sluices", mineralSaltStock: 150, contrabandResin: 45, gallowsTollCollected: 80 },
         dune: { flotillaName: "Dust-Haven", riverStreamline: "Silt Veil", cleanedWaterStock: 80, dailyWaterConsumption: 5, mooringTetherIntegrity: 100, driftDistanceKm: 0 },
         patron: { candidateSignificance: 25, symbolicDreamsSent: 0, verifiedTruths: 0, legendaryAwakenings: 0 },
         sovereign: {
-            title: "Korvan the Variable (Chained Hybrid)",
+            title: "The Pale Sovereign (Frost-Bound)",
             isAscended: false,
             yearsEndured: 0,
             significanceHarvested: 0,
@@ -862,7 +862,7 @@ const CampaignManager = rootScope.CampaignManager || {
         const seeds = {
             HOUSE: [['agt_1', 'High Marshal Vane', 'WAR_MASTER'], ['agt_2', 'Scout-Sergeant Kaelen', 'SCOUT'], ['agt_3', 'Warden Maris', 'WARDEN'], ['agt_4', 'Apprentice Jon', 'APPRENTICE']],
             ORDER: [['agt_1', 'Director Jess Nedaf', 'INSPECTOR'], ['agt_2', 'Chronicler Elyse', 'SCRIBE'], ['agt_3', 'Dust-Warden Gareth', 'WARDEN']],
-            SYNDICATE: [['agt_1', 'Brine-Lord Harl', 'CARTEL_LEADER'], ['agt_2', 'Vance the Leech', 'SMUGGLER'], ['agt_3', 'Iron-Jaw Ron', 'ENFORCER']],
+            SYNDICATE: [['agt_1', 'Sluice-Boss Harl', 'CARTEL_LEADER'], ['agt_2', 'Vance the Leech', 'SMUGGLER'], ['agt_3', 'Iron-Jaw Ron', 'ENFORCER']],
             DUNE: [['agt_1', 'Matron Morwen', 'ELDER_KEEPER'], ['agt_2', 'Sand-Pilot Dane', 'PILOT'], ['agt_3', 'Dredger Cael', 'DREDGER']],
             PATRON: [['agt_1', 'Lyra the Keen', 'SURVIVOR'], ['agt_2', 'Justin the Fowler', 'HUNTER']],
             SOVEREIGN: [['agt_1', 'The Bound Huntsman', 'PREDATOR']]
@@ -1384,30 +1384,26 @@ const ShadowInfluenceEngine = rootScope.ShadowInfluenceEngine || {
         const entropy = CampaignManager?.state?.order?.blindSpotEntropy ?? 12;
         const revealed = this.isEpitaphRevealed();
         const skewPct = (this.getMarkSelectionSkew() * 100).toFixed(1);
+        const commonerPct = (100 - Number(skewPct)).toFixed(1);
 
         return [
             `================================================================================`,
-            `🕵️ THE GENERAL LEDGER: EPISTEMIC & TEMPORAL RELATIVITY AUDIT`,
+            `🕵️ THE GENERAL LEDGER: ROYAL ARCHIVE STATISTICAL & CASUALTY AUDIT`,
             `================================================================================`,
-            `[1] TEMPORAL RELATIVITY & THE 6,000-YEAR BLIND SPOT`,
-            `  • Forest / Crown Perceived Timeline:  Year ${this.relativity.perceivedForestYears} AF (Shift = 0d Instantaneous Blink)`,
-            `  • Mountain / Dune Objective Timeline: Year ${this.relativity.objectiveYears} AF (Shift = 7d White Void Persistence)`,
-            `  • Unrecorded White Void Gap:          ${this.relativity.missingGapYears} Objective Years (Unknown to Crown & 19 Houses)`,
-            `  • Terminus / Guardian Biological Age: ~1.5x–2.0x Forest Rate (Persisting through every 7-day Void)`,
+            `[1] OFFICIAL CHRONOLOGY & PARISH CENSUS`,
+            `  • Royal Crucible Calendar:              Year ${this.relativity.perceivedForestYears} AF (14-Day Shift Cycle)`,
+            `  • Registered Chained Settlements:       20 Active Parishes ("A Score of Places")`,
+            `  • World-Wall Survey Confidence:         ${Math.round(this.relativity.terminusUnderstandingConfidence * 100)}% (Unexplained 5% marker variance post-Shift)`,
             ``,
-            `[2] THE VISTAS OF TRUTH & TERMINUS 95% ROTATIONAL BLIND SPOT`,
-            `  • Mountain Vista (r = 100–280km):     Observes the Forest dissolving into the 7-day White Void.`,
-            `  • Terminus 95% Understanding Failure: Terminus believes the Mountain Ring is fixed (Confidence: 95%).`,
-            `  • Dune Vista Only (r > 280km):        Observes the Mountain Ring rotating during the 7-day Void`,
-            `                                        (Cumulative Void Rotation Drift: ${this.relativity.mountainRotationDegrees}°).`,
+            `[2] STATISTICAL ANOMALY — HUNTSMAN'S MARK (SPHERICAL IDOL) DISTRIBUTION`,
+            `  • Observed Mark Recipients (Nobles):    ${skewPct}% Founder-Lineage Peers (Expected Baseline: 25.0%)`,
+            `  • Observed Mark Recipients (Commoners): ${commonerPct}% Parish Commoners (Expected Baseline: 75.0%)`,
+            `  • Auditor's Margin Note:                "Founder-bloodline heirs are claiming the Huntsman's Mark at`,
+            `                                           statistically improbable rates while commoners turn back."`,
             ``,
-            `[3] CENSUS ANOMALY & THE NOBLE FUNNEL (PROBABILISTIC SHADOW PRESSURE)`,
-            `  • Surface Census ("A Score of Places"): 20 Settlements Reported (1 Crown Seat + 19 Competing Houses)`,
-            `  • Blind Spot Entropy Index:             ${entropy}% (Reveal Threshold: ${this.revealThreshold}%)`,
-            `  • Settlement #7 [EPITAPH] Status:       ${revealed ? '⚠️ EXPOSED (21st Physical Node at r=185km — 18k AF Fallen-Era Sanctuary)' : 'CONCEALED BY FALLEN-ERA ILLUSION RUNES (Suppressed from 20-Node Census)'}`,
-            `  • Huntsman's Mark Selection Skew:       ${skewPct}% Founder-Bloodline Nobles vs. Commoners (Probabilistic Nudge: +${Math.round(this.pressure.nobleMarkWeightBias * 100)}%)`,
-            `  • Commoners Diverted / Nobles Vector'd: ${this.pressure.commonersDiverted} Commoners Spared | ${this.pressure.noblesInterceptedByHuntsman} Marked Nobles Intercepted`,
-            `  • Tragic Alignment Invariant:           Epitaph -> Korvan [${this.alignment.epitaphToKorvan}] | Korvan -> All [${this.alignment.korvanTrueAlignment}]`,
+            `[3] ARCHIVAL LEDGER INTEGRITY`,
+            `  • Scraped-Vellum Discrepancy Index:     ${entropy}%`,
+            `  • Parish Roll Audit Status:             ${revealed ? '⚠️ BREACH: Unindexed 21st Parish Roll uncovered beneath scraped ink [Ref: Settlement #7]' : 'Nominal — All 20 surface parish rolls sealed under Crown wax.'}`,
             `================================================================================`
         ].join('\n');
     }

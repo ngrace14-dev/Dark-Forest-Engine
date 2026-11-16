@@ -116,7 +116,7 @@ if (!mockElements.get('story-reader').innerText.includes('THE 19 NOBLE HOUSES'))
     failures.push('CommanderUI war board reader failed to render');
 }
 window.viewShadowLedger();
-if (!mockElements.get('story-reader').innerText.includes('THE GENERAL LEDGER: EPISTEMIC & TEMPORAL RELATIVITY AUDIT')) {
+if (!mockElements.get('story-reader').innerText.includes('THE GENERAL LEDGER: ROYAL ARCHIVE STATISTICAL & CASUALTY AUDIT')) {
     failures.push('CommanderUI General Ledger Audit reader failed to render');
 }
 
