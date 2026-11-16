@@ -42,6 +42,41 @@ window.viewTelemetry = function() {
     }
 };
 
+window.viewWarBoard = function() {
+    const board = window.CampaignManager?.getWarBoard() || [];
+    let text = "================================================================================\n";
+    text += "🏰 THE 19 NOBLE HOUSES & FEUDAL WAR BOARD\n";
+    text += "================================================================================\n\n";
+    text += "👑 THE 9 BLESSED HOUSES (MAJOR MONOPOLIES):\n";
+    board.filter(h => h.blessed).forEach((h, i) => {
+        text += `  ${i + 1}. ${h.name.padEnd(16, ' ')} | Monopoly: ${h.monopoly.padEnd(28, ' ')} | [${h.status}] | Power: ${h.power}\n`;
+    });
+    text += "\n⚔️ THE 10 CHALLENGER HOUSES:\n";
+    board.filter(h => !h.blessed).forEach((h, i) => {
+        text += `  ${i + 10}. ${h.name.padEnd(16, ' ')} | Output: ${h.monopoly.padEnd(28, ' ')} | [${h.status}] | Power: ${h.power}\n`;
+    });
+    const b = document.getElementById('story-reader');
+    if (b) {
+        b.style.display = 'block';
+        b.innerText = text;
+    }
+};
+
+window.interrogateSuspect = function(targetId = 'agt_2') {
+    const inq = window.InterrogationDesk?.interrogate(targetId);
+    const b = document.getElementById('story-reader');
+    if (b) {
+        b.style.display = 'block';
+        b.innerText = inq?.text || "No active inquest.";
+    }
+};
+
+window.renderVerdict = function(targetId, vType) {
+    const res = window.InterrogationDesk?.renderVerdict(targetId, vType);
+    alert(res?.message || 'Verdict rendered.');
+    window.refreshUI();
+};
+
 window.viewStory = function(id) {
     const d = window.CrucibleNarrativeEngine?.formatDossier(id);
     const p = window.CrucibleNarrativeEngine?.expandStory(id);

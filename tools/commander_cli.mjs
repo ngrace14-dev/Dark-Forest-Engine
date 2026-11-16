@@ -41,6 +41,7 @@ await import('../src/systems/agent_roster.js');
 await import('../src/systems/campaign_command.js');
 await import('../src/systems/log_dispatch.js');
 await import('../src/systems/crucible_narrative.js');
+await import('../src/systems/interrogation_desk.js');
 
 global.window.VillageManager?.generateWeb?.();
 
@@ -48,6 +49,7 @@ const CM = global.window.CampaignManager;
 const LDM = global.window.LogDispatchManager;
 const CNE = global.window.CrucibleNarrativeEngine;
 const ARM = global.window.AgentRosterManager;
+const IDK = global.window.InterrogationDesk;
 
 CM.selectCampaign('HOUSE');
 LDM.generateDailyDispatches(1, 'HOUSE', CM.state);
@@ -117,6 +119,20 @@ if (isTestMode) {
     const cult2 = CM.dispatchAction('CULTIVATE_RUNIC', 'agt_1');
     const cult3 = CM.dispatchAction('CULTIVATE_RUNIC', 'agt_1');
     if (!cult3.success || !agt.cultivation.isCultivatedGuardian) errors.push(`Terminus Runic Cultivation failed.`);
+
+    // Test Interrogation Desk & Truth Inquest
+    const inq = IDK.interrogate('agt_2');
+    if (!inq.success || !inq.text.includes('FORMAL INQUEST')) errors.push(`Interrogation failed.`);
+    const verd = IDK.renderVerdict('agt_2', 'turn_agent');
+    if (!verd.success || CM.state.house.blackmailDossiers < 1) errors.push(`Verdict turn_agent failed.`);
+
+    // Test 19-House Feudal War Board & Leverage
+    const warBoard = CM.getWarBoard();
+    if (warBoard.length !== 19) errors.push(`Expected 19 Noble Houses in War Board, got ${warBoard.length}`);
+    const levRes = CM.dispatchAction('LEVERAGE_HOUSE', 'House Cull');
+    if (!levRes.success) errors.push(`Leverage house failed: ${levRes.message}`);
+    const sponRes = CM.dispatchAction('SPONSOR_HOUSE', 'House Oakheart');
+    if (!sponRes.success) errors.push(`Sponsor house failed: ${sponRes.message}`);
 
     // Test ORDER, SYNDICATE, DUNE, PATRON Actions
     CM.selectCampaign('ORDER');
@@ -195,10 +211,16 @@ function printHelp() {
     console.log(`
 CORE COMMANDS:
   [Enter] / tick [N]    Advance simulation by 1 (or N) days.
+  telemetry             Review the 20 Bedrock Chained Settlements (Dunes remain hidden).
   logs / read           Read incoming courier dispatches and incident reports.
   roster                Review living officers and assigned tasks in your garrison.
   living                Inspect known living figures across the realm.
   dispatch <action>     Execute faction directive (see below).
+  interrogate <id>      Summon suspect to formal inquest (spies, embezzlers, Wendigo taint).
+  verdict <id> <type>   Render inquest verdict (exonerate, demote, execute, turn_agent).
+  war_board / houses    Display 19 Noble Houses (9 Blessed Monopolies vs 10 Challengers).
+  leverage <house>      Spend Blackmail Dossier to force rival House to yield leverage.
+  sponsor <house>       Transfer fuel to sponsor an allied House defense coalition.
   story [name|id]       List deceased actors, or inspect an actor's Post-Mortem Case File!
   expand <name|id>      Expand an actor's defining crucible moment into a 3-act prose story!
   campaign <mode>       Switch campaign (HOUSE, ORDER, SYNDICATE, DUNE, PATRON, SOVEREIGN).
@@ -327,6 +349,47 @@ function handleCommand(cmd) {
     } else if (action === 'ascend') {
         const res = CM.dispatchAction('ASCEND_SOVEREIGN');
         console.log(`\n👑 PROGENITOR BREAKTHROUGH: ${res.message}`);
+        console.log(`\n(Press Enter to continue...)`);
+        rl.question('', promptUser);
+        return;
+    } else if (action === 'interrogate') {
+        const inq = IDK.interrogate(arg || 'agt_2');
+        console.log(inq.text);
+        console.log(`(Press Enter to continue...)`);
+        rl.question('', promptUser);
+        return;
+    } else if (action === 'verdict') {
+        const [targetId, vType] = arg.split(' ');
+        const res = IDK.renderVerdict(targetId || 'agt_2', vType || 'exonerate');
+        console.log(`\n⚖️ VERDICT EXECUTED: ${res.message}`);
+        console.log(`\n(Press Enter to continue...)`);
+        rl.question('', promptUser);
+        return;
+    } else if (action === 'war_board' || action === 'houses') {
+        const board = CM.getWarBoard();
+        console.log(`\n🏰 THE 19 NOBLE HOUSES & FEUDAL WAR BOARD:`);
+        console.log(`--------------------------------------------------------------------------------`);
+        console.log(`👑 THE 9 BLESSED HOUSES (MAJOR MONOPOLIES):`);
+        board.filter(h => h.blessed).forEach((h, i) => {
+            console.log(`  ${i + 1}. ${h.name.padEnd(16, ' ')} | Monopoly: ${h.monopoly.padEnd(28, ' ')} | Military: [${h.status}] | Power: ${h.power}`);
+        });
+        console.log(`\n⚔️ THE 10 CHALLENGER HOUSES:`);
+        board.filter(h => !h.blessed).forEach((h, i) => {
+            console.log(`  ${i + 10}. ${h.name.padEnd(16, ' ')} | Output: ${h.monopoly.padEnd(28, ' ')} | Status: [${h.status}] | Power: ${h.power}`);
+        });
+        console.log(`--------------------------------------------------------------------------------`);
+        console.log(`\n(Press Enter to continue...)`);
+        rl.question('', promptUser);
+        return;
+    } else if (action === 'leverage') {
+        const res = CM.dispatchAction('LEVERAGE_HOUSE', arg || 'House Cull');
+        console.log(`\n📜 BLACKMAIL LEVERAGE: ${res.message}`);
+        console.log(`\n(Press Enter to continue...)`);
+        rl.question('', promptUser);
+        return;
+    } else if (action === 'sponsor') {
+        const res = CM.dispatchAction('SPONSOR_HOUSE', arg || 'House Oakheart');
+        console.log(`\n🤝 DEFENSE COALITION: ${res.message}`);
         console.log(`\n(Press Enter to continue...)`);
         rl.question('', promptUser);
         return;

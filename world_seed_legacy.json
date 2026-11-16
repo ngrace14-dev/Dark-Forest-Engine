@@ -1,6 +1,6 @@
 {
   "version": "1.0.0-PROLOGUE",
-  "exportedAt": "2026-11-16T20:30:37.071Z",
+  "exportedAt": "2026-11-16T20:38:19.608Z",
   "universe": "Universe-1-Aethelgard",
   "meta": {
     "worldSeed": "commander_50yr_audit_seed",
@@ -370,7 +370,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 1",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_2",
@@ -383,7 +383,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 2",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
     },
     {
       "id": "actor_yr_3",
@@ -396,7 +396,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 3",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
+      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
     },
     {
       "id": "actor_yr_4",
@@ -409,7 +409,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 4",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
+      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
     },
     {
       "id": "actor_yr_5",
@@ -435,7 +435,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 6",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
+      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
     },
     {
       "id": "actor_yr_7",
@@ -448,7 +448,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 7",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
+      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
     },
     {
       "id": "actor_yr_8",
@@ -461,7 +461,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 8",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_9",
@@ -474,7 +474,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 9",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
     },
     {
       "id": "actor_yr_10",
@@ -500,7 +500,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 11",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
     },
     {
       "id": "actor_yr_12",
@@ -513,7 +513,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 0",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_13",
@@ -526,7 +526,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 1",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
+      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
     },
     {
       "id": "actor_yr_14",
@@ -539,7 +539,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 2",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_15",
@@ -552,7 +552,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 3",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
+      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
     },
     {
       "id": "actor_yr_16",
@@ -565,7 +565,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 4",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
     },
     {
       "id": "actor_yr_17",
@@ -578,7 +578,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 5",
-      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_18",
@@ -591,7 +591,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 6",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
+      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
     },
     {
       "id": "actor_yr_19",
@@ -604,7 +604,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 7",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_20",
@@ -617,7 +617,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 8",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
     },
     {
       "id": "actor_yr_21",
@@ -630,7 +630,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 9",
-      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
+      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
     },
     {
       "id": "actor_yr_22",
@@ -643,7 +643,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 10",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_23",
@@ -656,7 +656,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 11",
-      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
+      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
     },
     {
       "id": "actor_yr_24",
@@ -669,7 +669,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 0",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
+      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
     },
     {
       "id": "actor_yr_25",
@@ -682,20 +682,20 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 1",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
     },
     {
       "id": "actor_yr_26",
       "name": "Warden Kaelen of Year 26",
-      "birthDay": 1095,
+      "birthDay": 1,
       "deathDay": 9855,
-      "ageYears": 24,
+      "ageYears": 26,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 2",
-      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
+      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
     },
     {
       "id": "actor_yr_27",
@@ -713,9 +713,9 @@
     {
       "id": "actor_yr_28",
       "name": "Warden Kaelen of Year 28",
-      "birthDay": 2562,
+      "birthDay": 1,
       "deathDay": 10585,
-      "ageYears": 21,
+      "ageYears": 28,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
@@ -734,7 +734,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 5",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_30",
@@ -747,20 +747,20 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 6",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_31",
       "name": "Warden Kaelen of Year 31",
-      "birthDay": 1,
+      "birthDay": 2555,
       "deathDay": 11680,
-      "ageYears": 31,
+      "ageYears": 25,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 7",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_32",
@@ -773,7 +773,7 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 8",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_33",
@@ -786,14 +786,14 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 9",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_34",
       "name": "Warden Kaelen of Year 34",
-      "birthDay": 4745,
+      "birthDay": 4015,
       "deathDay": 12775,
-      "ageYears": 22,
+      "ageYears": 24,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
@@ -812,14 +812,14 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 11",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
+      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
     },
     {
       "id": "actor_yr_36",
       "name": "Warden Kaelen of Year 36",
-      "birthDay": 1095,
+      "birthDay": 1825,
       "deathDay": 13505,
-      "ageYears": 34,
+      "ageYears": 32,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
@@ -838,14 +838,14 @@
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 1",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_38",
       "name": "Warden Kaelen of Year 38",
-      "birthDay": 1,
+      "birthDay": 2555,
       "deathDay": 14235,
-      "ageYears": 38,
+      "ageYears": 32,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
@@ -856,35 +856,35 @@
     {
       "id": "actor_yr_39",
       "name": "Warden Kaelen of Year 39",
-      "birthDay": 730,
+      "birthDay": 1,
       "deathDay": 14600,
-      "ageYears": 38,
+      "ageYears": 39,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 3",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
+      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
     },
     {
       "id": "actor_yr_40",
       "name": "Warden Kaelen of Year 40",
-      "birthDay": 4015,
+      "birthDay": 730,
       "deathDay": 14965,
-      "ageYears": 30,
+      "ageYears": 39,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 4",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_41",
       "name": "Warden Kaelen of Year 41",
-      "birthDay": 1,
+      "birthDay": 7300,
       "deathDay": 15337,
-      "ageYears": 42,
+      "ageYears": 22,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
@@ -895,74 +895,74 @@
     {
       "id": "actor_yr_42",
       "name": "Warden Kaelen of Year 42",
-      "birthDay": 372,
+      "birthDay": 5117,
       "deathDay": 15695,
-      "ageYears": 41,
+      "ageYears": 28,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 6",
-      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
+      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
     },
     {
       "id": "actor_yr_43",
       "name": "Warden Kaelen of Year 43",
-      "birthDay": 365,
+      "birthDay": 2555,
       "deathDay": 16060,
-      "ageYears": 43,
+      "ageYears": 37,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 7",
-      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_44",
       "name": "Warden Kaelen of Year 44",
-      "birthDay": 4745,
+      "birthDay": 4015,
       "deathDay": 16425,
-      "ageYears": 32,
+      "ageYears": 34,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 8",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_45",
       "name": "Warden Kaelen of Year 45",
-      "birthDay": 8395,
+      "birthDay": 6205,
       "deathDay": 16790,
-      "ageYears": 23,
+      "ageYears": 29,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 9",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
+      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
     },
     {
       "id": "actor_yr_46",
       "name": "Warden Kaelen of Year 46",
-      "birthDay": 1825,
+      "birthDay": 9125,
       "deathDay": 17155,
-      "ageYears": 42,
+      "ageYears": 22,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 10",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
+      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
     },
     {
       "id": "actor_yr_47",
       "name": "Warden Kaelen of Year 47",
-      "birthDay": 1,
+      "birthDay": 2190,
       "deathDay": 17520,
-      "ageYears": 47,
+      "ageYears": 42,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
@@ -973,28 +973,28 @@
     {
       "id": "actor_yr_48",
       "name": "Warden Kaelen of Year 48",
-      "birthDay": 2190,
+      "birthDay": 730,
       "deathDay": 17885,
-      "ageYears": 43,
+      "ageYears": 47,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 0",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
+      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     },
     {
       "id": "actor_yr_49",
       "name": "Warden Kaelen of Year 49",
-      "birthDay": 5840,
+      "birthDay": 1095,
       "deathDay": 18250,
-      "ageYears": 34,
+      "ageYears": 47,
       "cause": "Old age and 14-day Shift frost exposure",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
       ],
       "definingCrucible": "The Breach at Gate 1",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
+      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
     }
   ],
   "epistemicLedger": {

@@ -268,6 +268,17 @@ window.CampaignManager = {
             this.state.sovereign.heraldsMutated++;
             this.state.sovereign.significanceHarvested = (this.state.sovereign.significanceHarvested || 0) + 1500;
             res = { success: true, message: "The Macabre Communion performed: Frozen fungal flesh fed to captive commander. Herald Wendigo mutated." };
+        } else if (act === 'LEVERAGE_HOUSE' && this.campaignMode === 'HOUSE') {
+            const h = this.state.house;
+            if ((h.blackmailDossiers || 0) < 1) return { success: false, message: "No Blackmail Dossiers available. Monetize private sanctuary wing first." };
+            h.blackmailDossiers--;
+            res = { success: true, message: `Blackmail Dossier spent against ${arg || 'House Cull'}: Rival house yielded monopoly leverage (+15 Standing).` };
+        } else if (act === 'SPONSOR_HOUSE' && this.campaignMode === 'HOUSE') {
+            const h = this.state.house;
+            if (h.barrierFuelUnits < 8) return { success: false, message: "Insufficient fuel to sponsor ally house." };
+            h.barrierFuelUnits -= 8;
+            h.crownFavor = Math.min(100, h.crownFavor + 10);
+            res = { success: true, message: `Sponsored ${arg || 'House Oakheart'} with 8u fuel: Defense coalition secured (+10 Crown Standing).` };
         } else if (act === 'HIBERNATE' && this.campaignMode === 'SOVEREIGN') {
             const yrs = parseInt(arg, 10) || 100;
             const sov = this.state.sovereign;
@@ -406,6 +417,30 @@ window.CampaignManager = {
             barrierFuel: v.stats?.essence || 14,
             chainsIntegrity: 100
         }));
+    },
+
+    getWarBoard: function() {
+        return [
+            { name: "House Aethel", monopoly: "Royal Crucible Fuel", blessed: true, status: "PEACE", power: 95 },
+            { name: "House Terminus", monopoly: "Horizon Gate Defense", blessed: true, status: "MOBILIZED", power: 90 },
+            { name: "House Oakheart", monopoly: "14-Day Ironwood", blessed: true, status: "SKIRMISH", power: 78 },
+            { name: "House Gallows", monopoly: "Runic Dust & Tethers", blessed: true, status: "PEACE", power: 75 },
+            { name: "House Widow", monopoly: "Siphon-Vine Cold Resins", blessed: true, status: "PEACE", power: 72 },
+            { name: "House Blackwood", monopoly: "Slag-Weevil Fluid", blessed: true, status: "SKIRMISH", power: 70 },
+            { name: "House Ashen", monopoly: "Basalt Tablets", blessed: true, status: "PEACE", power: 68 },
+            { name: "House Shadowfen", monopoly: "Pre-Fuel Matrix Synthesis", blessed: true, status: "PEACE", power: 66 },
+            { name: "House Epitaph", monopoly: "18k Objective Records", blessed: true, status: "ISOLATED", power: 65 },
+            { name: "House Cull", monopoly: "Cardiac Catalysts", blessed: false, status: "WAR_PREP", power: 62 },
+            { name: "House Mire", monopoly: "Fungal Binders", blessed: false, status: "SKIRMISH", power: 58 },
+            { name: "House Hollow", monopoly: "Gator Leather Seals", blessed: false, status: "PEACE", power: 55 },
+            { name: "House Crow", monopoly: "Whisper Guild Intel", blessed: false, status: "COVERT", power: 54 },
+            { name: "House Thorn", monopoly: "Pacifying Wax", blessed: false, status: "PEACE", power: 50 },
+            { name: "House Gloom", monopoly: "Gloom-Glass Alembics", blessed: false, status: "PEACE", power: 48 },
+            { name: "House Dusken", monopoly: "Kinetic Silk", blessed: false, status: "PEACE", power: 46 },
+            { name: "House Grim", monopoly: "50-Ton Anchor Chains", blessed: false, status: "PEACE", power: 45 },
+            { name: "House Blightwatch", monopoly: "Parasite Antidotes", blessed: false, status: "DEFENSIVE", power: 42 },
+            { name: "House Wraith", monopoly: "Abyssal Salvage Oil", blessed: false, status: "PEACE", power: 40 }
+        ];
     }
 };
 
