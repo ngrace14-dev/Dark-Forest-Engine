@@ -152,7 +152,9 @@ class OriginMysterySystem {
             window.location.reload(); // The loop hard-reset
         }, 5000);
     }
+}
 
-
-window.OriginEngine = new OriginMysterySystem();
-export default window.OriginEngine;
+if (typeof window !== 'undefined') {
+    window.OriginEngine = new OriginMysterySystem();
+}
+export default (typeof window !== 'undefined' ? window.OriginEngine : null);

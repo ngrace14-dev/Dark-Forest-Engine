@@ -40,10 +40,29 @@
         <h1 class="title-card text-7xl font-black text-red-700 tracking-widest mb-2 uppercase">Dark Forests</h1>
         <h2 class="text-gray-400 tracking-[0.3em] text-sm mb-12 uppercase font-serif">A Grim-Dark Sandbox RPG</h2>
         
-        <div id="loading-container" class="loading-container"><div id="loading-bar" class="loading-bar"></div></div>
-        <p class="text-gray-600 mb-8 max-w-md text-center text-xs font-mono" id="loading-text">Booting WebAssembly Physics Engine...</p>
+        <div id="loading-container" class="loading-container mb-4"><div id="loading-bar" class="loading-bar"></div></div>
+        <p class="text-gray-500 mb-6 max-w-md text-center text-xs font-mono" id="loading-text">Booting WebAssembly Physics Engine...</p>
         
-        <button id="btn-start" class="hidden px-10 py-3 border border-red-900 bg-red-950/50 hover:bg-red-900 hover:text-white text-red-500 tracking-widest uppercase text-sm transition-all duration-300">Enter the Woods</button>
+        <div id="start-actions" class="flex flex-col items-center gap-3">
+            <button id="btn-soft-launch" class="px-8 py-3.5 border-2 border-amber-600 bg-amber-950/80 hover:bg-amber-600 hover:text-black text-amber-400 font-mono font-bold tracking-widest uppercase text-sm transition-all duration-300 shadow-[0_0_25px_rgba(245,158,11,0.35)] flex items-center gap-2 cursor-pointer">
+                <span>📜</span> Launch Text Commander (Prologue Soft Launch)
+            </button>
+            <button id="btn-start" class="hidden px-8 py-2 border border-red-900 bg-red-950/40 hover:bg-red-900 hover:text-white text-red-400 font-mono tracking-widest uppercase text-xs transition-all duration-300 cursor-pointer">
+                ⚔️ Enter the Woods (3D Sandbox)
+            </button>
+        </div>
+    </div>
+
+    <!-- FULLSCREEN TEXT COMMANDER VIEWPORT MODAL -->
+    <div id="text-commander-viewport" class="fixed inset-0 z-[100] hidden bg-[#040608] flex flex-col">
+        <div class="bg-black/95 border-b border-amber-900/60 p-2 px-4 flex justify-between items-center text-xs font-mono">
+            <span class="text-amber-400 font-bold tracking-widest">🌌 DARK FOREST ENGINE | PROLOGUE COMMANDER VIEWPORT</span>
+            <div class="flex gap-2 items-center">
+                <a href="crows-eye.html" target="_blank" class="px-3 py-1 bg-amber-950 border border-amber-700 text-amber-300 hover:bg-amber-800 rounded text-xs transition-colors">↗ Dedicated Tab</a>
+                <button id="btn-close-viewport" class="px-3 py-1 bg-red-950 border border-red-700 text-red-300 hover:bg-red-800 rounded text-xs transition-colors cursor-pointer">✖ Return to Title</button>
+            </div>
+        </div>
+        <iframe id="text-commander-frame" src="" class="w-full flex-1 border-0"></iframe>
     </div>
 
     <!-- MAIN HUD -->
@@ -228,6 +247,57 @@
     </div>
 
     <script type="module" src="./src/main.js"></script>
+
+    <script type="module">
+        // --- SOFT LAUNCH & VIEWPORT CONTROLLER ---
+        const softLaunchBtn = document.getElementById('btn-soft-launch');
+        const viewportModal = document.getElementById('text-commander-viewport');
+        const viewportFrame = document.getElementById('text-commander-frame');
+        const closeViewportBtn = document.getElementById('btn-close-viewport');
+        const start3DBtn = document.getElementById('btn-start');
+        const startScreen = document.getElementById('start-screen');
+        const hud = document.getElementById('hud');
+        const loadingBar = document.getElementById('loading-bar');
+        const loadingText = document.getElementById('loading-text');
+
+        // 1. Text Commander Soft Launch (Always Available Immediately)
+        softLaunchBtn?.addEventListener('click', () => {
+            if (viewportModal && viewportFrame) {
+                viewportFrame.src = 'crows-eye.html';
+                viewportModal.classList.remove('hidden');
+            }
+        });
+
+        closeViewportBtn?.addEventListener('click', () => {
+            if (viewportModal && viewportFrame) {
+                viewportModal.classList.add('hidden');
+                viewportFrame.src = '';
+            }
+        });
+
+        // 2. 3D Sandbox Launch
+        start3DBtn?.addEventListener('click', () => {
+            if (startScreen) startScreen.classList.add('hidden');
+            if (hud) hud.classList.remove('hidden');
+            if (window.GameCore) window.GameCore.engineState = 'running';
+            window.EventBus?.emit('UI_UPDATE_HUD');
+            window.EventBus?.emit('GAME_STARTED');
+            window.EventBus?.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
+        });
+
+        // 3. Engine Ready Hook
+        function onEngineReady() {
+            if (loadingBar) loadingBar.style.width = '100%';
+            if (loadingText) loadingText.innerText = 'Engine Ready. All simulation systems online.';
+            if (start3DBtn) start3DBtn.classList.remove('hidden');
+        }
+
+        if (window.EventBus) {
+            window.EventBus.on('ENGINE_READY', onEngineReady);
+        } else {
+            window.addEventListener('load', () => setTimeout(onEngineReady, 1500));
+        }
+    </script>
 
 </body>
 </html>

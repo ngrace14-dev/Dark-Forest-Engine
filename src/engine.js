@@ -2305,4 +2305,8 @@ window.EventBus?.on('PLAYER_RESPAWN', () => {
     window.GameState.pStats.hp = window.GameState.pStats.maxHp; 
     window.GameState.inventory.gold = Math.floor(window.GameState.inventory.gold / 2); 
     playEntityAnimation(window.GameCore.playerObj, 'idle'); 
-    window.EventBus.emit('UI_UPD
+    window.EventBus?.emit('UI_UPDATE_HUD'); 
+});
+
+// Signal Engine Ready for UI & Simulation Listeners
+window.EventBus?.emit('ENGINE_READY');
