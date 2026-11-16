@@ -1,13 +1,13 @@
 {
   "version": "1.0.0-PROLOGUE",
-  "exportedAt": "2026-11-16T21:07:38.697Z",
+  "exportedAt": "2026-11-16T23:16:54.958Z",
   "universe": "Universe-1-Aethelgard",
   "meta": {
-    "worldSeed": "commander_50yr_audit_seed",
-    "worldDay": 18250,
-    "objectiveYear": 18074,
-    "perceivedYear": 12050,
-    "missingGapYears": 6024,
+    "worldSeed": "millennium_audit_seed_1000",
+    "worldDay": 21,
+    "objectiveYear": 18000,
+    "perceivedYear": 12000,
+    "missingGapYears": 6000,
     "campaignMode": "SOVEREIGN",
     "activeFaction": "SOVEREIGN",
     "state": {
@@ -24,11 +24,11 @@
   "candidate": {
     "id": "agt_1",
     "name": "High Marshal Vane",
-    "career": "warden",
-    "significance": 65,
+    "career": "quartermaster",
+    "significance": 85,
     "vitals": {
-      "hp": 150,
-      "maxHp": 150,
+      "hp": 140,
+      "maxHp": 140,
       "stamina": 100,
       "poise": 100,
       "hunger": 100
@@ -49,960 +49,336 @@
       "name": "Oakhaven",
       "region": "forest",
       "house": "House Oakheart",
-      "x": 5145.8,
-      "z": -43693.4,
+      "x": -25041.6,
+      "z": 20689.6,
       "driftSpeed": 0
     },
     {
       "name": "Gallows Hill",
       "region": "forest",
       "house": "House Gallows",
-      "x": -30957.7,
-      "z": -8648.2,
+      "x": 31115.7,
+      "z": 26147,
       "driftSpeed": 0
     },
     {
       "name": "Mire's Edge",
       "region": "forest",
       "house": "House Mire",
-      "x": -53150.8,
-      "z": -155.8,
+      "x": -26264.5,
+      "z": 52903.1,
       "driftSpeed": 0
     },
     {
       "name": "Blackwood",
       "region": "forest",
       "house": "House Blackwood",
-      "x": -42769.6,
-      "z": -53842.6,
+      "x": -20416,
+      "z": 67798,
       "driftSpeed": 0
     },
     {
       "name": "Hollow Creek",
       "region": "forest",
       "house": "House Hollow",
-      "x": -93419.7,
-      "z": 8969.8,
+      "x": -6289.9,
+      "z": 81140.1,
       "driftSpeed": 0
     },
     {
       "name": "Ashen Hold",
       "region": "forest",
       "house": "House Ashen",
-      "x": -102637.2,
-      "z": -7306.2,
+      "x": 17915,
+      "z": 92591.5,
       "driftSpeed": 0
     },
     {
       "name": "Epitaph",
       "region": "mountain",
       "house": "House Epitaph",
-      "x": -103867.7,
-      "z": -38828.2,
+      "x": 7703,
+      "z": 110499.2,
       "driftSpeed": 0
     },
     {
       "name": "Crow's Perch",
       "region": "forest",
       "house": "House Crow",
-      "x": -97248.3,
-      "z": -85334.2,
+      "x": 51578.3,
+      "z": 118260.6,
       "driftSpeed": 0
     },
     {
       "name": "Widow's Web",
       "region": "forest",
       "house": "House Widow",
-      "x": -119503.6,
-      "z": -76723.1,
+      "x": 22016.1,
+      "z": 139798.3,
       "driftSpeed": 0
     },
     {
       "name": "Thornbury",
       "region": "forest",
       "house": "House Thorn",
-      "x": -135528.8,
-      "z": -80004.3,
+      "x": 19975.2,
+      "z": 156173.2,
       "driftSpeed": 0
     },
     {
       "name": "Gloomhaven",
       "region": "forest",
       "house": "House Gloom",
-      "x": -144154.6,
-      "z": -97409.7,
+      "x": 19373.4,
+      "z": 172278.1,
       "driftSpeed": 0
     },
     {
       "name": "Duskendale",
       "region": "forest",
       "house": "House Dusken",
-      "x": -159121.2,
-      "z": -102711.6,
+      "x": -9801.2,
+      "z": 193743.1,
       "driftSpeed": 0
     },
     {
       "name": "Grimsby",
       "region": "forest",
       "house": "House Grim",
-      "x": -162265.4,
-      "z": -130580.6,
+      "x": 31709.4,
+      "z": 201948.1,
       "driftSpeed": 0
     },
     {
       "name": "Shadowfen",
       "region": "forest",
       "house": "House Shadowfen",
-      "x": -187889.5,
-      "z": -115538.9,
+      "x": 35428.9,
+      "z": 217242.3,
       "driftSpeed": 0
     },
     {
       "name": "Blighted Watch",
       "region": "forest",
       "house": "House Blightwatch",
-      "x": -215016.8,
-      "z": -97628,
+      "x": 22598.4,
+      "z": 235641.3,
       "driftSpeed": 0
     },
     {
       "name": "Bleakmire",
       "region": "forest",
       "house": "House Bleak",
-      "x": -227336.8,
-      "z": -107981.7,
+      "x": -2694.6,
+      "z": 256378.1,
       "driftSpeed": 0
     },
     {
       "name": "Wraith's End",
       "region": "forest",
       "house": "House Wraith",
-      "x": 69090.2,
-      "z": 132707.2,
+      "x": 97760.6,
+      "z": -113258.6,
       "driftSpeed": 0
     },
     {
       "name": "Cullfield",
       "region": "forest",
       "house": "House Cull",
-      "x": -227263,
-      "z": -141993.4,
+      "x": 103413.1,
+      "z": 252465.2,
       "driftSpeed": 0
     },
     {
       "name": "Terminus",
       "region": "mountain",
       "house": "House Terminus",
-      "x": -250613.9,
-      "z": -131290.9,
+      "x": 52163.9,
+      "z": 278071.1,
       "driftSpeed": 0
     },
     {
       "name": "Silt-Reach",
       "region": "dunes",
       "house": "House of Silt",
-      "x": 305001.9,
-      "z": 27061.7,
+      "x": 349477.4,
+      "z": -18493.6,
       "driftSpeed": 0.12
     },
     {
       "name": "Siphon-Wells",
       "region": "dunes",
       "house": "Aquifer Guild",
-      "x": 473112.5,
-      "z": 181306.3,
+      "x": 508095.5,
+      "z": 170188.5,
       "driftSpeed": 0.08
     },
     {
       "name": "Stygian Basin",
       "region": "dunes",
       "house": "Basin Compact",
-      "x": 275298.4,
-      "z": 242656.6,
+      "x": 316614.9,
+      "z": 278518.2,
       "driftSpeed": 0.15
     },
     {
       "name": "Dust-Haven",
       "region": "dunes",
       "house": "Oasis Remnant",
-      "x": 359969.2,
-      "z": 443356.3,
+      "x": 353550,
+      "z": 494097.9,
       "driftSpeed": 0.1
     },
     {
       "name": "The Glass Flotilla",
       "region": "dunes",
       "house": "Vitreous Order",
-      "x": 123360.7,
-      "z": 424802.9,
+      "x": 169124.6,
+      "z": 463522.4,
       "driftSpeed": 0.14
     },
     {
       "name": "Salt-Marrow",
       "region": "dunes",
       "house": "Salt Syndicate",
-      "x": 33204.1,
-      "z": 344870.3,
+      "x": 35688.5,
+      "z": 377607,
       "driftSpeed": 0.09
     },
     {
       "name": "Filament Watch",
       "region": "dunes",
       "house": "Watchers of the Filament",
-      "x": -113312.4,
-      "z": 512654.6,
+      "x": -198896.7,
+      "z": 528991,
       "driftSpeed": 0.11
     },
     {
       "name": "Causal Drift",
       "region": "dunes",
       "house": "Archival Remnant",
-      "x": -276279.4,
-      "z": 323592.8,
+      "x": -244122.9,
+      "z": 379241.8,
       "driftSpeed": 0.07
     },
     {
       "name": "Zephyr Bastion",
       "region": "dunes",
       "house": "Zephyr Legion",
-      "x": -466458.7,
-      "z": 360378.1,
+      "x": -534767.6,
+      "z": 345866.9,
       "driftSpeed": 0.13
     },
     {
       "name": "Mirage End",
       "region": "dunes",
       "house": "Mirage Seekers",
-      "x": -446022.5,
-      "z": 129231.1,
+      "x": -488688.9,
+      "z": 185530.9,
       "driftSpeed": 0.16
     },
     {
       "name": "Dune-Grave",
       "region": "dunes",
       "house": "Bone Dredgers",
-      "x": -375693.9,
-      "z": -8048.8,
+      "x": -408276.5,
+      "z": -16376.5,
       "driftSpeed": 0.09
     },
     {
       "name": "Deep Aquifer",
       "region": "dunes",
       "house": "Vault Custodians",
-      "x": -543819.3,
-      "z": -179230,
+      "x": -578407.5,
+      "z": -137283.2,
       "driftSpeed": 0.06
     },
     {
       "name": "Silt-Hollow",
       "region": "dunes",
       "house": "Hollow Reeds",
-      "x": -336320.7,
-      "z": -278333.6,
+      "x": -378647.1,
+      "z": -295526.6,
       "driftSpeed": 0.12
     },
     {
       "name": "The Churned Spire",
       "region": "dunes",
       "house": "Spire Order",
-      "x": -164642.5,
-      "z": -281449.7,
+      "x": -237076.8,
+      "z": -279084.9,
       "driftSpeed": 0.11
     },
     {
       "name": "Obsidian Outpost",
       "region": "dunes",
       "house": "Obsidian Site-9",
-      "x": -126623.1,
-      "z": -499791.4,
+      "x": -152052,
+      "z": -530701.2,
       "driftSpeed": 0.1
     },
     {
       "name": "Sand-Weave",
       "region": "dunes",
       "house": "Silk Drifters",
-      "x": 24183.8,
-      "z": -386088.4,
+      "x": -33088.4,
+      "z": -436653.9,
       "driftSpeed": 0.14
     },
     {
       "name": "The Sunken Vault",
       "region": "dunes",
       "house": "Vault Preservers",
-      "x": 240277.7,
-      "z": -547886.2,
+      "x": 146665,
+      "z": -606301.4,
       "driftSpeed": 0.07
     },
     {
       "name": "Caravan's Rest",
       "region": "dunes",
       "house": "Nomad Coalition",
-      "x": 287144.2,
-      "z": -362210.6,
+      "x": 278691.4,
+      "z": -426683.2,
       "driftSpeed": 0.13
     },
     {
       "name": "Echo Basin",
       "region": "dunes",
       "house": "Resonance Guild",
-      "x": 311341.3,
-      "z": -186027.8,
+      "x": 340993.7,
+      "z": -200376,
       "driftSpeed": 0.09
     },
     {
       "name": "Vortex Point",
       "region": "dunes",
       "house": "Threshold Watch",
-      "x": 494327,
-      "z": -146916,
+      "x": 567229.3,
+      "z": -127337.4,
       "driftSpeed": 0.18
     }
   ],
   "ancestors": [
     {
-      "id": "actor_yr_1",
-      "name": "Warden Kaelen of Year 1",
+      "id": "agt_4",
+      "name": "Apprentice Jon",
       "birthDay": 1,
-      "deathDay": 730,
+      "deathDay": 21,
       "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
+      "cause": "Frost ambush during 14-day Shift",
       "survivors": [
         "No recorded kin; survived only by settlement creditors"
       ],
-      "definingCrucible": "The Breach at Gate 1",
-      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
-    },
-    {
-      "id": "actor_yr_2",
-      "name": "Warden Kaelen of Year 2",
-      "birthDay": 1,
-      "deathDay": 1095,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 2",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_3",
-      "name": "Warden Kaelen of Year 3",
-      "birthDay": 1,
-      "deathDay": 1460,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 3",
+      "definingCrucible": "The Cold Midnight on the Boundary Ditches",
       "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
-    },
-    {
-      "id": "actor_yr_4",
-      "name": "Warden Kaelen of Year 4",
-      "birthDay": 1,
-      "deathDay": 1825,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 4",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_5",
-      "name": "Warden Kaelen of Year 5",
-      "birthDay": 1,
-      "deathDay": 2190,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 5",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
-    },
-    {
-      "id": "actor_yr_6",
-      "name": "Warden Kaelen of Year 6",
-      "birthDay": 1,
-      "deathDay": 2555,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 6",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
-    },
-    {
-      "id": "actor_yr_7",
-      "name": "Warden Kaelen of Year 7",
-      "birthDay": 1,
-      "deathDay": 2920,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 7",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_8",
-      "name": "Warden Kaelen of Year 8",
-      "birthDay": 1,
-      "deathDay": 3285,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 8",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_9",
-      "name": "Warden Kaelen of Year 9",
-      "birthDay": 1,
-      "deathDay": 3650,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 9",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_10",
-      "name": "Warden Kaelen of Year 10",
-      "birthDay": 1,
-      "deathDay": 4015,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 10",
-      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
-    },
-    {
-      "id": "actor_yr_11",
-      "name": "Warden Kaelen of Year 11",
-      "birthDay": 1,
-      "deathDay": 4380,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 11",
-      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
-    },
-    {
-      "id": "actor_yr_12",
-      "name": "Warden Kaelen of Year 12",
-      "birthDay": 1,
-      "deathDay": 4745,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 0",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_13",
-      "name": "Warden Kaelen of Year 13",
-      "birthDay": 1,
-      "deathDay": 5117,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 1",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
-    },
-    {
-      "id": "actor_yr_14",
-      "name": "Warden Kaelen of Year 14",
-      "birthDay": 1,
-      "deathDay": 5475,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 2",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
-    },
-    {
-      "id": "actor_yr_15",
-      "name": "Warden Kaelen of Year 15",
-      "birthDay": 1,
-      "deathDay": 5840,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 3",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
-    },
-    {
-      "id": "actor_yr_16",
-      "name": "Warden Kaelen of Year 16",
-      "birthDay": 1,
-      "deathDay": 6205,
-      "ageYears": 16,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 4",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_17",
-      "name": "Warden Kaelen of Year 17",
-      "birthDay": 1,
-      "deathDay": 6570,
-      "ageYears": 17,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 5",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_18",
-      "name": "Warden Kaelen of Year 18",
-      "birthDay": 1,
-      "deathDay": 6935,
-      "ageYears": 18,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 6",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
-    },
-    {
-      "id": "actor_yr_19",
-      "name": "Warden Kaelen of Year 19",
-      "birthDay": 1,
-      "deathDay": 7300,
-      "ageYears": 19,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 7",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
-    },
-    {
-      "id": "actor_yr_20",
-      "name": "Warden Kaelen of Year 20",
-      "birthDay": 1,
-      "deathDay": 7665,
-      "ageYears": 20,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 8",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
-    },
-    {
-      "id": "actor_yr_21",
-      "name": "Warden Kaelen of Year 21",
-      "birthDay": 1,
-      "deathDay": 8030,
-      "ageYears": 21,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 9",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_22",
-      "name": "Warden Kaelen of Year 22",
-      "birthDay": 1,
-      "deathDay": 8395,
-      "ageYears": 22,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 10",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
-    },
-    {
-      "id": "actor_yr_23",
-      "name": "Warden Kaelen of Year 23",
-      "birthDay": 1,
-      "deathDay": 8760,
-      "ageYears": 23,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 11",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_24",
-      "name": "Warden Kaelen of Year 24",
-      "birthDay": 1,
-      "deathDay": 9125,
-      "ageYears": 24,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 0",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_25",
-      "name": "Warden Kaelen of Year 25",
-      "birthDay": 1,
-      "deathDay": 9490,
-      "ageYears": 25,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 1",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
-    },
-    {
-      "id": "actor_yr_26",
-      "name": "Warden Kaelen of Year 26",
-      "birthDay": 1,
-      "deathDay": 9855,
-      "ageYears": 26,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 2",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
-    },
-    {
-      "id": "actor_yr_27",
-      "name": "Warden Kaelen of Year 27",
-      "birthDay": 1,
-      "deathDay": 10227,
-      "ageYears": 28,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 3",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
-    },
-    {
-      "id": "actor_yr_28",
-      "name": "Warden Kaelen of Year 28",
-      "birthDay": 1,
-      "deathDay": 10585,
-      "ageYears": 28,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 4",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_29",
-      "name": "Warden Kaelen of Year 29",
-      "birthDay": 1,
-      "deathDay": 10950,
-      "ageYears": 29,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 5",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_30",
-      "name": "Warden Kaelen of Year 30",
-      "birthDay": 1,
-      "deathDay": 11315,
-      "ageYears": 30,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 6",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_31",
-      "name": "Warden Kaelen of Year 31",
-      "birthDay": 1,
-      "deathDay": 11680,
-      "ageYears": 31,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 7",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
-    },
-    {
-      "id": "actor_yr_32",
-      "name": "Warden Kaelen of Year 32",
-      "birthDay": 1,
-      "deathDay": 12045,
-      "ageYears": 32,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 8",
-      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
-    },
-    {
-      "id": "actor_yr_33",
-      "name": "Warden Kaelen of Year 33",
-      "birthDay": 1,
-      "deathDay": 12410,
-      "ageYears": 33,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 9",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
-    },
-    {
-      "id": "actor_yr_34",
-      "name": "Warden Kaelen of Year 34",
-      "birthDay": 1,
-      "deathDay": 12775,
-      "ageYears": 34,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 10",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_35",
-      "name": "Warden Kaelen of Year 35",
-      "birthDay": 3285,
-      "deathDay": 13140,
-      "ageYears": 27,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 11",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
-    },
-    {
-      "id": "actor_yr_36",
-      "name": "Warden Kaelen of Year 36",
-      "birthDay": 1,
-      "deathDay": 13505,
-      "ageYears": 36,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 0",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
-    },
-    {
-      "id": "actor_yr_37",
-      "name": "Warden Kaelen of Year 37",
-      "birthDay": 2555,
-      "deathDay": 13870,
-      "ageYears": 31,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 1",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
-    },
-    {
-      "id": "actor_yr_38",
-      "name": "Warden Kaelen of Year 38",
-      "birthDay": 1,
-      "deathDay": 14235,
-      "ageYears": 38,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 2",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_39",
-      "name": "Warden Kaelen of Year 39",
-      "birthDay": 1,
-      "deathDay": 14600,
-      "ageYears": 39,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 3",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
-    },
-    {
-      "id": "actor_yr_40",
-      "name": "Warden Kaelen of Year 40",
-      "birthDay": 6570,
-      "deathDay": 14965,
-      "ageYears": 23,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 4",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
-    },
-    {
-      "id": "actor_yr_41",
-      "name": "Warden Kaelen of Year 41",
-      "birthDay": 2920,
-      "deathDay": 15337,
-      "ageYears": 34,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 5",
-      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
-    },
-    {
-      "id": "actor_yr_42",
-      "name": "Warden Kaelen of Year 42",
-      "birthDay": 6577,
-      "deathDay": 15695,
-      "ageYears": 24,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 6",
-      "epitaph": "\"They left their iron in the ditch and their name to the winter wind.\""
-    },
-    {
-      "id": "actor_yr_43",
-      "name": "Warden Kaelen of Year 43",
-      "birthDay": 4380,
-      "deathDay": 16060,
-      "ageYears": 32,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 7",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_44",
-      "name": "Warden Kaelen of Year 44",
-      "birthDay": 1,
-      "deathDay": 16425,
-      "ageYears": 44,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 8",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
-    },
-    {
-      "id": "actor_yr_45",
-      "name": "Warden Kaelen of Year 45",
-      "birthDay": 2555,
-      "deathDay": 16790,
-      "ageYears": 39,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 9",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
-    },
-    {
-      "id": "actor_yr_46",
-      "name": "Warden Kaelen of Year 46",
-      "birthDay": 9125,
-      "deathDay": 17155,
-      "ageYears": 22,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 10",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
-    },
-    {
-      "id": "actor_yr_47",
-      "name": "Warden Kaelen of Year 47",
-      "birthDay": 365,
-      "deathDay": 17520,
-      "ageYears": 47,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 11",
-      "epitaph": "\"No bell was rung when the chain went slack, but the mist remembers where they stood.\""
-    },
-    {
-      "id": "actor_yr_48",
-      "name": "Warden Kaelen of Year 48",
-      "birthDay": 6570,
-      "deathDay": 17885,
-      "ageYears": 31,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 0",
-      "epitaph": "\"He counted the paces the cold forgot; the Gate stands heavier for his silence.\""
-    },
-    {
-      "id": "actor_yr_49",
-      "name": "Warden Kaelen of Year 49",
-      "birthDay": 6935,
-      "deathDay": 18250,
-      "ageYears": 31,
-      "cause": "Old age and 14-day Shift frost exposure",
-      "survivors": [
-        "No recorded kin; survived only by settlement creditors"
-      ],
-      "definingCrucible": "The Breach at Gate 1",
-      "epitaph": "\"A life weighed in pine-resin and measured by the shifting stones.\""
     }
   ],
   "epistemicLedger": {
-    "totalDispatches": 100,
+    "totalDispatches": 35,
     "recentDispatches": [
       {
-        "id": "disp_18250_fuel",
-        "day": 18250,
+        "id": "disp_21_fuel",
+        "day": 21,
         "type": "INSPECTION REPORT",
         "sender": "Basalt Brazier Overseer Mallow",
         "title": "Barrier Pressure Fluctuation (0 Units Left)",
@@ -1010,8 +386,8 @@
         "read": false
       },
       {
-        "id": "disp_18249_fuel",
-        "day": 18249,
+        "id": "disp_14_fuel",
+        "day": 14,
         "type": "INSPECTION REPORT",
         "sender": "Basalt Brazier Overseer Mallow",
         "title": "Barrier Pressure Fluctuation (0 Units Left)",
@@ -1019,8 +395,8 @@
         "read": false
       },
       {
-        "id": "disp_18248_fuel",
-        "day": 18248,
+        "id": "disp_13_fuel",
+        "day": 13,
         "type": "INSPECTION REPORT",
         "sender": "Basalt Brazier Overseer Mallow",
         "title": "Barrier Pressure Fluctuation (0 Units Left)",
@@ -1028,17 +404,17 @@
         "read": false
       },
       {
-        "id": "disp_18247_fuel",
-        "day": 18247,
-        "type": "INSPECTION REPORT",
-        "sender": "Basalt Brazier Overseer Mallow",
-        "title": "Barrier Pressure Fluctuation (0 Units Left)",
-        "body": "The violet rim above the outer moat flickered twice during third watch. Bailiffs reported copper tastes in well water. Without fresh pine resin before dusk, outer wards fall below safe radius.",
+        "id": "disp_13_shift",
+        "day": 13,
+        "type": "URGENT DISPATCH",
+        "sender": "Border Outpost IX (The Silt-Dike)",
+        "title": "Spatial Drift Warning — Shift in 1 Days",
+        "body": "The surveyor’s lead weight hung at a four-degree slant toward the forest all morning. The road is shortening; milestone twelve has slipped twenty paces into the moss. Station masters have doubled the grease on the gate pulleys.",
         "read": false
       },
       {
-        "id": "disp_18246_fuel",
-        "day": 18246,
+        "id": "disp_13_fuel",
+        "day": 13,
         "type": "INSPECTION REPORT",
         "sender": "Basalt Brazier Overseer Mallow",
         "title": "Barrier Pressure Fluctuation (0 Units Left)",

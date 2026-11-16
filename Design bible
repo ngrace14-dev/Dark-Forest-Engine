@@ -975,3 +975,37 @@ Because literacy in the Ash-Tongue grants literal power over flesh, stone, and s
 *   **Methods:** Neutral, blindfolded monks who hunt down rogue bindrunes and deface forbidden monuments. To destroy a powerful rune without triggering its backlash, they use hammered lead mallets and vinegar-ash to scrub the staves down to smooth stone.
 *   **Secret:** Only the Dust-Wardens preserve the true shape of the 25th Nameless Rune, divided into three fragments carried by their three blind High Wardens so no single person can ever assemble it.
 
+# ADDENDUM BY: TEMPORAL RELATIVITY, THE 6,000-YEAR GAP, THE TERMINUS 95% ROTATIONAL FAILURE & SETTLEMENT #7 ("EPITAPH")
+
+## 1. Temporal Relativity & The 6,000-Year Blind Spot (12,000 Perceived vs. 18,000 Objective Years)
+*   **Objective Time (18,000 Years):** It has been 18,000 objective years since the betrayal of Korvan (the ancient Champion of Light) by the Founders.
+*   **Perceived Time (12,000 Years):** Everyone inside the Dark Forest—all 20 surface settlements, the 19 Noble Houses, and the Crown (House Aethel) itself—believes it has only been 12,000 years since "the Hero saved the world."
+*   **Why the 6,000-Year Gap Exists (The 7-Day White Void):** Every 14 days, when the Shift occurs, everyone inside the Dark Forest experiences the reconfiguration as an instantaneous blink (0 elapsed days). In objective physical reality, however, the Forest dissolves into the **White Void for 7 full days** before reforming. Over 12,000 perceived Forest years (21 objective days per 14 perceived Forest days), **6,000 objective years** have elapsed inside the White Void without the Forest or the Crown ever perceiving them.
+*   **Who Knows What:**
+    *   The **19 Noble Houses** genuinely believe their ancestors did what they could to save the world.
+    *   The **Crown (House Aethel)** knows the historical truth of the ancient betrayal and ruthlessly kills or controls anyone who uncovers it, **but the Crown itself does NOT know that 6,000 years are missing**—because the Capital sits at the center of the Forest ($r = 0$) and skips the 7-day White Void alongside the rest of the Forest.
+    *   **House Terminus's Guarded Secret:** Only House Terminus (whose true noble manor and 300 Guardians are garrisoned on the Mountain Ring outside the Forest's perception skip) and the hidden village of **Epitaph** know about the missing 6,000 years. Terminus guards this secret even from the Crown because they know how dangerous it would be for anyone else—the Crown included—to realize 6,000 years are missing.
+*   **Why Terminus Nobles & Guardians "Age Faster":** Terminus nobles and the 300 Guardians are not magically cursed; they simply **persist for $1.5\times\text{–}2\times$ longer** than what the Forest perceives because they live through the 7 days of the White Void on the Mountain Ring while the Forest skips those days.
+
+## 2. The Vistas of Truth & The Terminus 95% Understanding Failure (Mountain Rotation)
+*   **From the Mountains & Dunes $\rightarrow$ The True Nature of the Forest:** Observers in the Mountain Ring ($r \approx 100\text{–}280\text{km}$) and Endless Dunes ($r > 280\text{km}$) sit outside the Forest's perception skip and witness the true nature of the Dark Forest (the 7-day White Void).
+*   **From the Dunes Only $\rightarrow$ The True Nature of the Mountains:** House Terminus suffers from a **95% Understanding Failure**. Terminus believes they understand everything because they witness the 7-day White Void and guard the 18,000-year timeline, but they do NOT realize that **during the 7 days of the White Void—with the Forest dissolved and no inner spatial reference point—the Mountain Ring itself rotates**. Only from the **Endless Dunes** ($r > 280\text{km}$) can the true rotational drift of the Mountains be gleaned.
+
+## 3. System Specification: Settlement #7 — "Epitaph" (Systemic Pressure, Not Direct Driver)
+*   **Architectural Identity & The "Score of Places" (20 vs. 21) Illusion:**
+    *   Settlement #7 (`name: "Epitaph"`) is located inside the Mountain Event Horizon ($r \approx 100\text{–}280\text{km}$) with `hiddenGapKeeper: true` and `objectiveTimelineAnchor: true`.
+    *   Surface-level world telemetry ("The General Ledger") must always report **20** active settlements ("a score of places": the 19 competing Noble Houses plus 1 permanent, non-competing Crown seat). Epitaph exists as the **21st physical settlement** in the data layer, suppressed from standard UI and Crown assessor registries by active Fallen-Era illusion runes until `blindSpotEntropy` breaches the reveal threshold (`>= 85`).
+*   **Cultural & Technological Profile (Fallen-Era Runic Mundanity):**
+    *   Direct descendants of the merchant and support bloodlines who supplied Korvan and his party before his betrayal 18,000 objective years ago.
+    *   Unlike the 19 Houses (which depend on Crown barrier fuel and treat runes as rare relics), Epitaph preserved everyday "household" merchant runic literacy from the Fallen Era (*Cultivation Runes* for uncorrupted grain, *Simple House Runes* for smokeless radiant heat, and *Lost Illusion Runes* for sensor masking and invisible traversal).
+    *   Epitaph does not participate in the standard Noble House fuel economy or competition loops, and its operatives traverse and infiltrate all 19 Houses without triggering border or patrol logs.
+*   **Active Simulation Behavior (Probabilistic Pressure, Not Deterministic Control):**
+    *   Epitaph never overrides NPC agency or deterministically forces outcomes; it acts strictly as a **continuous background probabilistic pressure** (a subtle thumb on the scale).
+    *   **The Noble Funnel (Hero Baiting):** Epitaph operatives apply a probabilistic bias to House prestige events and selection weights to inflate noble arrogance and Story Density, nudging Founder-bloodline nobles into claiming the **Huntsman's Mark (Spherical Idol)** more frequently than common villagers.
+    *   **Huntsman Vectoring:** Once a Founder-bloodline noble bears the Huntsman's Mark, Epitaph subtly biases their route probabilities toward the Huntsman's path.
+    *   **Asymmetric Cold War vs. The 300 Guardians:** While the 300 Guardians maintain mountain containment to prevent the Founders' descendants from reaping what their ancestors sowed, Epitaph applies covert valley pressure to funnel those bloodlines toward Korvan's reach.
+*   **The Tragic Unilateral Alignment Rule:**
+    *   Epitaph views itself as Korvan's ally (`epitaphAlignmentToKorvan: "UNILATERAL_ALLY"`), trying to support someone who gave everything and was betrayed.
+    *   **Korvan is NOT their ally—Korvan is only Korvan's ally** (`korvanAlignment: "KORVAN_ONLY"`, `hasFreeWill: false`). Consumed by corruption and betrayal-rage, Korvan grants Epitaph zero immunity; if Epitaph's pressure ever weakens containment or exposes them to Korvan, Korvan's AI targets and consumes Epitaph operatives and Founder nobles identically.
+
+

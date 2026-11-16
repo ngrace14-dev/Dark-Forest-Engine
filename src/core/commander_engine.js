@@ -1,0 +1,1295 @@
+/**
+ * File: src/core/commander_engine.js
+ * Clean-Room Headless Commander Simulation Core.
+ *
+ * Designed for dual-path execution:
+ * 1. Immediate Prologue Soft-Launch on Title Card Boot (zero Three.js / WebGL / DOM dependencies).
+ * 2. Foldable In-Game Commander System that the player can unlock and toggle during the 3D Sandbox.
+ */
+
+const rootScope = typeof window !== 'undefined' ? window : globalThis;
+
+// Ensure minimal global state hooks exist even before 3D engine boot
+rootScope.EngineParams = rootScope.EngineParams || {
+    worldDay: 1,
+    worldEpoch: 0,
+    timeScale: 1,
+    mountainRotation: 0
+};
+
+if (!rootScope.EventBus) {
+    rootScope.EventBus = {
+        events: {},
+        on(event, listener) {
+            if (!this.events[event]) this.events[event] = [];
+            this.events[event].push(listener);
+        },
+        off(event, listener) {
+            if (!this.events[event]) return;
+            this.events[event] = this.events[event].filter(l => l !== listener);
+        },
+        emit(event, data) {
+            if (!this.events[event]) return;
+            this.events[event].forEach(listener => {
+                try { listener(data); } catch (err) { console.error(`[EventBus:${event}]`, err); }
+            });
+        }
+    };
+}
+
+export const BIRTHRIGHTS = {
+    STORM_BORN: { id: 'STORM_BORN', title: 'Storm-Born', desc: '+20% Void Resistance; immune to Void Tremors.', poiseBonus: 10, voidImmune: true },
+    CHAMPION_KIN: { id: 'CHAMPION_KIN', title: 'Champion-Kin', desc: 'Poise floor 80; +15% Melee attack.', poiseBonus: 20, attackBonus: 15 },
+    HOUSE_REMNANT: { id: 'HOUSE_REMNANT', title: 'House Remnant', desc: '+20 Starting Significance; high morale floor.', sigBonus: 20 },
+    ECHO_OF_THE_SEAL: { id: 'ECHO_OF_THE_SEAL', title: 'Echo of the Seal', desc: 'Spatial prescience; +25% scouting efficiency.', scoutBonus: 25 },
+    ASH_BOUND: { id: 'ASH_BOUND', title: 'Ash-Bound', desc: '-25% Food needs during winter Shifts; immune to frostbite.', coldImmune: true },
+    DEEP_SIGHT: { id: 'DEEP_SIGHT', title: 'Deep-Sight', desc: '+20 Lore/Scribe affinity; deciphers ancient syntax.', loreBonus: 20 }
+};
+
+export const CANONICAL_BEDROCK_SETTLEMENTS = [
+    { id: 0, name: "The Capital", house: "House Aethel", industry: "barrier_fuel", population: 62500, barrierFuel: 500, chainsIntegrity: 100, isCrownSeat: true },
+    { id: 1, name: "Oakhaven", house: "House Oakheart", industry: "ironwood", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 2, name: "Gallows Hill", house: "House Gallows", industry: "runic_dust", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 3, name: "Mire's Edge", house: "House Mire", industry: "toxic_fungi", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 4, name: "Blackwood", house: "House Blackwood", industry: "weevil_fluid", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 5, name: "Hollow Creek", house: "House Hollow", industry: "gator_leather", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 6, name: "Ashen Hold", house: "House Ashen", industry: "basalt_tablets", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    {
+        id: 7,
+        name: "Epitaph",
+        house: "Hidden Sanctuary of Epitaph",
+        industry: "fallen_era_household_runes",
+        population: 4200,
+        barrierFuel: 0,
+        chainsIntegrity: 100,
+        rKm: 185,
+        region: "mountain_event_horizon",
+        hiddenGapKeeper: true,
+        objectiveTimelineAnchor: true,
+        concealedByFallenEraRunes: true,
+        fuelIndependent: true,
+        participatesInHouseCompetition: false
+    },
+    { id: 8, name: "Crow's Perch", house: "House Crow", industry: "intel", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 9, name: "Widow's Web", house: "House Widow", industry: "cold_resin", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 10, name: "Thornbury", house: "House Thorn", industry: "pacifying_wax", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 11, name: "Gloomhaven", house: "House Gloom", industry: "gloom_glass", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 12, name: "Duskendale", house: "House Dusken", industry: "kinetic_silk", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 13, name: "Grimsby", house: "House Grim", industry: "tether_chains", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 14, name: "Shadowfen", house: "House Shadowfen", industry: "pre_fuel_matrix", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 15, name: "Blighted Watch", house: "House Blightwatch", industry: "conduit_rods", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 16, name: "Bleakmire", house: "House Bleak", industry: "pale_caps", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 17, name: "Wraith's End", house: "House Wraith", industry: "abyssal_oil", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 18, name: "Cullfield", house: "House Cull", industry: "cardiac_catalysts", population: 9868, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 19, name: "Terminus", house: "House Terminus", industry: "containment_defense", population: 9876, barrierFuel: 50, chainsIntegrity: 100 },
+    { id: 20, name: "Aegis Rest (Outer Ward)", house: "Crown Outer Sanctuary", industry: "spatial_stabilization", population: 6400, barrierFuel: 50, chainsIntegrity: 100 }
+];
+
+// ============================================================================
+// 1. AGENT ROSTER MANAGER
+// ============================================================================
+const AgentRosterManager = rootScope.AgentRosterManager || {
+    agents: new Map(),
+
+    createAgent(id, name, archeType = 'SURVIVOR') {
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const bKeys = Object.keys(BIRTHRIGHTS);
+        const birthright = BIRTHRIGHTS[bKeys[Math.floor(Math.random() * bKeys.length)]];
+
+        const agent = {
+            id,
+            name,
+            identity: 'ACTIVE',
+            alive: true,
+            isHarvested: false,
+            birthDay: Math.max(1, day - 20 * 365),
+            firstShiftSurvivedDay: Math.ceil(day / 14) * 14,
+            shiftsSurvived: 0,
+            birthright,
+            vitals: { hp: 100, maxHp: 100, stamina: 100, poise: 60 + (birthright.poiseBonus || 0), hunger: 100 },
+            reflexes: { shock: 0, adrenaline: 0, exhaustion: 0 },
+            skills: { strength: 1, toughness: 1, athletics: 1, dodge: 1, meleeAtt: 1, meleeDef: 1, stealth: 1, lore: 1, survival: 1 },
+            operatingStance: { mode: 'IDLE', discipline: null, task: null, daysTrained: 0 },
+            statusEffects: [],
+            career: { id: archeType === 'WAR_MASTER' ? 'warden' : 'scout', level: 1, rank: 'Novice', xp: 0 },
+            cultivation: { stage: 0, foundationFireDays: 0, bonusLifespanYears: 0, isCultivatedGuardian: false },
+            significance: 20 + (birthright.sigBonus || 0),
+            assignedHouseId: 'House Terminus'
+        };
+
+        this.agents.set(id, agent);
+        return agent;
+    },
+
+    setTraining(agentId, discipline) {
+        const agent = this.agents.get(agentId);
+        if (!agent || !agent.alive) return { success: false, message: "Agent invalid or deceased." };
+        agent.operatingStance = { mode: 'TRAIN', discipline: discipline.toUpperCase(), task: null, daysTrained: 0 };
+        return { success: true, message: `${agent.name} assigned to drill: [TRAIN: ${discipline.toUpperCase()}].` };
+    },
+
+    setTask(agentId, taskType, targetId = null) {
+        const agent = this.agents.get(agentId);
+        if (!agent || !agent.alive) return { success: false, message: "Agent invalid or deceased." };
+        agent.operatingStance = { mode: 'TASK', discipline: null, task: taskType.toUpperCase(), targetId, daysTrained: 0 };
+        return { success: true, message: `${agent.name} dispatched: [TASK: ${taskType.toUpperCase()}].` };
+    },
+
+    assignTask(agentId, taskType, targetId = null) {
+        return this.setTask(agentId, taskType, targetId);
+    },
+
+    tickDailyDrills() {
+        this.agents.forEach(agent => {
+            if (!agent.alive) return;
+            const st = agent.operatingStance;
+            if (st.mode === 'TRAIN' && st.discipline) {
+                st.daysTrained = (st.daysTrained || 0) + 1;
+                if (st.discipline === 'LOGISTICS') {
+                    agent.skills.lore = Math.min(20, agent.skills.lore + 0.25);
+                    if (st.daysTrained >= 7 && agent.career.rank !== 'Logistics Bailiff') {
+                        agent.career.rank = 'Logistics Bailiff';
+                        rootScope.EventBus?.emit('UI_LOG', `📜 [ROSTER] ${agent.name} promoted to Logistics Bailiff!`);
+                    }
+                } else if (st.discipline === 'MARTIAL') {
+                    agent.skills.meleeAtt = Math.min(20, agent.skills.meleeAtt + 0.1);
+                } else if (st.discipline === 'DEFENSE') {
+                    agent.skills.meleeDef = Math.min(20, agent.skills.meleeDef + 0.1);
+                    agent.vitals.poise = Math.min(100, agent.vitals.poise + 0.2);
+                }
+            }
+            agent.statusEffects = (agent.statusEffects || []).filter(eff => {
+                eff.daysRemaining = (eff.daysRemaining || 1) - 1;
+                return eff.daysRemaining > 0;
+            });
+        });
+    },
+
+    applyShiftSurvivalConditions(barrierHealthy = true, starved = false, breachFought = false) {
+        this.agents.forEach(agent => {
+            if (!agent.alive) return;
+            agent.shiftsSurvived = (agent.shiftsSurvived || 0) + 1;
+            agent.statusEffects ??= [];
+            if (barrierHealthy) {
+                agent.statusEffects.push({ id: 'SHIFT_VIGOR', name: 'Shift Vigor', type: 'BUFF', daysRemaining: 14, desc: '+15 Poise' });
+                agent.vitals.poise = Math.min(100, agent.vitals.poise + 15);
+            } else if (!agent.birthright?.voidImmune) {
+                agent.statusEffects.push({ id: 'VOID_TREMORS', name: 'Void Tremors', type: 'DEBUFF', daysRemaining: 7, desc: '-10 Poise' });
+                agent.vitals.poise = Math.max(10, agent.vitals.poise - 10);
+            }
+            if (breachFought) {
+                agent.statusEffects.push({ id: 'VETERAN_POISE', name: 'Veteran Poise', type: 'BUFF', daysRemaining: 52, desc: '+20 Defense' });
+            }
+            if (starved && !agent.birthright?.coldImmune) {
+                agent.statusEffects.push({ id: 'FAMINE_SCARRED', name: 'Famine Scarred', type: 'DEBUFF', daysRemaining: 26, desc: '-10 Max HP' });
+                agent.vitals.maxHp = Math.max(30, agent.vitals.maxHp - 10);
+            }
+        });
+    },
+
+    cultivateTerminusRunic(agentId, houseState) {
+        const agent = this.agents.get(agentId);
+        if (!agent || !agent.alive) return { success: false, message: "Agent invalid or deceased." };
+        if ((houseState.barrierFuelUnits || 0) < 10) {
+            return { success: false, message: "Insufficient refined barrier fuel (Requires 10 units minimum)." };
+        }
+        houseState.barrierFuelUnits -= 10;
+        agent.cultivation.stage = (agent.cultivation.stage || 0) + 1;
+        if (agent.cultivation.stage < 3) {
+            return { success: true, message: `Terminus Bone-Carving Stage ${agent.cultivation.stage}/3 complete for ${agent.name}. Ancient syntax engraved.` };
+        }
+        agent.cultivation.isCultivatedGuardian = true;
+        agent.cultivation.bonusLifespanYears += 500;
+        agent.cultivation.foundationFireDays = 14;
+        agent.career.rank = 'Guardian of the 300';
+        agent.significance += 45;
+        agent.vitals.maxHp += 50;
+        agent.vitals.hp = agent.vitals.maxHp;
+        agent.vitals.poise = 100;
+        agent.statusEffects.push({ id: 'FOUNDATION_FIRE', name: 'Foundation Fire', type: 'SURGE', daysRemaining: 14, desc: '+200% all combat effectiveness' });
+        rootScope.EventBus?.emit('UI_LOG', `🔥 [TERMINUS] BREAKTHROUGH SURGE: ${agent.name} has ignited the Foundation Fire and joined the 300 Guardians! (+500y Lifespan)`);
+        return { success: true, message: `BREAKTHROUGH ASCENSION! ${agent.name} is now an immortal Guardian of the 300 (+500y lifespan, Foundation Fire ignited).` };
+    }
+};
+rootScope.AgentRosterManager = AgentRosterManager;
+
+// ============================================================================
+// 2. LOG DISPATCH MANAGER
+// ============================================================================
+const LogDispatchManager = rootScope.LogDispatchManager || {
+    dispatches: [],
+    unreadCount: 0,
+
+    init() {
+        rootScope.EventBus?.on('ENTITY_DIED', (data) => this.recordDeathNotice(data));
+    },
+
+    generateDailyDispatches(worldDay, campaignMode = 'HOUSE', state = {}) {
+        const newItems = [];
+        const shiftCountdown = 14 - (worldDay % 14);
+
+        if (shiftCountdown <= 3) {
+            newItems.push({
+                id: `disp_${worldDay}_shift`,
+                day: worldDay,
+                type: 'URGENT DISPATCH',
+                sender: 'Border Outpost IX (The Silt-Dike)',
+                title: `Spatial Drift Warning — Shift in ${shiftCountdown} Days`,
+                body: `The surveyor’s lead weight hung at a four-degree slant toward the forest all morning. The road is shortening; milestone twelve has slipped twenty paces into the moss. Station masters have doubled the grease on the gate pulleys.`
+            });
+        }
+
+        if (campaignMode === 'HOUSE') {
+            const h = state.house || {};
+            if (h.barrierFuelUnits <= 12) {
+                newItems.push({
+                    id: `disp_${worldDay}_fuel`,
+                    day: worldDay,
+                    type: 'INSPECTION REPORT',
+                    sender: 'Basalt Brazier Overseer Mallow',
+                    title: `Barrier Pressure Fluctuation (${h.barrierFuelUnits} Units Left)`,
+                    body: `The violet rim above the outer moat flickered twice during third watch. Bailiffs reported copper tastes in well water. Without fresh pine resin before dusk, outer wards fall below safe radius.`
+                });
+            } else {
+                newItems.push({
+                    id: `disp_${worldDay}_patrol`,
+                    day: worldDay,
+                    type: 'PATROL LOG',
+                    sender: 'Sergeant Kaelen, 3rd Horizon Watch',
+                    title: 'Eastern Gully Reconnaissance',
+                    body: `Found three empty resin casks abandoned in the bracken half a league past the chained perimeter. The stamps were chiselled off. Tracked them east toward salt marshes before pine needles buried the ruts.`
+                });
+            }
+        } else if (campaignMode === 'ORDER') {
+            newItems.push({
+                id: `disp_${worldDay}_ocp`,
+                day: worldDay,
+                type: 'OCP FORM 12-B',
+                sender: 'Directorate of Site Operations',
+                title: 'Containment Audit: Ledger Anomaly #77',
+                body: `Scribe Elyse flagged a discrepancy in the harvest rolls of 12,414 AF. The parchment was scraped thin and re-inked. The erased line named a settlement called 'Epitaph' inside the mountain mirage. The page is now sealed in basalt under three locks.`
+            });
+        } else if (campaignMode === 'DUNE') {
+            newItems.push({
+                id: `disp_${worldDay}_dune`,
+                day: worldDay,
+                type: 'PILOT LOG',
+                sender: 'Sand-Pilot Dane (Flotilla Keel Watch)',
+                title: 'Sounding Report: Silt Veil Streamline',
+                body: `Lead line touched riverbed at two hundred cubits. The subterranean current pulls inward at four knots toward the forest sinkhole. Solar stills yielded forty jugs, but brine residue smells sharply of scorched zinc.`
+            });
+        } else if (campaignMode === 'SYNDICATE') {
+            newItems.push({
+                id: `disp_${worldDay}_syn`,
+                day: worldDay,
+                type: 'SMUGGLER MANIFEST',
+                sender: 'Barge-Master Vance (Salt-Marrow Locks)',
+                title: 'Unstamped Resin Shipment Cleared',
+                body: `Three flat-bottomed skiffs slipped past the Gallows toll-chain under heavy river fog. Casks repacked in brine-salt barrels bound for the outer marshes.`
+            });
+        } else {
+            newItems.push({
+                id: `disp_${worldDay}_omen`,
+                day: worldDay,
+                type: 'OMEN RECORD',
+                sender: 'Watchtower III (The Frost-Line)',
+                title: 'Tremor in the Deep Bedrock',
+                body: `The fifty-ton anchor links rang twice at midnight without wind. Frost formed on the inner gate iron despite the braziers burning at full draft.`
+            });
+        }
+
+        newItems.forEach(item => {
+            item.read = false;
+            this.dispatches.unshift(item);
+            this.unreadCount++;
+            rootScope.EventBus?.emit('NEW_DISPATCH', item);
+        });
+
+        if (this.dispatches.length > 100) this.dispatches = this.dispatches.slice(0, 100);
+    },
+
+    recordDeathNotice(deathData) {
+        const victim = deathData?.victim || deathData?.id || 'Unknown Traveler';
+        const cause = deathData?.cause || 'perished in the fog';
+        const day = rootScope.EngineParams?.worldDay || 0;
+        const notice = {
+            id: `coroner_${day}_${Date.now()}`,
+            day,
+            type: 'CORONER MEMORANDUM',
+            sender: 'Parish Gravedigger & Bailiff',
+            title: `Mortality Record: ${victim}`,
+            body: `Remains recovered near boundary ditch. Cause noted: ${cause}. Possessions: 1 notched ash staff, 2 copper counters, woolen wraps, unaddressed letter. Interned beneath marked slate.`,
+            read: false
+        };
+        this.dispatches.unshift(notice);
+        this.unreadCount++;
+    },
+
+    getUnread() {
+        return this.dispatches.filter(d => !d.read);
+    },
+
+    markAllRead() {
+        this.dispatches.forEach(d => d.read = true);
+        this.unreadCount = 0;
+    }
+};
+LogDispatchManager.init();
+rootScope.LogDispatchManager = LogDispatchManager;
+
+
+// ============================================================================
+// 3. CRUCIBLE NARRATIVE ENGINE
+// ============================================================================
+const CrucibleNarrativeEngine = rootScope.CrucibleNarrativeEngine || {
+    crucibles: new Map(),
+    biographies: new Map(),
+    livingDossiers: new Map(),
+
+    init() {
+        rootScope.EventBus?.on('ENTITY_DIED', (data) => this.processActorDeath(data));
+        rootScope.EventBus?.on('ENTITY_DEATH', (data) => this.processActorDeath(data));
+        rootScope.EventBus?.on('CRUCIBLE_TRIGGERED', (data) => this.recordCrucible(data.actorId, data));
+    },
+
+    registerLivingActor(id, name, role = 'Warden', house = 'House Terminus', settlement = "World's End Gate") {
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const living = {
+            id,
+            name,
+            birthDay: Math.max(1, day - Math.floor(20 + Math.random() * 30) * 365),
+            role,
+            house,
+            settlement,
+            rank: 'Journeyman',
+            contractsFulfilled: Math.floor(Math.random() * 8) + 1,
+            truthsVerified: 0,
+            scars: [],
+            lineage: { spouse: null, children: [], apprentices: [], mentor: 'Master Cornelius' }
+        };
+        this.livingDossiers.set(id, living);
+        return living;
+    },
+
+    recordCrucible(actorId, data = {}) {
+        if (!this.crucibles.has(actorId)) this.crucibles.set(actorId, []);
+        const entry = {
+            id: `crucible_${actorId}_${Date.now()}`,
+            day: data.day || rootScope.EngineParams?.worldDay || 0,
+            type: data.type || 'CATASTROPHIC_FAILURE',
+            title: data.title || 'The Snapped Ash-Bow of the Silt-Veil',
+            intensity: data.intensity || 85,
+            location: data.location || "World's End Gate Perimeter",
+            catalyst: data.catalyst || 'Bowstring snapped in the freezing fog; hesitated for three heartbeats.',
+            fallout: data.fallout || 'Supply cart was lost to the mist; apprentice was dragged beneath the crust.',
+            scar: data.scar || 'Refused to carry hemp cord for the rest of their natural life.',
+            cast: data.cast || { witnesses: ['Bailiff Mallow'], casualties: ['Apprentice Jon'] }
+        };
+        this.crucibles.get(actorId).push(entry);
+        return entry;
+    },
+
+    processActorDeath(deathData = {}) {
+        const id = deathData?.id || deathData?.victim?.id || 'actor_unknown';
+        const name = deathData?.victim?.name || deathData?.name || id;
+        const cause = deathData?.cause || 'natural causes during the 14-day Shift';
+        const day = rootScope.EngineParams?.worldDay || 1;
+
+        const living = this.livingDossiers.get(id) || this.registerLivingActor(id, name);
+        const ageYears = Math.max(18, Math.floor((day - living.birthDay) / 365));
+
+        if (!this.crucibles.has(id) || this.crucibles.get(id).length === 0) {
+            this.recordCrucible(id, { day: Math.max(1, day - 14) });
+        }
+        const actorCrucibles = this.crucibles.get(id) || [];
+        const definingMoment = actorCrucibles[0];
+
+        const dossier = {
+            id,
+            name,
+            house: living.house,
+            settlement: living.settlement,
+            role: living.role,
+            birthright: 'Storm-Born',
+            firstShiftSurvivedDay: 14,
+            shiftsSurvived: Math.max(1, Math.floor(day / 14)),
+            birthDay: living.birthDay,
+            deathDay: day,
+            ageYears,
+            cause,
+            conditions: ['Shift Vigor', 'Frost-Scarred'],
+            survivors: ['Apprentice Jon (Border Watch)', 'Bailiff Mallow (Garrison Witness)'],
+            successor: 'Apprentice Jon',
+            contractsFulfilled: living.contractsFulfilled,
+            definingMoment,
+            epitaph: `"Here lies ${name}, who held the ${living.settlement} line through ${Math.max(1, Math.floor(day / 14))} Shifts before ${cause}."`
+        };
+
+        this.biographies.set(id, dossier);
+        return dossier;
+    },
+    getBiography(query) {
+        if (!query) return null;
+        if (this.biographies.has(query)) return this.biographies.get(query);
+        const q = String(query).toLowerCase();
+        for (const bio of this.biographies.values()) {
+            if (bio.id.toLowerCase() === q || bio.name.toLowerCase().includes(q)) return bio;
+        }
+        return null;
+    },
+
+    getAllBiographies() {
+        return Array.from(this.biographies.values());
+    },
+
+    formatDossier(query) {
+        const bio = this.getBiography(query);
+        if (!bio) return `[ARCHIVE ERROR] No post-mortem dossier found for query: "${query}".`;
+        const cru = bio.definingMoment;
+        return [
+            `================================================================================`,
+            `📜 POST-MORTEM CASE FILE: ${bio.name.toUpperCase()} (${bio.id})`,
+            `================================================================================`,
+            `Affiliation:     ${bio.house} | Seat: ${bio.settlement}`,
+            `Career Title:    ${bio.role}`,
+            `Circumstance:    Birthright: [${bio.birthright}]`,
+            `Shift Birthday:  Day ${bio.firstShiftSurvivedDay} AF (${bio.shiftsSurvived} Fortnightly Shifts Survived)`,
+            `Lifespan:        Born Day ${bio.birthDay} AF → Perished Day ${bio.deathDay} AF (Age ${bio.ageYears})`,
+            `Cause of Death:  ${bio.cause}`,
+            `Active Traits:   ${bio.conditions.join(', ')}`,
+            ``,
+            `─── 🌳 LINEAGE & SURVIVORSHIP ──────────────────────────────────────────────────`,
+            `Survived By:\n${bio.survivors.map(s => `  • ${s}`).join('\n')}`,
+            `Designated Heir: ${bio.successor}`,
+            ``,
+            `─── 📖 DEFINING CRUCIBLE MOMENT ────────────────────────────────────────────────`,
+            `  "${cru ? cru.title : 'None Recorded'}"`,
+            `  Location: ${cru ? cru.location : 'Unknown'} (Day ${cru ? cru.day : 'N/A'})`,
+            `  Catalyst: ${cru ? cru.catalyst : 'N/A'}`,
+            `  Lifelong Scar: ${cru ? cru.scar : 'None'}`,
+            ``,
+            `─── 🪦 FOLK EPITAPH ────────────────────────────────────────────────────────────`,
+            `  ${bio.epitaph}`,
+            `================================================================================`
+        ].join('\n');
+    },
+
+    expandStory(query) {
+        const bio = this.getBiography(query);
+        const cru = bio?.definingMoment || (query ? this.crucibles.get(query)?.[0] : null);
+        const actorName = bio?.name || query || 'The Traveler';
+        if (!cru) return `No recorded crucibles found for query: "${query}".`;
+        return [
+            `================================================================================`,
+            `📜 THE DEFINING CRUCIBLE OF ${actorName.toUpperCase()}`,
+            `   Incident: ${cru.title} (Recorded Day ${cru.day} AF)`,
+            `================================================================================`,
+            ``,
+            `[ACT I: THE STAKES]`,
+            `The boundary woods did not move like mortal trees; they ground against the bedrock like millstones. ${actorName} stood at ${cru.location}, tasked with holding the perimeter before the 14-day Shift took the sun.`,
+            ``,
+            `[ACT II: THE CRISIS & FAILURE]`,
+            `${cru.catalyst} In the freezing mist, there was no sound of a battle—only the dull thud of iron sinking into damp peat. For three heartbeats, no order was given.`,
+            ``,
+            `[ACT III: THE SCAR & AFTERMATH]`,
+            `${cru.fallout} ${actorName} walked back through the gate alone, hands stained with pine resin and ash. Though they lived for seasons afterward, ${cru.scar}`,
+            `================================================================================`
+        ].join('\n');
+    }
+};
+CrucibleNarrativeEngine.init();
+rootScope.CrucibleNarrativeEngine = CrucibleNarrativeEngine;
+
+// ============================================================================
+// 4. INTERROGATION DESK
+// ============================================================================
+const InterrogationDesk = rootScope.InterrogationDesk || {
+    suspects: new Map(),
+
+    init() {
+        rootScope.EventBus?.on('SUSPICION_FLAGGED', (data) => this.flagSuspect(data));
+    },
+
+    flagSuspect(data = {}) {
+        const id = data.id || 'agt_2';
+        const agent = AgentRosterManager.agents.get(id);
+        const name = data.name || agent?.name || id;
+        const reasons = [
+            'Found carrying unsealed export manifests near the eastern ditch.',
+            'Discrepancy in recorded resin barrel counts following border patrol.',
+            'Body temperature measured three degrees below normal; avoids braziers.',
+            'Spotted speaking with an unbadged courier from House Cull.'
+        ];
+        const crimeTypes = ['RIVAL_SPY', 'EMBEZZLER', 'WENDIGO_TAINT'];
+        const rolledCrime = data.crime || crimeTypes[Math.floor(Math.random() * crimeTypes.length)];
+
+        const suspectCase = {
+            id,
+            name,
+            dayFlagged: rootScope.EngineParams?.worldDay || 1,
+            crime: rolledCrime,
+            suspicionReason: data.reason || reasons[Math.floor(Math.random() * reasons.length)],
+            deceptionScore: Math.floor(40 + Math.random() * 50),
+            interrogated: false,
+            resolved: false,
+            verdict: null
+        };
+        this.suspects.set(id, suspectCase);
+        return suspectCase;
+    },
+
+    interrogate(targetId = 'agt_2') {
+        let suspect = this.suspects.get(targetId);
+        if (!suspect) suspect = this.flagSuspect({ id: targetId });
+        suspect.interrogated = true;
+
+        let txt = `\n================================================================================\n`;
+        txt += `⚖️ FORMAL INQUEST PROCEEDINGS: ${suspect.name.toUpperCase()} (${suspect.id})\n`;
+        txt += `================================================================================\n`;
+        txt += `Grounds for Suspicion: "${suspect.suspicionReason}"\n`;
+        txt += `Observed Stress Index: ${suspect.deceptionScore}% | Classification: ${suspect.crime}\n\n`;
+
+        if (suspect.crime === 'RIVAL_SPY') {
+            txt += `[TRANSCRIPT] When asked why House Cull wax seals were found in his kit, the suspect\nhesitated for four heartbeats, claiming he found them in the bracken.\n`;
+        } else if (suspect.crime === 'WENDIGO_TAINT') {
+            txt += `[TRANSCRIPT] When ordered to hold his hands over the basalt brazier, the suspect\ndid not flinch. His breath smelled of damp cellar lichen; skin cold to the touch.\n`;
+        } else {
+            txt += `[TRANSCRIPT] When confronted with missing resin tallies, the suspect swore the\ncasks leaked. Two unmonitored salt-deniers were found sewn into his boots.\n`;
+        }
+
+        txt += `\nEXECUTIVE VERDICTS AVAILABLE:\n`;
+        txt += `  • Exonerate   → Dismiss charges (Restores loyalty).\n`;
+        txt += `  • Demote      → Strip rank to boundary ash-carter.\n`;
+        txt += `  • Execute     → Public hanging on palisade.\n`;
+        txt += `  • Turn Agent  → Coerce into double agent (+1 Blackmail Dossier).\n`;
+        txt += `================================================================================\n`;
+
+        return { success: true, text: txt, suspect };
+    },
+
+    renderVerdict(targetId, verdictType) {
+        let suspect = this.suspects.get(targetId);
+        if (!suspect) suspect = this.flagSuspect({ id: targetId });
+
+        const v = (verdictType || '').toLowerCase();
+        suspect.resolved = true;
+        suspect.verdict = v.toUpperCase();
+
+        let msg = "";
+        if (v === 'exonerate') {
+            msg = `[INQUEST] ${suspect.name} exonerated of all suspicion. Returned to duty.`;
+        } else if (v === 'demote') {
+            msg = `[INQUEST] ${suspect.name} stripped of rank and reassigned to boundary ditch ash-carting.`;
+            const agent = AgentRosterManager.agents.get(targetId);
+            if (agent) agent.career.rank = 'Ash-Carter';
+        } else if (v === 'execute') {
+            msg = `[INQUEST] ${suspect.name} executed on northern palisade. Treason chilled across settlement.`;
+            const agent = AgentRosterManager.agents.get(targetId);
+            if (agent) {
+                agent.alive = false;
+                CrucibleNarrativeEngine.processActorDeath({
+                    id: agent.id,
+                    name: agent.name,
+                    cause: 'Executed for high treason following formal inquest'
+                });
+            }
+        } else if (v === 'turn_agent') {
+            msg = `[INQUEST] ${suspect.name} broken under leverage. Turned into double agent against rival Houses!`;
+            if (rootScope.CampaignManager?.state?.house) {
+                rootScope.CampaignManager.state.house.blackmailDossiers = (rootScope.CampaignManager.state.house.blackmailDossiers || 0) + 1;
+            }
+        } else {
+            return { success: false, message: `Unknown verdict: "${verdictType}". Valid: exonerate, demote, execute, turn_agent.` };
+        }
+
+        rootScope.EventBus?.emit('INQUEST_VERDICT_RENDERED', { suspect, verdict: v });
+        return { success: true, message: msg };
+    }
+};
+InterrogationDesk.init();
+rootScope.InterrogationDesk = InterrogationDesk;
+
+
+
+
+// ============================================================================
+// 5. CAMPAIGN COMMAND MANAGER
+// ============================================================================
+const CampaignManager = rootScope.CampaignManager || {
+    campaignMode: 'HOUSE',
+    activeFaction: null,
+    dayStarted: 0,
+    victoryConditionsMet: false,
+    collapseTriggered: false,
+    collapseReason: null,
+
+    state: {
+        house: {
+            houseId: 'House Terminus',
+            settlementName: "World's End Gate",
+            barrierFuelUnits: 28,
+            chainsIntegrity: 100,
+            guardiansCount: 300,
+            shiftCountdown: 14,
+            crownFavor: 65,
+            crownDemand: 16,
+            autarkyLevel: 0,
+            crownScrutiny: 10,
+            hasHorizonDispensation: true,
+            assignedBailiffId: null,
+            sanctuaryBuilt: false,
+            privateWingOpen: false,
+            unrest: 10,
+            blackmailDossiers: 0,
+            activeCaravans: []
+        },
+        order: { orderName: "Order of the Basalt Quill & OCP", containedAnomalies: 4, form12BReports: 2, dustWardenScrubs: 5, blindSpotEntropy: 12 },
+        syndicate: { syndicateName: "Salt Syndicate", baseSettlement: "Salt-Marrow", mineralSaltStock: 150, contrabandResin: 45, gallowsTollCollected: 80 },
+        dune: { flotillaName: "Dust-Haven", riverStreamline: "Silt Veil", cleanedWaterStock: 80, dailyWaterConsumption: 5, mooringTetherIntegrity: 100, driftDistanceKm: 0 },
+        patron: { candidateSignificance: 25, symbolicDreamsSent: 0, verifiedTruths: 0, legendaryAwakenings: 0 },
+        sovereign: {
+            title: "Korvan the Variable (Chained Hybrid)",
+            isAscended: false,
+            yearsEndured: 0,
+            significanceHarvested: 0,
+            heraldsMutated: 0,
+            lastSummonDay: -10,
+            bankedCharge: 0,
+            summonCooldown: 3
+        }
+    },
+
+    init() {
+        rootScope.EventBus?.on('HEARTBEAT_T12H', () => this.tickDayCycle());
+        rootScope.EventBus?.on('DAY_TICK', () => this.processDailyLogistics());
+    },
+
+    selectCampaign(mode, customFactionId = null) {
+        const validModes = ['HOUSE', 'ORDER', 'SYNDICATE', 'DUNE', 'PATRON', 'SOVEREIGN'];
+        const chosen = (mode || 'HOUSE').toUpperCase();
+        if (!validModes.includes(chosen)) throw new Error(`Unknown campaign mode: ${mode}`);
+        this.campaignMode = chosen;
+        this.activeFaction = customFactionId;
+        this.dayStarted = rootScope.EngineParams?.worldDay || 1;
+        this.victoryConditionsMet = false;
+        this.collapseTriggered = false;
+        this.collapseReason = null;
+
+        // Re-seed roster for the selected campaign mode
+        AgentRosterManager.agents.clear();
+        this._seedInitialRoster();
+
+        if (LogDispatchManager.dispatches.length === 0) {
+            LogDispatchManager.generateDailyDispatches(rootScope.EngineParams?.worldDay || 1, this.campaignMode, this.state);
+        }
+
+        rootScope.EventBus?.emit('CAMPAIGN_INITIALIZED', { mode: this.campaignMode });
+        return this.getCampaignStatus();
+    },
+
+    _seedInitialRoster() {
+        const seeds = {
+            HOUSE: [['agt_1', 'High Marshal Vane', 'WAR_MASTER'], ['agt_2', 'Scout-Sergeant Kaelen', 'SCOUT'], ['agt_3', 'Warden Maris', 'WARDEN'], ['agt_4', 'Apprentice Jon', 'APPRENTICE']],
+            ORDER: [['agt_1', 'Director Jess Nedaf', 'INSPECTOR'], ['agt_2', 'Chronicler Elyse', 'SCRIBE'], ['agt_3', 'Dust-Warden Gareth', 'WARDEN']],
+            SYNDICATE: [['agt_1', 'Brine-Lord Harl', 'CARTEL_LEADER'], ['agt_2', 'Vance the Leech', 'SMUGGLER'], ['agt_3', 'Iron-Jaw Ron', 'ENFORCER']],
+            DUNE: [['agt_1', 'Matron Morwen', 'ELDER_KEEPER'], ['agt_2', 'Sand-Pilot Dane', 'PILOT'], ['agt_3', 'Dredger Cael', 'DREDGER']],
+            PATRON: [['agt_1', 'Lyra the Keen', 'SURVIVOR'], ['agt_2', 'Justin the Fowler', 'HUNTER']],
+            SOVEREIGN: [['agt_1', 'The Bound Huntsman', 'PREDATOR']]
+        };
+        (seeds[this.campaignMode] || []).forEach(([id, name, arch]) => AgentRosterManager.createAgent(id, name, arch));
+    },
+
+    getCampaignStatus() {
+        const day = rootScope.EngineParams?.worldDay || 1;
+        return {
+            mode: this.campaignMode,
+            day,
+            daysActive: day - this.dayStarted,
+            victory: this.victoryConditionsMet,
+            collapsed: this.collapseTriggered,
+            collapseReason: this.collapseReason,
+            state: this.state[this.campaignMode.toLowerCase()] || {}
+        };
+    },
+
+    tickDayCycle() {
+        this.checkSovereignCooldown();
+    },
+
+    processDailyLogistics() {
+        const day = rootScope.EngineParams?.worldDay || 1;
+        AgentRosterManager.tickDailyDrills();
+
+        if (this.campaignMode === 'HOUSE') {
+            const h = this.state.house;
+            const consumption = Math.max(1, 4 - Math.floor((h.autarkyLevel || 0) / 35));
+            h.barrierFuelUnits = Math.max(0, h.barrierFuelUnits - consumption);
+            h.shiftCountdown = 14 - (day % 14);
+
+            if (day % 14 === 0) {
+                AgentRosterManager.applyShiftSurvivalConditions(h.barrierFuelUnits > 0, h.barrierFuelUnits <= 0, false);
+                h.crownDemand = 14 + Math.floor(Math.random() * 8);
+
+                if (!h.hasHorizonDispensation && h.crownScrutiny > 65) {
+                    h.barrierFuelUnits = Math.floor(h.barrierFuelUnits / 2);
+                    h.autarkyLevel = Math.max(0, h.autarkyLevel - 30);
+                    h.crownFavor = Math.max(0, h.crownFavor - 25);
+                    rootScope.EventBus?.emit('UI_LOG', '⚔️ [CROWN INQUEST] Inquisitorial Crusher Force raided unauthorized stills! Fuel seized.');
+                }
+            }
+
+            h.activeCaravans = (h.activeCaravans || []).filter(c => {
+                c.daysLeft--;
+                if (c.daysLeft <= 0) {
+                    h.barrierFuelUnits = Math.min(60, h.barrierFuelUnits + c.yieldFuel);
+                    rootScope.EventBus?.emit('UI_LOG', `📦 [TRADE] Caravan returned from ${c.dest}: +${c.yieldFuel} Barrier Fuel secured.`);
+                    return false;
+                }
+                return true;
+            });
+
+            if (h.barrierFuelUnits <= 0) {
+                h.chainsIntegrity = Math.max(0, h.chainsIntegrity - 15);
+                if (h.chainsIntegrity <= 0) {
+                    this.collapseTriggered = true;
+                    this.collapseReason = "Runic barrier depleted; anchor chains snapped in the White Void.";
+                }
+            }
+        } else if (this.campaignMode === 'ORDER') {
+            const o = this.state.order;
+            if (Math.random() < 0.25) o.blindSpotEntropy = Math.min(100, o.blindSpotEntropy + 2);
+            if (o.blindSpotEntropy >= 85) {
+                this.collapseTriggered = true;
+                this.collapseReason = "Reality leak exceeded threshold; memory of 6,000-year blind spot leaked.";
+                ShadowInfluenceEngine.revealEpitaph(o.blindSpotEntropy);
+            }
+        } else if (this.campaignMode === 'DUNE') {
+            const d = this.state.dune;
+            d.cleanedWaterStock = Math.max(0, d.cleanedWaterStock - d.dailyWaterConsumption);
+            d.driftDistanceKm += 0.12;
+            if (d.cleanedWaterStock <= 0) {
+                d.mooringTetherIntegrity = Math.max(0, d.mooringTetherIntegrity - 20);
+                if (d.mooringTetherIntegrity <= 0) {
+                    this.collapseTriggered = true;
+                    this.collapseReason = "Cleaned water depleted; flotilla tethers snapped into Sand Churn.";
+                }
+            }
+        } else if (this.campaignMode === 'SOVEREIGN') {
+            const sov = this.state.sovereign;
+            sov.yearsEndured = Number((sov.yearsEndured + 1 / 365).toFixed(2));
+        }
+
+        ShadowInfluenceEngine.tickDailyShadowOps(day, this.state);
+        LogDispatchManager.generateDailyDispatches(day, this.campaignMode, this.state);
+    },
+    dispatchAction(actionType, arg = null) {
+        const day = rootScope.EngineParams?.worldDay || 1;
+        let res = { success: false, message: "" };
+        const act = (actionType || '').toUpperCase();
+
+        if (act === 'PATROL') {
+            res = { success: true, message: "Scout patrol dispatched into mist. Observed subtle coordinate drift on marker posts." };
+            if (this.campaignMode === 'HOUSE' && Math.random() < 0.4) {
+                this.state.house.barrierFuelUnits = Math.min(40, this.state.house.barrierFuelUnits + 6);
+                res.message += " Intercepted an unmonitored wagon with 6 units cold pine resin.";
+            }
+        } else if (act === 'REQUISITION_FUEL') {
+            this.state.house.barrierFuelUnits += 14;
+            res = { success: true, message: "Emergency levy executed: +14 Barrier Fuel secured for World's End Gate." };
+        } else if (act === 'CROWN_FILL_FULL') {
+            const h = this.state.house;
+            if (h.barrierFuelUnits < h.crownDemand) return { success: false, message: `Insufficient fuel (${h.barrierFuelUnits}/${h.crownDemand}u).` };
+            h.barrierFuelUnits -= h.crownDemand;
+            h.crownFavor = Math.min(100, h.crownFavor + 20);
+            res = { success: true, message: `Full Crown quota fulfilled (-${h.crownDemand}u Fuel, +20 Crown Favor). Local moats run thin.` };
+        } else if (act === 'CROWN_FILL_PARTIAL') {
+            const h = this.state.house;
+            const half = Math.floor(h.crownDemand / 2);
+            h.barrierFuelUnits = Math.max(0, h.barrierFuelUnits - half);
+            h.crownFavor = Math.min(100, h.crownFavor + 5);
+            res = { success: true, message: `Partial tribute delivered (-${half}u Fuel, +5 Crown Favor). Royal Assessors noted compromise.` };
+        } else if (act === 'CROWN_DENY') {
+            const h = this.state.house;
+            h.crownFavor = Math.max(0, h.crownFavor - 15);
+            res = { success: true, message: `Crown requisition denied. Preserved 100% fuel. Royal courier left severe reprimand (-15 Favor).` };
+        } else if (act === 'DEVELOP_AUTARKY') {
+            const h = this.state.house;
+            h.autarkyLevel = Math.min(100, h.autarkyLevel + 15);
+            if (!h.hasHorizonDispensation) h.crownScrutiny += 15;
+            res = { success: true, message: `Domestic stills expanded (Autarky: ${h.autarkyLevel}%). ${h.hasHorizonDispensation ? 'Terminus Horizon Dispensation legalizes stills.' : 'Crown scrutiny rose!'}` };
+        } else if (act === 'PROXY_RAID') {
+            const h = this.state.house;
+            h.barrierFuelUnits = Math.min(60, h.barrierFuelUnits + 16);
+            res = { success: true, message: `Covert proxy raid ambushed rival supply line: +16 units cold resin seized without open war.` };
+        } else if (act === 'PROXY_SABOTAGE') {
+            res = { success: true, message: `Rival house ballistas sabotaged with bone-dust. Their Crown ranking deteriorated.` };
+        } else if (act === 'CONSTRUCT_SANCTUARY') {
+            this.state.house.sanctuaryBuilt = true;
+            res = { success: true, message: "Sanctuary of the Hearth sealed beneath bedrock. +15% population recovery during Shifts." };
+        } else if (act === 'OPEN_PRIVATE_WING') {
+            const h = this.state.house;
+            h.privateWingOpen = true;
+            h.blackmailDossiers++;
+            h.unrest += 15;
+            res = { success: true, message: "Private wing opened to visiting noble elites: +50 Gold, +1 Blackmail Dossier. Lower-bailey unrest rose." };
+        } else if (act === 'ASSIGN_BAILIFF') {
+            this.state.house.assignedBailiffId = arg || 'agt_1';
+            res = { success: true, message: `Logistics Bailiff assigned (${this.state.house.assignedBailiffId}). Official House trade caravans unlocked!` };
+        } else if (act === 'DISPATCH_CARAVAN') {
+            const h = this.state.house;
+            if (!h.assignedBailiffId) h.assignedBailiffId = 'agt_1';
+            h.activeCaravans.push({ dest: arg || 'Oakhaven', daysLeft: 4, yieldFuel: 18 });
+            res = { success: true, message: `Official House Trade Caravan departed for ${arg || 'Oakhaven'} under Bailiff seal (Returns in 4 days).` };
+        } else if (act === 'CULTIVATE_RUNIC') {
+            res = AgentRosterManager.cultivateTerminusRunic(arg || 'agt_1', this.state.house);
+        } else if (act === 'AUDIT_ANOMALY') {
+            this.state.order.containedAnomalies++;
+            this.state.order.form12BReports++;
+            this.state.order.blindSpotEntropy = Math.max(0, this.state.order.blindSpotEntropy - 8);
+            res = { success: true, message: "Form 12-B issued. Non-Euclidean spatial anomaly contained in Basalt Vault." };
+        } else if (act === 'SCRUB_MONUMENT') {
+            this.state.order.dustWardenScrubs++;
+            this.state.order.blindSpotEntropy = Math.max(0, this.state.order.blindSpotEntropy - 5);
+            res = { success: true, message: "Dust-Wardens scrubbed a forbidden monolith with vinegar-ash. Blind spot record erased." };
+        } else if (act === 'SMUGGLE_RESIN') {
+            this.state.syndicate.contrabandResin += 18;
+            this.state.syndicate.gallowsTollCollected -= 15;
+            res = { success: true, message: "Midnight barge diverted: +18 Contraband Resin seized from Crown supply chain." };
+        } else if (act === 'EXTORT_HOUSE') {
+            this.state.syndicate.gallowsTollCollected += 35;
+            res = { success: true, message: "Extortion levied on House Cull: +35 Salt-Deniers extorted under threat of sabotage." };
+        } else if (act === 'CONDENSE_WATER') {
+            this.state.dune.cleanedWaterStock += 15;
+            res = { success: true, message: "Solar condensers scraped of silica. +15 Cleaned Water added to tanks." };
+        } else if (act === 'DREDGE_STREAMLINE') {
+            this.state.dune.driftDistanceKm += 0.8;
+            res = { success: true, message: "Sounding dredge dropped into Silt Veil: Pre-Fracture vellum cylinder recovered from the riverbed." };
+        } else if (act === 'REPAIR_TETHERS') {
+            this.state.dune.mooringTetherIntegrity = Math.min(100, this.state.dune.mooringTetherIntegrity + 25);
+            res = { success: true, message: "Flotilla hemp and bronze mooring tethers re-tensioned to bedrock anchor." };
+        } else if (act === 'TRANSMIT_DREAM') {
+            this.state.patron.symbolicDreamsSent++;
+            this.state.patron.candidateSignificance += 8;
+            res = { success: true, message: `Symbolic dream whispered. Candidate significance reached ${this.state.patron.candidateSignificance}.` };
+        } else if (act === 'VERIFY_TRUTH') {
+            this.state.patron.verifiedTruths++;
+            this.state.patron.candidateSignificance += 12;
+            res = { success: true, message: "Divine revelation granted. Historical rumor verified into canonical Truth." };
+        } else if (act === 'SUMMON_HUNTSMAN') {
+            const ok = this.executeHuntsmanSummon();
+            res = { success: ok, message: ok ? "The Bound Huntsman awakens from frost to harvest prey." : "Huntsman bound to void cooldown." };
+        } else if (act === 'MACABRE_COMMUNION') {
+            this.state.sovereign.heraldsMutated++;
+            this.state.sovereign.significanceHarvested = (this.state.sovereign.significanceHarvested || 0) + 1500;
+            res = { success: true, message: "The Macabre Communion performed: Frozen fungal flesh fed to captive commander. Herald Wendigo mutated." };
+
+
+        } else if (act === 'LEVERAGE_HOUSE') {
+            const h = this.state.house;
+            if ((h.blackmailDossiers || 0) < 1) return { success: false, message: "No Blackmail Dossiers available. Monetize private sanctuary wing first." };
+            h.blackmailDossiers--;
+            res = { success: true, message: `Blackmail Dossier spent against ${arg || 'House Cull'}: Rival house yielded monopoly leverage (+15 Standing).` };
+        } else if (act === 'SPONSOR_HOUSE') {
+            const h = this.state.house;
+            if (h.barrierFuelUnits < 8) return { success: false, message: "Insufficient fuel to sponsor ally house." };
+            h.barrierFuelUnits -= 8;
+            h.crownFavor = Math.min(100, h.crownFavor + 10);
+            res = { success: true, message: `Sponsored ${arg || 'House Oakheart'} with 8u fuel: Defense coalition secured (+10 Crown Standing).` };
+        } else if (act === 'HIBERNATE') {
+            const yrs = parseInt(arg, 10) || 100;
+            const sov = this.state.sovereign;
+            sov.yearsEndured = (sov.yearsEndured || 0) + yrs;
+            sov.significanceHarvested = (sov.significanceHarvested || 0) + (yrs * 10);
+            res = { success: true, message: `Korvan hibernated in deep bedrock for ${yrs} years. Endured: ${sov.yearsEndured}/1000 Years.` };
+        } else if (act === 'ASCEND_SOVEREIGN') {
+            const sov = this.state.sovereign;
+            if ((sov.yearsEndured || 0) < 1000 || (sov.heraldsMutated || 0) < 5) {
+                return { success: false, message: `Ascension threshold not met. Requires 1,000 years (${sov.yearsEndured || 0}/1000) and 5 Herald Wendigos (${sov.heraldsMutated || 0}/5).` };
+            }
+            sov.isAscended = true;
+            sov.title = "The True Pale Sovereign (Void Emperor)";
+            res = { success: true, message: `CHAINS SHATTERED! Korvan evolves into The True Pale Sovereign (Porcelain bone carapace, Imperial antler-crown, Crimson mantle)!` };
+        } else if (act === 'AUDIT_SHADOW_LEDGER') {
+            res = { success: true, message: `General Ledger Shadow Audit compiled. Noble Huntsman-Mark Skew: ${(ShadowInfluenceEngine.getMarkSelectionSkew() * 100).toFixed(1)}%.` };
+        } else if (act === 'BREACH_BLIND_SPOT') {
+            this.state.order.blindSpotEntropy = 88;
+            ShadowInfluenceEngine.revealEpitaph(88);
+            res = { success: true, message: `⚠️ REALITY LEAK THRESHOLD BREACHED (Entropy: 88%). Fallen-Era Illusion Runes in the Mountain Event Horizon (r=185km) have fractured—Settlement #7 [EPITAPH] exposed as the 21st node!` };
+        } else {
+            res = { success: false, message: `Command '${actionType}' is not available for ${this.campaignMode}.` };
+        }
+        rootScope.EventBus?.emit('COMMAND_EXECUTED', { actionType, res, day });
+        return res;
+    },
+
+    checkSovereignCooldown() {
+        if (this.campaignMode !== 'SOVEREIGN') return;
+        const currentDay = rootScope.EngineParams?.worldDay || 1;
+        const sov = this.state.sovereign;
+        if (currentDay - sov.lastSummonDay >= sov.summonCooldown && sov.bankedCharge === 0) {
+            sov.bankedCharge = 1;
+            rootScope.EventBus?.emit('UI_LOG', '🦇 [SOVEREIGN] Resummon charge stacked. Huntsman immortal today.');
+        }
+    },
+
+    executeHuntsmanSummon() {
+        if (this.campaignMode !== 'SOVEREIGN') return false;
+        const currentDay = rootScope.EngineParams?.worldDay || 1;
+        const sov = this.state.sovereign;
+        if (sov.bankedCharge > 0) {
+            sov.bankedCharge = 0;
+            sov.lastSummonDay = currentDay;
+            rootScope.EventBus?.emit('UI_LOG', '💀 [SOVEREIGN] Instant Rebirth: Consuming banked charge!');
+            return true;
+        }
+        if (currentDay - sov.lastSummonDay >= sov.summonCooldown) {
+            sov.lastSummonDay = currentDay;
+            rootScope.EventBus?.emit('UI_LOG', '💀 [SOVEREIGN] Huntsman summoned.');
+            return true;
+        }
+        return false;
+    },
+
+
+    exportLegacySave(chosenCandidateId = null) {
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const seed = rootScope.EpochManagerInstance?.currentSeed || 'millennium_audit_seed_1000';
+        const shiftSys = rootScope.ShiftDirector;
+
+        let candidate = null;
+        if (AgentRosterManager.agents.size > 0) {
+            if (chosenCandidateId && AgentRosterManager.agents.has(chosenCandidateId)) {
+                candidate = AgentRosterManager.agents.get(chosenCandidateId);
+            } else {
+                candidate = Array.from(AgentRosterManager.agents.values()).sort((a, b) => (b.significance || 0) - (a.significance || 0))[0];
+            }
+        }
+
+        const ancestors = CrucibleNarrativeEngine.getAllBiographies() || [];
+        const liveVillages = rootScope.VillageManager?.villages || [];
+        const settlements = (liveVillages.length > 0 ? liveVillages : CANONICAL_BEDROCK_SETTLEMENTS).map(v => ({
+            name: v.name,
+            region: v.region || 'forest',
+            house: v.nobleHouse || v.house || 'Unblessed',
+            x: Number(v.x?.toFixed?.(1) || 0),
+            z: Number(v.z?.toFixed?.(1) || 0),
+            driftSpeed: v.driftSpeed || 0
+        }));
+
+        const legacyDossier = {
+            version: "1.0.0-PROLOGUE",
+            exportedAt: new Date().toISOString(),
+            universe: "Universe-1-Aethelgard",
+            meta: {
+                worldSeed: seed,
+                worldDay: day,
+                objectiveYear: shiftSys?.getObjectiveYear ? shiftSys.getObjectiveYear() : Math.floor(day / 365) + 18000,
+                perceivedYear: shiftSys?.getPerceivedYear ? shiftSys.getPerceivedYear() : Math.floor(day / 365) + 12000,
+                missingGapYears: shiftSys?.getMissingGapYears ? shiftSys.getMissingGapYears() : 6000,
+                campaignMode: this.campaignMode,
+                activeFaction: this.activeFaction || this.campaignMode,
+                state: this.state[this.campaignMode.toLowerCase()] || {}
+            },
+            candidate: candidate ? {
+                id: candidate.id,
+                name: candidate.name,
+                career: candidate.career?.id || 'hunter',
+                significance: candidate.significance || 20,
+                vitals: candidate.vitals || { hp: 100, poise: 60 },
+                bodyRunes: candidate.bodyRunes || {},
+                isTrueOriginNative: true
+            } : null,
+            settlements: settlements.slice(0, 40),
+            ancestors: ancestors.map(a => ({
+                id: a.id,
+                name: a.name,
+                birthDay: a.birthDay,
+                deathDay: a.deathDay,
+                ageYears: a.ageYears,
+                cause: a.cause,
+                survivors: a.survivors,
+                definingCrucible: a.definingMoment?.title || 'Unknown',
+                epitaph: a.epitaph
+            })),
+            epistemicLedger: {
+                totalDispatches: LogDispatchManager.dispatches.length,
+                recentDispatches: LogDispatchManager.dispatches.slice(0, 5)
+            }
+        };
+
+        rootScope.EventBus?.emit('LEGACY_SAVE_EXPORTED', legacyDossier);
+        rootScope.EventBus?.emit('UI_LOG', `🏆 [LEGACY] World Line Exported: Candidate ${candidate?.name || 'Wanderer'} stamped as True Origin Native.`);
+        return legacyDossier;
+    },
+
+    getBedrockTelemetry(options = {}) {
+        const revealed = ShadowInfluenceEngine.isEpitaphRevealed() || options.includeRevealedAnomalies === true;
+        const liveVillages = (rootScope.VillageManager?.villages || []).slice(0, 20);
+
+        if (liveVillages.length === 0) {
+            // Filter out Epitaph (21st physical node) while Fallen-Era Illusion Runes hold (blindSpotEntropy < 85),
+            // strictly returning 20 surface settlements ("a score of places": 1 Crown Seat + 19 Houses).
+            const baseList = CANONICAL_BEDROCK_SETTLEMENTS
+                .filter(s => revealed || !s.hiddenGapKeeper)
+                .map(s => ({ ...s }));
+            return options.allowTwentyFirst && revealed ? baseList : baseList.slice(0, 20);
+        }
+
+        // If live VillageManager is active (20 slots where index 7 is Epitaph), mask slot 7 behind
+        // Fallen-Era Illusion Runes until blindSpotEntropy >= 85.
+        return liveVillages.map(v => {
+            const isEpitaph = v.hiddenGapKeeper || v.name === 'Epitaph';
+            if (isEpitaph && !revealed) {
+                return {
+                    id: v.id,
+                    name: "Aegis Rest (Outer Ward)",
+                    house: "Crown Outer Sanctuary",
+                    industry: "spatial_stabilization",
+                    population: 6400,
+                    barrierFuel: 50,
+                    chainsIntegrity: 100,
+                    maskedByFallenEraRunes: true
+                };
+            }
+            return {
+                id: v.id,
+                name: v.name,
+                house: v.nobleHouse || 'Unblessed',
+                industry: v.industry?.produces || v.produces || 'raw_goods',
+                population: v.population?.current || 5000,
+                barrierFuel: isEpitaph ? 0 : (v.stats?.essence ?? 14),
+                chainsIntegrity: v.barrierIntegrity ?? 100,
+                hiddenGapKeeper: Boolean(isEpitaph)
+            };
+        });
+    },
+
+    getPhysicalBedrockRegistry() {
+        // Returns the raw 21-settlement physical data layer (20 surface + Settlement #7 Epitaph)
+        return CANONICAL_BEDROCK_SETTLEMENTS.map(s => ({ ...s }));
+    },
+
+    getWarBoard() {
+        return [
+            { name: "House Aethel", monopoly: "Royal Crucible Fuel", blessed: true, status: "PEACE", power: 95 },
+            { name: "House Terminus", monopoly: "Horizon Gate Defense", blessed: true, status: "MOBILIZED", power: 90 },
+            { name: "House Oakheart", monopoly: "14-Day Ironwood", blessed: true, status: "SKIRMISH", power: 78 },
+            { name: "House Gallows", monopoly: "Runic Dust & Tethers", blessed: true, status: "PEACE", power: 75 },
+            { name: "House Widow", monopoly: "Siphon-Vine Cold Resins", blessed: true, status: "PEACE", power: 72 },
+            { name: "House Blackwood", monopoly: "Slag-Weevil Fluid", blessed: true, status: "SKIRMISH", power: 70 },
+            { name: "House Ashen", monopoly: "Basalt Tablets", blessed: true, status: "PEACE", power: 68 },
+            { name: "House Shadowfen", monopoly: "Pre-Fuel Matrix Synthesis", blessed: true, status: "PEACE", power: 66 },
+            { name: "House Bleak", monopoly: "Pale Cap Binders & Titan Bone", blessed: true, status: "PEACE", power: 65 },
+            { name: "House Cull", monopoly: "Cardiac Catalysts", blessed: false, status: "WAR_PREP", power: 62 },
+            { name: "House Mire", monopoly: "Fungal Binders", blessed: false, status: "SKIRMISH", power: 58 },
+            { name: "House Hollow", monopoly: "Gator Leather Seals", blessed: false, status: "PEACE", power: 55 },
+            { name: "House Crow", monopoly: "Whisper Guild Intel", blessed: false, status: "COVERT", power: 54 },
+            { name: "House Thorn", monopoly: "Pacifying Wax", blessed: false, status: "PEACE", power: 50 },
+            { name: "House Gloom", monopoly: "Gloom-Glass Alembics", blessed: false, status: "PEACE", power: 48 },
+            { name: "House Dusken", monopoly: "Kinetic Silk", blessed: false, status: "PEACE", power: 46 },
+            { name: "House Grim", monopoly: "50-Ton Anchor Chains", blessed: false, status: "PEACE", power: 45 },
+            { name: "House Blightwatch", monopoly: "Parasite Antidotes", blessed: false, status: "DEFENSIVE", power: 42 },
+            { name: "House Wraith", monopoly: "Abyssal Salvage Oil", blessed: false, status: "PEACE", power: 40 }
+        ];
+    }
+};
+CampaignManager.init();
+rootScope.CampaignManager = CampaignManager;
+
+// ============================================================================
+// 5.5 SHADOW INFLUENCE & TEMPORAL RELATIVITY ENGINE (SETTLEMENT #7: EPITAPH)
+// ============================================================================
+const ShadowInfluenceEngine = rootScope.ShadowInfluenceEngine || {
+    revealThreshold: 85,
+    epitaphRevealed: false,
+
+    // Temporal Relativity & Spatial Vistas (Addendum BY)
+    relativity: {
+        perceivedForestYears: 12000,
+        objectiveYears: 18000,
+        missingGapYears: 6000,
+        voidDurationDays: 7,
+        forestShiftCycleDays: 14,
+        mountainRotationDegrees: 0,
+        terminusUnderstandingConfidence: 0.95, // 95% trap: Terminus does not know the Mountains rotate during the 7-day Void
+        crownKnowsBetrayal: true,
+        crownKnowsMissingGap: false,
+        terminusKnowsMissingGap: true,
+        epitaphKnowsMissingGap: true
+    },
+
+    // Probabilistic Pressure State (Thumb on the scale, never deterministic override)
+    pressure: {
+        nobleMarkWeightBias: 0.28,        // +28% probabilistic nudge toward Founder-bloodline nobles claiming Huntsman's Mark
+        commonerMarkWeightDampener: -0.22, // Steers common villagers away from the Spherical Idol
+        huntsmanVectorBias: 0.20,         // Subtle route nudge toward Huntsman's path
+        influencePool: 100,               // Finite Fallen-Era runic/operative bandwidth
+        influenceRegenPerDay: 4,
+        noblesNudgedToMark: 3,
+        commonersDiverted: 11,
+        noblesInterceptedByHuntsman: 1,
+        totalMarkTrials: 4
+    },
+
+    // Tragic Unilateral Alignment Invariant
+    alignment: {
+        epitaphToKorvan: 'UNILATERAL_ALLY', // Supports the betrayed Champion who gave everything 18,000 years ago
+        korvanToEpitaph: 'INDISCRIMINATE_PREY',
+        korvanTrueAlignment: 'KORVAN_ONLY',
+        korvanHasFreeWill: false
+    },
+
+    isEpitaphRevealed() {
+        const entropy = CampaignManager?.state?.order?.blindSpotEntropy || 0;
+        return this.epitaphRevealed || entropy >= this.revealThreshold;
+    },
+
+    revealEpitaph(currentEntropy = 85) {
+        if (currentEntropy >= this.revealThreshold && !this.epitaphRevealed) {
+            this.epitaphRevealed = true;
+            rootScope.EventBus?.emit('REVEAL_EPITAPH_COORDINATES', {
+                settlementId: 7,
+                name: 'Epitaph',
+                rKm: 185,
+                entropy: currentEntropy
+            });
+        }
+        return this.epitaphRevealed;
+    },
+
+    getMarkSelectionSkew() {
+        if (this.pressure.totalMarkTrials <= 0) return 0.75;
+        return this.pressure.noblesNudgedToMark / this.pressure.totalMarkTrials;
+    },
+
+    rollHuntsmanMarkCandidate(baseNobleProbability = 0.25, rngFn = Math.random) {
+        this.pressure.totalMarkTrials++;
+        let effectiveProb = baseNobleProbability;
+
+        if (this.pressure.influencePool >= 12) {
+            this.pressure.influencePool -= 12;
+            effectiveProb = Math.min(0.88, baseNobleProbability + this.pressure.nobleMarkWeightBias);
+        }
+
+        const roll = rngFn();
+        const nobleSelected = roll < effectiveProb;
+        if (nobleSelected) {
+            this.pressure.noblesNudgedToMark++;
+            if (rngFn() < 0.35 + this.pressure.huntsmanVectorBias) {
+                this.pressure.noblesInterceptedByHuntsman++;
+            }
+        } else {
+            this.pressure.commonersDiverted++;
+        }
+        return { nobleSelected, effectiveProb, roll };
+    },
+
+    evaluateKorvanTarget(actor = {}) {
+        return {
+            isTarget: true,
+            immune: false,
+            perceivedByEpitaph: this.alignment.epitaphToKorvan,
+            actualKorvanStance: this.alignment.korvanTrueAlignment,
+            reason: "Korvan is only Korvan's ally (hasFreeWill: false). Epitaph operatives and Founder nobles are consumed identically."
+        };
+    },
+
+    tickDailyShadowOps(worldDay, campaignState = {}) {
+        this.pressure.influencePool = Math.min(100, this.pressure.influencePool + this.pressure.influenceRegenPerDay);
+
+        // Every 14 perceived Forest days, 7 objective days pass in the White Void:
+        // Mountain & Dune observers experience those 7 days; the Mountain Ring rotates while reference points vanish.
+        if (worldDay > 0 && worldDay % 14 === 0) {
+            this.relativity.mountainRotationDegrees = Number(((this.relativity.mountainRotationDegrees + 5.4) % 360).toFixed(1));
+            this.rollHuntsmanMarkCandidate(0.25);
+        }
+
+        if ((campaignState?.order?.blindSpotEntropy || 0) >= this.revealThreshold) {
+            this.revealEpitaph(campaignState.order.blindSpotEntropy);
+        }
+    },
+
+    formatGeneralLedgerAudit() {
+        const entropy = CampaignManager?.state?.order?.blindSpotEntropy ?? 12;
+        const revealed = this.isEpitaphRevealed();
+        const skewPct = (this.getMarkSelectionSkew() * 100).toFixed(1);
+
+        return [
+            `================================================================================`,
+            `🕵️ THE GENERAL LEDGER: EPISTEMIC & TEMPORAL RELATIVITY AUDIT`,
+            `================================================================================`,
+            `[1] TEMPORAL RELATIVITY & THE 6,000-YEAR BLIND SPOT`,
+            `  • Forest / Crown Perceived Timeline:  Year ${this.relativity.perceivedForestYears} AF (Shift = 0d Instantaneous Blink)`,
+            `  • Mountain / Dune Objective Timeline: Year ${this.relativity.objectiveYears} AF (Shift = 7d White Void Persistence)`,
+            `  • Unrecorded White Void Gap:          ${this.relativity.missingGapYears} Objective Years (Unknown to Crown & 19 Houses)`,
+            `  • Terminus / Guardian Biological Age: ~1.5x–2.0x Forest Rate (Persisting through every 7-day Void)`,
+            ``,
+            `[2] THE VISTAS OF TRUTH & TERMINUS 95% ROTATIONAL BLIND SPOT`,
+            `  • Mountain Vista (r = 100–280km):     Observes the Forest dissolving into the 7-day White Void.`,
+            `  • Terminus 95% Understanding Failure: Terminus believes the Mountain Ring is fixed (Confidence: 95%).`,
+            `  • Dune Vista Only (r > 280km):        Observes the Mountain Ring rotating during the 7-day Void`,
+            `                                        (Cumulative Void Rotation Drift: ${this.relativity.mountainRotationDegrees}°).`,
+            ``,
+            `[3] CENSUS ANOMALY & THE NOBLE FUNNEL (PROBABILISTIC SHADOW PRESSURE)`,
+            `  • Surface Census ("A Score of Places"): 20 Settlements Reported (1 Crown Seat + 19 Competing Houses)`,
+            `  • Blind Spot Entropy Index:             ${entropy}% (Reveal Threshold: ${this.revealThreshold}%)`,
+            `  • Settlement #7 [EPITAPH] Status:       ${revealed ? '⚠️ EXPOSED (21st Physical Node at r=185km — 18k AF Fallen-Era Sanctuary)' : 'CONCEALED BY FALLEN-ERA ILLUSION RUNES (Suppressed from 20-Node Census)'}`,
+            `  • Huntsman's Mark Selection Skew:       ${skewPct}% Founder-Bloodline Nobles vs. Commoners (Probabilistic Nudge: +${Math.round(this.pressure.nobleMarkWeightBias * 100)}%)`,
+            `  • Commoners Diverted / Nobles Vector'd: ${this.pressure.commonersDiverted} Commoners Spared | ${this.pressure.noblesInterceptedByHuntsman} Marked Nobles Intercepted`,
+            `  • Tragic Alignment Invariant:           Epitaph -> Korvan [${this.alignment.epitaphToKorvan}] | Korvan -> All [${this.alignment.korvanTrueAlignment}]`,
+            `================================================================================`
+        ].join('\n');
+    }
+};
+rootScope.ShadowInfluenceEngine = ShadowInfluenceEngine;
+
+// ============================================================================
+// 6. UNIFIED COMMANDER ENGINE FACADE (PROLOGUE + FUTURE FOLD-IN SYSTEM)
+// ============================================================================
+export const CommanderEngine = {
+    initialized: false,
+    isUnlockedInSandbox: false, // Roadmap Hook: Unlocks as in-game Commander System in 3D Sandbox
+
+    boot(defaultMode = 'HOUSE') {
+        if (!this.initialized || AgentRosterManager.agents.size === 0) {
+            CampaignManager.selectCampaign(defaultMode);
+            this.initialized = true;
+        }
+        return CampaignManager.getCampaignStatus();
+    },
+
+    unlockInSandbox(reason = 'Claimed Command Desk') {
+        this.isUnlockedInSandbox = true;
+        rootScope.EventBus?.emit('COMMANDER_SYSTEM_UNLOCKED', { reason });
+        rootScope.EventBus?.emit('UI_LOG', `🌌 [COMMANDER] Macro-Logistics Command Desk Unlocked (${reason}).`);
+    },
+
+    advanceDays(days = 1) {
+        const count = Math.max(1, parseInt(days, 10) || 1);
+        for (let i = 0; i < count; i++) {
+            rootScope.EngineParams.worldDay = (rootScope.EngineParams.worldDay || 1) + 1;
+            const d = rootScope.EngineParams.worldDay;
+            rootScope.EventBus?.emit('DAY_TICK', { day: d });
+            rootScope.BarrierPipeline?.tickDailyProduction?.();
+            rootScope.DuneDriftSystem?.tickDailyDrift?.();
+            rootScope.ShiftDirector?.checkCycle?.();
+            // If DAY_TICK listener did not already run processDailyLogistics, ensure dispatches exist
+            if (!rootScope.EventBus?.events?.['DAY_TICK']?.length) {
+                CampaignManager.processDailyLogistics();
+            }
+        }
+        return CampaignManager.getCampaignStatus();
+    },
+
+    CampaignManager,
+    AgentRosterManager,
+    LogDispatchManager,
+    CrucibleNarrativeEngine,
+    InterrogationDesk,
+    ShadowInfluenceEngine
+};
+
+// Auto-boot default HOUSE campaign so state, agents, and dispatches are ready immediately
+CommanderEngine.boot('HOUSE');
+rootScope.CommanderEngine = CommanderEngine;
+export default CommanderEngine;

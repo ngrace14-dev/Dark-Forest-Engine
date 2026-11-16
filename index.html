@@ -45,7 +45,7 @@
         
         <div id="start-actions" class="flex flex-col items-center gap-3">
             <button id="btn-soft-launch" class="px-8 py-3.5 border-2 border-amber-600 bg-amber-950/80 hover:bg-amber-600 hover:text-black text-amber-400 font-mono font-bold tracking-widest uppercase text-sm transition-all duration-300 shadow-[0_0_25px_rgba(245,158,11,0.35)] flex items-center gap-2 cursor-pointer">
-                <span>📜</span> Launch Text Commander (Prologue Soft Launch)
+                <span>📜</span> Launch The General Ledger (Prologue Soft Launch)
             </button>
             <button id="btn-start" class="hidden px-8 py-2 border border-red-900 bg-red-950/40 hover:bg-red-900 hover:text-white text-red-400 font-mono tracking-widest uppercase text-xs transition-all duration-300 cursor-pointer">
                 ⚔️ Enter the Woods (3D Sandbox)
@@ -53,16 +53,16 @@
         </div>
     </div>
 
-    <!-- FULLSCREEN TEXT COMMANDER VIEWPORT MODAL -->
+    <!-- FULLSCREEN GENERAL LEDGER VIEWPORT MODAL -->
     <div id="text-commander-viewport" class="fixed inset-0 z-[100] hidden bg-[#040608] flex flex-col">
         <div class="bg-black/95 border-b border-amber-900/60 p-2 px-4 flex justify-between items-center text-xs font-mono">
-            <span class="text-amber-400 font-bold tracking-widest">🌌 DARK FOREST ENGINE | PROLOGUE COMMANDER VIEWPORT</span>
+            <span class="text-amber-400 font-bold tracking-widest">🌌 DARK FOREST ENGINE | THE GENERAL LEDGER (PROLOGUE VIEWPORT)</span>
             <div class="flex gap-2 items-center">
                 <a href="crows-eye.html" target="_blank" class="px-3 py-1 bg-amber-950 border border-amber-700 text-amber-300 hover:bg-amber-800 rounded text-xs transition-colors">↗ Dedicated Tab</a>
                 <button id="btn-close-viewport" class="px-3 py-1 bg-red-950 border border-red-700 text-red-300 hover:bg-red-800 rounded text-xs transition-colors cursor-pointer">✖ Return to Title</button>
             </div>
         </div>
-        <iframe id="text-commander-frame" src="" class="w-full flex-1 border-0"></iframe>
+        <div id="commander-terminal-root" class="w-full flex-1 overflow-y-auto p-4"></div>
     </div>
 
     <!-- MAIN HUD -->
@@ -246,13 +246,11 @@
         <span id="inv-title" class="text-white text-[11px] font-bold text-center w-48 truncate">Title</span>
     </div>
 
-    <script type="module" src="./src/main.js"></script>
-
+    <!-- 1. EARLY BOOT: Clean-Room Headless Commander Core & UI (Zero 3D/WASM dependencies) -->
     <script type="module">
-        // --- SOFT LAUNCH & VIEWPORT CONTROLLER ---
+        import CommanderUI from './src/systems/commander_ui.js';
+
         const softLaunchBtn = document.getElementById('btn-soft-launch');
-        const viewportModal = document.getElementById('text-commander-viewport');
-        const viewportFrame = document.getElementById('text-commander-frame');
         const closeViewportBtn = document.getElementById('btn-close-viewport');
         const start3DBtn = document.getElementById('btn-start');
         const startScreen = document.getElementById('start-screen');
@@ -260,19 +258,16 @@
         const loadingBar = document.getElementById('loading-bar');
         const loadingText = document.getElementById('loading-text');
 
-        // 1. Text Commander Soft Launch (Always Available Immediately)
+        // Initialize Commander UI immediately on Title Card boot
+        CommanderUI.init('commander-terminal-root');
+
+        // 1. Text Commander Soft Launch (Available Immediately on Title Card)
         softLaunchBtn?.addEventListener('click', () => {
-            if (viewportModal && viewportFrame) {
-                viewportFrame.src = 'crows-eye.html';
-                viewportModal.classList.remove('hidden');
-            }
+            CommanderUI.open();
         });
 
         closeViewportBtn?.addEventListener('click', () => {
-            if (viewportModal && viewportFrame) {
-                viewportModal.classList.add('hidden');
-                viewportFrame.src = '';
-            }
+            CommanderUI.close();
         });
 
         // 2. 3D Sandbox Launch
@@ -285,19 +280,19 @@
             window.EventBus?.emit('UI_LOG', "Welcome to the woods. Press U for Dev Tools.");
         });
 
-        // 3. Engine Ready Hook
+        // 3. Engine Ready Hook (Subscribed before main.js executes so ENGINE_READY is never missed)
         function onEngineReady() {
             if (loadingBar) loadingBar.style.width = '100%';
             if (loadingText) loadingText.innerText = 'Engine Ready. All simulation systems online.';
             if (start3DBtn) start3DBtn.classList.remove('hidden');
         }
 
-        if (window.EventBus) {
-            window.EventBus.on('ENGINE_READY', onEngineReady);
-        } else {
-            window.addEventListener('load', () => setTimeout(onEngineReady, 1500));
-        }
+        window.EventBus?.on('ENGINE_READY', onEngineReady);
+        window.addEventListener('load', () => setTimeout(onEngineReady, 1500));
     </script>
+
+    <!-- 2. MAIN 3D ENGINE BOOT -->
+    <script type="module" src="./src/main.js"></script>
 
 </body>
 </html>

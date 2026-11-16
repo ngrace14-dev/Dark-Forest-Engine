@@ -3,7 +3,7 @@
  * Purpose: Centralized Event Bus singleton to ensure safe initialization order.
  */
 
-window.EventBus = {
+window.EventBus = window.EventBus || {
     events: {},
     on: function(event, callback) { 
         if(!this.events[event]) this.events[event] = []; 
