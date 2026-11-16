@@ -87,7 +87,26 @@ globalThis.document = {
 globalThis.window = globalThis;
 
 const { CommanderUI } = await import('../src/systems/commander_ui.js');
-CommanderUI.open();
+CommanderUI.openRoleSelection();
+if (!mockElements.get('commander-terminal-root').innerHTML.includes('SELECT YOUR VANTAGE ROLE')) {
+    failures.push('Royal Archive Role Selection menu failed to render on openRoleSelection()');
+}
+
+// Verify Noble House Scion random 1-of-18 house roll & Crown Favor mandate
+CommanderUI.selectRoleAndLaunch('NOBLE_HOUSE');
+const rolledHouse = CommanderEngine.CampaignManager.state.house;
+console.log(`[11] Rolled Noble House: ${rolledHouse.houseId} (${rolledHouse.settlementName}) | Monopoly: ${rolledHouse.monopoly} | Crown Favor: ${rolledHouse.crownFavor}% | Dispensation: ${rolledHouse.hasHorizonDispensation}`);
+if (!rolledHouse.monopoly || rolledHouse.hasHorizonDispensation !== false) {
+    failures.push('Noble House Scion should roll a non-Terminus house with a unique monopoly and hasHorizonDispensation=false');
+}
+
+// Verify Terminus role restores legal Horizon Dispensation & 300 Guardians
+CommanderUI.selectRoleAndLaunch('TERMINUS');
+const termHouse = CommanderEngine.CampaignManager.state.house;
+if (termHouse.houseId !== 'House Terminus' || termHouse.hasHorizonDispensation !== true || termHouse.guardiansCount !== 300) {
+    failures.push('Terminus role failed to restore House Terminus & 300 Guardians');
+}
+
 window.viewTelemetry();
 if (!mockElements.get('story-reader').innerText.includes('THE 20 BEDROCK CHAINED SETTLEMENTS')) {
     failures.push('CommanderUI telemetry reader failed to render');

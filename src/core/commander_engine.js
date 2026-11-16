@@ -613,7 +613,76 @@ rootScope.InterrogationDesk = InterrogationDesk;
 
 
 // ============================================================================
-// 5. CAMPAIGN COMMAND MANAGER
+// 5. NOBLE HOUSE MONOPOLIES & ROLE REGISTRY
+// ============================================================================
+export const NOBLE_HOUSE_PROFILES = [
+    { houseId: "House Oakheart", seat: "Oakhaven", ruler: "Baron Kaelen Oakheart", monopoly: "14-Day Shift Ironwood Heartwood", bonusDesc: "+20% Caravan Trade Yield", fuelStart: 28, favorStart: 65 },
+    { houseId: "House Gallows", seat: "Gallows Hill", ruler: "Baroness Isolde Gallows", monopoly: "Ironbark Runic Dust & Stabilization Tethers", bonusDesc: "-50% Chain Decay on Fuel Depletion", fuelStart: 26, favorStart: 62 },
+    { houseId: "House Mire", seat: "Mire's Edge", ruler: "Elder Ystrid Mire", monopoly: "Toxic Swamp Reagents & Fungal Binders", bonusDesc: "+15% Domestic Still Efficiency", fuelStart: 25, favorStart: 58 },
+    { houseId: "House Blackwood", seat: "Blackwood", ruler: "Duke Vorian Blackwood", monopoly: "Deep-Crust Slag-Weevil Spinal Fluids", bonusDesc: "+4 Fuel on Emergency Requisition", fuelStart: 27, favorStart: 60 },
+    { houseId: "House Hollow", seat: "Hollow Creek", ruler: "Baron Vance Hollow", monopoly: "Swamp-Gator Iron-Leather Anchor Seals", bonusDesc: "-1 Daily Barrier Fuel Burn Floor", fuelStart: 26, favorStart: 60 },
+    { houseId: "House Ashen", seat: "Ashen Hold", ruler: "Duke Vaeloth Ashen", monopoly: "Diamond-Cut Basalt Runic Tablets", bonusDesc: "+10 Starting Crown Favor", fuelStart: 26, favorStart: 75 },
+    { houseId: "House Crow", seat: "Crow's Perch", ruler: "Master Corvus Crow", monopoly: "Whisper Guild Intelligence & Shadow-Blink", bonusDesc: "+1 Starting Blackmail Dossier", fuelStart: 24, favorStart: 55, startDossiers: 1 },
+    { houseId: "House Widow", seat: "Widow's Web", ruler: "Duchess Genevieve Widow", monopoly: "Parasitic Siphon-Vine Cold Resins", bonusDesc: "+6 Resin on Mist Patrols", fuelStart: 28, favorStart: 64 },
+    { houseId: "House Thorn", seat: "Thornbury", ruler: "Marquis Silas Thorn", monopoly: "Illumination Waxworks & Pacifying Smoke", bonusDesc: "-10 Starting Lower-Bailey Unrest", fuelStart: 25, favorStart: 58 },
+    { houseId: "House Gloom", seat: "Gloomhaven", ruler: "Baron Malazar Gloom", monopoly: "Gloom-Glass Refraction Lenses & Alembics", bonusDesc: "+10 Max Barrier Fuel Storage", fuelStart: 28, favorStart: 62 },
+    { houseId: "House Dusken", seat: "Duskendale", ruler: "Baron Lysander Dusken", monopoly: "Gloom-Weaver Kinetic Silk Armor", bonusDesc: "+15 Garrison Poise Floor", fuelStart: 25, favorStart: 56 },
+    { houseId: "House Grim", seat: "Grimsby", ruler: "Baron Thaddeus Grim", monopoly: "Blast Foundries & 50-Ton Tether Chains", bonusDesc: "Chains Integrity Reinforced (100%)", fuelStart: 26, favorStart: 60 },
+    { houseId: "House Shadowfen", seat: "Shadowfen", ruler: "Viscount Severin Shadowfen", monopoly: "Master Pre-Fuel Matrix Synthesis", bonusDesc: "+32 Starting Barrier Fuel Reserves", fuelStart: 32, favorStart: 68 },
+    { houseId: "House Blightwatch", seat: "Blighted Watch", ruler: "Ranger General Torin Graves", monopoly: "Petrified Ghost-Pine Conduit Rods", bonusDesc: "High Frontier Patrol Survival", fuelStart: 24, favorStart: 55 },
+    { houseId: "House Bleak", seat: "Bleakmire", ruler: "Baron Malacor Bleak", monopoly: "Titan-Bone Masonry & Pale Cap Binders", bonusDesc: "Volatile Fuel Transit Stabilized", fuelStart: 26, favorStart: 58 },
+    { houseId: "House Wraith", seat: "Wraith's End", ruler: "Countess Morwenna Wraith", monopoly: "Abyssal Salvage & Leviathan Deep Oil", bonusDesc: "Alternative Deep-Oil Burn Reserves", fuelStart: 27, favorStart: 54 },
+    { houseId: "House Cull", seat: "Cullfield", ruler: "Baron Vargus Cull", monopoly: "Slaughter-Chutes & Cardiac Catalysts", bonusDesc: "+20% Proxy Raid Resin Yield", fuelStart: 26, favorStart: 60 },
+    { houseId: "House Aethel (Cadet Stewardship)", seat: "Outer Ward Stewardship", ruler: "Royal Seneschal", monopoly: "Crown Crucible Tithe Auditing", bonusDesc: "+15 Starting Crown Favor", fuelStart: 30, favorStart: 80 }
+];
+
+export const ROLE_CATALOG = {
+    NOBLE_HOUSE: {
+        roleId: 'NOBLE_HOUSE',
+        title: '1. Noble House Scion (Random 1 of 18 Houses)',
+        campaignMode: 'HOUSE',
+        subtitle: 'Manage Crown Favor, Weekly Barrier Fuel Quotas & Your Unique House Monopoly',
+        desc: 'Roll one of the 18 competing Noble Houses. Leverage your monopoly while managing Crown Favor without Terminus\'s legal still dispensation.'
+    },
+    TERMINUS: {
+        roleId: 'TERMINUS',
+        title: '2. Terminus Warden & 300 Guardians',
+        campaignMode: 'HOUSE',
+        subtitle: "Guard World's End Gate, Cultivate the 300 Guardians & Contain the 6,000-Year Gap",
+        desc: "Command House Terminus at the Mountain Event Horizon. Manage Crown Favor plus legal Horizon Dispensation and 3-Stage Bone-Carving Runic Cultivation."
+    },
+    GUILD: {
+        roleId: 'GUILD',
+        title: '3. Adventurer Guild Leader',
+        campaignMode: 'ORDER',
+        subtitle: 'Command Garrison Squads, Boundary Contracts & Anomaly Expeditions',
+        desc: 'Lead the Adventurer Guilds and Directorate field squads. Drill operatives, investigate spatial anomalies, and survive the 14-day Shift.'
+    },
+    MERCHANT: {
+        roleId: 'MERCHANT',
+        title: '4. Merchant Network & Patron Broker',
+        campaignMode: 'PATRON',
+        subtitle: 'Arbitrage House Monopolies, Dispatch Caravans & Verify Ledger Truths',
+        desc: 'Operate the inter-settlement trade and courier network across the Warded Roads. Sponsor candidates and verify historical rumors into canonical Truth.'
+    },
+    SYNDICATE: {
+        roleId: 'SYNDICATE',
+        title: '5. Crime Syndicate Boss',
+        campaignMode: 'SYNDICATE',
+        subtitle: 'Smuggle Unstamped Crown Resin, Extort Houses & Collect Gallows Tolls',
+        desc: 'Rule the Salt Syndicate from the brine-locks. Divert midnight resin barges, build blackmail dossiers on Noble Houses, and profit from scarcity.'
+    },
+    SOVEREIGN: {
+        roleId: 'SOVEREIGN',
+        title: '6. The Pale Sovereign (Korvan the Variable)',
+        campaignMode: 'SOVEREIGN',
+        subtitle: 'Summon the Bound Huntsman, Mutate Heralds & Endure 1,000 Years to Shatter the Chains',
+        desc: 'Play as the betrayed Champion chained beneath the mountain peaks. Harvest Significance from marked nobles and evolve into the True Pale Sovereign.'
+    }
+};
+
+// ============================================================================
+// 5.1 CAMPAIGN COMMAND MANAGER
 // ============================================================================
 const CampaignManager = rootScope.CampaignManager || {
     campaignMode: 'HOUSE',
@@ -662,6 +731,108 @@ const CampaignManager = rootScope.CampaignManager || {
     init() {
         rootScope.EventBus?.on('HEARTBEAT_T12H', () => this.tickDayCycle());
         rootScope.EventBus?.on('DAY_TICK', () => this.processDailyLogistics());
+    },
+
+    selectRole(roleKey = 'NOBLE_HOUSE', customHouseId = null) {
+        const key = (roleKey || 'NOBLE_HOUSE').toUpperCase();
+        this.activeRole = key;
+
+        if (key === 'NOBLE_HOUSE') {
+            const picked = (customHouseId && NOBLE_HOUSE_PROFILES.find(h => h.houseId.toLowerCase() === customHouseId.toLowerCase()))
+                || NOBLE_HOUSE_PROFILES[Math.floor(Math.random() * NOBLE_HOUSE_PROFILES.length)];
+
+            this.campaignMode = 'HOUSE';
+            this.activeFaction = picked.houseId;
+            this.dayStarted = rootScope.EngineParams?.worldDay || 1;
+            this.victoryConditionsMet = false;
+            this.collapseTriggered = false;
+            this.collapseReason = null;
+
+            Object.assign(this.state.house, {
+                houseId: picked.houseId,
+                settlementName: picked.seat,
+                rulerName: picked.ruler,
+                monopoly: picked.monopoly,
+                monopolyBonus: picked.bonusDesc,
+                barrierFuelUnits: picked.fuelStart,
+                chainsIntegrity: 100,
+                guardiansCount: 0,
+                shiftCountdown: 14,
+                crownFavor: picked.favorStart,
+                crownDemand: 16,
+                autarkyLevel: 0,
+                crownScrutiny: 10,
+                hasHorizonDispensation: false,
+                assignedBailiffId: null,
+                sanctuaryBuilt: false,
+                privateWingOpen: false,
+                unrest: 10,
+                blackmailDossiers: picked.startDossiers || 0,
+                activeCaravans: []
+            });
+
+            AgentRosterManager.agents.clear();
+            [
+                ['agt_1', picked.ruler, 'WAR_MASTER'],
+                ['agt_2', 'House Bailiff Mallow', 'SCOUT'],
+                ['agt_3', 'Ward-Captain Maris', 'WARDEN'],
+                ['agt_4', 'Apprentice Jon', 'APPRENTICE']
+            ].forEach(([id, name, arch]) => {
+                const a = AgentRosterManager.createAgent(id, name, arch);
+                a.assignedHouseId = picked.houseId;
+            });
+
+            LogDispatchManager.dispatches.unshift({
+                id: `disp_role_${Date.now()}`,
+                day: this.dayStarted,
+                type: 'ROYAL ARCHIVE CHARTER',
+                sender: 'The Obsidian Citadel (Crown Assessor)',
+                title: `Charter Confirmed: ${picked.houseId} (${picked.seat})`,
+                body: `Ruler ${picked.ruler} registered under the King's Chain. Monopoly: [${picked.monopoly}] (${picked.bonusDesc}). Weekly Crown Fuel Quota: 16u. Warning: Unauthorized domestic fuel stills are strictly prohibited outside World's End Gate.`,
+                read: false
+            });
+
+            rootScope.EventBus?.emit('CAMPAIGN_INITIALIZED', { mode: 'HOUSE', role: key, house: picked });
+            return this.getCampaignStatus();
+        }
+
+        if (key === 'TERMINUS') {
+            Object.assign(this.state.house, {
+                houseId: 'House Terminus',
+                settlementName: "World's End Gate",
+                rulerName: 'High Marshal Vane',
+                monopoly: 'Horizon Gate Defense & 3-Stage Bone-Carving Cultivation',
+                monopolyBonus: 'Legal Horizon Stills Dispensation & 300 Guardians',
+                barrierFuelUnits: 28,
+                chainsIntegrity: 100,
+                guardiansCount: 300,
+                shiftCountdown: 14,
+                crownFavor: 65,
+                crownDemand: 16,
+                autarkyLevel: 0,
+                crownScrutiny: 10,
+                hasHorizonDispensation: true,
+                assignedBailiffId: null,
+                sanctuaryBuilt: false,
+                privateWingOpen: false,
+                unrest: 10,
+                blackmailDossiers: 0,
+                activeCaravans: []
+            });
+            return this.selectCampaign('HOUSE', 'House Terminus');
+        }
+
+        const roleToMode = {
+            GUILD: 'ORDER',
+            MERCHANT: 'PATRON',
+            SYNDICATE: 'SYNDICATE',
+            SOVEREIGN: 'SOVEREIGN',
+            DUNE: 'DUNE',
+            ORDER: 'ORDER',
+            PATRON: 'PATRON',
+            HOUSE: 'HOUSE'
+        };
+        return this.selectCampaign(roleToMode[key] || 'HOUSE');
     },
 
     selectCampaign(mode, customFactionId = null) {
@@ -1286,7 +1457,9 @@ export const CommanderEngine = {
     LogDispatchManager,
     CrucibleNarrativeEngine,
     InterrogationDesk,
-    ShadowInfluenceEngine
+    ShadowInfluenceEngine,
+    NOBLE_HOUSE_PROFILES,
+    ROLE_CATALOG
 };
 
 // Auto-boot default HOUSE campaign so state, agents, and dispatches are ready immediately

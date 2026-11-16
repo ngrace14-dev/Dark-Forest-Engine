@@ -13,6 +13,7 @@ export const CommanderUI = {
     containerId: 'commander-terminal-root',
     modalId: 'text-commander-viewport',
     activeBannerMsg: null,
+    roleSelected: false,
 
     init(customContainerId = null) {
         if (customContainerId) this.containerId = customContainerId;
@@ -22,11 +23,74 @@ export const CommanderUI = {
         return this;
     },
 
-    open() {
+    open(showRoleGate = true) {
         const modal = document.getElementById(this.modalId);
         if (modal) modal.classList.remove('hidden');
-        CommanderEngine.boot(CommanderEngine.CampaignManager.campaignMode || 'HOUSE');
+        if (showRoleGate && !this.roleSelected) {
+            this.renderRoleSelection();
+        } else {
+            this.render();
+        }
+    },
+
+    openRoleSelection() {
+        const modal = document.getElementById(this.modalId);
+        if (modal) modal.classList.remove('hidden');
+        this.roleSelected = false;
+        this.renderRoleSelection();
+    },
+
+    selectRoleAndLaunch(roleKey, customHouseId = null) {
+        this.roleSelected = true;
+        const container = document.getElementById(this.containerId);
+        if (container) container.dataset.initialized = 'false';
+        CommanderEngine.CampaignManager.selectRole(roleKey, customHouseId);
+        const h = CommanderEngine.CampaignManager.state.house;
         this.render();
+        if (roleKey === 'NOBLE_HOUSE') {
+            this.showBanner(`Rolled [${h.houseId}] (${h.settlementName}) — Ruler: ${h.rulerName} | Monopoly: ${h.monopoly} (${h.monopolyBonus})`);
+        } else {
+            this.showBanner(`Initialized Royal Archive Lens: [${roleKey}]`);
+        }
+    },
+
+    renderRoleSelection() {
+        if (typeof document === 'undefined') return;
+        const container = document.getElementById(this.containerId);
+        if (!container) return;
+        container.dataset.initialized = 'role_gate';
+
+        const roles = Object.values(CommanderEngine.ROLE_CATALOG || {});
+        const cardsHtml = roles.map(r => `
+            <div class="cmd-card" style="display:flex; flex-direction:column; justify-content:space-between; border-color:#92400e;">
+                <div>
+                    <div style="color:#fbbf24; font-size:14px; font-weight:bold; margin-bottom:4px;">${r.title}</div>
+                    <div style="color:#f59e0b; font-size:11px; margin-bottom:6px;">${r.subtitle}</div>
+                    <div style="color:#94a3b8; font-size:11px; line-height:1.4;">${r.desc}</div>
+                </div>
+                <div style="margin-top:10px;">
+                    <button class="cmd-btn" style="width:100%; padding:8px; font-size:12px; background:#451a03; color:#fde68a; border-color:#f59e0b;" onclick="window.selectArchiveRole('${r.roleId}')">
+                        📜 Initialize ${r.roleId === 'NOBLE_HOUSE' ? 'Random Noble House (1 of 18)' : r.title.replace(/^\d+\.\s*/, '')}
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+        container.innerHTML = `
+            <style>
+                .cmd-card { background: rgba(15, 23, 42, 0.95); border: 1px solid #78350f; padding: 14px; margin-bottom: 12px; font-family: monospace; color: #cbd5e1; }
+                .cmd-title { color: #fbbf24; margin: 0 0 6px 0; font-size: 18px; font-weight: bold; letter-spacing: 0.08em; }
+                .cmd-btn { background: #1e1b18; color: #fbbf24; border: 1px solid #78350f; font-family: monospace; font-size: 11px; font-weight: bold; padding: 5px 9px; cursor: pointer; margin: 2px; transition: all 0.15s; }
+                .cmd-btn:hover { background: #78350f; border-color: #fbbf24; color: #fff; }
+                .cmd-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+                @media (max-width: 900px) { .cmd-grid-2 { grid-template-columns: 1fr; } }
+            </style>
+            <div class="cmd-card" style="border-color:#d97706;">
+                <div class="cmd-title">🏛️ THE ROYAL ARCHIVE & GENERAL LEDGER — SELECT YOUR VANTAGE ROLE</div>
+                <div style="color:#f59e0b; font-size:12px;">Choose your career lens to unseal the General Ledger. All Noble House runs must manage Crown Favor and weekly Barrier Fuel quotas alongside their unique economic monopoly.</div>
+            </div>
+            <div class="cmd-grid-2">${cardsHtml}</div>
+        `;
     },
 
     close() {
@@ -50,6 +114,8 @@ export const CommanderUI = {
 
         // Global window helpers for inline handlers & legacy compatibility
         window.CommanderUI = this;
+        window.selectArchiveRole = (roleKey, houseId = null) => this.selectRoleAndLaunch(roleKey, houseId);
+        window.openRoleGate = () => this.openRoleSelection();
         window.setCampaign = (m) => {
             CommanderEngine.CampaignManager.selectCampaign(m);
             this.showBanner(`Switched Campaign Mode to [${m}].`);
@@ -230,7 +296,14 @@ export const CommanderUI = {
                 <div id="status-bar" style="font-size: 12px; color: #f59e0b; margin-bottom: 8px; font-weight: bold;">Initializing...</div>
                 <div id="commander-action-banner" style="display:none; background:#1c1917; border-left:3px solid #f59e0b; color:#fde68a; padding:6px 10px; margin-bottom:8px; font-size:11px;"></div>
                 <div style="margin-bottom: 6px;">
-                    <b style="color:#d97706;">CAMPAIGN:</b> ${campaigns}
+                    <b style="color:#d97706;">ARCHIVE ROLE:</b>
+                    <button class="cmd-btn" style="border-color:#f59e0b; color:#fde68a;" onclick="window.openRoleGate()">🔄 Switch Role Menu</button>
+                    <button class="cmd-btn" onclick="window.selectArchiveRole('NOBLE_HOUSE')">🎲 Re-Roll Noble House (1 of 18)</button>
+                    <button class="cmd-btn" onclick="window.selectArchiveRole('TERMINUS')">🛡️ Terminus</button>
+                    <button class="cmd-btn" onclick="window.selectArchiveRole('GUILD')">⚔️ Guild</button>
+                    <button class="cmd-btn" onclick="window.selectArchiveRole('MERCHANT')">⚖️ Merchant</button>
+                    <button class="cmd-btn" onclick="window.selectArchiveRole('SYNDICATE')">🗡️ Syndicate</button>
+                    <button class="cmd-btn" onclick="window.selectArchiveRole('SOVEREIGN')">👑 Sovereign</button>
                     <b style="margin-left: 12px; color:#d97706;">TIME:</b>
                     <button class="cmd-btn" onclick="window.advanceDays(1)">+1 Day</button>
                     <button class="cmd-btn" onclick="window.advanceDays(7)">+7 Days</button>
@@ -264,12 +337,15 @@ export const CommanderUI = {
         const d = s.day;
         const shiftDays = 14 - (d % 14);
         const st = s.state;
-        let m = `Day: ${d} (Year ${Math.floor(d / 365) + 12000} AF) | Shift in: ${shiftDays}d | Mode: [${s.mode}]`;
-        if (s.mode === 'HOUSE') m += ` | Fuel: ${st.barrierFuelUnits}u | Chains: ${st.chainsIntegrity}% | Crown Favor: ${st.crownFavor}%`;
-        if (s.mode === 'ORDER') m += ` | Anomalies: ${st.containedAnomalies} | Entropy: ${st.blindSpotEntropy}%`;
+        const roleLabel = CommanderEngine.CampaignManager.activeRole || s.mode;
+        let m = `Day: ${d} (Perceived: Year ${Math.floor(d / 365) + 12000} AF) | Shift in: ${shiftDays}d | Role: [${roleLabel}]`;
+        if (s.mode === 'HOUSE') {
+            m += ` | ${st.houseId || 'House Terminus'} (${st.settlementName || "World's End Gate"}) | Monopoly: [${st.monopoly || 'Horizon Defense'}] | Fuel: ${st.barrierFuelUnits}u | Chains: ${st.chainsIntegrity}% | Crown Favor: ${st.crownFavor}% | Scrutiny: ${st.crownScrutiny || 10}%`;
+        }
+        if (s.mode === 'ORDER') m += ` | Anomalies: ${st.containedAnomalies} | Blind-Spot Entropy: ${st.blindSpotEntropy}%`;
         if (s.mode === 'SYNDICATE') m += ` | Salt: ${st.mineralSaltStock}u | Contraband Resin: ${st.contrabandResin}u | Toll: ${st.gallowsTollCollected}d`;
         if (s.mode === 'DUNE') m += ` | Water: ${st.cleanedWaterStock}u | Drift: ${st.driftDistanceKm?.toFixed(1)}km | Tethers: ${st.mooringTetherIntegrity}%`;
-        if (s.mode === 'PATRON') m += ` | Candidate Sig: ${st.candidateSignificance} | Dreams: ${st.symbolicDreamsSent} | Truths: ${st.verifiedTruths}`;
+        if (s.mode === 'PATRON') m += ` | Candidate Sig: ${st.candidateSignificance} | Dreams: ${st.symbolicDreamsSent} | Verified Truths: ${st.verifiedTruths}`;
         if (s.mode === 'SOVEREIGN') m += ` | Endured: ${st.yearsEndured}y | Heralds: ${st.heraldsMutated}/5 | ${st.title}`;
 
         const sb = document.getElementById('status-bar');

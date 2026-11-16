@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Dark Forest Engine | Standalone Commander & Chronicle</title>
+    <title>Dark Forest Engine | The Royal Archive & General Ledger</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -14,6 +14,11 @@
         window.EngineConfig = { crowsEyeMode: true };
     </script>
     <div id="commander-terminal-root"></div>
-    <script type="module" src="./src/systems/commander_ui.js"></script>
+    <script type="module">
+        import CommanderUI from './src/systems/commander_ui.js';
+        CommanderUI.init('commander-terminal-root');
+        CommanderUI.openRoleSelection();
+    </script>
 </body>
 </html>
+
