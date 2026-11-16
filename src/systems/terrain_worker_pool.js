@@ -1,4 +1,4 @@
-import WorkerPool from './src_core_worker_pool.js';
+import WorkerPool from '../core/worker_pool.js';
 class TerrainWorkerPool {
     constructor() { console.log('[TerrainWorkerPool] Upgraded to Unified Worker Pool (Phase 2).'); }
     requestChunkData(cx, cz, lod, size, seed, localRoadPoints, callback) {

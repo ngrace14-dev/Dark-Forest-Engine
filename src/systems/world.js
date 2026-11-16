@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createNoise2D } from 'simplex-noise';
-import { EpochManager } from './src_epoch_manager.js';
+import { EpochManager } from '../epoch_manager.js';
 
 // Attach createNoise2D globally for src_engine.js and noise initializations
 window.createNoise2D = createNoise2D;

@@ -95,7 +95,7 @@ import './systems/narrative_driver.js';
 import './systems/world.js';
 
 import './systems/inventory.js';
-import { initializeUIEngine } from './src/ui/init.js';
+import { initializeUIEngine } from './ui/init.js';
 import './systems/ui.js';
 import './systems/render_optimizer.js'; 
 import './systems/graphics.js';          // Dedicated AAA Graphics Pipeline & Post-Processing
@@ -104,15 +104,15 @@ import './systems/terrain_worker_pool.js'; // Background Web Worker Pool
 import './systems/block_terrain.js';      // Procedural Block Terrain & Shader System
 import './systems/grass.js';
 import './systems/ruins.js';             // Procedural Stone Ruins & Cobblestones
-import './src_generators_redwood.js';        // <-- ADDED: Redwood Generator & Web Worker Orchestrator
+import './generators/redwood.js';        // <-- ADDED: Redwood Generator & Web Worker Orchestrator
 import './systems/procedural_trees.js';   // High-Quality Procedural Trees
-import { ImpostorBaker } from './src_systems_impostor_baker.js'; // Single Authority Baker
+import { ImpostorBaker } from './systems/impostor_baker.js'; // Single Authority Baker
 import './systems/forest_impostors.js';   // 3km Distant Canopy Impostor System
-import WetlandsSystem from './src_systems_wetlands.js';
-import MountainSystem from './src_systems_mountains.js';
-import DunesSystem from './src_systems_dunes.js';
+import WetlandsSystem from './systems/wetlands.js';
+import MountainSystem from './systems/mountains.js';
+import DunesSystem from './systems/dunes.js';
 import './systems/dune_drift.js';
-import TidewaterSystem from './src_systems_tidewater.js';
+import TidewaterSystem from './systems/tidewater.js';
 
 import './systems/input.js';
 import './systems/audio.js';
@@ -181,16 +181,18 @@ import './systems/navigation_careers.js';
 
 
 // 1.5 Integration Testing: Character Stack
-import './src/character/init.js';
+import './character/init.js';
 
 // 2. Mod Tools, Overlays & Dev Systems
-import './src/animation_tools/MixamoRetargeting.js';
+import './animation_tools/MixamoRetargeting.js';
 import './firebase.js';
 import './multiplayer.js';
 import './systems/editor.js';
 import './systems/attractor.js';
 import './systems/crows_eye.js';
-import './src/systems/integrity.js';
+import './systems/integrity.js';
+import './systems/agent_roster.js';
+import './systems/campaign_command.js';
 
 import './systems/dev_tools.js';
 import './systems/health.js';

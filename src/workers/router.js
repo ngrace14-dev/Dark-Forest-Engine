@@ -18,10 +18,10 @@ self.onmessage = async (e) => {
         if (!handlerModule) {
             switch (domain) {
                 case 'terrain':
-                    handlerModule = await import('./src_workers_terrain_logic.js');
+                    handlerModule = await import('./terrain_logic.js');
                     break;
                 case 'horde':
-                    handlerModule = await import('./src_workers_horde_logic.js');
+                    handlerModule = await import('./horde_logic.js');
                     break;
                 // case 'economy': 
                 //     handlerModule = await import('./src_workers_economy_logic.js');

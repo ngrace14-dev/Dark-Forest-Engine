@@ -20,7 +20,7 @@ class UnifiedWorkerPool {
         // Boot the workers
         for (let i = 0; i < this.size; i++) {
             // We use a generic router worker that can handle multiple domain modules
-            const worker = new Worker('src_workers_router.js', { type: 'module' });
+            const worker = new Worker('./workers/router.js', { type: 'module' });
             
             worker.onmessage = (e) => {
                 console.log(String.fromCharCode(91,77,97,105,110,93,32,82,101,99,101,105,118,101,100,32,101,46,100,97,116,97), e.data);
