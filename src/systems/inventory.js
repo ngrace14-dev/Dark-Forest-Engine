@@ -213,7 +213,8 @@ window.EventBus.on('INV_USE', (packIndex) => {
             if (item.stats.buff) window.EventBus.emit('UI_LOG', `${item.name} grants +${item.stats.amount} ${item.stats.buff} for ${item.stats.duration}s.`);
             window.EventBus.emit('UI_UPDATE_HUD');
         }
-        else if (item.isDiscovery || item.type === 'weapon' || item.type === 'armor') {
+    }
+    else if (item.isDiscovery || item.type === 'weapon' || item.type === 'armor') {
         // --- ARTIFACT & STEEL STRAND: INSPECTION FLOW ---
         window.EventBus.emit('UI_LOG', `[ARTIFACT] Inspecting ${item.name}...`);
         

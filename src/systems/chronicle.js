@@ -70,14 +70,14 @@ window.ChronicleManager = {
                     detail: 'Twelve high-significance foes have fallen by your hand.'
                 });
             }
-        }
+        },
 
-        hasEpochAchievement(nodeId, achievementId) {
+        hasEpochAchievement: function(nodeId, achievementId) {
             const records = this.entityRecords.get(nodeId) || [];
             return records.some(r => r.type === 'EPOCH_ACHIEVEMENT' && r.achievementId === achievementId);
-        }
+        },
 
-        recordEpochAchievement(nodeId, achievement) {
+        recordEpochAchievement: function(nodeId, achievement) {
             this.recordEvent({
                 actorId: nodeId,
                 type: 'EPOCH_ACHIEVEMENT',

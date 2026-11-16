@@ -77,7 +77,7 @@ function moveCompanion(companion, destination, speedMultiplier = 1, delta = 0) {
  * Manifestation Rule: Trust Networks.
  * NPCs physically cluster around trusted influencers and mentors.
  */
-    processCrowdGathering(entity, delta) {
+function processCrowdGathering(entity, delta) {
     if (!window.ReputationManager || !window.PersonhoodManager) return;
     
     // Only NPCs within villages gather
