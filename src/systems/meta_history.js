@@ -88,8 +88,11 @@ class MetaHistorySystem {
     /**
      * 100.6 World State Export
      */
-    exportWorldLine() {
-        // Logic to save world state for potential "Save Import" in next run (100.1)
+    exportWorldLine(candidateId = null) {
+        if (window.CampaignManager?.exportLegacySave) {
+            return window.CampaignManager.exportLegacySave(candidateId);
+        }
+        return null;
     }
 }
 

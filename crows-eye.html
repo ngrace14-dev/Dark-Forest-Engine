@@ -1,23 +1,84 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dark Forest Engine | Crow's Eye</title>
-    <style>body { background: #040608; color: #94a3b8; font-family: monospace; margin: 0; }</style>
+    <title>Dark Forest Engine | Standalone Commander & Chronicle</title>
+    <meta charset="utf-8">
+    <style>
+        body { background: #040608; color: #94a3b8; font-family: monospace; margin: 0; padding: 14px; }
+        h1, h2 { color: #fbbf24; margin: 0 0 6px 0; }
+        .card { background: rgba(15, 23, 42, 0.95); border: 1px solid #78350f; padding: 10px; margin-bottom: 10px; }
+        .btn { background: #1e1b18; color: #fbbf24; border: 1px solid #78350f; font-family: inherit; font-size: 11px; font-weight: bold; padding: 4px 8px; cursor: pointer; margin: 2px; }
+        .btn:hover { background: #451a03; border-color: #fbbf24; color: #fff; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .dispatch { background: #000; border: 1px solid #451a03; padding: 6px; margin-bottom: 5px; font-size: 11px; }
+        .story-box { background: #0b0f17; border: 1px solid #d97706; padding: 10px; white-space: pre-wrap; font-size: 11px; color: #fef3c7; max-height: 350px; overflow-y: auto; }
+    </style>
 </head>
 <body>
-    <div id="crows-eye-status"></div>
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-        }
-    }
-    </script>
-    <script type="module" src="src/main.js"></script>
     <script>
-        // Soft launch: Boot headless mode
         window.isHeadless = true;
         window.EngineConfig = { crowsEyeMode: true };
     </script>
+    <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+    <script type="module" src="src/main.js"></script>
+    <script type="module" src="src/browser_bridge.js"></script>
+
+    <div class="card">
+        <h1>🌌 DARK FOREST ENGINE | COMMANDER TERMINAL (PROLOGUE)</h1>
+        <div id="status-bar" style="font-size: 12px; color: #f59e0b; margin-bottom: 6px;">Initializing...</div>
+        <div>
+            <b style="color:#78350f;">CAMPAIGN:</b>
+            <button class="btn" onclick="setCampaign('HOUSE')">HOUSE</button>
+            <button class="btn" onclick="setCampaign('ORDER')">ORDER</button>
+            <button class="btn" onclick="setCampaign('SYNDICATE')">SYNDICATE</button>
+            <button class="btn" onclick="setCampaign('DUNE')">DUNE</button>
+            <button class="btn" onclick="setCampaign('PATRON')">PATRON</button>
+            <button class="btn" onclick="setCampaign('SOVEREIGN')">SOVEREIGN</button>
+            <b style="margin-left: 10px; color:#78350f;">TIME:</b>
+            <button class="btn" onclick="advanceDays(1)">+1 Day</button>
+            <button class="btn" onclick="advanceDays(7)">+7 Days</button>
+            <button class="btn" style="background:#78350f; color:#fff;" onclick="exportSave()">💾 Export Legacy Save (July 3D)</button>
+        </div>
+        <div style="margin-top: 5px;">
+            <b style="color:#78350f;">DIRECTIVES:</b>
+            <button class="btn" onclick="viewTelemetry()">🏛️ 20 Bedrock Settlements</button>
+            <button class="btn" onclick="dispatchCmd('PATROL')">Patrol Mist</button>
+            <button class="btn" onclick="dispatchCmd('REQUISITION_FUEL')">Requisition Fuel</button>
+            <button class="btn" onclick="dispatchCmd('CROWN_FILL_FULL')">Crown: Fill Full</button>
+            <button class="btn" onclick="dispatchCmd('CROWN_DENY')">Crown: Deny</button>
+            <button class="btn" onclick="dispatchCmd('DISPATCH_CARAVAN', 'Oakhaven')">Dispatch Caravan</button>
+            <button class="btn" onclick="dispatchCmd('PROXY_RAID')">Proxy Raid</button>
+            <button class="btn" onclick="dispatchCmd('AUDIT_ANOMALY')">Audit Anomaly (12-B)</button>
+            <button class="btn" onclick="dispatchCmd('SCRUB_MONUMENT')">Scrub Monolith</button>
+            <button class="btn" onclick="dispatchCmd('SMUGGLE_RESIN')">Smuggle Resin</button>
+            <button class="btn" onclick="dispatchCmd('CONDENSE_WATER')">Scrape Condensers</button>
+            <button class="btn" onclick="dispatchCmd('TRANSMIT_DREAM')">Whisper Dream</button>
+            <button class="btn" onclick="dispatchCmd('SUMMON_HUNTSMAN')">Summon Huntsman</button>
+            <button class="btn" onclick="dispatchCmd('HIBERNATE', 100)">Hibernate (100y)</button>
+            <button class="btn" onclick="dispatchCmd('ASCEND_SOVEREIGN')">Ascend Sovereign</button>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <div>
+            <div class="card">
+                <h2>📬 COURIER DISPATCHES</h2>
+                <div id="dispatches-list" style="max-height: 250px; overflow-y: auto;">Waiting...</div>
+            </div>
+            <div class="card">
+                <h2>👥 GARRISON ROSTER</h2>
+                <div id="roster-list">Loading agents...</div>
+            </div>
+        </div>
+        <div>
+            <div class="card">
+                <h2>📜 CRUCIBLE STORY ARCHIVE & NECROLOGY</h2>
+                <div id="story-archive">Loading records...</div>
+                <div id="story-reader" class="story-box" style="display:none; margin-top:8px;"></div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

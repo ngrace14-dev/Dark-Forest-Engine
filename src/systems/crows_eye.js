@@ -430,6 +430,7 @@ class CrowsEyeSystem {
         this.overlay = null;
         this.updateTimer = 0;
         this.selectedEntityId = null;
+        this.selectedStoryActorId = null;
         this.currentView = 'MAP'; // Default view
         this.zoom = 1.0;
         this.pan = { x: 0, z: 0 };
@@ -442,8 +443,8 @@ class CrowsEyeSystem {
         this.currentFolder = 'WORLD';
         this.folders = {
             'WORLD': ['MAP', 'WATCHLIST', 'ACTIONS', 'FORCES', 'FORCE_LAYER', 'CIV_PRESSURE'],
-            'INTEL': ['INTEL', 'TRUTH', 'CHRONICLE', 'ANTHOLOGY', 'LEGENDS', 'OFFICIAL_HISTORY'],
-            'POWER': ['HOUSES', 'HOUSE_HISTORY', 'INFLUENCE_MAP', 'CIV_TIMELINE', 'ECONOMY', 'LINEAGES', 'RELATIONSHIPS'],
+            'INTEL': ['INTEL', 'TRUTH', 'CHRONICLE', 'ANTHOLOGY', 'LEGENDS', 'OFFICIAL_HISTORY', 'NECROLOGY'],
+            'POWER': ['CAMPAIGN', 'HOUSES', 'HOUSE_HISTORY', 'INFLUENCE_MAP', 'CIV_TIMELINE', 'ECONOMY', 'LINEAGES', 'RELATIONSHIPS'],
             'BEYOND': ['ORIGIN_DOSSIER', 'IMPACT_ANALYSIS', 'HARVEST', 'RUNES', 'MYSTERIES', 'MEANING', 'DREAMS', 'RECORDED_MEMORY', 'LOST_MEMORY'],
             'BUREAU': ['PLAYBACK', 'CALIBRATION']
         };

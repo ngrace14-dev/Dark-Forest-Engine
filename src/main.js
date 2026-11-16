@@ -193,6 +193,8 @@ import './systems/crows_eye.js';
 import './systems/integrity.js';
 import './systems/agent_roster.js';
 import './systems/campaign_command.js';
+import './systems/log_dispatch.js';
+import './systems/crucible_narrative.js';
 
 import './systems/dev_tools.js';
 import './systems/health.js';
