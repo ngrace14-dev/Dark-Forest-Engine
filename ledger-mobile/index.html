@@ -20,48 +20,86 @@
         window.EngineConfig = { crowsEyeMode: true };
     </script>
 
-    <!-- LAYER 1: TITLE CARD PARCHMENT SCROLL (ONE PAGE AT A TIME) -->
-    <div id="mobile-title-screen" class="scroll-stage">
-        <div class="scroll-column active-scroll" style="max-width: 520px; margin: 16px auto;">
-            <div class="scroll-roller"></div>
-            <div class="parchment-sheet" style="min-height: 680px; justify-content: center;">
-                <div class="rune-margin left">ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚ</div>
-                <div class="rune-margin right">ᛟᛞᛜᛚᛗᛖᛒᛏᛊᛉᛈᛇᛃᛁᚾᚺᚹᚷᚲᚱᚨ</div>
+    <!-- LAYER 1: AETHELGARD CHAINED RUNE MONOLITH TITLE CARD -->
+    <div id="mobile-title-screen" class="monolith-gateway-screen">
+        <svg class="monolith-scene-svg" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <radialGradient id="mistGlow" cx="50%" cy="46%" r="52%">
+                    <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.34"/>
+                    <stop offset="45%" stop-color="#0f2933" stop-opacity="0.65"/>
+                    <stop offset="100%" stop-color="#040709" stop-opacity="0.98"/>
+                </radialGradient>
+                <linearGradient id="stoneSlab" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#334155"/>
+                    <stop offset="48%" stop-color="#1e293b"/>
+                    <stop offset="100%" stop-color="#0f172a"/>
+                </linearGradient>
+                <linearGradient id="cyanRune" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#ecfeff"/>
+                    <stop offset="40%" stop-color="#22d3ee"/>
+                    <stop offset="100%" stop-color="#0891b2"/>
+                </linearGradient>
+            </defs>
+            <rect width="1200" height="720" fill="url(#mistGlow)"/>
+            <polygon points="180,560 260,410 330,450 290,590" fill="#111920" stroke="#1e293b" stroke-width="2" opacity="0.7"/>
+            <polygon points="910,560 850,430 960,390 1020,580" fill="#111920" stroke="#1e293b" stroke-width="2" opacity="0.7"/>
+            <g stroke="#293238" stroke-width="14" stroke-dasharray="22 10" stroke-linecap="round">
+                <line x1="250" y1="20" x2="565" y2="335"/>
+                <line x1="950" y1="20" x2="635" y2="335"/>
+                <line x1="220" y1="660" x2="540" y2="410"/>
+                <line x1="980" y1="660" x2="660" y2="410"/>
+            </g>
+            <g stroke="#64748b" stroke-width="4" stroke-dasharray="22 10" stroke-linecap="round" opacity="0.65">
+                <line x1="250" y1="18" x2="565" y2="333"/>
+                <line x1="950" y1="18" x2="635" y2="333"/>
+                <line x1="220" y1="658" x2="540" y2="408"/>
+                <line x1="980" y1="658" x2="660" y2="408"/>
+            </g>
+            <polygon points="485,630 502,135 545,105 655,105 698,135 715,630" fill="url(#stoneSlab)" stroke="#475569" stroke-width="3"/>
+            <path d="M510,220 L555,255 L535,310 M690,260 L645,295 L665,360 M520,470 L575,510" stroke="#090d12" stroke-width="3" fill="none"/>
 
-                <div class="title-scroll-content">
-                    <div>
-                        <h1 class="title-emblem-heading">DARK<br>FORESTS</h1>
-                        <h2 class="title-emblem-sub">A GRIM-DARK SANDBOX RPG</h2>
+            <path d="M440,660 Q495,530 515,390 Q535,240 585,102" stroke="#2d1c13" stroke-width="15" fill="none" stroke-linecap="round"/>
+            <path d="M760,660 Q705,520 680,380 Q665,240 615,105" stroke="#261710" stroke-width="16" fill="none" stroke-linecap="round"/>
+            <path d="M490,650 Q560,515 645,425 Q690,375 702,290" stroke="#382217" stroke-width="11" fill="none" stroke-linecap="round"/>
+            <path d="M710,650 Q635,510 545,410 Q500,350 498,260" stroke="#311d13" stroke-width="10" fill="none" stroke-linecap="round"/>
 
-                        <!-- Thorny Bramble Divider SVG -->
-                        <svg class="thorn-divider" viewBox="0 0 300 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M10 12 Q80 6 150 12 T290 12" stroke="#23180e" stroke-width="2.2" fill="none"/>
-                            <path d="M25 12 Q95 18 150 12 T275 12" stroke="#3b2818" stroke-width="1.5" fill="none"/>
-                            <polygon points="65,9 72,3 74,10" fill="#23180e"/>
-                            <polygon points="110,14 116,21 120,13" fill="#23180e"/>
-                            <polygon points="150,9 155,2 159,10" fill="#23180e"/>
-                            <polygon points="190,14 196,21 200,13" fill="#23180e"/>
-                            <polygon points="235,9 242,3 244,10" fill="#23180e"/>
-                        </svg>
+            <g class="monolith-rune-glow">
+                <path d="M582,175 L582,535 M582,275 L668,185 M582,365 L658,285" stroke="#06b6d4" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.45"/>
+                <path d="M582,175 L582,535 M582,275 L668,185 M582,365 L658,285" stroke="url(#cyanRune)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <path d="M582,175 L582,535 M582,275 L668,185 M582,365 L658,285" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </g>
 
-                        <p class="title-engine-ready">Engine Ready. All simulation systems online.</p>
-                        <div class="title-futhark-strip">ᚲᛚᛗᚾᛞᛊᛏᚷᛏᛉᛦᚱᚠᛟᛈᚦᚱᛗ</div>
-                    </div>
+            <line x1="495" y1="295" x2="705" y2="415" stroke="#1e293b" stroke-width="12" stroke-dasharray="18 8" stroke-linecap="round"/>
+            <line x1="705" y1="280" x2="495" y2="405" stroke="#1e293b" stroke-width="12" stroke-dasharray="18 8" stroke-linecap="round"/>
 
-                    <div style="width: 100%; margin-top: 12px;">
-                        <button id="btn-mobile-access-archive" class="parchment-ribbon-btn">
-                            ACCESS ROYAL ARCHIVE
-                        </button>
-                        <button id="btn-mobile-enter-woods" class="parchment-ribbon-btn secondary">
-                            ENTER THE WOODS (3D SANDBOX)
-                        </button>
-                        <button id="btn-title-landscape-fit" class="parchment-ribbon-btn secondary" style="font-size: 11px; padding: 8px 12px; margin-top: 6px;">
-                            📱 MOBILE LANDSCAPE FIT: AUTO
-                        </button>
-                    </div>
-                </div>
+            <path d="M0,0 L120,0 Q75,180 140,340 Q60,510 190,720 L0,720 Z" fill="#05080a"/>
+            <path d="M1200,0 L1080,0 Q1125,180 1060,340 Q1140,510 1010,720 L1200,720 Z" fill="#05080a"/>
+            <path d="M85,90 Q190,150 265,120 M110,490 Q220,430 310,470 M1115,100 Q1010,160 935,130 M1090,490 Q980,430 890,470" stroke="#080c0f" stroke-width="12" fill="none" stroke-linecap="round"/>
+
+            <circle cx="340" cy="310" r="3" fill="#f97316" opacity="0.85"/>
+            <circle cx="290" cy="490" r="2.5" fill="#fb923c" opacity="0.75"/>
+            <circle cx="860" cy="390" r="3" fill="#f97316" opacity="0.8"/>
+            <circle cx="535" cy="210" r="2.5" fill="#a5f3fc" opacity="0.9"/>
+            <circle cx="665" cy="340" r="2.5" fill="#67e8f9" opacity="0.9"/>
+            <circle cx="550" cy="460" r="2" fill="#22d3ee" opacity="0.85"/>
+        </svg>
+
+        <div class="monolith-overlay-content">
+            <h1 class="monolith-title-main">DARK FOREST</h1>
+            <h2 class="monolith-title-sub">AETHELGARD</h2>
+            <div class="monolith-status-tag">Engine Ready // All Simulation Systems Online</div>
+
+            <div class="monolith-actions-row">
+                <button id="btn-mobile-access-archive" class="monolith-stone-btn">
+                    📜 ACCESS ROYAL ARCHIVE
+                </button>
+                <button id="btn-mobile-enter-woods" class="monolith-stone-btn secondary">
+                    ⚔️ ENTER THE WOODS (3D SANDBOX)
+                </button>
+                <button id="btn-title-landscape-fit" class="monolith-stone-btn secondary" style="font-size: 10.5px; padding: 8px 12px;">
+                    📱 Landscape Fit: ON (No-Scroll)
+                </button>
             </div>
-            <div class="scroll-roller"></div>
         </div>
     </div>
 
