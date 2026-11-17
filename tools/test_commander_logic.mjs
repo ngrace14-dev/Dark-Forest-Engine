@@ -77,7 +77,7 @@ const makeEl = (id) => ({
         contains(c) { return this._set.has(c); }
     }
 });
-['commander-terminal-root', 'text-commander-viewport', 'status-bar', 'commander-action-banner', 'crisis-triage-panel', 'btn-autotick-state', 'timescale-bar', 'daily-goal-bar', 'role-directives-bar', 'dispatches-list', 'roster-list', 'story-archive', 'inquest-verdict-bar', 'story-reader'].forEach(id => {
+['commander-terminal-root', 'text-commander-viewport', 'status-bar', 'commander-action-banner', 'crisis-triage-panel', 'btn-autotick-state', 'timescale-bar', 'daily-goal-bar', 'role-directives-bar', 'expeditions-list', 'dispatches-list', 'roster-list', 'story-archive', 'inquest-verdict-bar', 'story-reader'].forEach(id => {
     mockElements.set(id, makeEl(id));
 });
 globalThis.document = {
@@ -107,12 +107,33 @@ if (termHouse.houseId !== 'House Terminus' || termHouse.hasHorizonDispensation !
     failures.push('Terminus role failed to restore House Terminus & 300 Guardians');
 }
 
-// Verify Role-Scoped Directives for Crime Syndicate Boss (no Crown Fuel or Sovereign buttons)
+// Verify Role-Scoped & Facility-Gated Directives for Crime Syndicate Boss (no Crown Fuel or Sovereign buttons)
 CommanderUI.selectRoleAndLaunch('SYNDICATE');
 const synDirsHtml = mockElements.get('role-directives-bar').innerHTML;
-if (!synDirsHtml.includes('Smuggle Resin') || synDirsHtml.includes('Crown: Fill Full') || synDirsHtml.includes('Summon Bound Huntsman')) {
+if (!synDirsHtml.includes('Send Smuggler Skiff') || synDirsHtml.includes('Crown: Fill Full') || synDirsHtml.includes('Dispatch Bound Huntsman')) {
     failures.push('Syndicate role directives were not properly scoped');
 }
+
+// Verify Base Start Gating, Facility Unlocks, Village Guard Prosperity Regen & Fallout Shelter Expedition Log
+CommanderUI.selectRoleAndLaunch('NOBLE_HOUSE', 'House Oakheart');
+const lockedGuardedRes = CommanderEngine.ExpeditionEngine.launchExpedition('GUARDED_CARAVAN', 'Gallows Hill');
+if (lockedGuardedRes.success !== false) {
+    failures.push('Guarded Caravan must be locked at Base Start before Guard Barracks is constructed');
+}
+const unguardedRes = CommanderEngine.ExpeditionEngine.launchExpedition('UNGUARDED_CARAVAN', 'Gallows Hill');
+if (!unguardedRes.success || CommanderEngine.ExpeditionEngine.activeExpeditions.length !== 1) {
+    failures.push('Unguarded Caravan must be available at Base Start and populate activeExpeditions');
+}
+CommanderEngine.FacilityEngine.unlockFacility('guard_barracks');
+const guardedRes = CommanderEngine.ExpeditionEngine.launchExpedition('GUARDED_CARAVAN', 'Gallows Hill');
+if (!guardedRes.success) {
+    failures.push('Guarded Caravan should unlock after constructing Guard Barracks');
+}
+CommanderEngine.tickInGameHour(4);
+console.log(`[11f] Active Expedition Mid-Mission Log: ${guardedRes.expedition.logs[guardedRes.expedition.logs.length - 1]}`);
+const skipRes = CommanderEngine.chronoSkipDays(1);
+console.log(`[11g] Chrono-Skip Result (Seals Left: ${skipRes.sealsRemaining}): ${skipRes.skippedEvents[0]}`);
+if (!skipRes.success) failures.push('Chrono-Skip failed');
 
 // Verify 30–60min / 40-Day Crisis Grace Period & House Wraith (Wraith's End) Deep-Oil Fire Crisis
 CommanderUI.selectRoleAndLaunch('NOBLE_HOUSE', 'House Wraith');
@@ -142,6 +163,28 @@ if (CommanderEngine.timeScale !== 8 || CommanderEngine.getEffectiveDayDurationMs
 }
 window.setTimeScale(1);
 console.log(`[11c] TimeScale Verified: 1x=${CommanderEngine.getEffectiveDayDurationMs() / 3600000}h/day | Max=8x (1.5h/day)`);
+
+// Verify End-of-Day Pause, Supplies Gain/Loss Report & Role-Specific Ambush/Hunting/Production Targets
+CommanderUI.selectRoleAndLaunch('SYNDICATE');
+window.setNextDayGoal('AMBUSH_SHADOWFEN_CONVOY');
+window.advanceDays(1);
+if (!ce.pendingDailyReconciliation || CommanderUI.autoTickEnabled !== false) {
+    failures.push('Expected simulation to pause at end of day with pendingDailyReconciliation=true');
+}
+if (!ce.lastDayReport?.gains.includes('Contraband Resin')) {
+    failures.push('Expected Syndicate ambush target to report Contraband Resin supply gain');
+}
+console.log(`[11d] End-of-Day Reconciliation Report: Gains="${ce.lastDayReport.gains}" | Losses="${ce.lastDayReport.losses}"`);
+
+// Verify Squad Armory Auto-Sort, Individual Equip & Character Stat Sheet
+const autoSortRes = CommanderEngine.AgentRosterManager.giveGearToSquadAutoSort('widow_resin_blade');
+const directEquipRes = CommanderEngine.AgentRosterManager.assignGearToAgent('agt_1', 'grimsby_plate');
+window.viewAgentStatSheet('agt_1');
+const statSheetText = mockElements.get('story-reader').innerText;
+console.log(`[11e] Squad Gear & Stat Sheet: ${autoSortRes.message} | ${directEquipRes.message}`);
+if (!statSheetText.includes('SQUAD MEMBER CHARACTER STAT SHEET') || !statSheetText.includes('Grimsby Runic-Dusted Hauberk')) {
+    failures.push('Character Stat Sheet failed to display equipped Grimsby Runic-Dusted Hauberk');
+}
 
 CommanderUI.selectRoleAndLaunch('TERMINUS');
 

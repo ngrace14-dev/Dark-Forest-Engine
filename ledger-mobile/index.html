@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#040608">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Dark Forest: The General Ledger</title>
+    <link rel="manifest" href="./manifest.json">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background: #040608;
+            color: #cbd5e1;
+            font-family: monospace;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #mobile-title-screen {
+            position: fixed;
+            inset: 0;
+            background: #040608;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            border: 12px solid #080c11;
+            text-align: center;
+        }
+        .title-main {
+            color: #b91c1c;
+            font-size: clamp(28px, 7vw, 56px);
+            font-weight: 900;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin: 0 0 8px 0;
+        }
+        .title-sub {
+            color: #fbbf24;
+            font-size: clamp(11px, 3vw, 14px);
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            margin: 0 0 32px 0;
+        }
+        .btn-archive-launch {
+            padding: 14px 28px;
+            border: 2px solid #d97706;
+            background: rgba(69, 26, 3, 0.85);
+            color: #fbbf24;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 14px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 0 25px rgba(245, 158, 11, 0.35);
+            transition: all 0.2s ease;
+        }
+        .btn-archive-launch:hover {
+            background: #d97706;
+            color: #000;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <script>
+        window.isHeadless = true;
+        window.isMobileMarketplaceBuild = true;
+        window.EngineConfig = { crowsEyeMode: true };
+    </script>
+
+    <!-- STANDALONE MOBILE TITLE CARD -->
+    <div id="mobile-title-screen">
+        <h1 class="title-main">Dark Forests</h1>
+        <h2 class="title-sub">The Royal Archive & General Ledger</h2>
+        <button id="btn-mobile-access-archive" class="btn-archive-launch">
+            📜 Access Royal Archive
+        </button>
+    </div>
+
+    <!-- FULLSCREEN GENERAL LEDGER VIEWPORT -->
+    <div id="text-commander-viewport" class="hidden" style="min-height: 100vh; display: flex; flex-direction: column;">
+        <div style="background: #000; border-bottom: 1px solid #78350f; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+            <span style="color: #fbbf24; font-weight: bold; letter-spacing: 0.08em;">🌌 DARK FOREST | THE GENERAL LEDGER</span>
+            <button id="btn-close-viewport" style="padding: 4px 10px; background: #450a0a; border: 1px solid #b91c1c; color: #fca5a5; font-family: monospace; font-size: 11px; cursor: pointer;">✖ Title Card</button>
+        </div>
+        <div id="commander-terminal-root" style="flex: 1; padding: 12px; overflow-y: auto;"></div>
+    </div>
+
+    <script type="module">
+        import CommanderUI from './src/systems/commander_ui.js';
+
+        const titleScreen = document.getElementById('mobile-title-screen');
+        const viewport = document.getElementById('text-commander-viewport');
+        const launchBtn = document.getElementById('btn-mobile-access-archive');
+        const closeBtn = document.getElementById('btn-close-viewport');
+
+        CommanderUI.init('commander-terminal-root');
+
+        launchBtn?.addEventListener('click', () => {
+            titleScreen?.classList.add('hidden');
+            viewport?.classList.remove('hidden');
+            CommanderUI.openRoleSelection();
+        });
+
+        closeBtn?.addEventListener('click', () => {
+            CommanderUI.close();
+            titleScreen?.classList.remove('hidden');
+        });
+    </script>
+</body>
+</html>

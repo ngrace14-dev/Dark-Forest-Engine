@@ -1,0 +1,10 @@
+{
+  "name": "dark-forest-general-ledger-mobile",
+  "version": "0.1.0-beta",
+  "private": true,
+  "type": "module",
+  "description": "Isolated Mobile Marketplace & PWA Package for Dark Forest: The General Ledger",
+  "scripts": {
+    "sync-from-core": "node -e \"const fs=require('fs'); fs.copyFileSync('../src/core/commander_engine.js','./src/core/commander_engine.js'); fs.copyFileSync('../src/systems/commander_ui.js','./src/systems/commander_ui.js'); console.log('Synced General Ledger from root repo.');\""
+  }
+}

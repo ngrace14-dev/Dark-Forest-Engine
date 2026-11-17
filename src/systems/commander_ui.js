@@ -47,8 +47,11 @@ export const CommanderUI = {
         if (typeof window !== 'undefined' && !window.isHeadless) {
             const hourIntervalMs = CommanderEngine.getEffectiveHourDurationMs();
             this._autoTickTimer = setInterval(() => {
-                if (!this.roleSelected || CommanderEngine.CrisisEngine.activeCrisis) return;
+                if (!this.roleSelected || CommanderEngine.CrisisEngine.activeCrisis || CommanderEngine.CrisisEngine.pendingDailyReconciliation) return;
                 CommanderEngine.tickInGameHour(1);
+                if (CommanderEngine.CrisisEngine.activeCrisis || CommanderEngine.CrisisEngine.pendingDailyReconciliation) {
+                    this.stopAutoTick();
+                }
                 this.render();
             }, hourIntervalMs);
         }
@@ -89,6 +92,9 @@ export const CommanderUI = {
         CommanderEngine.CrisisEngine.sessionStartedAtMs = Date.now();
         CommanderEngine.CrisisEngine.volatilityIndex = 0;
         CommanderEngine.CrisisEngine.activeCrisis = null;
+        CommanderEngine.CrisisEngine.pendingDailyReconciliation = false;
+        CommanderEngine.FacilityEngine?.resetForNewRun?.();
+        if (CommanderEngine.ExpeditionEngine) CommanderEngine.ExpeditionEngine.activeExpeditions = [];
         CommanderEngine.CampaignManager.selectRole(roleKey, customHouseId);
         this.startAutoTick();
         const h = CommanderEngine.CampaignManager.state.house;
@@ -167,23 +173,39 @@ export const CommanderUI = {
         window.setNextDayGoal = (goalId) => {
             const res = CommanderEngine.CrisisEngine.setNextDayGoal(goalId);
             if (res.success) {
-                this.showBanner(`Next Day Strategic Posture set: ${res.goal.label} (${res.goal.desc})`);
+                this.startAutoTick();
+                this.showBanner(`Tomorrow's Objective Locked: ${res.goal.label} (${res.goal.supplyGain || res.goal.desc})`);
                 this.render();
             }
         };
         window.resolveCrisis = (choiceId) => {
             const res = CommanderEngine.CrisisEngine.resolveActiveCrisis(choiceId);
+            this.startAutoTick();
             this.showBanner(res.message || 'Crisis directive executed.');
             this.render();
         };
-        window.setCampaign = (m) => {
-            CommanderEngine.CampaignManager.selectCampaign(m);
-            this.showBanner(`Switched Campaign Mode to [${m}].`);
+        window.viewAgentStatSheet = (agentId) => {
+            const sheet = CommanderEngine.AgentRosterManager.formatAgentStatSheet(agentId);
+            this.setReaderContent(sheet);
+        };
+        window.equipAgentGear = (agentId, itemId) => {
+            const res = CommanderEngine.AgentRosterManager.assignGearToAgent(agentId, itemId);
+            this.showBanner(res.message);
             this.render();
+            this.setReaderContent(CommanderEngine.AgentRosterManager.formatAgentStatSheet(agentId));
+        };
+        window.giveGearToSquad = (itemId = null) => {
+            const res = CommanderEngine.AgentRosterManager.giveGearToSquadAutoSort(itemId);
+            this.showBanner(res.message);
+            this.render();
+            if (res.agent) this.setReaderContent(CommanderEngine.AgentRosterManager.formatAgentStatSheet(res.agent.id));
         };
         window.advanceDays = (n) => {
             CommanderEngine.advanceDays(n);
-            this.showBanner(`Advanced timeline by +${n} day(s).`);
+            if (CommanderEngine.CrisisEngine.activeCrisis || CommanderEngine.CrisisEngine.pendingDailyReconciliation) {
+                this.stopAutoTick();
+            }
+            this.showBanner(`Day closed. Simulation paused — review Daily Supplies Report & select tomorrow's target.`);
             this.render();
         };
         window.dispatchCmd = (a, arg = null) => {
@@ -194,6 +216,29 @@ export const CommanderUI = {
         window.viewTelemetry = () => this.renderTelemetryReader();
         window.viewWarBoard = () => this.renderWarBoardReader();
         window.viewShadowLedger = () => this.renderShadowLedgerReader();
+        window.viewFacilities = () => this.renderFacilitiesReader();
+        window.unlockFacility = (facId) => {
+            const res = CommanderEngine.FacilityEngine.unlockFacility(facId);
+            this.showBanner(res.message);
+            this.render();
+            this.renderFacilitiesReader();
+        };
+        window.sendExpedition = (type, dest = 'Oakhaven') => {
+            const res = CommanderEngine.ExpeditionEngine.launchExpedition(type, dest);
+            this.showBanner(res.message);
+            this.render();
+        };
+        window.stepExpeditionHour = (hrs = 2) => {
+            CommanderEngine.tickInGameHour(hrs);
+            this.showBanner(`Advanced field clock by +${hrs}h.`);
+            this.render();
+        };
+        window.chronoSkip = (days = 1) => {
+            const res = CommanderEngine.chronoSkipDays(days);
+            this.showBanner(res.message);
+            this.setReaderContent(res.message);
+            this.render();
+        };
         window.interrogateSuspect = (targetId = 'agt_2') => this.renderInquestReader(targetId);
         window.renderVerdict = (targetId, vType) => {
             const res = CommanderEngine.InterrogationDesk.renderVerdict(targetId, vType);
@@ -255,6 +300,32 @@ export const CommanderUI = {
     renderShadowLedgerReader() {
         const text = CommanderEngine.ShadowInfluenceEngine?.formatGeneralLedgerAudit?.() || "General Ledger Audit unavailable.";
         this.setReaderContent(text);
+    },
+
+    renderFacilitiesReader() {
+        const fe = CommanderEngine.FacilityEngine;
+        if (!fe) return;
+        let text = "================================================================================\n";
+        text += "🏗️ BASE INFRASTRUCTURE, FACILITY UNLOCKS & VILLAGE GUARD GENERATION\n";
+        text += "================================================================================\n";
+        text += `Settlement Prosperity: ${fe.settlementProsperity}% (Threshold >= 55% to auto-generate guards)\n`;
+        text += `Settlement Resources:  ${fe.settlementResources}u | Regenerated Village Guards: ${fe.villageGuardsCurrent}/${fe.villageGuardsMaxThreshold}\n`;
+        text += `Royal Chrono-Seals:    ${fe.chronoSeals} (Used for instant full-day skip; ⚠️ skips crisis intervention!)\n\n`;
+
+        Object.values(fe.facilities).forEach((f, idx) => {
+            const st = f.unlocked ? `[UNLOCKED — Level ${f.level}]` : `[LOCKED — Build Cost: ${f.cost} Resources]`;
+            text += `${idx + 1}. ${f.name} ${st}\n   ↳ ${f.unlocksDesc}\n\n`;
+        });
+        this.setReaderContent(text);
+
+        const verdictBar = document.getElementById('inquest-verdict-bar');
+        if (verdictBar) {
+            verdictBar.style.display = 'flex';
+            verdictBar.innerHTML = Object.values(fe.facilities)
+                .filter(f => f.id !== 'scriptorium')
+                .map(f => `<button class="cmd-btn" onclick="window.unlockFacility('${f.id}')">${f.unlocked ? `⬆️ Upgrade ${f.name.split(' ')[1]} (${f.cost}r)` : `🔨 Build ${f.name} (${f.cost}r)`}</button>`)
+                .join('');
+        }
     },
 
     renderWarBoardReader() {
@@ -337,7 +408,9 @@ export const CommanderUI = {
                         <button class="cmd-btn" onclick="window.setTimeScale(4)">4x (3h)</button>
                         <button class="cmd-btn" onclick="window.setTimeScale(8)">8x (1.5h)</button>
                     </span>
+                    <button class="cmd-btn" onclick="window.stepExpeditionHour(2)">+2h Field Clock</button>
                     <button class="cmd-btn" onclick="window.advanceDays(1)">+1 Day (Close Day)</button>
+                    <button class="cmd-btn" style="background:#3b0764; border-color:#a855f7; color:#e9d5ff;" title="Warning: Simulates full day instantly. You will NOT be allowed to intervene if a Crisis occurs!" onclick="window.chronoSkip(1)">⏭️ Chrono-Skip 1d (⚠️ No Crisis Intervention)</button>
                     <button class="cmd-btn" style="background:#78350f; color:#fff;" onclick="window.exportSave()">💾 Export Legacy Save (July 3D)</button>
                     <button class="cmd-btn" style="border-color:#7f1d1d; color:#fca5a5; float:right;" onclick="window.openRoleGate()">🚪 End Run (Role Menu)</button>
                 </div>
@@ -346,8 +419,9 @@ export const CommanderUI = {
             </div>
             <div class="cmd-grid-2">
                 <div>
-                    <div class="cmd-card"><div class="cmd-subtitle">📬 COURIER DISPATCHES</div><div id="dispatches-list" style="max-height: 260px; overflow-y: auto;">Waiting...</div></div>
-                    <div class="cmd-card"><div class="cmd-subtitle">👥 GARRISON ROSTER</div><div id="roster-list">Loading agents...</div></div>
+                    <div class="cmd-card"><div class="cmd-subtitle">🧭 ACTIVE FIELD EXPEDITIONS & CARAVANS (LIVE LOG)</div><div id="expeditions-list" style="max-height: 200px; overflow-y: auto;">No squads currently out in the mist.</div></div>
+                    <div class="cmd-card"><div class="cmd-subtitle">📬 COURIER DISPATCHES</div><div id="dispatches-list" style="max-height: 220px; overflow-y: auto;">Waiting...</div></div>
+                    <div class="cmd-card"><div class="cmd-subtitle">👥 GARRISON ROSTER & ARMORY</div><div id="roster-list">Loading agents...</div></div>
                 </div>
                 <div>
                     <div class="cmd-card">
@@ -385,7 +459,34 @@ export const CommanderUI = {
         const vol = Math.round(CommanderEngine.CrisisEngine?.volatilityIndex || 0);
         const bars = Math.min(10, Math.floor(vol / 10));
         const gauge = `[${'|'.repeat(bars)}${'-'.repeat(10 - bars)}] ${vol}%`;
-        if (sb) sb.innerText = `${m} | Volatility: ${gauge}`;
+        const fe = CommanderEngine.FacilityEngine;
+        const guardInfo = fe ? ` | Village Guards: ${fe.villageGuardsCurrent}/${fe.villageGuardsMaxThreshold} (Prosperity: ${fe.settlementProsperity}% | Res: ${fe.settlementResources}u)` : '';
+        if (sb) sb.innerText = `${m}${guardInfo} | Volatility: ${gauge}`;
+
+        // Render Fallout Shelter–Style Active Field Expeditions Log
+        const expDiv = document.getElementById('expeditions-list');
+        if (expDiv && CommanderEngine.ExpeditionEngine) {
+            const exps = CommanderEngine.ExpeditionEngine.activeExpeditions || [];
+            if (exps.length === 0) {
+                expDiv.innerHTML = `<div style="color:#64748b; font-size:11px;">No squads or caravans currently out in the mist. Dispatch a caravan or squad above to track their live field log.</div>`;
+            } else {
+                expDiv.innerHTML = exps.map(e => {
+                    const pct = Math.min(10, Math.round((e.hoursElapsed / e.totalHours) * 10));
+                    const bar = `[${'█'.repeat(pct)}${'░'.repeat(10 - pct)}] ${e.hoursElapsed}h/${e.totalHours}h`;
+                    return `
+                        <div class="cmd-dispatch" style="border-color:#d97706;">
+                            <div style="display:flex; justify-content:space-between; color:#fbbf24; font-weight:bold;">
+                                <span>🧭 ${e.type} → ${e.targetName} (${e.leadAgentName})</span>
+                                <span>${e.status} ${bar}</span>
+                            </div>
+                            <div style="margin-top:4px; color:#cbd5e1; font-size:10px;">
+                                ${e.logs.map(l => `<div>• ${l}</div>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
 
         const tickBtn = document.getElementById('btn-autotick-state');
         const ts = CommanderEngine.timeScale || 1;
@@ -403,15 +504,32 @@ export const CommanderUI = {
             }).join('');
         }
 
-        // Render End-of-Day Decisive Strategic Goal Selector
+        // Render End-of-Day Supplies Gain/Loss Report & Role-Specific Next-Day Target Modal
         const goalBar = document.getElementById('daily-goal-bar');
         if (goalBar && CommanderEngine.CrisisEngine) {
-            const curGoal = CommanderEngine.CrisisEngine.nextDayGoal;
-            const goalsHtml = Object.values(CommanderEngine.CrisisEngine.DAILY_GOALS).map(g => {
-                const activeStyle = g.id === curGoal ? 'background:#78350f; color:#fff; border-color:#fbbf24;' : '';
-                return `<button class="cmd-btn" style="${activeStyle}" title="${g.desc}" onclick="window.setNextDayGoal('${g.id}')">${g.label}</button>`;
+            const ce = CommanderEngine.CrisisEngine;
+            const roleTargets = ce.getTargetsForRole(roleLabel);
+            const curGoal = ce.nextDayGoal;
+            const targetsHtml = roleTargets.map(t => {
+                const activeStyle = t.id === curGoal ? 'background:#78350f; color:#fff; border-color:#fbbf24;' : '';
+                return `<button class="cmd-btn" style="${activeStyle}" title="${t.desc} (${t.supplyGain})" onclick="window.setNextDayGoal('${t.id}')">${t.label} [${t.supplyGain}]</button>`;
             }).join('');
-            goalBar.innerHTML = `<b style="color:#d97706;">NEXT DAY GOAL:</b> ${goalsHtml}`;
+
+            if (ce.pendingDailyReconciliation && ce.lastDayReport) {
+                const rep = ce.lastDayReport;
+                goalBar.innerHTML = `
+                    <div style="background:#0f172a; border:2px solid #f59e0b; padding:10px; margin-bottom:8px;">
+                        <div style="color:#fbbf24; font-weight:bold; font-size:13px; margin-bottom:4px;">⏸️ END OF DAY ${rep.day} RECONCILIATION — SIMULATION PAUSED</div>
+                        <div style="font-size:11px; color:#cbd5e1; margin-bottom:4px;"><b>Executed Target:</b> ${rep.executedGoal}</div>
+                        <div style="font-size:11px; color:#4ade80; margin-bottom:2px;"><b>📈 Supplies & Training Gained (+):</b> ${rep.gains}</div>
+                        <div style="font-size:11px; color:#f87171; margin-bottom:8px;"><b>📉 Supplies & Upkeep Expended (-):</b> ${rep.losses}</div>
+                        <div style="color:#fde68a; font-size:11px; font-weight:bold; margin-bottom:4px;">SELECT TOMORROW'S TARGET TO RESUME SIMULATION:</div>
+                        <div>${targetsHtml}</div>
+                    </div>
+                `;
+            } else {
+                goalBar.innerHTML = `<b style="color:#d97706;">TOMORROW'S TARGET [${roleLabel}]:</b> ${targetsHtml}`;
+            }
         }
 
         // Render Role-Scoped Directives Only
@@ -458,20 +576,41 @@ export const CommanderUI = {
 
         const rosterDiv = document.getElementById('roster-list');
         if (rosterDiv) {
+            const armoryStock = CommanderEngine.AgentRosterManager.squadArmoryStock || [];
+            const catalog = CommanderEngine.SQUAD_ARMORY_CATALOG || {};
+            const armoryHtml = `
+                <div style="background:#0b0f17; border:1px solid #78350f; padding:8px; margin-bottom:8px; font-size:11px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <b style="color:#fbbf24;">🎒 SQUAD ARMORY STOCKPILE (${armoryStock.length} Items)</b>
+                        <button class="cmd-btn" style="background:#451a03; border-color:#f59e0b;" onclick="window.giveGearToSquad()">⚙️ Give Gear to Squad (Auto-Sort)</button>
+                    </div>
+                    <div style="color:#94a3b8; font-size:10px;">
+                        ${armoryStock.map(id => `[${catalog[id]?.name || id}]`).join(' ') || 'All armory gear currently equipped on squad members.'}
+                    </div>
+                </div>
+            `;
+
             const agents = Array.from(CommanderEngine.AgentRosterManager.agents.values()).filter(a => a.alive);
-            rosterDiv.innerHTML = agents.map(a => `
+            const nextGearId = armoryStock[0] || 'ironwood_spear';
+            rosterDiv.innerHTML = armoryHtml + (agents.map(a => {
+                const eq = a.equipment || {};
+                const gearSummary = [eq.weapon?.name, eq.armor?.name, eq.trinket?.name].filter(Boolean).join(', ') || 'Standard Issue';
+                return `
                 <div style="padding: 6px 0; border-bottom: 1px solid #1e293b;">
                     <b style="color:#fbbf24;">${a.name}</b> <span style="font-size:10px; color:#f59e0b;">${a.cultivation?.isCultivatedGuardian ? '★ 300 GUARDIAN' : ''}</span>
                     <span style="color:#d97706;">(${a.career?.rank || 'Novice'} ${a.career?.id})</span>
-                    <div style="font-size:10px; color:#94a3b8;">Birthright: [${a.birthright?.title || 'None'}] | Shift Birthday: Day ${a.firstShiftSurvivedDay} AF (${a.shiftsSurvived || 0} Shifts) | Stance: [${a.operatingStance?.mode || 'IDLE'}${a.operatingStance?.discipline ? ':' + a.operatingStance.discipline : ''}]</div>
+                    <div style="font-size:10px; color:#cbd5e1;">HP: ${a.vitals.hp}/${a.vitals.maxHp} | Poise: ${Math.round(a.vitals.poise)} | Att: ${Number(a.skills.meleeAtt).toFixed(1)} | Def: ${Number(a.skills.meleeDef).toFixed(1)} | Tough: ${Number(a.skills.toughness).toFixed(1)} | Stealth: ${Number(a.skills.stealth).toFixed(1)}</div>
+                    <div style="font-size:10px; color:#fde68a;">🗡️ Gear: [${gearSummary}]</div>
+                    <div style="font-size:10px; color:#94a3b8;">Birthright: [${a.birthright?.title || 'None'}] | Shift Birthday: Day ${a.firstShiftSurvivedDay} AF (${a.shiftsSurvived || 0} Shifts)</div>
                     <div style="margin-top:4px;">
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:10px; border-color:#f59e0b; color:#fde68a;" onclick="window.viewAgentStatSheet('${a.id}')">📋 Stat Sheet</button>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:10px;" onclick="window.equipAgentGear('${a.id}','${nextGearId}')">🗡️ Equip Gear</button>
                         <button class="cmd-btn" style="padding:2px 6px; font-size:10px;" onclick="window.AgentRosterManager.setTraining('${a.id}','logistics'); window.CommanderUI.showBanner('${a.name} assigned to Logistics drill.'); window.refreshUI();">Train Logistics</button>
                         <button class="cmd-btn" style="padding:2px 6px; font-size:10px;" onclick="window.AgentRosterManager.setTraining('${a.id}','martial'); window.CommanderUI.showBanner('${a.name} assigned to Martial drill.'); window.refreshUI();">Train Martial</button>
-                        <button class="cmd-btn" style="padding:2px 6px; font-size:10px;" onclick="window.dispatchCmd('CULTIVATE_RUNIC','${a.id}')">Cultivate Runic</button>
                         <button class="cmd-btn" style="padding:2px 6px; font-size:10px;" onclick="window.interrogateSuspect('${a.id}')">Inquest</button>
                     </div>
                 </div>
-            `).join('') || '<div style="color:#ef4444;">All garrison agents deceased. Switch campaign to re-seed.</div>';
+            `}).join('') || '<div style="color:#ef4444;">All garrison agents deceased.</div>');
         }
 
         const necDiv = document.getElementById('story-archive');

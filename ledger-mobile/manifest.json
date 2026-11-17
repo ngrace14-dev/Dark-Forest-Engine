@@ -1,0 +1,10 @@
+{
+  "name": "Dark Forest: The General Ledger",
+  "short_name": "General Ledger",
+  "description": "A Grim-Dark Feudal Logistics, Crisis Triage & Royal Archive Simulation.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#040608",
+  "theme_color": "#040608"
+}
