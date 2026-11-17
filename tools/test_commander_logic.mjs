@@ -77,7 +77,7 @@ const makeEl = (id) => ({
         contains(c) { return this._set.has(c); }
     }
 });
-['commander-terminal-root', 'text-commander-viewport', 'status-bar', 'commander-action-banner', 'crisis-triage-panel', 'btn-autotick-state', 'daily-goal-bar', 'role-directives-bar', 'dispatches-list', 'roster-list', 'story-archive', 'inquest-verdict-bar', 'story-reader'].forEach(id => {
+['commander-terminal-root', 'text-commander-viewport', 'status-bar', 'commander-action-banner', 'crisis-triage-panel', 'btn-autotick-state', 'timescale-bar', 'daily-goal-bar', 'role-directives-bar', 'dispatches-list', 'roster-list', 'story-archive', 'inquest-verdict-bar', 'story-reader'].forEach(id => {
     mockElements.set(id, makeEl(id));
 });
 globalThis.document = {
@@ -131,6 +131,17 @@ console.log(`[11b] House Wraith Oil Fire + Water Brigade Outcome: [${waterRes.ou
 if (waterRes.outcomeType !== 'CATASTROPHIC_FLARE') {
     failures.push('Sending Water Brigade to House Wraith oil fire must cause CATASTROPHIC_FLARE');
 }
+
+// Verify 12-Hour Real-World Day (1x) & 8x Max Time Scale Clamping
+if (CommanderEngine.baseDayDurationMs !== 12 * 60 * 60 * 1000) {
+    failures.push(`Expected 12h baseDayDurationMs (43,200,000 ms), got ${CommanderEngine.baseDayDurationMs}`);
+}
+window.setTimeScale(16); // Should clamp to max 8x
+if (CommanderEngine.timeScale !== 8 || CommanderEngine.getEffectiveDayDurationMs() !== 5400000) {
+    failures.push(`Expected 8x clamped timeScale (5,400,000 ms = 1.5h/day), got ${CommanderEngine.timeScale}x (${CommanderEngine.getEffectiveDayDurationMs()} ms)`);
+}
+window.setTimeScale(1);
+console.log(`[11c] TimeScale Verified: 1x=${CommanderEngine.getEffectiveDayDurationMs() / 3600000}h/day | Max=8x (1.5h/day)`);
 
 CommanderUI.selectRoleAndLaunch('TERMINUS');
 

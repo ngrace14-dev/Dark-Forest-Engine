@@ -1710,6 +1710,40 @@ rootScope.CrisisEngine = CrisisEngine;
 export const CommanderEngine = {
     initialized: false,
     isUnlockedInSandbox: false, // Roadmap Hook: Unlocks as in-game Commander System in 3D Sandbox
+    baseDayDurationMs: 12 * 60 * 60 * 1000, // 1 In-Game Day = 12 Real-World Hours (43,200,000 ms) at 1x
+    maxTimeScale: 8,                        // Players can accelerate up to 8x (1.5 Real-World Hours / Day)
+    timeScale: 1,
+    currentHour: 6,                         // 0–23 in-game hour within the current day
+
+    setTimeScale(scale = 1) {
+        const clamped = Math.max(1, Math.min(this.maxTimeScale, Number(scale) || 1));
+        this.timeScale = clamped;
+        if (rootScope.EngineParams) rootScope.EngineParams.timeScale = clamped;
+        rootScope.EventBus?.emit('TIMESCALE_CHANGED', {
+            timeScale: clamped,
+            effectiveDayHours: Number((12 / clamped).toFixed(2)),
+            effectiveDayDurationMs: this.getEffectiveDayDurationMs()
+        });
+        return this.timeScale;
+    },
+
+    getEffectiveDayDurationMs() {
+        return Math.round(this.baseDayDurationMs / (this.timeScale || 1));
+    },
+
+    getEffectiveHourDurationMs() {
+        return Math.round(this.getEffectiveDayDurationMs() / 24);
+    },
+
+    tickInGameHour(hours = 1) {
+        const step = Math.max(1, parseInt(hours, 10) || 1);
+        this.currentHour += step;
+        while (this.currentHour >= 24) {
+            this.currentHour -= 24;
+            this.advanceDays(1);
+        }
+        return { day: rootScope.EngineParams?.worldDay || 1, hour: this.currentHour };
+    },
 
     boot(defaultMode = 'HOUSE') {
         if (!this.initialized || AgentRosterManager.agents.size === 0) {

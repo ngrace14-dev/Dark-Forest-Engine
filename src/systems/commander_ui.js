@@ -41,15 +41,16 @@ export const CommanderUI = {
         this.renderRoleSelection();
     },
 
-    startAutoTick(intervalMs = 45000) {
+    startAutoTick() {
         this.stopAutoTick();
         this.autoTickEnabled = true;
         if (typeof window !== 'undefined' && !window.isHeadless) {
+            const hourIntervalMs = CommanderEngine.getEffectiveHourDurationMs();
             this._autoTickTimer = setInterval(() => {
                 if (!this.roleSelected || CommanderEngine.CrisisEngine.activeCrisis) return;
-                CommanderEngine.advanceDays(1);
+                CommanderEngine.tickInGameHour(1);
                 this.render();
-            }, intervalMs);
+            }, hourIntervalMs);
         }
     },
 
@@ -64,11 +65,20 @@ export const CommanderUI = {
     toggleAutoTick() {
         if (this.autoTickEnabled) {
             this.stopAutoTick();
-            this.showBanner("Simulation clock paused. Advance days manually or resume auto-tick.");
+            this.showBanner("Simulation clock paused.");
         } else {
             this.startAutoTick();
-            this.showBanner("Simulation clock ticking automatically (1 Day / 45s).");
+            const hrs = Number((12 / CommanderEngine.timeScale).toFixed(2));
+            this.showBanner(`Simulation clock active at ${CommanderEngine.timeScale}x (${hrs} real-world hrs / in-game day).`);
         }
+        this.render();
+    },
+
+    changeTimeScale(scale) {
+        const applied = CommanderEngine.setTimeScale(scale);
+        if (this.autoTickEnabled) this.startAutoTick();
+        const hrs = Number((12 / applied).toFixed(2));
+        this.showBanner(`Time scale set to ${applied}x (1 In-Game Day = ${hrs} Real-World Hours).`);
         this.render();
     },
 
@@ -153,6 +163,7 @@ export const CommanderUI = {
         window.selectArchiveRole = (roleKey, houseId = null) => this.selectRoleAndLaunch(roleKey, houseId);
         window.openRoleGate = () => this.openRoleSelection();
         window.toggleAutoTick = () => this.toggleAutoTick();
+        window.setTimeScale = (scale) => this.changeTimeScale(scale);
         window.setNextDayGoal = (goalId) => {
             const res = CommanderEngine.CrisisEngine.setNextDayGoal(goalId);
             if (res.success) {
@@ -318,10 +329,15 @@ export const CommanderUI = {
                 <div id="commander-action-banner" style="display:none; background:#1c1917; border-left:3px solid #f59e0b; color:#fde68a; padding:6px 10px; margin-bottom:8px; font-size:11px;"></div>
                 <div id="crisis-triage-panel" style="display:none; background:#2a0a0a; border:2px solid #ef4444; padding:12px; margin-bottom:10px;"></div>
                 <div style="margin-bottom: 6px;">
-                    <b style="color:#d97706;">SESSION & CLOCK:</b>
+                    <b style="color:#d97706;">CLOCK (12h Real/Day @ 1x):</b>
                     <button id="btn-autotick-state" class="cmd-btn" style="border-color:#10b981; color:#6ee7b7;" onclick="window.toggleAutoTick()">⏯️ Clock: ACTIVE</button>
+                    <span id="timescale-bar">
+                        <button class="cmd-btn" onclick="window.setTimeScale(1)">1x (12h)</button>
+                        <button class="cmd-btn" onclick="window.setTimeScale(2)">2x (6h)</button>
+                        <button class="cmd-btn" onclick="window.setTimeScale(4)">4x (3h)</button>
+                        <button class="cmd-btn" onclick="window.setTimeScale(8)">8x (1.5h)</button>
+                    </span>
                     <button class="cmd-btn" onclick="window.advanceDays(1)">+1 Day (Close Day)</button>
-                    <button class="cmd-btn" onclick="window.advanceDays(7)">+7 Days</button>
                     <button class="cmd-btn" style="background:#78350f; color:#fff;" onclick="window.exportSave()">💾 Export Legacy Save (July 3D)</button>
                     <button class="cmd-btn" style="border-color:#7f1d1d; color:#fca5a5; float:right;" onclick="window.openRoleGate()">🚪 End Run (Role Menu)</button>
                 </div>
@@ -372,9 +388,19 @@ export const CommanderUI = {
         if (sb) sb.innerText = `${m} | Volatility: ${gauge}`;
 
         const tickBtn = document.getElementById('btn-autotick-state');
+        const ts = CommanderEngine.timeScale || 1;
+        const effHrs = Number((12 / ts).toFixed(2));
         if (tickBtn) {
-            tickBtn.innerText = this.autoTickEnabled ? '⏸️ Clock: TICKING (45s/d)' : '▶️ Clock: PAUSED';
+            tickBtn.innerText = this.autoTickEnabled ? `⏸️ Clock: ${ts}x (${effHrs}h/d)` : `▶️ Clock: PAUSED (${ts}x)`;
             tickBtn.style.borderColor = this.autoTickEnabled ? '#10b981' : '#f59e0b';
+        }
+
+        const tsBar = document.getElementById('timescale-bar');
+        if (tsBar) {
+            tsBar.innerHTML = [1, 2, 4, 8].map(s => {
+                const active = s === ts ? 'background:#78350f; color:#fff; border-color:#fbbf24;' : '';
+                return `<button class="cmd-btn" style="${active}" onclick="window.setTimeScale(${s})">${s}x (${Number((12 / s).toFixed(1))}h)</button>`;
+            }).join('');
         }
 
         // Render End-of-Day Decisive Strategic Goal Selector
