@@ -1365,6 +1365,56 @@ const ShadowInfluenceEngine = rootScope.ShadowInfluenceEngine || {
         };
     },
 
+    /**
+     * Evaluates what an observer perceives near or far from the Mountain/Dune border
+     * (Addendum BY §2: The 25-Mile Border Optical Mirage & Relative Rotation Law).
+     */
+    evaluateBorderPerception(observerRegion = 'mountain', milesFromBorder = 50, isDuringShiftVoid = false) {
+        const reg = (observerRegion || 'mountain').toLowerCase();
+        if (milesFromBorder > 25) {
+            if (reg === 'mountain') {
+                return {
+                    canSeeAcrossBorder: false,
+                    perceivedHorizon: 'ENDLESS_MOUNTAINS',
+                    perceivedMotion: 'NONE',
+                    description: 'Outside the 25-mile border threshold: optical mirage projects a never-ending mountain range forever.'
+                };
+            }
+            return {
+                canSeeAcrossBorder: false,
+                perceivedHorizon: 'ENDLESS_DUNES',
+                perceivedMotion: 'SLOW_OCEAN_DRIFT',
+                description: 'Outside the 25-mile border threshold: optical mirage projects endless dunes forever with nothing beyond.'
+            };
+        }
+
+        // Within 25 miles of the Mountain/Dune border
+        if (!isDuringShiftVoid) {
+            return {
+                canSeeAcrossBorder: true,
+                perceivedHorizon: reg === 'mountain' ? 'DUNES_BELOW_MOUNTAIN_WALL' : 'MOUNTAIN_WALL_ABOVE_DUNES',
+                perceivedMotion: 'STATIC_BETWEEN_SHIFTS',
+                description: 'Within 25 miles of the border between Shifts: terrain transition visible; Mountain Ring is static.'
+            };
+        }
+
+        // Within 25 miles of the border DURING the 7-day White Void Shift
+        if (reg === 'mountain') {
+            return {
+                canSeeAcrossBorder: true,
+                perceivedHorizon: 'DUNES_BELOW_MOUNTAIN_WALL',
+                perceivedMotion: 'DUNES_APPEAR_TO_ROTATE_AROUND_MOUNTAIN',
+                description: 'Within 25 miles on the Mountains looking down during a Shift: relative to the mountain frame, it looks as if the sands are rotating around the mountain.'
+            };
+        }
+        return {
+            canSeeAcrossBorder: true,
+            perceivedHorizon: 'MOUNTAIN_WALL_ABOVE_DUNES',
+            perceivedMotion: 'MOUNTAIN_RING_ACTUALLY_SPINNING',
+            description: 'Within 25 miles in the Dunes looking at the Mountains during a Shift: from the slow-motion sand ocean reference frame, the Mountain Ring itself is seen spinning.'
+        };
+    },
+
     tickDailyShadowOps(worldDay, campaignState = {}) {
         this.pressure.influencePool = Math.min(100, this.pressure.influencePool + this.pressure.influenceRegenPerDay);
 

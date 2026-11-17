@@ -132,6 +132,18 @@ const korvanCheck = sie.evaluateKorvanTarget({ faction: 'Epitaph' });
 if (korvanCheck.immune !== false || korvanCheck.actualKorvanStance !== 'KORVAN_ONLY') {
     failures.push('Tragic Alignment violation: Korvan must only be Korvan\'s ally and grant zero immunity to Epitaph');
 }
+
+// Verify 25-Mile Border Optical Mirage & Relative Rotation Law
+const farMountain = sie.evaluateBorderPerception('mountain', 40, true);
+const farDune = sie.evaluateBorderPerception('dune', 40, true);
+const nearMountainShift = sie.evaluateBorderPerception('mountain', 15, true);
+const nearDuneShift = sie.evaluateBorderPerception('dune', 15, true);
+if (farMountain.perceivedHorizon !== 'ENDLESS_MOUNTAINS' || farDune.perceivedHorizon !== 'ENDLESS_DUNES') {
+    failures.push('Outside 25 miles, Mountains must look like endless mountains and Dunes must look like endless dunes');
+}
+if (nearMountainShift.perceivedMotion !== 'DUNES_APPEAR_TO_ROTATE_AROUND_MOUNTAIN' || nearDuneShift.perceivedMotion !== 'MOUNTAIN_RING_ACTUALLY_SPINNING') {
+    failures.push('Within 25 miles during a Shift, Mountain observer sees sands rotating around mountain; Dune observer sees Mountain Ring spinning');
+}
 CommanderEngine.CampaignManager.dispatchAction('BREACH_BLIND_SPOT');
 const postBreachTelemetry = CommanderEngine.CampaignManager.getBedrockTelemetry({ allowTwentyFirst: true });
 console.log(`[11] Post-Breach Telemetry Count: ${postBreachTelemetry.length} (Epitaph Revealed: ${postBreachTelemetry.some(s => s.name === 'Epitaph')})`);
