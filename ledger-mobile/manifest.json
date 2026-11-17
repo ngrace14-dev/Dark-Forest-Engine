@@ -4,7 +4,7 @@
   "description": "A Grim-Dark Feudal Logistics, Crisis Triage & Royal Archive Simulation.",
   "start_url": "./index.html",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#040608",
-  "theme_color": "#040608"
+  "orientation": "any",
+  "background_color": "#0b0907",
+  "theme_color": "#0b0907"
 }

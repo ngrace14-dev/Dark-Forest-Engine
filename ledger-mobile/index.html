@@ -55,6 +55,9 @@
                         <button id="btn-mobile-enter-woods" class="parchment-ribbon-btn secondary">
                             ENTER THE WOODS (3D SANDBOX)
                         </button>
+                        <button id="btn-title-landscape-fit" class="parchment-ribbon-btn secondary" style="font-size: 11px; padding: 8px 12px; margin-top: 6px;">
+                            📱 MOBILE LANDSCAPE FIT: AUTO
+                        </button>
                     </div>
                 </div>
             </div>
@@ -69,6 +72,7 @@
                 <span>📜 DARK FORESTS // ROYAL ARCHIVE</span>
             </div>
             <div class="archive-nav-steps">
+                <button id="btn-nav-landscape-fit" class="nav-step-btn active" title="Toggle Zero-Scroll Mobile Landscape Fit">📱 Landscape Fit: ON</button>
                 <button id="btn-nav-role-scroll" class="nav-step-btn">Vantage Roles</button>
                 <button id="btn-close-viewport" class="nav-step-btn">Title Scroll</button>
             </div>
@@ -85,6 +89,40 @@
         const woodsBtn = document.getElementById('btn-mobile-enter-woods');
         const roleScrollBtn = document.getElementById('btn-nav-role-scroll');
         const closeBtn = document.getElementById('btn-close-viewport');
+        const titleFitBtn = document.getElementById('btn-title-landscape-fit');
+        const navFitBtn = document.getElementById('btn-nav-landscape-fit');
+
+        // Default to Mobile Landscape Fit ON so it fits on a landscape screen without scrolling
+        let landscapeFitEnabled = localStorage.getItem('df_mobile_landscape_fit') !== 'off';
+
+        function applyLandscapeFitState() {
+            if (landscapeFitEnabled) {
+                document.body.classList.add('mobile-landscape-fit');
+                document.body.classList.remove('landscape-fit-off');
+            } else {
+                document.body.classList.remove('mobile-landscape-fit');
+                document.body.classList.add('landscape-fit-off');
+            }
+            const label = landscapeFitEnabled ? '📱 Landscape Fit: ON (No-Scroll)' : '📱 Landscape Fit: OFF (Full Scroll)';
+            if (titleFitBtn) titleFitBtn.textContent = label;
+            if (navFitBtn) {
+                navFitBtn.textContent = label;
+                navFitBtn.classList.toggle('active', landscapeFitEnabled);
+            }
+        }
+
+        function toggleLandscapeFit() {
+            landscapeFitEnabled = !landscapeFitEnabled;
+            localStorage.setItem('df_mobile_landscape_fit', landscapeFitEnabled ? 'on' : 'off');
+            if (landscapeFitEnabled && screen.orientation?.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+            applyLandscapeFitState();
+        }
+
+        applyLandscapeFitState();
+        titleFitBtn?.addEventListener('click', toggleLandscapeFit);
+        navFitBtn?.addEventListener('click', toggleLandscapeFit);
 
         CommanderUI.init('commander-terminal-root');
 
