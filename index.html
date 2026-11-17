@@ -38,58 +38,11 @@
 
     <!-- START SCREEN: AETHELGARD CHAINED RUNE MONOLITH GATEWAY -->
     <div id="start-screen" class="monolith-gateway-screen">
-        <svg class="monolith-scene-svg" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <radialGradient id="rootMistGlow" cx="50%" cy="46%" r="52%">
-                    <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.34"/>
-                    <stop offset="45%" stop-color="#0f2933" stop-opacity="0.65"/>
-                    <stop offset="100%" stop-color="#040709" stop-opacity="0.98"/>
-                </radialGradient>
-                <linearGradient id="rootStoneSlab" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#334155"/>
-                    <stop offset="48%" stop-color="#1e293b"/>
-                    <stop offset="100%" stop-color="#0f172a"/>
-                </linearGradient>
-                <linearGradient id="rootCyanRune" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stop-color="#ecfeff"/>
-                    <stop offset="40%" stop-color="#22d3ee"/>
-                    <stop offset="100%" stop-color="#0891b2"/>
-                </linearGradient>
-            </defs>
-            <rect width="1200" height="720" fill="url(#rootMistGlow)"/>
-            <polygon points="180,560 260,410 330,450 290,590" fill="#111920" stroke="#1e293b" stroke-width="2" opacity="0.7"/>
-            <polygon points="910,560 850,430 960,390 1020,580" fill="#111920" stroke="#1e293b" stroke-width="2" opacity="0.7"/>
-            <g stroke="#293238" stroke-width="14" stroke-dasharray="22 10" stroke-linecap="round">
-                <line x1="250" y1="20" x2="565" y2="335"/>
-                <line x1="950" y1="20" x2="635" y2="335"/>
-                <line x1="220" y1="660" x2="540" y2="410"/>
-                <line x1="980" y1="660" x2="660" y2="410"/>
-            </g>
-            <g stroke="#64748b" stroke-width="4" stroke-dasharray="22 10" stroke-linecap="round" opacity="0.65">
-                <line x1="250" y1="18" x2="565" y2="333"/>
-                <line x1="950" y1="18" x2="635" y2="333"/>
-                <line x1="220" y1="658" x2="540" y2="408"/>
-                <line x1="980" y1="658" x2="660" y2="408"/>
-            </g>
-            <polygon points="485,630 502,135 545,105 655,105 698,135 715,630" fill="url(#rootStoneSlab)" stroke="#475569" stroke-width="3"/>
-            <path d="M440,660 Q495,530 515,390 Q535,240 585,102" stroke="#2d1c13" stroke-width="15" fill="none" stroke-linecap="round"/>
-            <path d="M760,660 Q705,520 680,380 Q665,240 615,105" stroke="#261710" stroke-width="16" fill="none" stroke-linecap="round"/>
-            <g class="monolith-rune-glow">
-                <path d="M582,175 L582,535 M582,275 L668,185 M582,365 L658,285" stroke="#06b6d4" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.45"/>
-                <path d="M582,175 L582,535 M582,275 L668,185 M582,365 L658,285" stroke="url(#rootCyanRune)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                <path d="M582,175 L582,535 M582,275 L668,185 M582,365 L658,285" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            </g>
-            <line x1="495" y1="295" x2="705" y2="415" stroke="#1e293b" stroke-width="12" stroke-dasharray="18 8" stroke-linecap="round"/>
-            <line x1="705" y1="280" x2="495" y2="405" stroke="#1e293b" stroke-width="12" stroke-dasharray="18 8" stroke-linecap="round"/>
-            <path d="M0,0 L120,0 Q75,180 140,340 Q60,510 190,720 L0,720 Z" fill="#05080a"/>
-            <path d="M1200,0 L1080,0 Q1125,180 1060,340 Q1140,510 1010,720 L1200,720 Z" fill="#05080a"/>
-        </svg>
+        <img src="./ledger-mobile/assets/monolith_title.jfif" alt="Dark Forest: Aethelgard" class="monolith-artwork-img" />
+        <div class="monolith-vignette"></div>
 
         <div class="monolith-overlay-content">
-            <h1 class="monolith-title-main">DARK FOREST</h1>
-            <h2 class="monolith-title-sub">AETHELGARD</h2>
-
-            <div id="loading-container" class="loading-container mb-3"><div id="loading-bar" class="loading-bar"></div></div>
+            <div id="loading-container" class="loading-container mb-2"><div id="loading-bar" class="loading-bar"></div></div>
             <p class="monolith-status-tag" id="loading-text">Booting WebAssembly Physics Engine...</p>
 
             <div id="start-actions" class="monolith-actions-row">

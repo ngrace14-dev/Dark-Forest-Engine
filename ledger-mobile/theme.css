@@ -973,7 +973,7 @@ body.mobile-landscape-fit .astrolabe-svg {
 }
 
 /* ============================================================================
-   LAYER 1: AETHELGARD CHAINED RUNE MONOLITH TITLE GATEWAY
+   LAYER 1: AETHELGARD CHAINED RUNE MONOLITH TITLE GATEWAY (HIGH-RES ARTWORK)
    ============================================================================ */
 .monolith-gateway-screen {
     position: fixed;
@@ -985,36 +985,42 @@ body.mobile-landscape-fit .astrolabe-svg {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    background:
-        radial-gradient(ellipse at 50% 42%, rgba(34, 211, 238, 0.22) 0%, rgba(12, 34, 42, 0.55) 38%, rgba(5, 8, 10, 0.96) 78%),
-        linear-gradient(180deg, #06090b 0%, #0d161a 48%, #050708 100%);
+    justify-content: flex-end;
+    background: #040709;
     user-select: none;
 }
 
-.monolith-scene-svg {
+.monolith-artwork-img {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center center;
     pointer-events: none;
     z-index: 1;
+    animation: monolithPulse 6s ease-in-out infinite;
 }
 
-.monolith-rune-glow {
-    animation: runeBreath 3.6s ease-in-out infinite;
-}
-
-@keyframes runeBreath {
+@keyframes monolithPulse {
     0%, 100% {
-        filter: drop-shadow(0 0 12px #00f0ff) drop-shadow(0 0 28px #0891b2);
-        opacity: 0.92;
+        filter: brightness(1) contrast(1.03);
+        transform: scale(1);
     }
     50% {
-        filter: drop-shadow(0 0 22px #a5f3fc) drop-shadow(0 0 46px #06b6d4);
-        opacity: 1;
+        filter: brightness(1.07) contrast(1.06) drop-shadow(0 0 18px rgba(34, 211, 238, 0.25));
+        transform: scale(1.012);
     }
+}
+
+.monolith-vignette {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(4, 7, 9, 0.25) 0%, transparent 35%, transparent 62%, rgba(4, 7, 9, 0.88) 92%, #040709 100%),
+        radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(2, 5, 7, 0.72) 100%);
 }
 
 .monolith-overlay-content {
@@ -1023,131 +1029,96 @@ body.mobile-landscape-fit .astrolabe-svg {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
     text-align: center;
     width: 100%;
     max-width: 880px;
-    padding: 16px 20px;
-}
-
-.monolith-title-main {
-    font-family: 'Cinzel', Georgia, serif;
-    font-weight: 900;
-    font-size: clamp(36px, 7.2vw, 78px);
-    letter-spacing: 0.08em;
-    line-height: 1;
-    margin: 0;
-    text-transform: uppercase;
-    background: linear-gradient(180deg, #e2e8f0 0%, #94a3b8 46%, #475569 72%, #cbd5e1 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter:
-        drop-shadow(0 4px 0 #090d10)
-        drop-shadow(0 8px 18px rgba(0, 0, 0, 0.95))
-        drop-shadow(0 0 24px rgba(34, 211, 238, 0.42));
-}
-
-.monolith-title-sub {
-    font-family: 'Cinzel', Georgia, serif;
-    font-weight: 700;
-    font-size: clamp(16px, 2.8vw, 30px);
-    letter-spacing: 0.28em;
-    margin: 6px 0 18px;
-    text-transform: uppercase;
-    background: linear-gradient(180deg, #a5f3fc 0%, #67e8f9 45%, #0e7490 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter:
-        drop-shadow(0 2px 0 #041318)
-        drop-shadow(0 4px 12px rgba(0, 0, 0, 0.95))
-        drop-shadow(0 0 14px rgba(34, 211, 238, 0.55));
+    padding: 12px 20px clamp(18px, 4vh, 38px);
 }
 
 .monolith-status-tag {
     font-family: 'Share Tech Mono', monospace;
     font-size: 11px;
     letter-spacing: 0.14em;
-    color: #99f6e4;
+    color: #a5f3fc;
     text-transform: uppercase;
-    background: rgba(6, 18, 22, 0.72);
-    border: 1px solid rgba(34, 211, 238, 0.35);
+    background: rgba(6, 18, 22, 0.78);
+    border: 1px solid rgba(34, 211, 238, 0.45);
     padding: 4px 14px;
-    margin-bottom: 18px;
-    box-shadow: 0 0 16px rgba(34, 211, 238, 0.2);
+    margin-bottom: 12px;
+    box-shadow: 0 0 16px rgba(34, 211, 238, 0.25);
+    backdrop-filter: blur(4px);
 }
 
 .monolith-actions-row {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
     align-items: center;
     gap: 10px;
     width: 100%;
-    max-width: 340px;
+    max-width: 760px;
 }
 
 .monolith-stone-btn {
-    width: 100%;
-    padding: 13px 20px;
+    min-width: 220px;
+    padding: 12px 20px;
     font-family: 'Cinzel', Georgia, serif;
     font-weight: 800;
-    font-size: 13.5px;
+    font-size: 13px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: #ecfeff;
-    background:
-        linear-gradient(180deg, rgba(22, 48, 56, 0.92) 0%, rgba(11, 25, 31, 0.96) 100%);
+    background: linear-gradient(180deg, rgba(16, 42, 52, 0.92) 0%, rgba(8, 20, 26, 0.96) 100%);
     border: 2px solid #22d3ee;
     box-shadow:
-        0 0 22px rgba(34, 211, 238, 0.4),
+        0 0 22px rgba(34, 211, 238, 0.45),
         inset 0 0 12px rgba(34, 211, 238, 0.25);
     cursor: pointer;
     transition: all 0.2s ease;
+    backdrop-filter: blur(4px);
 }
 
 .monolith-stone-btn:hover {
     transform: translateY(-2px);
     background: linear-gradient(180deg, rgba(14, 116, 144, 0.95) 0%, rgba(8, 51, 68, 0.98) 100%);
     box-shadow:
-        0 0 30px rgba(34, 211, 238, 0.75),
-        inset 0 0 16px rgba(165, 243, 252, 0.4);
+        0 0 30px rgba(34, 211, 238, 0.8),
+        inset 0 0 16px rgba(165, 243, 252, 0.45);
 }
 
 .monolith-stone-btn.secondary {
-    border-color: #475569;
-    color: #cbd5e1;
-    background: linear-gradient(180deg, rgba(30, 36, 40, 0.88) 0%, rgba(15, 19, 22, 0.94) 100%);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.75);
-    font-size: 12px;
-    padding: 10px 16px;
+    border-color: #64748b;
+    color: #e2e8f0;
+    background: linear-gradient(180deg, rgba(26, 33, 38, 0.88) 0%, rgba(12, 16, 19, 0.94) 100%);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.85);
+    font-size: 11.5px;
+    padding: 11px 16px;
 }
 
 .monolith-stone-btn.secondary:hover {
-    border-color: #94a3b8;
+    border-color: #a5f3fc;
     color: #fff;
 }
 
 /* Landscape compact fit for Monolith Title Screen */
 body.mobile-landscape-fit .monolith-overlay-content,
 @media (orientation: landscape) and (max-height: 600px) {
-    .monolith-title-sub {
-        margin: 4px 0 10px;
+    .monolith-overlay-content {
+        padding: 6px 14px 10px;
     }
     .monolith-status-tag {
-        margin-bottom: 10px;
-        font-size: 10px;
-        padding: 3px 10px;
+        margin-bottom: 6px;
+        font-size: 9.5px;
+        padding: 2px 10px;
     }
     .monolith-actions-row {
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
-        max-width: 680px;
         gap: 8px;
     }
     .monolith-stone-btn {
-        width: auto;
-        min-width: 210px;
-        padding: 9px 14px;
-        font-size: 11.5px;
+        min-width: 185px;
+        padding: 8px 12px;
+        font-size: 11px;
     }
 }
