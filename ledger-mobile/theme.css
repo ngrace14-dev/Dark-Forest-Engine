@@ -1,0 +1,664 @@
+/**
+ * File: ledger-mobile/theme.css
+ * Grim-Dark Royal Archive Parchment & Iron-Riveted Scroll Theme
+ * Designed after the 3-Scroll Concept Art (Title Scroll, Role Selector Scroll, General Ledger Scroll)
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Share+Tech+Mono&display=swap');
+
+:root {
+    --wood-bg-deep: #0b0907;
+    --wood-bg-mid: #17120e;
+    --parchment-light: #d8ccb8;
+    --parchment-mid: #c2b299;
+    --parchment-dark: #9e8c72;
+    --parchment-edge: #5a4b38;
+    --ink-deep: #1b140e;
+    --ink-muted: #433526;
+    --blood-crimson: #6e140e;
+    --iron-dark: #1d2224;
+    --iron-mid: #2f3739;
+    --bronze-warm: #c97a36;
+    --rune-cyan: #22d3ee;
+    --rune-teal: #14b8a6;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body.archive-scroll-body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background-color: var(--wood-bg-deep);
+    background-image:
+        radial-gradient(circle at 50% 20%, rgba(34, 211, 238, 0.05) 0%, transparent 55%),
+        radial-gradient(circle at 15% 85%, rgba(25, 46, 28, 0.28) 0%, transparent 40%),
+        radial-gradient(circle at 85% 15%, rgba(25, 46, 28, 0.25) 0%, transparent 40%),
+        repeating-linear-gradient(
+            90deg,
+            rgba(0, 0, 0, 0.35) 0px,
+            rgba(0, 0, 0, 0.35) 2px,
+            rgba(28, 20, 14, 0.15) 2px,
+            rgba(28, 20, 14, 0.15) 48px
+        ),
+        linear-gradient(180deg, #0c0a08 0%, #17120d 50%, #090705 100%);
+    color: var(--ink-deep);
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    overflow-x: hidden;
+}
+
+.archive-top-nav {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 16px;
+    background: linear-gradient(180deg, #16191b 0%, #0c0e10 100%);
+    border-bottom: 2px solid #3f3224;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.85);
+    font-family: 'Share Tech Mono', monospace;
+    color: #d6cbb9;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.archive-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Cinzel', serif;
+    font-weight: 800;
+    font-size: 13px;
+    color: #e2a052;
+    letter-spacing: 0.1em;
+}
+
+.archive-nav-steps {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.nav-step-btn {
+    background: linear-gradient(180deg, #2a241e 0%, #171310 100%);
+    color: #cbbba0;
+    border: 1px solid #5c4b37;
+    padding: 5px 11px;
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+}
+
+.nav-step-btn:hover,
+.nav-step-btn.active {
+    background: linear-gradient(180deg, #4b3826 0%, #2b1e12 100%);
+    color: #fde68a;
+    border-color: var(--rune-cyan);
+    box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
+}
+
+.scroll-stage {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 18px 14px 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.scroll-column {
+    width: 100%;
+    display: none;
+    flex-direction: column;
+    position: relative;
+    filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.9));
+}
+
+.scroll-column.active-scroll {
+    display: flex;
+    animation: unfurlScroll 0.28s ease-out;
+}
+
+@keyframes unfurlScroll {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.99);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.scroll-roller {
+    height: 26px;
+    margin: 0 -10px;
+    border-radius: 6px;
+    background:
+        linear-gradient(90deg,
+            #141617 0%,
+            #353c3f 4%,
+            #1b1f21 7%,
+            #6a5843 8%,
+            #9d896f 22%,
+            #7d6a52 50%,
+            #9b886e 78%,
+            #5e4d3a 92%,
+            #1b1f21 93%,
+            #353c3f 96%,
+            #141617 100%
+        );
+    border: 2px solid #2b231b;
+    box-shadow:
+        inset 0 4px 6px rgba(255, 255, 255, 0.22),
+        inset 0 -5px 8px rgba(0, 0, 0, 0.7),
+        0 6px 12px rgba(0, 0, 0, 0.85);
+    position: relative;
+    z-index: 3;
+}
+
+.scroll-roller::before,
+.scroll-roller::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    width: 14px;
+    background: linear-gradient(180deg, #4b5356 0%, #1c2022 50%, #0d0f10 100%);
+    border: 1px solid #6b7275;
+    border-radius: 3px;
+}
+
+.scroll-roller::before { left: -6px; }
+
+.parchment-sheet {
+    position: relative;
+    z-index: 2;
+    min-height: 750px;
+    padding: 22px 20px 26px;
+    background-color: var(--parchment-mid);
+    background-image:
+        radial-gradient(ellipse at 20% 15%, rgba(235, 225, 206, 0.75) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 75%, rgba(130, 108, 82, 0.45) 0%, transparent 60%),
+        radial-gradient(circle at 50% 50%, rgba(219, 206, 184, 0.6) 0%, rgba(154, 134, 106, 0.85) 100%),
+        repeating-linear-gradient(
+            0deg,
+            rgba(70, 52, 34, 0.03) 0px,
+            rgba(70, 52, 34, 0.03) 1px,
+            transparent 1px,
+            transparent 4px
+        );
+    border-left: 3px solid #4a3b2a;
+    border-right: 3px solid #4a3b2a;
+    box-shadow:
+        inset 0 22px 28px -10px rgba(24, 17, 10, 0.78),
+        inset 0 -22px 28px -10px rgba(24, 17, 10, 0.78),
+        inset 18px 0 26px -12px rgba(38, 27, 16, 0.65),
+        inset -18px 0 26px -12px rgba(38, 27, 16, 0.65);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.rune-margin {
+    position: absolute;
+    top: 32px;
+    bottom: 32px;
+    width: 18px;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    font-family: monospace;
+    font-size: 12px;
+    letter-spacing: 6px;
+    color: rgba(20, 184, 166, 0.52);
+    text-shadow: 0 0 8px rgba(34, 211, 238, 0.65);
+    pointer-events: none;
+    user-select: none;
+    overflow: hidden;
+}
+.rune-margin.left { left: 5px; }
+.rune-margin.right { right: 5px; }
+
+.title-scroll-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    text-align: center;
+    padding: 18px 14px;
+    position: relative;
+}
+
+.title-emblem-heading {
+    font-family: 'Cinzel', Georgia, serif;
+    font-weight: 900;
+    font-size: clamp(36px, 4.5vw, 52px);
+    line-height: 0.96;
+    letter-spacing: 0.06em;
+    color: #5e110b;
+    text-transform: uppercase;
+    margin: 12px 0 10px;
+    text-shadow:
+        0 2px 0 #d9c9b0,
+        0 4px 12px rgba(94, 17, 11, 0.45);
+}
+
+.title-emblem-sub {
+    font-family: 'Cinzel', Georgia, serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.16em;
+    color: #231a12;
+    text-transform: uppercase;
+    margin: 0 0 14px;
+}
+
+.thorn-divider {
+    width: 85%;
+    height: 22px;
+    margin: 6px auto 12px;
+    opacity: 0.85;
+}
+
+.title-engine-ready {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: #2f2419;
+    margin: 4px 0 10px;
+}
+
+.title-futhark-strip {
+    font-family: monospace;
+    font-size: 14px;
+    letter-spacing: 0.25em;
+    color: #5c4934;
+    margin-bottom: 24px;
+    user-select: none;
+}
+
+.parchment-ribbon-btn {
+    position: relative;
+    width: 90%;
+    max-width: 280px;
+    padding: 14px 18px;
+    margin: 10px auto;
+    font-family: 'Cinzel', Georgia, serif;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #1c130b;
+    background: linear-gradient(180deg, #dfbe89 0%, #c49a5c 50%, #a57b42 100%);
+    border: 2px solid #3a2614;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 245, 220, 0.65),
+        0 6px 14px rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.parchment-ribbon-btn.secondary {
+    background: linear-gradient(180deg, #c7bca8 0%, #a89a84 50%, #8c7d68 100%);
+    color: #231c15;
+}
+
+.parchment-ribbon-btn:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.8),
+        0 0 16px rgba(34, 211, 238, 0.45),
+        0 8px 18px rgba(0, 0, 0, 0.55);
+    border-color: #155e63;
+}
+
+.role-scroll-header {
+    text-align: center;
+    border-bottom: 2px solid #574532;
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+}
+
+.role-scroll-title {
+    font-family: 'Cinzel', Georgia, serif;
+    font-weight: 800;
+    font-size: 17px;
+    letter-spacing: 0.05em;
+    color: #1d150e;
+    margin: 0 0 4px;
+    text-transform: uppercase;
+}
+
+.role-scroll-subtitle {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-style: italic;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    color: #463625;
+    text-transform: uppercase;
+    margin: 0;
+}
+
+.vantage-role-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    flex: 1;
+}
+
+@media (max-width: 560px) {
+    .vantage-role-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.vantage-role-card {
+    position: relative;
+    background: linear-gradient(180deg, rgba(222, 209, 187, 0.88) 0%, rgba(187, 170, 143, 0.94) 100%);
+    border: 2px solid #4c3c2b;
+    outline: 1px solid rgba(58, 44, 30, 0.45);
+    outline-offset: -5px;
+    padding: 12px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    transition: all 0.2s ease;
+}
+
+.vantage-role-card:hover {
+    transform: translateY(-2px);
+    border-color: #21170e;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.38);
+}
+
+.vantage-role-card.sovereign-special {
+    background:
+        radial-gradient(circle at 50% 40%, rgba(34, 211, 238, 0.28) 0%, rgba(176, 198, 194, 0.9) 70%),
+        linear-gradient(180deg, #c5d9d5 0%, #9abbb6 100%);
+    border: 2px solid #22d3ee;
+    box-shadow:
+        0 0 18px rgba(34, 211, 238, 0.65),
+        inset 0 0 15px rgba(34, 211, 238, 0.35);
+}
+
+.vantage-rune-watermark {
+    font-size: 24px;
+    line-height: 1;
+    color: rgba(68, 52, 35, 0.35);
+    margin-bottom: 2px;
+    font-family: monospace;
+}
+
+.vantage-role-card.sovereign-special .vantage-rune-watermark {
+    color: #0891b2;
+    text-shadow: 0 0 10px rgba(34, 211, 238, 0.8);
+}
+
+.vantage-card-title {
+    font-family: 'Cinzel', Georgia, serif;
+    font-weight: 800;
+    font-size: 13px;
+    color: #1b130c;
+    line-height: 1.2;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.vantage-card-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10.5px;
+    color: #463523;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.vantage-card-desc {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #2f2318;
+    line-height: 1.25;
+    margin-bottom: 8px;
+}
+
+.vantage-init-btn {
+    width: 100%;
+    padding: 8px 6px;
+    background: linear-gradient(180deg, #cbb696 0%, #a88f6c 100%);
+    border: 1.5px solid #3f2f1e;
+    color: #1b130b;
+    font-family: 'Cinzel', Georgia, serif;
+    font-weight: 800;
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    transition: all 0.15s ease;
+}
+
+.vantage-init-btn:hover {
+    background: linear-gradient(180deg, #dfbe89 0%, #b88b4a 100%);
+    color: #000;
+}
+
+.vantage-role-card.sovereign-special .vantage-init-btn {
+    background: linear-gradient(180deg, #a5f3fc 0%, #22d3ee 55%, #0891b2 100%);
+    border-color: #083344;
+    color: #041e26;
+    box-shadow: 0 0 12px rgba(34, 211, 238, 0.55);
+}
+.ledger-top-slate {
+    background: linear-gradient(180deg, #161b1d 0%, #22282a 100%);
+    border: 2px solid #3f352a;
+    padding: 10px 12px;
+    margin: -10px -8px 10px;
+    color: #e5dccb;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+.ledger-slate-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.ledger-slate-title {
+    font-family: 'Cinzel', Georgia, serif;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    color: #e88d39;
+}
+
+.ledger-slate-title span {
+    color: #f3ead8;
+}
+
+.iron-section-bar {
+    position: relative;
+    background: linear-gradient(180deg, #4b5254 0%, #2c3234 50%, #1e2224 100%);
+    border: 1.5px solid #16191a;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.25),
+        0 2px 5px rgba(0, 0, 0, 0.4);
+    color: #e5dccb;
+    font-family: 'Cinzel', Georgia, serif;
+    font-weight: 800;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-align: center;
+    text-transform: uppercase;
+    padding: 4px 20px;
+    margin: 8px -4px 6px;
+}
+
+.iron-section-bar::before,
+.iron-section-bar::after {
+    content: '•';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    font-size: 14px;
+    line-height: 1;
+}
+.iron-section-bar::before { left: 6px; }
+.iron-section-bar::after { right: 6px; }
+
+.ledger-btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 6px;
+}
+
+.cmd-btn {
+    background: linear-gradient(180deg, #d7c7ad 0%, #b8a384 100%);
+    color: #1c140d;
+    border: 1.5px solid #463625;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 5px 8px;
+    cursor: pointer;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        0 2px 4px rgba(0, 0, 0, 0.25);
+    transition: all 0.15s ease;
+    text-transform: uppercase;
+}
+
+.cmd-btn:hover {
+    background: linear-gradient(180deg, #ebd6b3 0%, #cfa263 100%);
+    border-color: #164e63;
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.45);
+}
+
+.ledger-lower-split {
+    display: grid;
+    grid-template-columns: 1.08fr 0.92fr;
+    gap: 10px;
+    margin-top: 6px;
+    align-items: start;
+}
+
+@media (max-width: 640px) {
+    .ledger-lower-split {
+        grid-template-columns: 1fr;
+    }
+}
+
+.parchment-note-box {
+    background: linear-gradient(165deg, rgba(226, 214, 193, 0.92) 0%, rgba(190, 173, 146, 0.94) 100%);
+    border: 1.5px solid #4d3c2a;
+    padding: 8px 9px;
+    margin-bottom: 8px;
+    box-shadow:
+        2px 4px 8px rgba(0, 0, 0, 0.28),
+        inset 0 0 14px rgba(74, 55, 35, 0.2);
+    position: relative;
+}
+
+.parchment-note-title {
+    font-family: 'Cinzel', Georgia, serif;
+    font-weight: 800;
+    font-size: 11px;
+    color: #23180e;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid #6e5840;
+    padding-bottom: 3px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cmd-dispatch {
+    border-bottom: 1px dashed #7c664d;
+    padding: 5px 0;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10.5px;
+    color: #241a10;
+}
+
+.cmd-story-box {
+    background: #181410;
+    color: #e7dac6;
+    border: 1.5px solid #6e563b;
+    padding: 9px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10.5px;
+    white-space: pre-wrap;
+    max-height: 250px;
+    overflow-y: auto;
+    line-height: 1.4;
+}
+
+.astrolabe-widget {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 6px;
+    background: radial-gradient(circle at 50% 52%, rgba(13, 42, 48, 0.35) 0%, transparent 68%);
+    border: 1.5px solid rgba(77, 60, 42, 0.65);
+    margin-bottom: 8px;
+}
+
+.astrolabe-svg {
+    width: 100%;
+    max-width: 245px;
+    height: auto;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.55));
+}
+
+.astrolabe-ring-slow {
+    transform-origin: 120px 120px;
+    animation: spinAstrolabe 48s linear infinite;
+}
+
+.astrolabe-ring-reverse {
+    transform-origin: 120px 120px;
+    animation: spinAstrolabeReverse 32s linear infinite;
+}
+
+.astrolabe-core-pulse {
+    transform-origin: 120px 120px;
+    animation: pulseCore 4s ease-in-out infinite;
+}
+
+@keyframes spinAstrolabe {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes spinAstrolabeReverse {
+    from { transform: rotate(360deg); }
+    to { transform: rotate(0deg); }
+}
+
+@keyframes pulseCore {
+    0%, 100% { opacity: 0.88; transform: scale(0.97); }
+    50% { opacity: 1; transform: scale(1.04); }
+}

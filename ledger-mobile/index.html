@@ -3,95 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#040608">
+    <meta name="theme-color" content="#0b0907">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Dark Forest: The General Ledger</title>
+    <title>Dark Forests: The Royal Archive & General Ledger</title>
     <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="./theme.css">
     <style>
-        * { box-sizing: border-box; }
-        body {
-            background: #040608;
-            color: #cbd5e1;
-            font-family: monospace;
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        #mobile-title-screen {
-            position: fixed;
-            inset: 0;
-            background: #040608;
-            z-index: 50;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            border: 12px solid #080c11;
-            text-align: center;
-        }
-        .title-main {
-            color: #b91c1c;
-            font-size: clamp(28px, 7vw, 56px);
-            font-weight: 900;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            margin: 0 0 8px 0;
-        }
-        .title-sub {
-            color: #fbbf24;
-            font-size: clamp(11px, 3vw, 14px);
-            letter-spacing: 0.25em;
-            text-transform: uppercase;
-            margin: 0 0 32px 0;
-        }
-        .btn-archive-launch {
-            padding: 14px 28px;
-            border: 2px solid #d97706;
-            background: rgba(69, 26, 3, 0.85);
-            color: #fbbf24;
-            font-family: monospace;
-            font-weight: bold;
-            font-size: 14px;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            cursor: pointer;
-            box-shadow: 0 0 25px rgba(245, 158, 11, 0.35);
-            transition: all 0.2s ease;
-        }
-        .btn-archive-launch:hover {
-            background: #d97706;
-            color: #000;
-        }
         .hidden { display: none !important; }
     </style>
 </head>
-<body>
+<body class="archive-scroll-body">
     <script>
         window.isHeadless = true;
         window.isMobileMarketplaceBuild = true;
         window.EngineConfig = { crowsEyeMode: true };
     </script>
 
-    <!-- STANDALONE MOBILE TITLE CARD -->
-    <div id="mobile-title-screen">
-        <h1 class="title-main">Dark Forests</h1>
-        <h2 class="title-sub">The Royal Archive & General Ledger</h2>
-        <button id="btn-mobile-access-archive" class="btn-archive-launch">
-            📜 Access Royal Archive
-        </button>
+    <!-- LAYER 1: TITLE CARD PARCHMENT SCROLL (ONE PAGE AT A TIME) -->
+    <div id="mobile-title-screen" class="scroll-stage">
+        <div class="scroll-column active-scroll" style="max-width: 520px; margin: 16px auto;">
+            <div class="scroll-roller"></div>
+            <div class="parchment-sheet" style="min-height: 680px; justify-content: center;">
+                <div class="rune-margin left">ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚ</div>
+                <div class="rune-margin right">ᛟᛞᛜᛚᛗᛖᛒᛏᛊᛉᛈᛇᛃᛁᚾᚺᚹᚷᚲᚱᚨ</div>
+
+                <div class="title-scroll-content">
+                    <div>
+                        <h1 class="title-emblem-heading">DARK<br>FORESTS</h1>
+                        <h2 class="title-emblem-sub">A GRIM-DARK SANDBOX RPG</h2>
+
+                        <!-- Thorny Bramble Divider SVG -->
+                        <svg class="thorn-divider" viewBox="0 0 300 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10 12 Q80 6 150 12 T290 12" stroke="#23180e" stroke-width="2.2" fill="none"/>
+                            <path d="M25 12 Q95 18 150 12 T275 12" stroke="#3b2818" stroke-width="1.5" fill="none"/>
+                            <polygon points="65,9 72,3 74,10" fill="#23180e"/>
+                            <polygon points="110,14 116,21 120,13" fill="#23180e"/>
+                            <polygon points="150,9 155,2 159,10" fill="#23180e"/>
+                            <polygon points="190,14 196,21 200,13" fill="#23180e"/>
+                            <polygon points="235,9 242,3 244,10" fill="#23180e"/>
+                        </svg>
+
+                        <p class="title-engine-ready">Engine Ready. All simulation systems online.</p>
+                        <div class="title-futhark-strip">ᚲᛚᛗᚾᛞᛊᛏᚷᛏᛉᛦᚱᚠᛟᛈᚦᚱᛗ</div>
+                    </div>
+
+                    <div style="width: 100%; margin-top: 12px;">
+                        <button id="btn-mobile-access-archive" class="parchment-ribbon-btn">
+                            ACCESS ROYAL ARCHIVE
+                        </button>
+                        <button id="btn-mobile-enter-woods" class="parchment-ribbon-btn secondary">
+                            ENTER THE WOODS (3D SANDBOX)
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="scroll-roller"></div>
+        </div>
     </div>
 
-    <!-- FULLSCREEN GENERAL LEDGER VIEWPORT -->
-    <div id="text-commander-viewport" class="hidden" style="min-height: 100vh; display: flex; flex-direction: column;">
-        <div style="background: #000; border-bottom: 1px solid #78350f; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
-            <span style="color: #fbbf24; font-weight: bold; letter-spacing: 0.08em;">🌌 DARK FOREST | THE GENERAL LEDGER</span>
-            <button id="btn-close-viewport" style="padding: 4px 10px; background: #450a0a; border: 1px solid #b91c1c; color: #fca5a5; font-family: monospace; font-size: 11px; cursor: pointer;">✖ Title Card</button>
+    <!-- LAYER 2 (ROLE SELECTOR SCROLL) & LAYER 3 (GENERAL LEDGER GAMEPLAY SCROLL) -->
+    <div id="text-commander-viewport" class="hidden">
+        <div class="archive-top-nav">
+            <div class="archive-nav-brand">
+                <span>📜 DARK FORESTS // ROYAL ARCHIVE</span>
+            </div>
+            <div class="archive-nav-steps">
+                <button id="btn-nav-role-scroll" class="nav-step-btn">Vantage Roles</button>
+                <button id="btn-close-viewport" class="nav-step-btn">Title Scroll</button>
+            </div>
         </div>
-        <div id="commander-terminal-root" style="flex: 1; padding: 12px; overflow-y: auto;"></div>
+        <div id="commander-terminal-root" class="scroll-stage"></div>
     </div>
 
     <script type="module">
@@ -100,6 +82,8 @@
         const titleScreen = document.getElementById('mobile-title-screen');
         const viewport = document.getElementById('text-commander-viewport');
         const launchBtn = document.getElementById('btn-mobile-access-archive');
+        const woodsBtn = document.getElementById('btn-mobile-enter-woods');
+        const roleScrollBtn = document.getElementById('btn-nav-role-scroll');
         const closeBtn = document.getElementById('btn-close-viewport');
 
         CommanderUI.init('commander-terminal-root');
@@ -107,6 +91,14 @@
         launchBtn?.addEventListener('click', () => {
             titleScreen?.classList.add('hidden');
             viewport?.classList.remove('hidden');
+            CommanderUI.openRoleSelection();
+        });
+
+        woodsBtn?.addEventListener('click', () => {
+            window.location.href = '../index.html';
+        });
+
+        roleScrollBtn?.addEventListener('click', () => {
             CommanderUI.openRoleSelection();
         });
 

@@ -849,22 +849,22 @@ const CampaignManager = rootScope.CampaignManager || {
         this.activeRole = key;
 
         // Reset system state for new run
-        rootScope.EngineParams.worldDay = 1;
+        if (rootScope.EngineParams) rootScope.EngineParams.worldDay = 1;
         this.currentHour = 6;
-        
-        // Reset Engines & Log Manager
-        window.FacilityEngine?.resetForNewRun?.();
-        window.ExpeditionEngine.activeExpeditions = [];
-        window.ExpeditionEngine.completedLogs = [];
-        window.AgentRosterManager.agents.clear();
-        window.AgentRosterManager.squadArmoryStock = ['ironwood_spear', 'widow_resin_blade', 'kinetic_silk_coat', 'grimsby_plate', 'gloom_lens_lantern'];
-        window.LogDispatchManager.dispatches = [];
-        window.LogDispatchManager.unreadCount = 0;
-        window.InterrogationDesk.suspects.clear();
-        window.CrucibleNarrativeEngine.biographies.clear();
-        window.CrucibleNarrativeEngine.crucibles.clear();
 
-        if (key === 'NOBLE_HOUSE') {
+        // Reset Engines & Log Manager headlessly
+        rootScope.FacilityEngine?.resetForNewRun?.();
+        if (rootScope.ExpeditionEngine) {
+            rootScope.ExpeditionEngine.activeExpeditions = [];
+            rootScope.ExpeditionEngine.completedLogs = [];
+        }
+        AgentRosterManager.agents.clear();
+        AgentRosterManager.squadArmoryStock = ['ironwood_spear', 'widow_resin_blade', 'kinetic_silk_coat', 'grimsby_plate', 'gloom_lens_lantern'];
+        LogDispatchManager.dispatches = [];
+        LogDispatchManager.unreadCount = 0;
+        InterrogationDesk.suspects.clear();
+        CrucibleNarrativeEngine.biographies.clear();
+        CrucibleNarrativeEngine.crucibles.clear();
 
         if (key === 'NOBLE_HOUSE') {
             const picked = (customHouseId && NOBLE_HOUSE_PROFILES.find(h => h.houseId.toLowerCase() === customHouseId.toLowerCase()))
@@ -2000,36 +2000,45 @@ const FacilityEngine = rootScope.FacilityEngine || {
         this.facilities.scriptorium.level = 1;
     },
 
-    unlockFacility(facilityId, instant = false) {
+    unlockFacility(facilityId, instant = true) {
         const f = this.facilities[facilityId];
         if (!f) return { success: false, message: `Unknown facility: ${facilityId}` };
-        
-        // Define build/upgrade time (Max 30 IRL Days = 60 In-Game Days = 720 Hours)
-        const durationHours = Math.min(720, (f.level + 1) * 48); // Scaled duration
+        const durationHours = Math.min(720, (f.level + 1) * 48);
 
         if (f.unlocked) {
             if (this.settlementResources < f.cost) return { success: false, message: `Insufficient Settlement Resources (${this.settlementResources}/${f.cost}).` };
-            if (f.isConstructing) return { success: false, message: `[${f.name}] is already under construction.` };
-            
-            f.isConstructing = true;
-            f.hoursRemaining = instant ? 0 : durationHours;
-            f.totalHours = durationHours;
-            f.targetLevel = f.level + 1;
             this.settlementResources -= f.cost;
-            return { success: true, message: `Started upgrading [${f.name}] to Lv ${f.targetLevel}. Completion in ${durationHours/24} days.` };
+            if (!instant) {
+                f.isConstructing = true;
+                f.hoursRemaining = durationHours;
+                f.totalHours = durationHours;
+                f.targetLevel = f.level + 1;
+                return { success: true, facility: f, message: `Started upgrading [${f.name}] to Lv ${f.targetLevel}.` };
+            }
+            f.level += 1;
+            this.settlementProsperity = Math.min(100, this.settlementProsperity + 8);
+            if (facilityId === 'guard_barracks') this.villageGuardsMaxThreshold += 4;
+            return { success: true, facility: f, message: `Upgraded [${f.name}] to Level ${f.level}! Prosperity: ${this.settlementProsperity}%.` };
         }
 
-        if (this.settlementResources < f.cost) return { success: false, message: `Insufficient Settlement Resources (${this.settlementResources}/${f.cost}).` };
-        if (f.isConstructing) return { success: false, message: `[${f.name}] is already under construction.` };
-
-        f.isConstructing = true;
-        f.hoursRemaining = instant ? 0 : durationHours;
-        f.totalHours = durationHours;
-        f.targetLevel = 1;
+        if (this.settlementResources < f.cost) {
+            return { success: false, message: `Insufficient Settlement Resources (${this.settlementResources}/${f.cost}) to construct ${f.name}.` };
+        }
         this.settlementResources -= f.cost;
-        return { success: true, message: `Started construction of [${f.name}]. Completion in ${durationHours/24} days.` };
-    },
-
+        if (!instant) {
+            f.isConstructing = true;
+            f.hoursRemaining = durationHours;
+            f.totalHours = durationHours;
+            f.targetLevel = 1;
+            return { success: true, facility: f, message: `Started construction of [${f.name}].` };
+        }
+        f.unlocked = true;
+        f.level = 1;
+        this.settlementProsperity = Math.min(100, this.settlementProsperity + 10);
+        if (facilityId === 'guard_barracks') {
+            this.villageGuardsMaxThreshold += 6;
+            this.villageGuardsCurrent = Math.min(this.villageGuardsMaxThreshold, this.villageGuardsCurrent + 4);
+        }
         rootScope.EventBus?.emit('FACILITY_UNLOCKED', f);
         return { success: true, facility: f, message: `ðŸ—ï¸ Constructed [${f.name}]! ${f.unlocksDesc}` };
     },
@@ -2204,6 +2213,17 @@ export const CommanderEngine = {
     tickInGameHour(hours = 1) {
         const step = Math.max(1, parseInt(hours, 10) || 1);
         ExpeditionEngine.tickExpeditionHours(step);
+        Object.values(FacilityEngine.facilities).forEach(f => {
+            if (f.isConstructing && f.hoursRemaining > 0) {
+                f.hoursRemaining = Math.max(0, f.hoursRemaining - step);
+                if (f.hoursRemaining === 0) {
+                    f.unlocked = true;
+                    f.level = f.targetLevel;
+                    f.isConstructing = false;
+                    rootScope.EventBus?.emit('UI_LOG', `[CONSTRUCTION] ${f.name} completed!`);
+                }
+            }
+        });
         this.currentHour += step;
         while (this.currentHour >= 24) {
             this.currentHour -= 24;
@@ -2211,20 +2231,6 @@ export const CommanderEngine = {
         }
         return { day: rootScope.EngineParams?.worldDay || 1, hour: this.currentHour };
     },
-
-        Object.values(this.FacilityEngine.facilities).forEach(f => {
-            if (f.isConstructing && f.hoursRemaining > 0) {
-                f.hoursRemaining = Math.max(0, f.hoursRemaining - step);
-                if (f.hoursRemaining === 0) {
-                    f.unlocked = true;
-                    f.level = f.targetLevel;
-                    f.isConstructing = false;
-                    window.EventBus?.emit('UI_LOG', `ðŸ—ï¸ [CONSTRUCTION] ${f.name} completed!`);
-                }
-            }
-        });
-
-
     boot(defaultMode = 'HOUSE') {
         if (!this.initialized || AgentRosterManager.agents.size === 0) {
             CampaignManager.selectCampaign(defaultMode);
