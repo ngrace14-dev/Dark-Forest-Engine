@@ -77,7 +77,7 @@ const makeEl = (id) => ({
         contains(c) { return this._set.has(c); }
     }
 });
-['commander-terminal-root', 'text-commander-viewport', 'status-bar', 'commander-action-banner', 'dispatches-list', 'roster-list', 'story-archive', 'inquest-verdict-bar', 'story-reader'].forEach(id => {
+['commander-terminal-root', 'text-commander-viewport', 'status-bar', 'commander-action-banner', 'crisis-triage-panel', 'btn-autotick-state', 'daily-goal-bar', 'role-directives-bar', 'dispatches-list', 'roster-list', 'story-archive', 'inquest-verdict-bar', 'story-reader'].forEach(id => {
     mockElements.set(id, makeEl(id));
 });
 globalThis.document = {
@@ -106,6 +106,33 @@ const termHouse = CommanderEngine.CampaignManager.state.house;
 if (termHouse.houseId !== 'House Terminus' || termHouse.hasHorizonDispensation !== true || termHouse.guardiansCount !== 300) {
     failures.push('Terminus role failed to restore House Terminus & 300 Guardians');
 }
+
+// Verify Role-Scoped Directives for Crime Syndicate Boss (no Crown Fuel or Sovereign buttons)
+CommanderUI.selectRoleAndLaunch('SYNDICATE');
+const synDirsHtml = mockElements.get('role-directives-bar').innerHTML;
+if (!synDirsHtml.includes('Smuggle Resin') || synDirsHtml.includes('Crown: Fill Full') || synDirsHtml.includes('Summon Bound Huntsman')) {
+    failures.push('Syndicate role directives were not properly scoped');
+}
+
+// Verify 30–60min / 40-Day Crisis Grace Period & House Wraith (Wraith's End) Deep-Oil Fire Crisis
+CommanderUI.selectRoleAndLaunch('NOBLE_HOUSE', 'House Wraith');
+const ce = CommanderEngine.CrisisEngine;
+if (ce.isGracePeriodComplete(10) !== false || ce.isGracePeriodComplete(42) !== true) {
+    failures.push('Crisis Grace Period check failed (should block before Day 40 and allow at Day 40+)');
+}
+window.setNextDayGoal('MAXIMIZE_MONOPOLY');
+ce.triggerContextualCrisis('NOBLE_HOUSE', 'House Wraith');
+CommanderUI.render();
+if (ce.activeCrisis?.id !== 'wraith_deep_oil_fire' || ce.activeCrisis?.boundSettlement !== "Wraith's End") {
+    failures.push("House Wraith should trigger the Wraith's End Leviathan Deep-Oil Vat Fire crisis");
+}
+const waterRes = ce.resolveActiveCrisis('WATER_BRIGADE');
+console.log(`[11b] House Wraith Oil Fire + Water Brigade Outcome: [${waterRes.outcomeType}] ${waterRes.message}`);
+if (waterRes.outcomeType !== 'CATASTROPHIC_FLARE') {
+    failures.push('Sending Water Brigade to House Wraith oil fire must cause CATASTROPHIC_FLARE');
+}
+
+CommanderUI.selectRoleAndLaunch('TERMINUS');
 
 window.viewTelemetry();
 if (!mockElements.get('story-reader').innerText.includes('THE 20 BEDROCK CHAINED SETTLEMENTS')) {

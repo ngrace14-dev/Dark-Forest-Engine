@@ -951,6 +951,7 @@ const CampaignManager = rootScope.CampaignManager || {
         }
 
         ShadowInfluenceEngine.tickDailyShadowOps(day, this.state);
+        CrisisEngine.tickDailyVolatility(day - this.dayStarted, this.activeRole || this.campaignMode, this.state.house);
         LogDispatchManager.generateDailyDispatches(day, this.campaignMode, this.state);
     },
     dispatchAction(actionType, arg = null) {
@@ -1461,6 +1462,249 @@ const ShadowInfluenceEngine = rootScope.ShadowInfluenceEngine || {
 rootScope.ShadowInfluenceEngine = ShadowInfluenceEngine;
 
 // ============================================================================
+// 5.6 CRISIS RESPONSE TRIAGE & DAILY GOAL ENGINE
+// ============================================================================
+const CrisisEngine = rootScope.CrisisEngine || {
+    minCrisisDayThreshold: 40,       // ~30–60 minutes into a run before major crisis events trigger
+    minRealTimeElapsedMs: 30 * 60 * 1000,
+    sessionStartedAtMs: Date.now(),
+    volatilityIndex: 0,              // Builds gradually each day toward 100
+    activeCrisis: null,
+    nextDayGoal: 'MAINTAIN_WARDS',   // Decisive end-of-day strategic posture chosen by player
+    crisisHistory: [],
+
+    DAILY_GOALS: {
+        MAINTAIN_WARDS: { id: 'MAINTAIN_WARDS', label: '🛡️ Fortify Wards & Conserve Fuel', desc: '-1 Daily Fuel Burn; -3 Volatility buildup tomorrow.' },
+        MAXIMIZE_MONOPOLY: { id: 'MAXIMIZE_MONOPOLY', label: '⚙️ Push Monopoly Output & Trade', desc: '+4 Resource/Fuel output tomorrow; +6 Industrial Volatility.' },
+        SHADOW_INQUEST: { id: 'SHADOW_INQUEST', label: '🕵️ Counter-Espionage & Ledger Audit', desc: '+15% Spy Detection; reduces Unrest & Scrutiny.' },
+        AGGRESSIVE_SORTIE: { id: 'AGGRESSIVE_SORTIE', label: '⚔️ Boundary Sortie & Leverage', desc: '+20% Patrol/Raid yield tomorrow; +8 Volatility.' }
+    },
+
+    CRISIS_CATALOG: [
+        {
+            id: 'wraith_deep_oil_fire',
+            title: "🔥 CRISIS AT WRAITH'S END: LEVIATHAN DEEP-OIL VAT FIRE",
+            boundHouseId: 'House Wraith',
+            boundSettlement: "Wraith's End",
+            allowedRoles: ['NOBLE_HOUSE', 'SYNDICATE', 'GUILD'],
+            description: "A rendering vat of pressurized Leviathan deep-oil and fish-blubber at Wraith's End (House Wraith) has ruptured near the boiler flues! Boiling abyssal oil is spilling across the iron dock grating toward the main storage casks.",
+            choices: [
+                {
+                    id: 'WATER_BRIGADE',
+                    label: '💧 Dispatch Squad with Water Buckets to Douse the Vats',
+                    outcomeType: 'CATASTROPHIC_FLARE',
+                    resolution: "💥 CATASTROPHIC FLARE! Cold water struck boiling Leviathan deep-oil, instantly flashing into a superheated steam-and-oil fireball! The explosion shattered three adjacent vats across Wraith's End (-14 Fuel, -15% Chains Integrity, squad severely burned)."
+                },
+                {
+                    id: 'SMOTHER_SILT',
+                    label: '🪨 Order Dredge-Squad to Smother Vats with Heavy Caldera Silt & Seal Vents',
+                    outcomeType: 'CONTAINED',
+                    resolution: "✅ FIRE SMOTHERED: Heavy damp caldera silt and iron hatch-covers starved the boiling fish-oil vats of oxygen without flashing. Refinery saved (+6 Crown Favor, +4 Salvaged Deep-Oil Fuel)."
+                },
+                {
+                    id: 'JETTISON_CASKS',
+                    label: '⚓ Cut Winch-Chains & Dump Burning Vats into the Abyssal Trench',
+                    outcomeType: 'PARTIAL_LOSS',
+                    resolution: "⚠️ CONTAINED AT COST: The burning vats plunged into the black trench waters before reaching the main magazine. Docks saved, but -8 units of refined oil were lost."
+                }
+            ]
+        },
+        {
+            id: 'gallows_sluice_ambush',
+            title: "🗡️ CRISIS AT GALLOWS-GATE SLUICES: CROWN INSPECTOR BLOCKADE",
+            boundHouseId: 'House Gallows',
+            boundSettlement: "Gallows-Gate Sluices",
+            allowedRoles: ['SYNDICATE'],
+            description: "Crown Iron-Clad Assessors have dropped the portcullis chain across the lower sluice canal while three of your unstamped resin skiffs are trapped inside the lock!",
+            choices: [
+                {
+                    id: 'RAM_THE_CHAIN',
+                    label: '⛵ Order Skiffs to Ram the Iron Toll-Chain at Full Oar',
+                    outcomeType: 'CATASTROPHIC_FLARE',
+                    resolution: "💥 HULLS CRUSHED! The 50-ton Grimsby iron chain sheared the prows off two skiffs; casks ruptured and sank (-20 Contraband Resin, -25 Toll)."
+                },
+                {
+                    id: 'BRIBE_LOCKKEEPER',
+                    label: '💰 Bribe the Night Lock-Keeper & Flood the Side-Weir',
+                    outcomeType: 'CONTAINED',
+                    resolution: "✅ SLIPPED THE NET: The side-weir flooded on signal, floating all three resin skiffs into the marsh fog unseen (+12 Contraband Resin, -10 Toll)."
+                }
+            ]
+        }
+    ],
+
+    setNextDayGoal(goalId) {
+        if (this.DAILY_GOALS[goalId]) {
+            this.nextDayGoal = goalId;
+            return { success: true, goal: this.DAILY_GOALS[goalId] };
+        }
+        return { success: false };
+    },
+
+    isGracePeriodComplete(daysActive = 0, forceBypass = false) {
+        if (forceBypass) return true;
+        const elapsedMs = Date.now() - this.sessionStartedAtMs;
+        return daysActive >= this.minCrisisDayThreshold || elapsedMs >= this.minRealTimeElapsedMs;
+    },
+
+    tickDailyVolatility(daysActive = 0, activeRole = 'NOBLE_HOUSE', houseState = {}) {
+        const goal = this.nextDayGoal || 'MAINTAIN_WARDS';
+        let deltaVol = 2.5;
+        if (goal === 'MAINTAIN_WARDS') {
+            deltaVol = 1.0;
+            if (houseState.barrierFuelUnits !== undefined) houseState.barrierFuelUnits = Math.min(60, houseState.barrierFuelUnits + 1);
+        } else if (goal === 'MAXIMIZE_MONOPOLY') {
+            deltaVol = 5.5;
+            if (houseState.barrierFuelUnits !== undefined) houseState.barrierFuelUnits = Math.min(60, houseState.barrierFuelUnits + 4);
+        } else if (goal === 'SHADOW_INQUEST') {
+            deltaVol = 1.5;
+            if (houseState.crownScrutiny !== undefined) houseState.crownScrutiny = Math.max(0, houseState.crownScrutiny - 4);
+        } else if (goal === 'AGGRESSIVE_SORTIE') {
+            deltaVol = 6.5;
+        }
+
+        this.volatilityIndex = Math.min(100, Number((this.volatilityIndex + deltaVol).toFixed(1)));
+
+        // Enforce 30–60 minute / 40-day grace period before any crisis event can interrupt
+        if (!this.activeCrisis && this.isGracePeriodComplete(daysActive) && this.volatilityIndex >= 85) {
+            this.triggerContextualCrisis(activeRole, houseState?.houseId);
+        }
+    },
+
+    triggerContextualCrisis(activeRole = 'NOBLE_HOUSE', activeHouseId = null, forceCrisisId = null) {
+        let candidate = null;
+        if (forceCrisisId) {
+            candidate = this.CRISIS_CATALOG.find(c => c.id === forceCrisisId);
+        } else if (activeHouseId === 'House Wraith') {
+            candidate = this.CRISIS_CATALOG.find(c => c.id === 'wraith_deep_oil_fire');
+        } else {
+            const pool = this.CRISIS_CATALOG.filter(c => c.allowedRoles.includes(activeRole));
+            candidate = pool[0] || this.CRISIS_CATALOG[0];
+        }
+        if (candidate) {
+            this.activeCrisis = { ...candidate, triggeredDay: rootScope.EngineParams?.worldDay || 1 };
+            rootScope.EventBus?.emit('CRISIS_TRIGGERED', this.activeCrisis);
+        }
+        return this.activeCrisis;
+    },
+
+    resolveActiveCrisis(choiceId) {
+        if (!this.activeCrisis) return { success: false, message: "No active crisis to resolve." };
+        const crisis = this.activeCrisis;
+        const choice = crisis.choices.find(c => c.id === choiceId) || crisis.choices[0];
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const h = CampaignManager.state.house;
+        const syn = CampaignManager.state.syndicate;
+
+        if (choice.outcomeType === 'CATASTROPHIC_FLARE') {
+            if (CampaignManager.campaignMode === 'HOUSE') {
+                h.barrierFuelUnits = Math.max(0, h.barrierFuelUnits - 14);
+                h.chainsIntegrity = Math.max(0, h.chainsIntegrity - 15);
+            } else if (CampaignManager.campaignMode === 'SYNDICATE') {
+                syn.contrabandResin = Math.max(0, syn.contrabandResin - 20);
+                syn.gallowsTollCollected = Math.max(0, syn.gallowsTollCollected - 25);
+            }
+            CrucibleNarrativeEngine.recordCrucible('agt_2', {
+                day,
+                type: 'CRISIS_CATASTROPHE',
+                title: crisis.title,
+                location: crisis.boundSettlement,
+                catalyst: `Ordered [${choice.label}] during ${crisis.title}.`,
+                fallout: choice.resolution,
+                scar: `Bears burn-scars from the ${crisis.boundSettlement} catastrophe.`
+            });
+        } else if (choice.outcomeType === 'CONTAINED') {
+            if (CampaignManager.campaignMode === 'HOUSE') {
+                h.crownFavor = Math.min(100, h.crownFavor + 6);
+                h.barrierFuelUnits = Math.min(60, h.barrierFuelUnits + 4);
+            } else if (CampaignManager.campaignMode === 'SYNDICATE') {
+                syn.contrabandResin += 12;
+            }
+        } else if (choice.outcomeType === 'PARTIAL_LOSS') {
+            if (CampaignManager.campaignMode === 'HOUSE') {
+                h.barrierFuelUnits = Math.max(0, h.barrierFuelUnits - 8);
+            }
+        }
+
+        LogDispatchManager.dispatches.unshift({
+            id: `crisis_res_${day}_${Date.now()}`,
+            day,
+            type: `CRISIS AFTERMATH [${choice.outcomeType}]`,
+            sender: `${crisis.boundSettlement} Emergency Watch`,
+            title: crisis.title,
+            body: choice.resolution,
+            read: false
+        });
+
+        this.crisisHistory.push({ crisisId: crisis.id, choiceId: choice.id, outcomeType: choice.outcomeType, day });
+        this.activeCrisis = null;
+        this.volatilityIndex = 20;
+        return { success: true, outcomeType: choice.outcomeType, message: choice.resolution };
+    },
+
+    getDirectivesForRole(roleKey = 'NOBLE_HOUSE') {
+        const r = (roleKey || 'NOBLE_HOUSE').toUpperCase();
+        const map = {
+            NOBLE_HOUSE: [
+                [`window.viewTelemetry()`, '🏛️ 20 Bedrock Settlements'],
+                [`window.viewWarBoard()`, '🏰 19-House War Board'],
+                [`window.viewShadowLedger()`, '🕵️ General Ledger Audit'],
+                [`window.interrogateSuspect()`, '⚖️ Inquest / Interrogate'],
+                [`window.dispatchCmd('PATROL')`, 'Patrol Mist'],
+                [`window.dispatchCmd('REQUISITION_FUEL')`, 'Requisition Fuel'],
+                [`window.dispatchCmd('CROWN_FILL_FULL')`, 'Crown: Fill Full'],
+                [`window.dispatchCmd('CROWN_DENY')`, 'Crown: Deny'],
+                [`window.dispatchCmd('DISPATCH_CARAVAN','Oakhaven')`, 'Dispatch Caravan'],
+                [`window.dispatchCmd('PROXY_RAID')`, 'Proxy Raid']
+            ],
+            TERMINUS: [
+                [`window.viewTelemetry()`, '🏛️ 20 Bedrock Settlements'],
+                [`window.viewWarBoard()`, '🏰 19-House War Board'],
+                [`window.viewShadowLedger()`, '🕵️ General Ledger Audit'],
+                [`window.interrogateSuspect()`, '⚖️ Inquest / Interrogate'],
+                [`window.dispatchCmd('PATROL')`, 'Patrol Mist'],
+                [`window.dispatchCmd('REQUISITION_FUEL')`, 'Requisition Fuel'],
+                [`window.dispatchCmd('CROWN_FILL_FULL')`, 'Crown: Fill Full'],
+                [`window.dispatchCmd('DEVELOP_AUTARKY')`, 'Expand Horizon Stills'],
+                [`window.dispatchCmd('CULTIVATE_RUNIC','agt_1')`, 'Cultivate 300 Guardian']
+            ],
+            GUILD: [
+                [`window.viewTelemetry()`, '🏛️ 20 Bedrock Settlements'],
+                [`window.viewShadowLedger()`, '🕵️ General Ledger Audit'],
+                [`window.interrogateSuspect()`, '⚖️ Inquest / Interrogate'],
+                [`window.dispatchCmd('PATROL')`, 'Patrol Mist'],
+                [`window.dispatchCmd('AUDIT_ANOMALY')`, 'Audit Anomaly (12-B)'],
+                [`window.dispatchCmd('SCRUB_MONUMENT')`, 'Scrub Monolith']
+            ],
+            MERCHANT: [
+                [`window.viewTelemetry()`, '🏛️ 20 Bedrock Settlements'],
+                [`window.viewWarBoard()`, '🏰 19-House War Board'],
+                [`window.viewShadowLedger()`, '🕵️ General Ledger Audit'],
+                [`window.dispatchCmd('DISPATCH_CARAVAN','Oakhaven')`, 'Dispatch Caravan'],
+                [`window.dispatchCmd('TRANSMIT_DREAM')`, 'Sponsor Candidate'],
+                [`window.dispatchCmd('VERIFY_TRUTH')`, 'Verify Ledger Truth']
+            ],
+            SYNDICATE: [
+                [`window.viewWarBoard()`, '🏰 19-House War Board'],
+                [`window.viewShadowLedger()`, '🕵️ General Ledger Audit'],
+                [`window.interrogateSuspect()`, '⚖️ Inquest / Interrogate'],
+                [`window.dispatchCmd('SMUGGLE_RESIN')`, 'Smuggle Resin'],
+                [`window.dispatchCmd('EXTORT_HOUSE')`, 'Extort House'],
+                [`window.dispatchCmd('PROXY_SABOTAGE')`, 'Sabotage Rival']
+            ],
+            SOVEREIGN: [
+                [`window.viewWarBoard()`, '🏰 19-House War Board'],
+                [`window.dispatchCmd('SUMMON_HUNTSMAN')`, 'Summon Bound Huntsman'],
+                [`window.dispatchCmd('MACABRE_COMMUNION')`, 'Macabre Communion'],
+                [`window.dispatchCmd('HIBERNATE',100)`, 'Brood in Frost (+100y)']
+            ]
+        };
+        return map[r] || map.NOBLE_HOUSE;
+    }
+};
+rootScope.CrisisEngine = CrisisEngine;
+
+// ============================================================================
 // 6. UNIFIED COMMANDER ENGINE FACADE (PROLOGUE + FUTURE FOLD-IN SYSTEM)
 // ============================================================================
 export const CommanderEngine = {
@@ -1504,6 +1748,7 @@ export const CommanderEngine = {
     CrucibleNarrativeEngine,
     InterrogationDesk,
     ShadowInfluenceEngine,
+    CrisisEngine,
     NOBLE_HOUSE_PROFILES,
     ROLE_CATALOG
 };

@@ -37,20 +37,56 @@ export const CommanderUI = {
         const modal = document.getElementById(this.modalId);
         if (modal) modal.classList.remove('hidden');
         this.roleSelected = false;
+        this.stopAutoTick();
         this.renderRoleSelection();
+    },
+
+    startAutoTick(intervalMs = 45000) {
+        this.stopAutoTick();
+        this.autoTickEnabled = true;
+        if (typeof window !== 'undefined' && !window.isHeadless) {
+            this._autoTickTimer = setInterval(() => {
+                if (!this.roleSelected || CommanderEngine.CrisisEngine.activeCrisis) return;
+                CommanderEngine.advanceDays(1);
+                this.render();
+            }, intervalMs);
+        }
+    },
+
+    stopAutoTick() {
+        this.autoTickEnabled = false;
+        if (this._autoTickTimer) {
+            clearInterval(this._autoTickTimer);
+            this._autoTickTimer = null;
+        }
+    },
+
+    toggleAutoTick() {
+        if (this.autoTickEnabled) {
+            this.stopAutoTick();
+            this.showBanner("Simulation clock paused. Advance days manually or resume auto-tick.");
+        } else {
+            this.startAutoTick();
+            this.showBanner("Simulation clock ticking automatically (1 Day / 45s).");
+        }
+        this.render();
     },
 
     selectRoleAndLaunch(roleKey, customHouseId = null) {
         this.roleSelected = true;
         const container = document.getElementById(this.containerId);
         if (container) container.dataset.initialized = 'false';
+        CommanderEngine.CrisisEngine.sessionStartedAtMs = Date.now();
+        CommanderEngine.CrisisEngine.volatilityIndex = 0;
+        CommanderEngine.CrisisEngine.activeCrisis = null;
         CommanderEngine.CampaignManager.selectRole(roleKey, customHouseId);
+        this.startAutoTick();
         const h = CommanderEngine.CampaignManager.state.house;
         this.render();
         if (roleKey === 'NOBLE_HOUSE') {
             this.showBanner(`Rolled [${h.houseId}] (${h.settlementName}) — Ruler: ${h.rulerName} | Monopoly: ${h.monopoly} (${h.monopolyBonus})`);
         } else {
-            this.showBanner(`Initialized Royal Archive Lens: [${roleKey}]`);
+            this.showBanner(`Initialized Royal Archive Lens: [${roleKey}] — Simulation clock active.`);
         }
     },
 
@@ -116,6 +152,19 @@ export const CommanderUI = {
         window.CommanderUI = this;
         window.selectArchiveRole = (roleKey, houseId = null) => this.selectRoleAndLaunch(roleKey, houseId);
         window.openRoleGate = () => this.openRoleSelection();
+        window.toggleAutoTick = () => this.toggleAutoTick();
+        window.setNextDayGoal = (goalId) => {
+            const res = CommanderEngine.CrisisEngine.setNextDayGoal(goalId);
+            if (res.success) {
+                this.showBanner(`Next Day Strategic Posture set: ${res.goal.label} (${res.goal.desc})`);
+                this.render();
+            }
+        };
+        window.resolveCrisis = (choiceId) => {
+            const res = CommanderEngine.CrisisEngine.resolveActiveCrisis(choiceId);
+            this.showBanner(res.message || 'Crisis directive executed.');
+            this.render();
+        };
         window.setCampaign = (m) => {
             CommanderEngine.CampaignManager.selectCampaign(m);
             this.showBanner(`Switched Campaign Mode to [${m}].`);
@@ -251,29 +300,6 @@ export const CommanderUI = {
         if (container.dataset.initialized === 'true') return;
         container.dataset.initialized = 'true';
 
-        const campaigns = ['HOUSE', 'ORDER', 'SYNDICATE', 'DUNE', 'PATRON', 'SOVEREIGN']
-            .map(m => `<button class="cmd-btn" onclick="window.setCampaign('${m}')">${m}</button>`).join('');
-
-        const directives = [
-            [`window.viewTelemetry()`, '🏛️ 20 Bedrock Settlements'],
-            [`window.viewWarBoard()`, '🏰 19-House War Board'],
-            [`window.viewShadowLedger()`, '🕵️ General Ledger Audit'],
-            [`window.interrogateSuspect()`, '⚖️ Inquest / Interrogate'],
-            [`window.dispatchCmd('PATROL')`, 'Patrol Mist'],
-            [`window.dispatchCmd('REQUISITION_FUEL')`, 'Requisition Fuel'],
-            [`window.dispatchCmd('CROWN_FILL_FULL')`, 'Crown: Fill Full'],
-            [`window.dispatchCmd('CROWN_DENY')`, 'Crown: Deny'],
-            [`window.dispatchCmd('DISPATCH_CARAVAN','Oakhaven')`, 'Dispatch Caravan'],
-            [`window.dispatchCmd('PROXY_RAID')`, 'Proxy Raid'],
-            [`window.dispatchCmd('AUDIT_ANOMALY')`, 'Audit Anomaly (12-B)'],
-            [`window.dispatchCmd('SCRUB_MONUMENT')`, 'Scrub Monolith'],
-            [`window.dispatchCmd('SMUGGLE_RESIN')`, 'Smuggle Resin'],
-            [`window.dispatchCmd('EXTORT_HOUSE')`, 'Extort House'],
-            [`window.dispatchCmd('TRANSMIT_DREAM')`, 'Whisper Dream'],
-            [`window.dispatchCmd('SUMMON_HUNTSMAN')`, 'Summon Huntsman'],
-            [`window.dispatchCmd('MACABRE_COMMUNION')`, 'Macabre Communion']
-        ].map(([fn, label]) => `<button class="cmd-btn" onclick="${fn}">${label}</button>`).join('');
-
         container.innerHTML = `
             <style>
                 .cmd-card { background: rgba(15, 23, 42, 0.95); border: 1px solid #78350f; padding: 12px; margin-bottom: 12px; font-family: monospace; color: #cbd5e1; }
@@ -290,21 +316,17 @@ export const CommanderUI = {
                 <div class="cmd-title">🌌 DARK FOREST ENGINE | THE GENERAL LEDGER (PROLOGUE & MACRO-COMMAND)</div>
                 <div id="status-bar" style="font-size: 12px; color: #f59e0b; margin-bottom: 8px; font-weight: bold;">Initializing...</div>
                 <div id="commander-action-banner" style="display:none; background:#1c1917; border-left:3px solid #f59e0b; color:#fde68a; padding:6px 10px; margin-bottom:8px; font-size:11px;"></div>
+                <div id="crisis-triage-panel" style="display:none; background:#2a0a0a; border:2px solid #ef4444; padding:12px; margin-bottom:10px;"></div>
                 <div style="margin-bottom: 6px;">
-                    <b style="color:#d97706;">ARCHIVE ROLE:</b>
-                    <button class="cmd-btn" style="border-color:#f59e0b; color:#fde68a;" onclick="window.openRoleGate()">🔄 Switch Role Menu</button>
-                    <button class="cmd-btn" onclick="window.selectArchiveRole('NOBLE_HOUSE')">🎲 Re-Roll Noble House (1 of 18)</button>
-                    <button class="cmd-btn" onclick="window.selectArchiveRole('TERMINUS')">🛡️ Terminus</button>
-                    <button class="cmd-btn" onclick="window.selectArchiveRole('GUILD')">⚔️ Guild</button>
-                    <button class="cmd-btn" onclick="window.selectArchiveRole('MERCHANT')">⚖️ Merchant</button>
-                    <button class="cmd-btn" onclick="window.selectArchiveRole('SYNDICATE')">🗡️ Syndicate</button>
-                    <button class="cmd-btn" onclick="window.selectArchiveRole('SOVEREIGN')">👑 Sovereign</button>
-                    <b style="margin-left: 12px; color:#d97706;">TIME:</b>
-                    <button class="cmd-btn" onclick="window.advanceDays(1)">+1 Day</button>
+                    <b style="color:#d97706;">SESSION & CLOCK:</b>
+                    <button id="btn-autotick-state" class="cmd-btn" style="border-color:#10b981; color:#6ee7b7;" onclick="window.toggleAutoTick()">⏯️ Clock: ACTIVE</button>
+                    <button class="cmd-btn" onclick="window.advanceDays(1)">+1 Day (Close Day)</button>
                     <button class="cmd-btn" onclick="window.advanceDays(7)">+7 Days</button>
                     <button class="cmd-btn" style="background:#78350f; color:#fff;" onclick="window.exportSave()">💾 Export Legacy Save (July 3D)</button>
+                    <button class="cmd-btn" style="border-color:#7f1d1d; color:#fca5a5; float:right;" onclick="window.openRoleGate()">🚪 End Run (Role Menu)</button>
                 </div>
-                <div><b style="color:#d97706;">DIRECTIVES:</b> ${directives}</div>
+                <div id="daily-goal-bar" style="margin-bottom: 6px;"></div>
+                <div id="role-directives-bar"></div>
             </div>
             <div class="cmd-grid-2">
                 <div>
@@ -344,7 +366,57 @@ export const CommanderUI = {
         if (s.mode === 'SOVEREIGN') m += ` | Endured: ${st.yearsEndured}y | Heralds: ${st.heraldsMutated}/5 | ${st.title}`;
 
         const sb = document.getElementById('status-bar');
-        if (sb) sb.innerText = m;
+        const vol = Math.round(CommanderEngine.CrisisEngine?.volatilityIndex || 0);
+        const bars = Math.min(10, Math.floor(vol / 10));
+        const gauge = `[${'|'.repeat(bars)}${'-'.repeat(10 - bars)}] ${vol}%`;
+        if (sb) sb.innerText = `${m} | Volatility: ${gauge}`;
+
+        const tickBtn = document.getElementById('btn-autotick-state');
+        if (tickBtn) {
+            tickBtn.innerText = this.autoTickEnabled ? '⏸️ Clock: TICKING (45s/d)' : '▶️ Clock: PAUSED';
+            tickBtn.style.borderColor = this.autoTickEnabled ? '#10b981' : '#f59e0b';
+        }
+
+        // Render End-of-Day Decisive Strategic Goal Selector
+        const goalBar = document.getElementById('daily-goal-bar');
+        if (goalBar && CommanderEngine.CrisisEngine) {
+            const curGoal = CommanderEngine.CrisisEngine.nextDayGoal;
+            const goalsHtml = Object.values(CommanderEngine.CrisisEngine.DAILY_GOALS).map(g => {
+                const activeStyle = g.id === curGoal ? 'background:#78350f; color:#fff; border-color:#fbbf24;' : '';
+                return `<button class="cmd-btn" style="${activeStyle}" title="${g.desc}" onclick="window.setNextDayGoal('${g.id}')">${g.label}</button>`;
+            }).join('');
+            goalBar.innerHTML = `<b style="color:#d97706;">NEXT DAY GOAL:</b> ${goalsHtml}`;
+        }
+
+        // Render Role-Scoped Directives Only
+        const dirBar = document.getElementById('role-directives-bar');
+        if (dirBar && CommanderEngine.CrisisEngine) {
+            const roleDirs = CommanderEngine.CrisisEngine.getDirectivesForRole(roleLabel);
+            const dirsHtml = roleDirs.map(([fn, label]) => `<button class="cmd-btn" onclick="${fn}">${label}</button>`).join('');
+            dirBar.innerHTML = `<b style="color:#d97706;">ROLE DIRECTIVES [${roleLabel}]:</b> ${dirsHtml}`;
+        }
+
+        // Render Urgent Crisis Response Triage Overlay if active
+        const crisisPanel = document.getElementById('crisis-triage-panel');
+        if (crisisPanel) {
+            const activeCrisis = CommanderEngine.CrisisEngine?.activeCrisis;
+            if (activeCrisis) {
+                crisisPanel.style.display = 'block';
+                const choicesHtml = activeCrisis.choices.map(c => `
+                    <button class="cmd-btn" style="display:block; width:100%; text-align:left; padding:8px; margin-top:6px; background:#450a0a; border-color:#ef4444; color:#fecaca;" onclick="window.resolveCrisis('${c.id}')">
+                        ${c.label}
+                    </button>
+                `).join('');
+                crisisPanel.innerHTML = `
+                    <div style="color:#f87171; font-weight:bold; font-size:13px; margin-bottom:4px;">🚨 URGENT CRISIS RESPONSE EVENT: ${activeCrisis.title}</div>
+                    <div style="color:#fca5a5; font-size:11px; margin-bottom:8px;">${activeCrisis.description}</div>
+                    <div style="color:#fbbf24; font-size:11px; font-weight:bold;">SELECT SQUAD TRIAGE DIRECTIVE:</div>
+                    ${choicesHtml}
+                `;
+            } else {
+                crisisPanel.style.display = 'none';
+            }
+        }
 
         const dispDiv = document.getElementById('dispatches-list');
         if (dispDiv) {
