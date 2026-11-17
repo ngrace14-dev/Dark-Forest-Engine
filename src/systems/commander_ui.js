@@ -387,12 +387,16 @@ export const CommanderUI = {
                 .cmd-card { background: rgba(15, 23, 42, 0.95); border: 1px solid #78350f; padding: 12px; margin-bottom: 12px; font-family: monospace; color: #cbd5e1; }
                 .cmd-title { color: #fbbf24; margin: 0 0 8px 0; font-size: 16px; font-weight: bold; letter-spacing: 0.08em; }
                 .cmd-subtitle { color: #fbbf24; margin: 0 0 8px 0; font-size: 13px; font-weight: bold; }
-                .cmd-btn { background: #1e1b18; color: #fbbf24; border: 1px solid #78350f; font-family: monospace; font-size: 11px; font-weight: bold; padding: 5px 9px; cursor: pointer; margin: 2px; transition: all 0.15s; }
+                .cmd-btn { background: #1e1b18; color: #fbbf24; border: 1px solid #78350f; font-family: monospace; font-size: 11px; font-weight: bold; padding: 6px 10px; cursor: pointer; margin: 2px; transition: all 0.15s; touch-action: manipulation; }
                 .cmd-btn:hover { background: #451a03; border-color: #fbbf24; color: #fff; }
                 .cmd-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
                 .cmd-dispatch { background: #040608; border: 1px solid #451a03; padding: 8px; margin-bottom: 6px; font-size: 11px; }
-                .cmd-story-box { background: #0b0f17; border: 1px solid #d97706; padding: 10px; white-space: pre-wrap; font-size: 11px; color: #fef3c7; max-height: 360px; overflow-y: auto; font-family: monospace; }
-                @media (max-width: 900px) { .cmd-grid-2 { grid-template-columns: 1fr; } }
+                .cmd-story-box { background: #0b0f17; border: 1px solid #d97706; padding: 10px; white-space: pre-wrap; overflow-x: auto; font-size: 11px; color: #fef3c7; max-height: 360px; overflow-y: auto; font-family: monospace; }
+                @media (max-width: 900px) {
+                    .cmd-grid-2 { grid-template-columns: 1fr; }
+                    .cmd-btn { padding: 8px 11px; font-size: 12px; }
+                    .cmd-title { font-size: 14px; }
+                }
             </style>
             <div class="cmd-card">
                 <div class="cmd-title">🌌 DARK FOREST ENGINE | THE GENERAL LEDGER (PROLOGUE & MACRO-COMMAND)</div>
