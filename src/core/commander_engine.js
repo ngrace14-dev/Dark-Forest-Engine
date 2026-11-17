@@ -1,4 +1,4 @@
-/**
+﻿/**
  * File: src/core/commander_engine.js
  * Clean-Room Headless Commander Simulation Core.
  *
@@ -160,7 +160,7 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
                     agent.skills.lore = Math.min(20, agent.skills.lore + 0.25);
                     if (st.daysTrained >= 7 && agent.career.rank !== 'Logistics Bailiff') {
                         agent.career.rank = 'Logistics Bailiff';
-                        rootScope.EventBus?.emit('UI_LOG', `📜 [ROSTER] ${agent.name} promoted to Logistics Bailiff!`);
+                        rootScope.EventBus?.emit('UI_LOG', `ðŸ“œ [ROSTER] ${agent.name} promoted to Logistics Bailiff!`);
                     }
                 } else if (st.discipline === 'MARTIAL') {
                     agent.skills.meleeAtt = Math.min(20, agent.skills.meleeAtt + 0.1);
@@ -218,7 +218,7 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
         agent.vitals.hp = agent.vitals.maxHp;
         agent.vitals.poise = 100;
         agent.statusEffects.push({ id: 'FOUNDATION_FIRE', name: 'Foundation Fire', type: 'SURGE', daysRemaining: 14, desc: '+200% all combat effectiveness' });
-        rootScope.EventBus?.emit('UI_LOG', `🔥 [TERMINUS] BREAKTHROUGH SURGE: ${agent.name} has ignited the Foundation Fire and joined the 300 Guardians! (+500y Lifespan)`);
+        rootScope.EventBus?.emit('UI_LOG', `ðŸ”¥ [TERMINUS] BREAKTHROUGH SURGE: ${agent.name} has ignited the Foundation Fire and joined the 300 Guardians! (+500y Lifespan)`);
         return { success: true, message: `BREAKTHROUGH ASCENSION! ${agent.name} is now an immortal Guardian of the 300 (+500y lifespan, Foundation Fire ignited).` };
     },
 
@@ -263,7 +263,7 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
         const res = this.assignGearToAgent(recipient.id, chosenId);
         return {
             ...res,
-            message: `🎒 [SQUAD AUTO-SORT] Squad sorted [${item.name}] to ${recipient.name} (${recipient.career?.rank} ${recipient.career?.id}) — ${item.desc}.`
+            message: `ðŸŽ’ [SQUAD AUTO-SORT] Squad sorted [${item.name}] to ${recipient.name} (${recipient.career?.rank} ${recipient.career?.id}) â€” ${item.desc}.`
         };
     },
 
@@ -297,27 +297,27 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
         const rf = a.reflexes || {};
         return [
             `================================================================================`,
-            `🛡️ SQUAD MEMBER CHARACTER STAT SHEET: ${a.name.toUpperCase()} (${a.id})`,
+            `ðŸ›¡ï¸ SQUAD MEMBER CHARACTER STAT SHEET: ${a.name.toUpperCase()} (${a.id})`,
             `================================================================================`,
             `Role / Rank:     ${a.career?.rank || 'Novice'} ${(a.career?.id || 'scout').toUpperCase()} | House/Faction: ${a.assignedHouseId}`,
-            `Birthright:      [${a.birthright?.title || 'None'}] — ${a.birthright?.desc || ''}`,
+            `Birthright:      [${a.birthright?.title || 'None'}] â€” ${a.birthright?.desc || ''}`,
             `Shift Birthday:  Day ${a.firstShiftSurvivedDay} AF (Shifts Endured: ${a.shiftsSurvived || 0}) | Significance: ${a.significance}`,
-            `Cultivation:     Stage ${a.cultivation?.stage || 0}/3 ${a.cultivation?.isCultivatedGuardian ? '★ IMMORTAL 300 GUARDIAN (+500y)' : '(Mortal)'}`,
+            `Cultivation:     Stage ${a.cultivation?.stage || 0}/3 ${a.cultivation?.isCultivatedGuardian ? 'â˜… IMMORTAL 300 GUARDIAN (+500y)' : '(Mortal)'}`,
             `Current Stance:  [${a.operatingStance?.mode || 'IDLE'}${a.operatingStance?.discipline ? ': ' + a.operatingStance.discipline : ''}]`,
             ``,
-            `─── ❤️ VITALS & REFLEXES ──────────────────────────────────────────────────────`,
-            `  • HP: ${vt.hp}/${vt.maxHp} | Stamina: ${vt.stamina}/100 | Poise: ${vt.poise.toFixed ? vt.poise.toFixed(0) : vt.poise}/100 | Hunger: ${vt.hunger}%`,
-            `  • Shock: ${rf.shock}% | Adrenaline: ${rf.adrenaline}% | Exhaustion: ${rf.exhaustion}%`,
+            `â”€â”€â”€ â¤ï¸ VITALS & REFLEXES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
+            `  â€¢ HP: ${vt.hp}/${vt.maxHp} | Stamina: ${vt.stamina}/100 | Poise: ${vt.poise.toFixed ? vt.poise.toFixed(0) : vt.poise}/100 | Hunger: ${vt.hunger}%`,
+            `  â€¢ Shock: ${rf.shock}% | Adrenaline: ${rf.adrenaline}% | Exhaustion: ${rf.exhaustion}%`,
             ``,
-            `─── ⚔️ EQUIPPED GEAR & LOADOUT ────────────────────────────────────────────────`,
-            `  • Weapon:  ${eq.weapon ? `${eq.weapon.name} (${eq.weapon.desc})` : '[Empty — Standard Issue]'}`,
-            `  • Armor:   ${eq.armor ? `${eq.armor.name} (${eq.armor.desc})` : '[Empty — Cloth Tunic]'}`,
-            `  • Trinket: ${eq.trinket ? `${eq.trinket.name} (${eq.trinket.desc})` : '[Empty — None]'}`,
+            `â”€â”€â”€ âš”ï¸ EQUIPPED GEAR & LOADOUT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
+            `  â€¢ Weapon:  ${eq.weapon ? `${eq.weapon.name} (${eq.weapon.desc})` : '[Empty â€” Standard Issue]'}`,
+            `  â€¢ Armor:   ${eq.armor ? `${eq.armor.name} (${eq.armor.desc})` : '[Empty â€” Cloth Tunic]'}`,
+            `  â€¢ Trinket: ${eq.trinket ? `${eq.trinket.name} (${eq.trinket.desc})` : '[Empty â€” None]'}`,
             ``,
-            `─── 📊 COMBAT & SURVIVAL ATTRIBUTES ───────────────────────────────────────────`,
-            `  • Strength:  ${Number(sk.strength).toFixed(1).padStart(4, ' ')}   | Melee Att: ${Number(sk.meleeAtt).toFixed(1).padStart(4, ' ')}   | Stealth:  ${Number(sk.stealth).toFixed(1).padStart(4, ' ')}`,
-            `  • Toughness: ${Number(sk.toughness).toFixed(1).padStart(4, ' ')}   | Melee Def: ${Number(sk.meleeDef).toFixed(1).padStart(4, ' ')}   | Lore:     ${Number(sk.lore).toFixed(1).padStart(4, ' ')}`,
-            `  • Athletics: ${Number(sk.athletics).toFixed(1).padStart(4, ' ')}   | Dodge:     ${Number(sk.dodge).toFixed(1).padStart(4, ' ')}   | Survival: ${Number(sk.survival).toFixed(1).padStart(4, ' ')}`,
+            `â”€â”€â”€ ðŸ“Š COMBAT & SURVIVAL ATTRIBUTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
+            `  â€¢ Strength:  ${Number(sk.strength).toFixed(1).padStart(4, ' ')}   | Melee Att: ${Number(sk.meleeAtt).toFixed(1).padStart(4, ' ')}   | Stealth:  ${Number(sk.stealth).toFixed(1).padStart(4, ' ')}`,
+            `  â€¢ Toughness: ${Number(sk.toughness).toFixed(1).padStart(4, ' ')}   | Melee Def: ${Number(sk.meleeDef).toFixed(1).padStart(4, ' ')}   | Lore:     ${Number(sk.lore).toFixed(1).padStart(4, ' ')}`,
+            `  â€¢ Athletics: ${Number(sk.athletics).toFixed(1).padStart(4, ' ')}   | Dodge:     ${Number(sk.dodge).toFixed(1).padStart(4, ' ')}   | Survival: ${Number(sk.survival).toFixed(1).padStart(4, ' ')}`,
             `================================================================================`
         ].join('\n');
     }
@@ -345,8 +345,8 @@ const LogDispatchManager = rootScope.LogDispatchManager || {
                 day: worldDay,
                 type: 'URGENT DISPATCH',
                 sender: 'Border Outpost IX (The Silt-Dike)',
-                title: `Spatial Drift Warning — Shift in ${shiftCountdown} Days`,
-                body: `The surveyor’s lead weight hung at a four-degree slant toward the forest all morning. The road is shortening; milestone twelve has slipped twenty paces into the moss. Station masters have doubled the grease on the gate pulleys.`
+                title: `Spatial Drift Warning â€” Shift in ${shiftCountdown} Days`,
+                body: `The surveyorâ€™s lead weight hung at a four-degree slant toward the forest all morning. The road is shortening; milestone twelve has slipped twenty paces into the moss. Station masters have doubled the grease on the gate pulleys.`
             });
         }
 
@@ -559,27 +559,27 @@ const CrucibleNarrativeEngine = rootScope.CrucibleNarrativeEngine || {
         const cru = bio.definingMoment;
         return [
             `================================================================================`,
-            `📜 POST-MORTEM CASE FILE: ${bio.name.toUpperCase()} (${bio.id})`,
+            `ðŸ“œ POST-MORTEM CASE FILE: ${bio.name.toUpperCase()} (${bio.id})`,
             `================================================================================`,
             `Affiliation:     ${bio.house} | Seat: ${bio.settlement}`,
             `Career Title:    ${bio.role}`,
             `Circumstance:    Birthright: [${bio.birthright}]`,
             `Shift Birthday:  Day ${bio.firstShiftSurvivedDay} AF (${bio.shiftsSurvived} Fortnightly Shifts Survived)`,
-            `Lifespan:        Born Day ${bio.birthDay} AF → Perished Day ${bio.deathDay} AF (Age ${bio.ageYears})`,
+            `Lifespan:        Born Day ${bio.birthDay} AF â†’ Perished Day ${bio.deathDay} AF (Age ${bio.ageYears})`,
             `Cause of Death:  ${bio.cause}`,
             `Active Traits:   ${bio.conditions.join(', ')}`,
             ``,
-            `─── 🌳 LINEAGE & SURVIVORSHIP ──────────────────────────────────────────────────`,
-            `Survived By:\n${bio.survivors.map(s => `  • ${s}`).join('\n')}`,
+            `â”€â”€â”€ ðŸŒ³ LINEAGE & SURVIVORSHIP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
+            `Survived By:\n${bio.survivors.map(s => `  â€¢ ${s}`).join('\n')}`,
             `Designated Heir: ${bio.successor}`,
             ``,
-            `─── 📖 DEFINING CRUCIBLE MOMENT ────────────────────────────────────────────────`,
+            `â”€â”€â”€ ðŸ“– DEFINING CRUCIBLE MOMENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
             `  "${cru ? cru.title : 'None Recorded'}"`,
             `  Location: ${cru ? cru.location : 'Unknown'} (Day ${cru ? cru.day : 'N/A'})`,
             `  Catalyst: ${cru ? cru.catalyst : 'N/A'}`,
             `  Lifelong Scar: ${cru ? cru.scar : 'None'}`,
             ``,
-            `─── 🪦 FOLK EPITAPH ────────────────────────────────────────────────────────────`,
+            `â”€â”€â”€ ðŸª¦ FOLK EPITAPH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
             `  ${bio.epitaph}`,
             `================================================================================`
         ].join('\n');
@@ -592,7 +592,7 @@ const CrucibleNarrativeEngine = rootScope.CrucibleNarrativeEngine || {
         if (!cru) return `No recorded crucibles found for query: "${query}".`;
         return [
             `================================================================================`,
-            `📜 THE DEFINING CRUCIBLE OF ${actorName.toUpperCase()}`,
+            `ðŸ“œ THE DEFINING CRUCIBLE OF ${actorName.toUpperCase()}`,
             `   Incident: ${cru.title} (Recorded Day ${cru.day} AF)`,
             `================================================================================`,
             ``,
@@ -600,7 +600,7 @@ const CrucibleNarrativeEngine = rootScope.CrucibleNarrativeEngine || {
             `The boundary woods did not move like mortal trees; they ground against the bedrock like millstones. ${actorName} stood at ${cru.location}, tasked with holding the perimeter before the 14-day Shift took the sun.`,
             ``,
             `[ACT II: THE CRISIS & FAILURE]`,
-            `${cru.catalyst} In the freezing mist, there was no sound of a battle—only the dull thud of iron sinking into damp peat. For three heartbeats, no order was given.`,
+            `${cru.catalyst} In the freezing mist, there was no sound of a battleâ€”only the dull thud of iron sinking into damp peat. For three heartbeats, no order was given.`,
             ``,
             `[ACT III: THE SCAR & AFTERMATH]`,
             `${cru.fallout} ${actorName} walked back through the gate alone, hands stained with pine resin and ash. Though they lived for seasons afterward, ${cru.scar}`,
@@ -655,7 +655,7 @@ const InterrogationDesk = rootScope.InterrogationDesk || {
         suspect.interrogated = true;
 
         let txt = `\n================================================================================\n`;
-        txt += `⚖️ FORMAL INQUEST PROCEEDINGS: ${suspect.name.toUpperCase()} (${suspect.id})\n`;
+        txt += `âš–ï¸ FORMAL INQUEST PROCEEDINGS: ${suspect.name.toUpperCase()} (${suspect.id})\n`;
         txt += `================================================================================\n`;
         txt += `Grounds for Suspicion: "${suspect.suspicionReason}"\n`;
         txt += `Observed Stress Index: ${suspect.deceptionScore}% | Classification: ${suspect.crime}\n\n`;
@@ -669,10 +669,10 @@ const InterrogationDesk = rootScope.InterrogationDesk || {
         }
 
         txt += `\nEXECUTIVE VERDICTS AVAILABLE:\n`;
-        txt += `  • Exonerate   → Dismiss charges (Restores loyalty).\n`;
-        txt += `  • Demote      → Strip rank to boundary ash-carter.\n`;
-        txt += `  • Execute     → Public hanging on palisade.\n`;
-        txt += `  • Turn Agent  → Coerce into double agent (+1 Blackmail Dossier).\n`;
+        txt += `  â€¢ Exonerate   â†’ Dismiss charges (Restores loyalty).\n`;
+        txt += `  â€¢ Demote      â†’ Strip rank to boundary ash-carter.\n`;
+        txt += `  â€¢ Execute     â†’ Public hanging on palisade.\n`;
+        txt += `  â€¢ Turn Agent  â†’ Coerce into double agent (+1 Blackmail Dossier).\n`;
         txt += `================================================================================\n`;
 
         return { success: true, text: txt, suspect };
@@ -848,6 +848,24 @@ const CampaignManager = rootScope.CampaignManager || {
         const key = (roleKey || 'NOBLE_HOUSE').toUpperCase();
         this.activeRole = key;
 
+        // Reset system state for new run
+        rootScope.EngineParams.worldDay = 1;
+        this.currentHour = 6;
+        
+        // Reset Engines & Log Manager
+        window.FacilityEngine?.resetForNewRun?.();
+        window.ExpeditionEngine.activeExpeditions = [];
+        window.ExpeditionEngine.completedLogs = [];
+        window.AgentRosterManager.agents.clear();
+        window.AgentRosterManager.squadArmoryStock = ['ironwood_spear', 'widow_resin_blade', 'kinetic_silk_coat', 'grimsby_plate', 'gloom_lens_lantern'];
+        window.LogDispatchManager.dispatches = [];
+        window.LogDispatchManager.unreadCount = 0;
+        window.InterrogationDesk.suspects.clear();
+        window.CrucibleNarrativeEngine.biographies.clear();
+        window.CrucibleNarrativeEngine.crucibles.clear();
+
+        if (key === 'NOBLE_HOUSE') {
+
         if (key === 'NOBLE_HOUSE') {
             const picked = (customHouseId && NOBLE_HOUSE_PROFILES.find(h => h.houseId.toLowerCase() === customHouseId.toLowerCase()))
                 || NOBLE_HOUSE_PROFILES[Math.floor(Math.random() * NOBLE_HOUSE_PROFILES.length)];
@@ -1016,7 +1034,7 @@ const CampaignManager = rootScope.CampaignManager || {
                     h.barrierFuelUnits = Math.floor(h.barrierFuelUnits / 2);
                     h.autarkyLevel = Math.max(0, h.autarkyLevel - 30);
                     h.crownFavor = Math.max(0, h.crownFavor - 25);
-                    rootScope.EventBus?.emit('UI_LOG', '⚔️ [CROWN INQUEST] Inquisitorial Crusher Force raided unauthorized stills! Fuel seized.');
+                    rootScope.EventBus?.emit('UI_LOG', 'âš”ï¸ [CROWN INQUEST] Inquisitorial Crusher Force raided unauthorized stills! Fuel seized.');
                 }
             }
 
@@ -1024,7 +1042,7 @@ const CampaignManager = rootScope.CampaignManager || {
                 c.daysLeft--;
                 if (c.daysLeft <= 0) {
                     h.barrierFuelUnits = Math.min(60, h.barrierFuelUnits + c.yieldFuel);
-                    rootScope.EventBus?.emit('UI_LOG', `📦 [TRADE] Caravan returned from ${c.dest}: +${c.yieldFuel} Barrier Fuel secured.`);
+                    rootScope.EventBus?.emit('UI_LOG', `ðŸ“¦ [TRADE] Caravan returned from ${c.dest}: +${c.yieldFuel} Barrier Fuel secured.`);
                     return false;
                 }
                 return true;
@@ -1198,7 +1216,7 @@ const CampaignManager = rootScope.CampaignManager || {
         } else if (act === 'BREACH_BLIND_SPOT') {
             this.state.order.blindSpotEntropy = 88;
             ShadowInfluenceEngine.revealEpitaph(88);
-            res = { success: true, message: `⚠️ REALITY LEAK THRESHOLD BREACHED (Entropy: 88%). Fallen-Era Illusion Runes in the Mountain Event Horizon (r=185km) have fractured—Settlement #7 [EPITAPH] exposed as the 21st node!` };
+            res = { success: true, message: `âš ï¸ REALITY LEAK THRESHOLD BREACHED (Entropy: 88%). Fallen-Era Illusion Runes in the Mountain Event Horizon (r=185km) have fracturedâ€”Settlement #7 [EPITAPH] exposed as the 21st node!` };
         } else {
             res = { success: false, message: `Command '${actionType}' is not available for ${this.campaignMode}.` };
         }
@@ -1212,7 +1230,7 @@ const CampaignManager = rootScope.CampaignManager || {
         const sov = this.state.sovereign;
         if (currentDay - sov.lastSummonDay >= sov.summonCooldown && sov.bankedCharge === 0) {
             sov.bankedCharge = 1;
-            rootScope.EventBus?.emit('UI_LOG', '🦇 [SOVEREIGN] Resummon charge stacked. Huntsman immortal today.');
+            rootScope.EventBus?.emit('UI_LOG', 'ðŸ¦‡ [SOVEREIGN] Resummon charge stacked. Huntsman immortal today.');
         }
     },
 
@@ -1223,12 +1241,12 @@ const CampaignManager = rootScope.CampaignManager || {
         if (sov.bankedCharge > 0) {
             sov.bankedCharge = 0;
             sov.lastSummonDay = currentDay;
-            rootScope.EventBus?.emit('UI_LOG', '💀 [SOVEREIGN] Instant Rebirth: Consuming banked charge!');
+            rootScope.EventBus?.emit('UI_LOG', 'ðŸ’€ [SOVEREIGN] Instant Rebirth: Consuming banked charge!');
             return true;
         }
         if (currentDay - sov.lastSummonDay >= sov.summonCooldown) {
             sov.lastSummonDay = currentDay;
-            rootScope.EventBus?.emit('UI_LOG', '💀 [SOVEREIGN] Huntsman summoned.');
+            rootScope.EventBus?.emit('UI_LOG', 'ðŸ’€ [SOVEREIGN] Huntsman summoned.');
             return true;
         }
         return false;
@@ -1302,7 +1320,7 @@ const CampaignManager = rootScope.CampaignManager || {
         };
 
         rootScope.EventBus?.emit('LEGACY_SAVE_EXPORTED', legacyDossier);
-        rootScope.EventBus?.emit('UI_LOG', `🏆 [LEGACY] World Line Exported: Candidate ${candidate?.name || 'Wanderer'} stamped as True Origin Native.`);
+        rootScope.EventBus?.emit('UI_LOG', `ðŸ† [LEGACY] World Line Exported: Candidate ${candidate?.name || 'Wanderer'} stamped as True Origin Native.`);
         return legacyDossier;
     },
 
@@ -1480,7 +1498,7 @@ const ShadowInfluenceEngine = rootScope.ShadowInfluenceEngine || {
 
     /**
      * Evaluates what an observer perceives near or far from the Mountain/Dune border
-     * (Addendum BY §2: The 25-Mile Border Optical Mirage & Relative Rotation Law).
+     * (Addendum BY Â§2: The 25-Mile Border Optical Mirage & Relative Rotation Law).
      */
     evaluateBorderPerception(observerRegion = 'mountain', milesFromBorder = 50, isDuringShiftVoid = false) {
         const reg = (observerRegion || 'mountain').toLowerCase();
@@ -1551,22 +1569,22 @@ const ShadowInfluenceEngine = rootScope.ShadowInfluenceEngine || {
 
         return [
             `================================================================================`,
-            `🕵️ THE GENERAL LEDGER: ROYAL ARCHIVE STATISTICAL & CASUALTY AUDIT`,
+            `ðŸ•µï¸ THE GENERAL LEDGER: ROYAL ARCHIVE STATISTICAL & CASUALTY AUDIT`,
             `================================================================================`,
             `[1] OFFICIAL CHRONOLOGY & PARISH CENSUS`,
-            `  • Royal Crucible Calendar:              Year ${this.relativity.perceivedForestYears} AF (14-Day Shift Cycle)`,
-            `  • Registered Chained Settlements:       20 Active Parishes ("A Score of Places")`,
-            `  • World-Wall Survey Confidence:         ${Math.round(this.relativity.terminusUnderstandingConfidence * 100)}% (Unexplained 5% marker variance post-Shift)`,
+            `  â€¢ Royal Crucible Calendar:              Year ${this.relativity.perceivedForestYears} AF (14-Day Shift Cycle)`,
+            `  â€¢ Registered Chained Settlements:       20 Active Parishes ("A Score of Places")`,
+            `  â€¢ World-Wall Survey Confidence:         ${Math.round(this.relativity.terminusUnderstandingConfidence * 100)}% (Unexplained 5% marker variance post-Shift)`,
             ``,
-            `[2] STATISTICAL ANOMALY — HUNTSMAN'S MARK (SPHERICAL IDOL) DISTRIBUTION`,
-            `  • Observed Mark Recipients (Nobles):    ${skewPct}% Founder-Lineage Peers (Expected Baseline: 25.0%)`,
-            `  • Observed Mark Recipients (Commoners): ${commonerPct}% Parish Commoners (Expected Baseline: 75.0%)`,
-            `  • Auditor's Margin Note:                "Founder-bloodline heirs are claiming the Huntsman's Mark at`,
+            `[2] STATISTICAL ANOMALY â€” HUNTSMAN'S MARK (SPHERICAL IDOL) DISTRIBUTION`,
+            `  â€¢ Observed Mark Recipients (Nobles):    ${skewPct}% Founder-Lineage Peers (Expected Baseline: 25.0%)`,
+            `  â€¢ Observed Mark Recipients (Commoners): ${commonerPct}% Parish Commoners (Expected Baseline: 75.0%)`,
+            `  â€¢ Auditor's Margin Note:                "Founder-bloodline heirs are claiming the Huntsman's Mark at`,
             `                                           statistically improbable rates while commoners turn back."`,
             ``,
             `[3] ARCHIVAL LEDGER INTEGRITY`,
-            `  • Scraped-Vellum Discrepancy Index:     ${entropy}%`,
-            `  • Parish Roll Audit Status:             ${revealed ? '⚠️ BREACH: Unindexed 21st Parish Roll uncovered beneath scraped ink [Ref: Settlement #7]' : 'Nominal — All 20 surface parish rolls sealed under Crown wax.'}`,
+            `  â€¢ Scraped-Vellum Discrepancy Index:     ${entropy}%`,
+            `  â€¢ Parish Roll Audit Status:             ${revealed ? 'âš ï¸ BREACH: Unindexed 21st Parish Roll uncovered beneath scraped ink [Ref: Settlement #7]' : 'Nominal â€” All 20 surface parish rolls sealed under Crown wax.'}`,
             `================================================================================`
         ].join('\n');
     }
@@ -1577,7 +1595,7 @@ rootScope.ShadowInfluenceEngine = ShadowInfluenceEngine;
 // 5.6 CRISIS RESPONSE TRIAGE & DAILY GOAL ENGINE
 // ============================================================================
 const CrisisEngine = rootScope.CrisisEngine || {
-    minCrisisDayThreshold: 40,       // ~30–60 minutes into a run before major crisis events trigger
+    minCrisisDayThreshold: 40,       // ~30â€“60 minutes into a run before major crisis events trigger
     minRealTimeElapsedMs: 30 * 60 * 1000,
     sessionStartedAtMs: Date.now(),
     volatilityIndex: 0,              // Builds gradually each day toward 100
@@ -1586,40 +1604,40 @@ const CrisisEngine = rootScope.CrisisEngine || {
     crisisHistory: [],
 
     DAILY_GOALS: {
-        MAINTAIN_WARDS: { id: 'MAINTAIN_WARDS', label: '🛡️ Fortify Wards & Conserve Fuel', desc: '-1 Daily Fuel Burn; -3 Volatility buildup tomorrow.' },
-        MAXIMIZE_MONOPOLY: { id: 'MAXIMIZE_MONOPOLY', label: '⚙️ Push Monopoly Output & Trade', desc: '+4 Resource/Fuel output tomorrow; +6 Industrial Volatility.' },
-        SHADOW_INQUEST: { id: 'SHADOW_INQUEST', label: '🕵️ Counter-Espionage & Ledger Audit', desc: '+15% Spy Detection; reduces Unrest & Scrutiny.' },
-        AGGRESSIVE_SORTIE: { id: 'AGGRESSIVE_SORTIE', label: '⚔️ Boundary Sortie & Leverage', desc: '+20% Patrol/Raid yield tomorrow; +8 Volatility.' }
+        MAINTAIN_WARDS: { id: 'MAINTAIN_WARDS', label: 'ðŸ›¡ï¸ Fortify Wards & Conserve Fuel', desc: '-1 Daily Fuel Burn; -3 Volatility buildup tomorrow.' },
+        MAXIMIZE_MONOPOLY: { id: 'MAXIMIZE_MONOPOLY', label: 'âš™ï¸ Push Monopoly Output & Trade', desc: '+4 Resource/Fuel output tomorrow; +6 Industrial Volatility.' },
+        SHADOW_INQUEST: { id: 'SHADOW_INQUEST', label: 'ðŸ•µï¸ Counter-Espionage & Ledger Audit', desc: '+15% Spy Detection; reduces Unrest & Scrutiny.' },
+        AGGRESSIVE_SORTIE: { id: 'AGGRESSIVE_SORTIE', label: 'âš”ï¸ Boundary Sortie & Leverage', desc: '+20% Patrol/Raid yield tomorrow; +8 Volatility.' }
     },
 
     // Role-Specific End-of-Day Strategic Targets (Production Goals / Ambush Sites / Hunting Grounds)
     ROLE_DAILY_TARGETS: {
         NOBLE_HOUSE: [
-            { id: 'PROD_MONOPOLY_SURPLUS', label: '🏭 Production Goal: Maximize Monopoly Extraction', supplyGain: '+6 House Monopoly Stock, +4 Barrier Fuel', desc: 'Overtime extraction of your House monopoly commodity.' },
-            { id: 'PROD_CROWN_TITHE', label: '👑 Production Goal: Refine Crown Tithe Reserves', supplyGain: '+3 Barrier Fuel, +5% Crown Favor', desc: 'Prioritize pure fuel synthesis for the Royal Crucible.' },
-            { id: 'PROD_CHAIN_FORGE', label: '⛓️ Production Goal: Reinforce 50-Ton Anchor Chains', supplyGain: '+10% Chains Integrity, +1 Squad Armor', desc: 'Divert foundry crews to anchor-link maintenance.' }
+            { id: 'PROD_MONOPOLY_SURPLUS', label: 'ðŸ­ Production Goal: Maximize Monopoly Extraction', supplyGain: '+6 House Monopoly Stock, +4 Barrier Fuel', desc: 'Overtime extraction of your House monopoly commodity.' },
+            { id: 'PROD_CROWN_TITHE', label: 'ðŸ‘‘ Production Goal: Refine Crown Tithe Reserves', supplyGain: '+3 Barrier Fuel, +5% Crown Favor', desc: 'Prioritize pure fuel synthesis for the Royal Crucible.' },
+            { id: 'PROD_CHAIN_FORGE', label: 'â›“ï¸ Production Goal: Reinforce 50-Ton Anchor Chains', supplyGain: '+10% Chains Integrity, +1 Squad Armor', desc: 'Divert foundry crews to anchor-link maintenance.' }
         ],
         TERMINUS: [
-            { id: 'TERM_BRAZIER_STOCK', label: '🔥 Production Goal: Stockpile World-Wall Braziers', supplyGain: '+5 Barrier Fuel, +5% Chains Integrity', desc: 'Distill legal Horizon fuel reserves for the Gate.' },
-            { id: 'TERM_BONE_CARVING', label: '🦴 Production Goal: Prepare Bone-Carving Crucibles', supplyGain: '+1 Guardian Cultivation Progress, +2 Squad Poise', desc: 'Refine runic marrow for the 300 Guardians.' }
+            { id: 'TERM_BRAZIER_STOCK', label: 'ðŸ”¥ Production Goal: Stockpile World-Wall Braziers', supplyGain: '+5 Barrier Fuel, +5% Chains Integrity', desc: 'Distill legal Horizon fuel reserves for the Gate.' },
+            { id: 'TERM_BONE_CARVING', label: 'ðŸ¦´ Production Goal: Prepare Bone-Carving Crucibles', supplyGain: '+1 Guardian Cultivation Progress, +2 Squad Poise', desc: 'Refine runic marrow for the 300 Guardians.' }
         ],
         SYNDICATE: [
-            { id: 'AMBUSH_SHADOWFEN_CONVOY', label: '🗡️ Ambush Target: Shadowfen Pre-Fuel Convoy', supplyGain: '+14 Contraband Resin, +1 Gloom-Glass Lantern', desc: 'Rob the Shadowfen–Capital chemical wagons for volatile resin.' },
-            { id: 'AMBUSH_OAKHEART_WAIN', label: '🌲 Ambush Target: Oakheart Ironwood Timber Wains', supplyGain: '+12 Ironwood Timber, +1 Oakheart Ironwood Spear', desc: 'Rob the Oakhaven–Gallows logging road for heartwood weapons.' },
-            { id: 'AMBUSH_CULL_TRAIN', label: '🥩 Ambush Target: Cullfield Slaughter-Train', supplyGain: '+18 Salted Rations, +25 Gallows Toll Coin', desc: 'Rob the Cullfield meat-wagons for provisions and silver.' }
+            { id: 'AMBUSH_SHADOWFEN_CONVOY', label: 'ðŸ—¡ï¸ Ambush Target: Shadowfen Pre-Fuel Convoy', supplyGain: '+14 Contraband Resin, +1 Gloom-Glass Lantern', desc: 'Rob the Shadowfenâ€“Capital chemical wagons for volatile resin.' },
+            { id: 'AMBUSH_OAKHEART_WAIN', label: 'ðŸŒ² Ambush Target: Oakheart Ironwood Timber Wains', supplyGain: '+12 Ironwood Timber, +1 Oakheart Ironwood Spear', desc: 'Rob the Oakhavenâ€“Gallows logging road for heartwood weapons.' },
+            { id: 'AMBUSH_CULL_TRAIN', label: 'ðŸ¥© Ambush Target: Cullfield Slaughter-Train', supplyGain: '+18 Salted Rations, +25 Gallows Toll Coin', desc: 'Rob the Cullfield meat-wagons for provisions and silver.' }
         ],
         SOVEREIGN: [
-            { id: 'HUNT_TWILIGHT_VALLEYS', label: '🐺 Hunting Ground: Twilight Valleys (Stalk Noble Scions)', supplyGain: '+120 Significance, +0.4 Squad Stealth & Speed', desc: 'Train Heralds by hunting marked noble patrols in the valleys.' },
-            { id: 'HUNT_SMOLDERING_CRAGS', label: '🪨 Hunting Ground: Smoldering Crags (Gorge on Basalt-Beasts)', supplyGain: '+80 Significance, +0.5 Squad Toughness & Max HP', desc: 'Harden Herald bone-carapaces against crag-horrors.' },
-            { id: 'HUNT_DROWNED_LOWLANDS', label: '🩸 Hunting Ground: Drowned Lowlands (Ambush Warden Outposts)', supplyGain: '+150 Significance, +0.5 Squad Melee Attack', desc: 'Blood the pack against heavily armed perimeter wardens.' }
+            { id: 'HUNT_TWILIGHT_VALLEYS', label: 'ðŸº Hunting Ground: Twilight Valleys (Stalk Noble Scions)', supplyGain: '+120 Significance, +0.4 Squad Stealth & Speed', desc: 'Train Heralds by hunting marked noble patrols in the valleys.' },
+            { id: 'HUNT_SMOLDERING_CRAGS', label: 'ðŸª¨ Hunting Ground: Smoldering Crags (Gorge on Basalt-Beasts)', supplyGain: '+80 Significance, +0.5 Squad Toughness & Max HP', desc: 'Harden Herald bone-carapaces against crag-horrors.' },
+            { id: 'HUNT_DROWNED_LOWLANDS', label: 'ðŸ©¸ Hunting Ground: Drowned Lowlands (Ambush Warden Outposts)', supplyGain: '+150 Significance, +0.5 Squad Melee Attack', desc: 'Blood the pack against heavily armed perimeter wardens.' }
         ],
         GUILD: [
-            { id: 'GUILD_MIST_SWEEP', label: '🧭 Contract Target: Outer Mist Marker Sweep', supplyGain: '+15 Guild Coin, +0.3 Squad Survival & Martial', desc: 'Clear corrupted road markers along the shifting paths.' },
-            { id: 'GUILD_RELIC_ESCORT', label: '🛡️ Contract Target: Basalt Vault Relic Escort', supplyGain: '+1 Armory Gear Piece, -4% Anomaly Entropy', desc: 'Escort sealed Directorate crates to the vault.' }
+            { id: 'GUILD_MIST_SWEEP', label: 'ðŸ§­ Contract Target: Outer Mist Marker Sweep', supplyGain: '+15 Guild Coin, +0.3 Squad Survival & Martial', desc: 'Clear corrupted road markers along the shifting paths.' },
+            { id: 'GUILD_RELIC_ESCORT', label: 'ðŸ›¡ï¸ Contract Target: Basalt Vault Relic Escort', supplyGain: '+1 Armory Gear Piece, -4% Anomaly Entropy', desc: 'Escort sealed Directorate crates to the vault.' }
         ],
         MERCHANT: [
-            { id: 'TRADE_RESIN_ARBITRAGE', label: '⚖️ Trade Goal: Widow–Shadowfen Resin Arbitrage', supplyGain: '+20 Merchant Gold, +4 Candidate Significance', desc: 'Move cold-resin casks along high-margin warded roads.' },
-            { id: 'TRADE_IRON_ARBITRAGE', label: '⚒️ Trade Goal: Blackwood–Grimsby Ore Arbitrage', supplyGain: '+15 Merchant Gold, +1 Grimsby Hauberk', desc: 'Broker deep-crust iron ore to the Grimsby foundries.' }
+            { id: 'TRADE_RESIN_ARBITRAGE', label: 'âš–ï¸ Trade Goal: Widowâ€“Shadowfen Resin Arbitrage', supplyGain: '+20 Merchant Gold, +4 Candidate Significance', desc: 'Move cold-resin casks along high-margin warded roads.' },
+            { id: 'TRADE_IRON_ARBITRAGE', label: 'âš’ï¸ Trade Goal: Blackwoodâ€“Grimsby Ore Arbitrage', supplyGain: '+15 Merchant Gold, +1 Grimsby Hauberk', desc: 'Broker deep-crust iron ore to the Grimsby foundries.' }
         ]
     },
 
@@ -1629,7 +1647,7 @@ const CrisisEngine = rootScope.CrisisEngine || {
     CRISIS_CATALOG: [
         {
             id: 'wraith_deep_oil_fire',
-            title: "🔥 CRISIS AT WRAITH'S END: LEVIATHAN DEEP-OIL VAT FIRE",
+            title: "ðŸ”¥ CRISIS AT WRAITH'S END: LEVIATHAN DEEP-OIL VAT FIRE",
             boundHouseId: 'House Wraith',
             boundSettlement: "Wraith's End",
             allowedRoles: ['NOBLE_HOUSE', 'SYNDICATE', 'GUILD'],
@@ -1637,27 +1655,27 @@ const CrisisEngine = rootScope.CrisisEngine || {
             choices: [
                 {
                     id: 'WATER_BRIGADE',
-                    label: '💧 Dispatch Squad with Water Buckets to Douse the Vats',
+                    label: 'ðŸ’§ Dispatch Squad with Water Buckets to Douse the Vats',
                     outcomeType: 'CATASTROPHIC_FLARE',
-                    resolution: "💥 CATASTROPHIC FLARE! Cold water struck boiling Leviathan deep-oil, instantly flashing into a superheated steam-and-oil fireball! The explosion shattered three adjacent vats across Wraith's End (-14 Fuel, -15% Chains Integrity, squad severely burned)."
+                    resolution: "ðŸ’¥ CATASTROPHIC FLARE! Cold water struck boiling Leviathan deep-oil, instantly flashing into a superheated steam-and-oil fireball! The explosion shattered three adjacent vats across Wraith's End (-14 Fuel, -15% Chains Integrity, squad severely burned)."
                 },
                 {
                     id: 'SMOTHER_SILT',
-                    label: '🪨 Order Dredge-Squad to Smother Vats with Heavy Caldera Silt & Seal Vents',
+                    label: 'ðŸª¨ Order Dredge-Squad to Smother Vats with Heavy Caldera Silt & Seal Vents',
                     outcomeType: 'CONTAINED',
-                    resolution: "✅ FIRE SMOTHERED: Heavy damp caldera silt and iron hatch-covers starved the boiling fish-oil vats of oxygen without flashing. Refinery saved (+6 Crown Favor, +4 Salvaged Deep-Oil Fuel)."
+                    resolution: "âœ… FIRE SMOTHERED: Heavy damp caldera silt and iron hatch-covers starved the boiling fish-oil vats of oxygen without flashing. Refinery saved (+6 Crown Favor, +4 Salvaged Deep-Oil Fuel)."
                 },
                 {
                     id: 'JETTISON_CASKS',
-                    label: '⚓ Cut Winch-Chains & Dump Burning Vats into the Abyssal Trench',
+                    label: 'âš“ Cut Winch-Chains & Dump Burning Vats into the Abyssal Trench',
                     outcomeType: 'PARTIAL_LOSS',
-                    resolution: "⚠️ CONTAINED AT COST: The burning vats plunged into the black trench waters before reaching the main magazine. Docks saved, but -8 units of refined oil were lost."
+                    resolution: "âš ï¸ CONTAINED AT COST: The burning vats plunged into the black trench waters before reaching the main magazine. Docks saved, but -8 units of refined oil were lost."
                 }
             ]
         },
         {
             id: 'gallows_sluice_ambush',
-            title: "🗡️ CRISIS AT GALLOWS-GATE SLUICES: CROWN INSPECTOR BLOCKADE",
+            title: "ðŸ—¡ï¸ CRISIS AT GALLOWS-GATE SLUICES: CROWN INSPECTOR BLOCKADE",
             boundHouseId: 'House Gallows',
             boundSettlement: "Gallows-Gate Sluices",
             allowedRoles: ['SYNDICATE'],
@@ -1665,15 +1683,15 @@ const CrisisEngine = rootScope.CrisisEngine || {
             choices: [
                 {
                     id: 'RAM_THE_CHAIN',
-                    label: '⛵ Order Skiffs to Ram the Iron Toll-Chain at Full Oar',
+                    label: 'â›µ Order Skiffs to Ram the Iron Toll-Chain at Full Oar',
                     outcomeType: 'CATASTROPHIC_FLARE',
-                    resolution: "💥 HULLS CRUSHED! The 50-ton Grimsby iron chain sheared the prows off two skiffs; casks ruptured and sank (-20 Contraband Resin, -25 Toll)."
+                    resolution: "ðŸ’¥ HULLS CRUSHED! The 50-ton Grimsby iron chain sheared the prows off two skiffs; casks ruptured and sank (-20 Contraband Resin, -25 Toll)."
                 },
                 {
                     id: 'BRIBE_LOCKKEEPER',
-                    label: '💰 Bribe the Night Lock-Keeper & Flood the Side-Weir',
+                    label: 'ðŸ’° Bribe the Night Lock-Keeper & Flood the Side-Weir',
                     outcomeType: 'CONTAINED',
-                    resolution: "✅ SLIPPED THE NET: The side-weir flooded on signal, floating all three resin skiffs into the marsh fog unseen (+12 Contraband Resin, -10 Toll)."
+                    resolution: "âœ… SLIPPED THE NET: The side-weir flooded on signal, floating all three resin skiffs into the marsh fog unseen (+12 Contraband Resin, -10 Toll)."
                 }
             ]
         }
@@ -1767,7 +1785,7 @@ const CrisisEngine = rootScope.CrisisEngine || {
 
         this.volatilityIndex = Math.min(100, Number((this.volatilityIndex + deltaVol).toFixed(1)));
 
-        // Enforce 30–60 minute / 40-day grace period before any crisis event can interrupt
+        // Enforce 30â€“60 minute / 40-day grace period before any crisis event can interrupt
         if (!this.activeCrisis && this.isGracePeriodComplete(daysActive) && this.volatilityIndex >= 85) {
             this.triggerContextualCrisis(activeRole, houseState?.houseId);
         }
@@ -1848,25 +1866,25 @@ const CrisisEngine = rootScope.CrisisEngine || {
         const r = (roleKey || 'NOBLE_HOUSE').toUpperCase();
         const fac = FacilityEngine.facilities;
         const dirs = [
-            [`window.viewFacilities()`, '🏗️ Base Upgrades & Facilities'],
-            [`window.viewTelemetry()`, '🏛️ 20 Bedrock Settlements']
+            [`window.viewFacilities()`, 'ðŸ—ï¸ Base Upgrades & Facilities'],
+            [`window.viewTelemetry()`, 'ðŸ›ï¸ 20 Bedrock Settlements']
         ];
 
         // Base Start: Everyone (except Sovereign) can send Unguarded Trade Caravans from Day 1
         if (r !== 'SOVEREIGN') {
-            dirs.push([`window.sendExpedition('UNGUARDED_CARAVAN','Oakhaven')`, '📦 Send Unguarded Caravan']);
+            dirs.push([`window.sendExpedition('UNGUARDED_CARAVAN','Oakhaven')`, 'ðŸ“¦ Send Unguarded Caravan']);
         }
 
         // Guard Barracks Unlock: Unlocks Guarded Caravans (uses regenerated Village Guards) & Squad Mist Patrols
         if (fac.guard_barracks?.unlocked && r !== 'SOVEREIGN') {
-            dirs.push([`window.sendExpedition('GUARDED_CARAVAN','Oakhaven')`, '🛡️ Send Guarded Caravan']);
-            dirs.push([`window.sendExpedition('PATROL_MIST','Border Mist')`, '🧭 Send Squad Patrol']);
+            dirs.push([`window.sendExpedition('GUARDED_CARAVAN','Oakhaven')`, 'ðŸ›¡ï¸ Send Guarded Caravan']);
+            dirs.push([`window.sendExpedition('PATROL_MIST','Border Mist')`, 'ðŸ§­ Send Squad Patrol']);
         }
 
         // Inquest Chamber Unlock: Unlocks Inquest & General Ledger Statistical Audit
         if (fac.inquest_chamber?.unlocked) {
-            dirs.push([`window.viewShadowLedger()`, '🕵️ General Ledger Audit']);
-            dirs.push([`window.interrogateSuspect()`, '⚖️ Inquest / Interrogate']);
+            dirs.push([`window.viewShadowLedger()`, 'ðŸ•µï¸ General Ledger Audit']);
+            dirs.push([`window.interrogateSuspect()`, 'âš–ï¸ Inquest / Interrogate']);
         }
 
         // Role-specific core & facility-gated actions
@@ -1874,19 +1892,19 @@ const CrisisEngine = rootScope.CrisisEngine || {
             dirs.push([`window.dispatchCmd('CROWN_FILL_FULL')`, 'Crown: Fill Full']);
             dirs.push([`window.dispatchCmd('CROWN_DENY')`, 'Crown: Deny']);
             if (fac.alchemical_still?.unlocked) {
-                dirs.push([`window.dispatchCmd('REQUISITION_FUEL')`, '⚗️ Requisition Fuel']);
+                dirs.push([`window.dispatchCmd('REQUISITION_FUEL')`, 'âš—ï¸ Requisition Fuel']);
                 if (r === 'TERMINUS') dirs.push([`window.dispatchCmd('DEVELOP_AUTARKY')`, 'Expand Horizon Stills']);
             }
             if (fac.war_table?.unlocked) {
-                dirs.push([`window.viewWarBoard()`, '🏰 19-House War Board']);
-                dirs.push([`window.sendExpedition('PROXY_RAID','Rival Convoy')`, '⚔️ Send Proxy Raid Squad']);
-                if (r === 'TERMINUS') dirs.push([`window.dispatchCmd('CULTIVATE_RUNIC','agt_1')`, '🔥 Cultivate 300 Guardian']);
+                dirs.push([`window.viewWarBoard()`, 'ðŸ° 19-House War Board']);
+                dirs.push([`window.sendExpedition('PROXY_RAID','Rival Convoy')`, 'âš”ï¸ Send Proxy Raid Squad']);
+                if (r === 'TERMINUS') dirs.push([`window.dispatchCmd('CULTIVATE_RUNIC','agt_1')`, 'ðŸ”¥ Cultivate 300 Guardian']);
             }
         } else if (r === 'SYNDICATE') {
-            dirs.push([`window.sendExpedition('SMUGGLE_RESIN','Gallows Sluice')`, '🛶 Send Smuggler Skiff']);
+            dirs.push([`window.sendExpedition('SMUGGLE_RESIN','Gallows Sluice')`, 'ðŸ›¶ Send Smuggler Skiff']);
             if (fac.war_table?.unlocked) {
-                dirs.push([`window.viewWarBoard()`, '🏰 19-House War Board']);
-                dirs.push([`window.dispatchCmd('EXTORT_HOUSE')`, '🗡️ Extort House']);
+                dirs.push([`window.viewWarBoard()`, 'ðŸ° 19-House War Board']);
+                dirs.push([`window.dispatchCmd('EXTORT_HOUSE')`, 'ðŸ—¡ï¸ Extort House']);
                 dirs.push([`window.dispatchCmd('PROXY_SABOTAGE')`, 'Sabotage Rival']);
             }
         } else if (r === 'GUILD') {
@@ -1897,15 +1915,15 @@ const CrisisEngine = rootScope.CrisisEngine || {
         } else if (r === 'MERCHANT') {
             if (fac.alchemical_still?.unlocked) dirs.push([`window.dispatchCmd('VERIFY_TRUTH')`, 'Verify Ledger Truth']);
             if (fac.war_table?.unlocked) {
-                dirs.push([`window.viewWarBoard()`, '🏰 19-House War Board']);
+                dirs.push([`window.viewWarBoard()`, 'ðŸ° 19-House War Board']);
                 dirs.push([`window.dispatchCmd('TRANSMIT_DREAM')`, 'Sponsor Candidate']);
             }
         } else if (r === 'SOVEREIGN') {
-            dirs.push([`window.sendExpedition('SUMMON_HUNTSMAN','Twilight Valleys')`, '🐺 Dispatch Bound Huntsman']);
+            dirs.push([`window.sendExpedition('SUMMON_HUNTSMAN','Twilight Valleys')`, 'ðŸº Dispatch Bound Huntsman']);
             if (fac.war_table?.unlocked) {
-                dirs.push([`window.viewWarBoard()`, '🏰 19-House War Board']);
-                dirs.push([`window.dispatchCmd('MACABRE_COMMUNION')`, '🩸 Macabre Communion']);
-                dirs.push([`window.dispatchCmd('HIBERNATE',100)`, '❄️ Brood in Frost (+100y)']);
+                dirs.push([`window.viewWarBoard()`, 'ðŸ° 19-House War Board']);
+                dirs.push([`window.dispatchCmd('MACABRE_COMMUNION')`, 'ðŸ©¸ Macabre Communion']);
+                dirs.push([`window.dispatchCmd('HIBERNATE',100)`, 'â„ï¸ Brood in Frost (+100y)']);
             }
         }
         return dirs;
@@ -1926,7 +1944,7 @@ const FacilityEngine = rootScope.FacilityEngine || {
     facilities: {
         scriptorium: {
             id: 'scriptorium',
-            name: '📜 Archive Scriptorium & Trade Post',
+            name: 'ðŸ“œ Archive Scriptorium & Trade Post',
             level: 1,
             unlocked: true,
             cost: 0,
@@ -1934,7 +1952,7 @@ const FacilityEngine = rootScope.FacilityEngine || {
         },
         guard_barracks: {
             id: 'guard_barracks',
-            name: '🛡️ Garrison Barracks & Watchtower',
+            name: 'ðŸ›¡ï¸ Garrison Barracks & Watchtower',
             level: 0,
             unlocked: false,
             cost: 8,
@@ -1942,7 +1960,7 @@ const FacilityEngine = rootScope.FacilityEngine || {
         },
         inquest_chamber: {
             id: 'inquest_chamber',
-            name: '⚖️ Inquest & Statistical Audit Chamber',
+            name: 'âš–ï¸ Inquest & Statistical Audit Chamber',
             level: 0,
             unlocked: false,
             cost: 10,
@@ -1950,7 +1968,7 @@ const FacilityEngine = rootScope.FacilityEngine || {
         },
         alchemical_still: {
             id: 'alchemical_still',
-            name: '⚗️ Alchemical Still & Assay Vault',
+            name: 'âš—ï¸ Alchemical Still & Assay Vault',
             level: 0,
             unlocked: false,
             cost: 12,
@@ -1958,7 +1976,7 @@ const FacilityEngine = rootScope.FacilityEngine || {
         },
         war_table: {
             id: 'war_table',
-            name: '🏰 Grand War Table & Crucible Sanctum',
+            name: 'ðŸ° Grand War Table & Crucible Sanctum',
             level: 0,
             unlocked: false,
             cost: 15,
@@ -1972,34 +1990,48 @@ const FacilityEngine = rootScope.FacilityEngine || {
         this.villageGuardsCurrent = 6;
         this.villageGuardsMaxThreshold = 12;
         Object.values(this.facilities).forEach(f => {
-            if (f.id === 'scriptorium') { f.unlocked = true; f.level = 1; }
-            else { f.unlocked = false; f.level = 0; }
+            f.unlocked = false;
+            f.level = 0;
+            f.isConstructing = false;
+            f.hoursRemaining = 0;
+            f.totalHours = 0;
         });
+        this.facilities.scriptorium.unlocked = true;
+        this.facilities.scriptorium.level = 1;
     },
 
-    unlockFacility(facilityId) {
+    unlockFacility(facilityId, instant = false) {
         const f = this.facilities[facilityId];
         if (!f) return { success: false, message: `Unknown facility: ${facilityId}` };
+        
+        // Define build/upgrade time (Max 30 IRL Days = 60 In-Game Days = 720 Hours)
+        const durationHours = Math.min(720, (f.level + 1) * 48); // Scaled duration
+
         if (f.unlocked) {
-            if (this.settlementResources < f.cost) {
-                return { success: false, message: `Insufficient Settlement Resources (${this.settlementResources}/${f.cost}).` };
-            }
-            f.level++;
-            this.settlementResources = Math.max(0, this.settlementResources - f.cost);
-            return { success: true, facility: f, message: `Upgraded [${f.name}] to Level ${f.level}!` };
+            if (this.settlementResources < f.cost) return { success: false, message: `Insufficient Settlement Resources (${this.settlementResources}/${f.cost}).` };
+            if (f.isConstructing) return { success: false, message: `[${f.name}] is already under construction.` };
+            
+            f.isConstructing = true;
+            f.hoursRemaining = instant ? 0 : durationHours;
+            f.totalHours = durationHours;
+            f.targetLevel = f.level + 1;
+            this.settlementResources -= f.cost;
+            return { success: true, message: `Started upgrading [${f.name}] to Lv ${f.targetLevel}. Completion in ${durationHours/24} days.` };
         }
-        if (this.settlementResources < f.cost) {
-            return { success: false, message: `Insufficient Settlement Resources (${this.settlementResources}/${f.cost}).` };
-        }
+
+        if (this.settlementResources < f.cost) return { success: false, message: `Insufficient Settlement Resources (${this.settlementResources}/${f.cost}).` };
+        if (f.isConstructing) return { success: false, message: `[${f.name}] is already under construction.` };
+
+        f.isConstructing = true;
+        f.hoursRemaining = instant ? 0 : durationHours;
+        f.totalHours = durationHours;
+        f.targetLevel = 1;
         this.settlementResources -= f.cost;
-        f.unlocked = true;
-        f.level = 1;
-        if (facilityId === 'guard_barracks') {
-            this.villageGuardsMaxThreshold = 24;
-            this.villageGuardsCurrent = Math.min(this.villageGuardsMaxThreshold, this.villageGuardsCurrent + 4);
-        }
+        return { success: true, message: `Started construction of [${f.name}]. Completion in ${durationHours/24} days.` };
+    },
+
         rootScope.EventBus?.emit('FACILITY_UNLOCKED', f);
-        return { success: true, facility: f, message: `🏗️ Constructed [${f.name}]! ${f.unlocksDesc}` };
+        return { success: true, facility: f, message: `ðŸ—ï¸ Constructed [${f.name}]! ${f.unlocksDesc}` };
     },
 
     tickDailyGuardGeneration() {
@@ -2016,7 +2048,7 @@ const FacilityEngine = rootScope.FacilityEngine || {
 rootScope.FacilityEngine = FacilityEngine;
 
 // ============================================================================
-// 5.8 FALLOUT SHELTER–STYLE EXPEDITION & FIELD LOG ENGINE
+// 5.8 FALLOUT SHELTERâ€“STYLE EXPEDITION & FIELD LOG ENGINE
 // ============================================================================
 const ExpeditionEngine = rootScope.ExpeditionEngine || {
     activeExpeditions: [],
@@ -2064,7 +2096,7 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
             totalHours,
             status: 'OUTBOUND',
             logs: [
-                `[00:00] ${leadAgent ? leadAgent.name : 'Caravan Drovers'} departed gates for ${targetName} (${guarded ? `Guarded Escort: ${guardsAssigned || 2} Guards` : '⚠️ UNGUARDED — Vulnerable to Mist Raiders'}).`
+                `[00:00] ${leadAgent ? leadAgent.name : 'Caravan Drovers'} departed gates for ${targetName} (${guarded ? `Guarded Escort: ${guardsAssigned || 2} Guards` : 'âš ï¸ UNGUARDED â€” Vulnerable to Mist Raiders'}).`
             ]
         };
 
@@ -2072,7 +2104,7 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
         return {
             success: true,
             expedition: exp,
-            message: `🧭 Dispatched [${type}] to ${targetName} (${exp.leadAgentName}). Estimated duration: ${totalHours}h.`
+            message: `ðŸ§­ Dispatched [${type}] to ${targetName} (${exp.leadAgentName}). Estimated duration: ${totalHours}h.`
         };
     },
 
@@ -2090,19 +2122,19 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
                 if (exp.hoursElapsed === Math.ceil(exp.totalHours * 0.35)) {
                     exp.status = 'EN_ROUTE';
                     if (!exp.guarded && exp.type === 'UNGUARDED_CARAVAN') {
-                        exp.logs.push(`[${hh}:00] ⚠️ Mist-stalkers shadowed the unguarded wagons near mile-stone four; drovers whipped the mules hard (-2 Cargo lost).`);
+                        exp.logs.push(`[${hh}:00] âš ï¸ Mist-stalkers shadowed the unguarded wagons near mile-stone four; drovers whipped the mules hard (-2 Cargo lost).`);
                     } else {
-                        exp.logs.push(`[${hh}:00] ⚔️ Escort repelled a pack of bracken-hounds in the copper fog; perimeter held.`);
+                        exp.logs.push(`[${hh}:00] âš”ï¸ Escort repelled a pack of bracken-hounds in the copper fog; perimeter held.`);
                     }
                 } else if (exp.hoursElapsed === Math.ceil(exp.totalHours * 0.7)) {
                     exp.status = 'RETURNING';
-                    exp.logs.push(`[${hh}:00] 📦 Reached ${exp.targetName} checkpoint. Loaded casks and turned back toward home gates.`);
+                    exp.logs.push(`[${hh}:00] ðŸ“¦ Reached ${exp.targetName} checkpoint. Loaded casks and turned back toward home gates.`);
                 }
 
                 if (exp.hoursElapsed >= exp.totalHours) {
                     exp.status = 'COMPLETED';
                     const yieldFuel = exp.guarded ? 14 : 7;
-                    exp.logs.push(`[${hh}:00] ✅ Returned safely through the gatehouse (+${yieldFuel} Supply/Fuel secured).`);
+                    exp.logs.push(`[${hh}:00] âœ… Returned safely through the gatehouse (+${yieldFuel} Supply/Fuel secured).`);
 
                     if (exp.leadAgentId && AgentRosterManager.agents.has(exp.leadAgentId)) {
                         const agt = AgentRosterManager.agents.get(exp.leadAgentId);
@@ -2147,7 +2179,7 @@ export const CommanderEngine = {
     baseDayDurationMs: 12 * 60 * 60 * 1000, // 1 In-Game Day = 12 Real-World Hours (43,200,000 ms) at 1x
     maxTimeScale: 8,                        // Players can accelerate up to 8x (1.5 Real-World Hours / Day)
     timeScale: 1,
-    currentHour: 6,                         // 0–23 in-game hour within the current day
+    currentHour: 6,                         // 0â€“23 in-game hour within the current day
 
     setTimeScale(scale = 1) {
         const clamped = Math.max(1, Math.min(this.maxTimeScale, Number(scale) || 1));
@@ -2180,6 +2212,19 @@ export const CommanderEngine = {
         return { day: rootScope.EngineParams?.worldDay || 1, hour: this.currentHour };
     },
 
+        Object.values(this.FacilityEngine.facilities).forEach(f => {
+            if (f.isConstructing && f.hoursRemaining > 0) {
+                f.hoursRemaining = Math.max(0, f.hoursRemaining - step);
+                if (f.hoursRemaining === 0) {
+                    f.unlocked = true;
+                    f.level = f.targetLevel;
+                    f.isConstructing = false;
+                    window.EventBus?.emit('UI_LOG', `ðŸ—ï¸ [CONSTRUCTION] ${f.name} completed!`);
+                }
+            }
+        });
+
+
     boot(defaultMode = 'HOUSE') {
         if (!this.initialized || AgentRosterManager.agents.size === 0) {
             CampaignManager.selectCampaign(defaultMode);
@@ -2191,7 +2236,7 @@ export const CommanderEngine = {
     unlockInSandbox(reason = 'Claimed Command Desk') {
         this.isUnlockedInSandbox = true;
         rootScope.EventBus?.emit('COMMANDER_SYSTEM_UNLOCKED', { reason });
-        rootScope.EventBus?.emit('UI_LOG', `🌌 [COMMANDER] Macro-Logistics Command Desk Unlocked (${reason}).`);
+        rootScope.EventBus?.emit('UI_LOG', `ðŸŒŒ [COMMANDER] Macro-Logistics Command Desk Unlocked (${reason}).`);
     },
 
     advanceDays(days = 1) {
@@ -2232,16 +2277,16 @@ export const CommanderEngine = {
                 const cTitle = CrisisEngine.activeCrisis.title;
                 const worstChoice = CrisisEngine.activeCrisis.choices.find(c => c.outcomeType === 'CATASTROPHIC_FLARE') || CrisisEngine.activeCrisis.choices[0];
                 const res = CrisisEngine.resolveActiveCrisis(worstChoice.id);
-                skippedEvents.push(`⚠️ UNATTENDED CRISIS DURING SKIP (${cTitle}): ${res.message}`);
+                skippedEvents.push(`âš ï¸ UNATTENDED CRISIS DURING SKIP (${cTitle}): ${res.message}`);
             } else {
-                skippedEvents.push(`📜 Day ${rootScope.EngineParams.worldDay}: ${CrisisEngine.lastDayReport?.executedGoal || 'Routine operations'} (${CrisisEngine.lastDayReport?.gains || ''})`);
+                skippedEvents.push(`ðŸ“œ Day ${rootScope.EngineParams.worldDay}: ${CrisisEngine.lastDayReport?.executedGoal || 'Routine operations'} (${CrisisEngine.lastDayReport?.gains || ''})`);
             }
         }
         return {
             success: true,
             sealsRemaining: FacilityEngine.chronoSeals,
             skippedEvents,
-            message: `⏭️ [CHRONO-SKIP COMPLETE] Simulated ${count} full day(s) unattended. (${FacilityEngine.chronoSeals} Chrono-Seals left).\n` + skippedEvents.join('\n')
+            message: `â­ï¸ [CHRONO-SKIP COMPLETE] Simulated ${count} full day(s) unattended. (${FacilityEngine.chronoSeals} Chrono-Seals left).\n` + skippedEvents.join('\n')
         };
     },
 
@@ -2263,3 +2308,9 @@ export const CommanderEngine = {
 CommanderEngine.boot('HOUSE');
 rootScope.CommanderEngine = CommanderEngine;
 export default CommanderEngine;
+
+
+
+
+
+
