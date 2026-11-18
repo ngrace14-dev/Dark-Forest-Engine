@@ -855,6 +855,17 @@ const InterrogationDesk = rootScope.InterrogationDesk || {
             if (rootScope.CampaignManager?.state?.house) {
                 rootScope.CampaignManager.state.house.blackmailDossiers = (rootScope.CampaignManager.state.house.blackmailDossiers || 0) + 1;
             }
+            if (rootScope.RealityEditorVault) {
+                rootScope.RealityEditorVault.discoverFact({
+                    title: `Double-Agent Cipher Confession of ${suspect.name}`,
+                    source: `Basalt Inquest Chamber Interrogation`,
+                    targetHouse: suspect.rivalHouse || 'House Cull',
+                    valueFuel: 15,
+                    valueRes: 20,
+                    costPaid: 'Inquest Interrogation & Leverage',
+                    riskDesc: `Proof of covert espionage by ${suspect.rivalHouse || 'House Cull'}.`
+                });
+            }
         } else {
             return { success: false, message: `Unknown verdict: "${verdictType}". Valid: exonerate, demote, execute, turn_agent.` };
         }
@@ -1319,6 +1330,169 @@ export const ProceduralCollisionEngine = rootScope.ProceduralCollisionEngine || 
 rootScope.ProceduralCollisionEngine = ProceduralCollisionEngine;
 
 // ============================================================================
+// 5.08 MANIFESTO §2 & §3: EDITOR OF REALITY (FACT & RELIC VAULT) & EMISSARY DILEMMAS
+// ============================================================================
+export const RealityEditorVault = rootScope.RealityEditorVault || {
+    facts: [],
+    resolvedHistory: [],
+    activeEmissaryPetition: null,
+
+    resetForNewRun() {
+        this.facts = [];
+        this.resolvedHistory = [];
+        this.activeEmissaryPetition = null;
+        this.discoverFact({
+            title: "Palimpsest of the Twenty-First Parish",
+            source: "Scraped Vellum Roll #77 (Archive Basement)",
+            targetHouse: "House Gallows",
+            valueFuel: 14,
+            valueRes: 18,
+            costPaid: "3 Rations, 1 Scribe Candle",
+            riskDesc: "Exposes a 6,000-year chronological discrepancy in the King's Chain census.",
+            credibility: 84
+        });
+    },
+
+    discoverFact(opts = {}) {
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const warBoard = CampaignManager?.getWarBoard?.() || [];
+        const rival = opts.targetHouse || warBoard.find(w => w.status === 'WAR_PREP' || w.status === 'SKIRMISH')?.name || 'House Cull';
+        const fact = {
+            id: opts.id || `fact_${day}_${this.facts.length + this.resolvedHistory.length + 1}`,
+            dayDiscovered: day,
+            title: opts.title || `Unstamped ${rival} Siphon-Resin Ledger`,
+            source: opts.source || `Recovered by Field Squad near ${rival} toll-markers`,
+            owner: CampaignManager?.state?.house?.houseId || CampaignManager?.campaignMode || 'Royal Archive',
+            targetHouse: rival,
+            valueFuel: opts.valueFuel || 12,
+            valueRes: opts.valueRes || 16,
+            costPaid: opts.costPaid || '8h Field March & Escort Rations',
+            riskDesc: opts.riskDesc || `Implicates ${rival} in unauthorized resin diversion (+10% Entropy if published).`,
+            credibility: opts.credibility || Math.min(98, Math.round(65 + (RoleStateMachine.computeSquadCapabilityMetrics().avgLore * 5)))
+        };
+        this.facts.unshift(fact);
+        rootScope.EventBus?.emit('FACT_DISCOVERED', fact);
+        return fact;
+    },
+
+    resolveFact(factId, verb = 'ARCHIVE') {
+        const idx = factId ? this.facts.findIndex(f => f.id === factId) : 0;
+        if (idx === -1 || this.facts.length === 0) {
+            return { success: false, message: "No discovered Facts or Relics in the Vault to resolve." };
+        }
+        const fact = this.facts.splice(idx, 1)[0];
+        const act = String(verb || 'ARCHIVE').toUpperCase();
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const h = CampaignManager.state.house;
+        const o = CampaignManager.state.order;
+        const syn = CampaignManager.state.syndicate;
+        const pat = CampaignManager.state.patron;
+        const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
+        const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
+
+        let effectSummary = '';
+        if (act === 'PUBLISH') {
+            o.blindSpotEntropy = Math.min(100, (o.blindSpotEntropy || 12) + 12);
+            h.crownFavor = Math.max(0, (h.crownFavor || 50) - 10);
+            pat.candidateSignificance = (pat.candidateSignificance || 25) + 18;
+            CampaignManager.mutateWarBoard(fact.targetHouse, -8, 'WAR_PREP', `Public broadcast of [${fact.title}] shattered institutional legitimacy`);
+            effectSummary = `📢 [PUBLISHED] Broadcast [${fact.title}] across all 20 settlements! (+12% Blind-Spot Entropy, +18 Significance, -10% Crown Favor, ${fact.targetHouse} humiliated -8 Power).`;
+        } else if (act === 'LEAK') {
+            h.blackmailDossiers = (h.blackmailDossiers || 0) + 1;
+            CampaignManager.mutateWarBoard(fact.targetHouse, -10, 'SKIRMISH', `Covert leak of [${fact.title}] triggered a targeted feudal schism`);
+            effectSummary = `🗡️ [LEAKED] Secretly leaked [${fact.title}] against ${fact.targetHouse}! (${fact.targetHouse} -10 Power -> SKIRMISH, +1 Blackmail Dossier).`;
+        } else if (act === 'SELL') {
+            if (CampaignManager.campaignMode === 'SYNDICATE') {
+                syn.contrabandResin += fact.valueFuel;
+                syn.gallowsTollCollected += fact.valueRes;
+            } else {
+                h.barrierFuelUnits = Math.min(maxFuel, (h.barrierFuelUnits || 0) + fact.valueFuel);
+            }
+            FacilityEngine.settlementResources += fact.valueRes;
+            effectSummary = `💰 [SOLD] Brokered [${fact.title}] for monopoly favors (+${fact.valueFuel}u Fuel/Resin, +${fact.valueRes} Settlement Resources).`;
+        } else if (act === 'ARCHIVE') {
+            AgentRosterManager.agents.forEach(a => {
+                if (a.alive) a.skills.lore = Number((a.skills.lore + 0.5).toFixed(2));
+            });
+            FacilityEngine.settlementProsperity = Math.min(100, FacilityEngine.settlementProsperity + 6);
+            CrisisEngine.volatilityIndex = Math.max(0, (CrisisEngine.volatilityIndex || 0) - 4);
+            effectSummary = `🏛️ [ARCHIVED] Sealed [${fact.title}] in private Scriptorium vault (+0.5 Squad Lore, +6% Prosperity, -4% Volatility).`;
+        } else if (act === 'SUPPRESS') {
+            h.crownFavor = Math.min(100, (h.crownFavor || 50) + 12);
+            h.crownScrutiny = Math.max(0, (h.crownScrutiny || 10) - 8);
+            o.blindSpotEntropy = Math.max(0, (o.blindSpotEntropy || 12) - 5);
+            effectSummary = `🤫 [SUPPRESSED] Buried [${fact.title}] to protect institutional order (+12% Crown Favor, -8% Scrutiny, -5% Entropy).`;
+        } else if (act === 'DESTROY') {
+            o.blindSpotEntropy = Math.max(0, (o.blindSpotEntropy || 12) - 10);
+            CrisisEngine.volatilityIndex = Math.max(0, (CrisisEngine.volatilityIndex || 0) - 10);
+            effectSummary = `🔥 [DESTROYED] Incinerated [${fact.title}] in the basalt brazier (-10% Blind-Spot Entropy, -10% Volatility; history lost forever).`;
+        } else {
+            this.facts.unshift(fact);
+            return { success: false, message: `Unknown Editor verb: ${verb}` };
+        }
+
+        const record = { ...fact, resolvedDay: day, verb: act, effectSummary };
+        this.resolvedHistory.unshift(record);
+        LogDispatchManager.dispatches.unshift({
+            id: `editor_${day}_${Date.now()}`,
+            day,
+            type: `REALITY EDITOR [${act}]`,
+            sender: 'The Crow\'s Eye Vault',
+            title: `${act}: ${fact.title}`,
+            body: effectSummary,
+            read: false
+        });
+        rootScope.EventBus?.emit('FACT_RESOLVED', record);
+        return { success: true, verb: act, fact: record, message: effectSummary };
+    },
+
+    generateEmissaryPetition(day = 1) {
+        if (this.activeEmissaryPetition) return this.activeEmissaryPetition;
+        const warBoard = CampaignManager?.getWarBoard?.() || [];
+        const activeHouse = CampaignManager?.state?.house?.houseId || 'House Terminus';
+        const rival = warBoard.find(w => w.name !== activeHouse && w.name !== 'House Aethel') || { name: 'House Shadowfen', monopoly: 'Pre-Fuel Matrix', power: 66, status: 'PEACE' };
+
+        this.activeEmissaryPetition = {
+            id: `pet_${day}_${Math.floor(Math.random() * 1000)}`,
+            day,
+            senderHouse: rival.name,
+            title: `Emissary Petition from ${rival.name} (${rival.status})`,
+            prompt: `An envoy from ${rival.name} (Power: ${rival.power}) stands at the gatehouse offering +10u Barrier Fuel & +12 Resources in exchange for a joint toll embargo against their blood-rivals (+6% Crown Scrutiny).`,
+            acceptLabel: `🤝 Accept ${rival.name} Pact (+10u Fuel, +12 Res, +5 Ally Power, +6% Scrutiny)`,
+            rejectLabel: `🛡️ Reject Envoy & Assert Autonomy (+5% Crown Favor, ${rival.name} -4 Power)`
+        };
+        return this.activeEmissaryPetition;
+    },
+
+    resolveEmissaryPetition(decision = 'ACCEPT') {
+        if (!this.activeEmissaryPetition) {
+            return { success: false, message: "No active emissary petition at the gatehouse." };
+        }
+        const pet = this.activeEmissaryPetition;
+        this.activeEmissaryPetition = null;
+        const h = CampaignManager.state.house;
+        const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
+        const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
+        const act = String(decision || 'ACCEPT').toUpperCase();
+
+        let msg = '';
+        if (act === 'ACCEPT') {
+            h.barrierFuelUnits = Math.min(maxFuel, (h.barrierFuelUnits || 0) + 10);
+            h.crownScrutiny = Math.min(100, (h.crownScrutiny || 10) + 6);
+            FacilityEngine.settlementResources += 12;
+            CampaignManager.mutateWarBoard(pet.senderHouse, 5, 'ALLIED', `Signed bilateral monopoly embargo pact`);
+            msg = `🤝 [PETITION ACCEPTED] Sealed pact with ${pet.senderHouse}: +10u Barrier Fuel, +12 Resources, ${pet.senderHouse} posture shifted to ALLIED (+6% Scrutiny).`;
+        } else {
+            h.crownFavor = Math.min(100, (h.crownFavor || 50) + 5);
+            CampaignManager.mutateWarBoard(pet.senderHouse, -4, 'SKIRMISH', `Envoy turned away at the gatehouse`);
+            msg = `🛡️ [PETITION REJECTED] Turned away ${pet.senderHouse} envoy: +5% Crown Favor (${pet.senderHouse} -4 Power -> SKIRMISH).`;
+        }
+        return { success: true, decision: act, message: msg };
+    }
+};
+rootScope.RealityEditorVault = RealityEditorVault;
+
+// ============================================================================
 // 5.1 CAMPAIGN COMMAND MANAGER
 // ============================================================================
 const CampaignManager = rootScope.CampaignManager || {
@@ -1396,6 +1570,7 @@ const CampaignManager = rootScope.CampaignManager || {
         CrucibleNarrativeEngine.biographies.clear();
         CrucibleNarrativeEngine.crucibles.clear();
         this.resetWarBoard();
+        RealityEditorVault.resetForNewRun();
         RoleStateMachine.transitionTo('MORNING_BRIEFING');
 
         if (key === 'NOBLE_HOUSE') {
@@ -1653,6 +1828,10 @@ const CampaignManager = rootScope.CampaignManager || {
         const activeFeralCount = AgentRosterManager.spawnedFeralWendigos?.length || 0;
         if (activeFeralCount > 0 && rootScope.CrisisEngine) {
             rootScope.CrisisEngine.volatilityIndex = Math.min(100, (rootScope.CrisisEngine.volatilityIndex || 0) + activeFeralCount * 3);
+        }
+
+        if (day % 3 === 0 && !RealityEditorVault.activeEmissaryPetition) {
+            RealityEditorVault.generateEmissaryPetition(day);
         }
 
         const daysActive = day - this.dayStarted;
@@ -2831,9 +3010,11 @@ const CrisisEngine = rootScope.CrisisEngine || {
     getDirectivesForRole(roleKey = 'NOBLE_HOUSE') {
         const r = (roleKey || 'NOBLE_HOUSE').toUpperCase();
         const fac = FacilityEngine.facilities;
+        const factCount = RealityEditorVault.facts?.length || 0;
         const dirs = [
-            [`window.viewFacilities()`, 'ðŸ—ï¸ Base Upgrades & Facilities'],
-            [`window.viewTelemetry()`, 'ðŸ›ï¸ 20 Bedrock Settlements']
+            [`window.viewFacilities()`, '🏗️ Base Upgrades & Facilities'],
+            [`window.viewTruthVault()`, `📜 Truth & Relic Vault (${factCount})`],
+            [`window.viewTelemetry()`, '🏛️ 20 Bedrock Settlements']
         ];
 
         // Base Start: Everyone (except Sovereign) can send Unguarded Trade Caravans from Day 1
@@ -3254,6 +3435,15 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
                         CampaignManager.mutateWarBoard(exp.targetName, 2, 'PEACE');
                     }
 
+                    RealityEditorVault.discoverFact({
+                        title: `${exp.targetName} Field Recon & Toll Manifest`,
+                        source: `${exp.leadAgentName} (${exp.type} Return)`,
+                        targetHouse: exp.targetName,
+                        valueFuel: Math.max(8, Math.round(yieldFuel * 0.8)),
+                        valueRes: 14,
+                        costPaid: `${exp.totalHours}h Field March (${exp.cargoIntegrity ?? 100}% Cargo Integrity)`
+                    });
+
                     LogDispatchManager.dispatches.unshift({
                         id: `exp_done_${Date.now()}_${Math.random()}`,
                         day,
@@ -3404,6 +3594,7 @@ export const CommanderEngine = {
     RoleStateMachine,
     ProceduralCollisionEngine,
     PRESSURE_TAG_REGISTRY,
+    RealityEditorVault,
     HOUSE_MONOPOLY_MODIFIERS,
     AgentRosterManager,
     LogDispatchManager,

@@ -8,7 +8,8 @@
 - [x] **6-Role State Machine & Active House Monopolies (Phase 1):** All 6 roles (`NOBLE_HOUSE`, `TERMINUS`, `GUILD`, `MERCHANT`, `SYNDICATE`, `SOVEREIGN`) and 19 House Monopolies active in daily math.
 - [x] **Emergent Expeditions, Will-to-Live Retreat & Caravan Recall (Phase 2):** Dynamic hazard vs. defense rolls, tactical retreats, and early recall salvage.
 - [x] **Logistical Entropy Tax & State-Driven Crisis Synthesis (Phase 3):** Scaling economic friction and causal War Board telemetry dispatches.
-- [x] **Situational Pressure Collision — Feral Wendigo Rebirth:** Dual `STARVING` + `FREEZING` death hook queuing next-Shift Feral Wendigo rebirths.
+- [x] **Situational Pressure Collision — Feral Wendigo Rebirth & Perimeter Hunt:** Dual `STARVING` + `FREEZING` death hook queuing next-Shift Feral Wendigo rebirths and active `HUNT_FERAL_WENDIGO` directive.
+- [x] **Manifesto §3 "Editor of Reality" Vault, Emissary Petitions & Grouped Mobile Directives:** 5-property Fact Dossiers with 6 Editor verbs (`PUBLISH`, `LEAK`, `SELL`, `ARCHIVE`, `SUPPRESS`, `DESTROY`), interactive rival House petitions, and progressive UI categorization.
 - [x] **Memory Bank & Workflow Standards Initialization:** Created `memory-bank/` and preserved `.clinerules` guardrails.
 
 ## 2. Pending Tasks / Roadmap

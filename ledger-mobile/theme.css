@@ -1125,3 +1125,244 @@ body.mobile-landscape-fit .monolith-overlay-content,
 
 /* Add resize handles to UI panels */
 .parchment-note-box, .cmd-story-box, #roster-list, #expeditions-list, #dispatches-list, #story-archive { resize: vertical; overflow: auto; min-height: 100px; }
+
+/* ============================================================================
+   5-PAGE BRUTALIST RUNIC-IRON CONCEPT ART REPLICA THEME
+   ============================================================================ */
+.brutalist-runic-frame {
+    position: relative;
+    width: 100%;
+    max-width: 980px;
+    margin: 6px auto;
+    background:
+        linear-gradient(rgba(18, 28, 26, 0.35) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(18, 28, 26, 0.35) 1px, transparent 1px),
+        radial-gradient(ellipse at 50% 45%, #111819 0%, #070a0b 100%);
+    background-size: 20px 20px, 20px 20px, 100% 100%;
+    border: 4px solid #2b2f30;
+    border-radius: 14px;
+    box-shadow:
+        0 20px 45px rgba(0, 0, 0, 0.95),
+        inset 0 0 35px rgba(0, 0, 0, 0.9),
+        inset 0 0 2px 2px #474d4e;
+    color: #d6cbb5;
+    font-family: 'Share Tech Mono', monospace;
+    padding: 14px 36px 18px;
+    overflow: hidden;
+}
+
+.brutalist-rune-border-left,
+.brutalist-rune-border-right {
+    position: absolute;
+    top: 38px;
+    bottom: 38px;
+    width: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+    font-size: 13px;
+    color: #7c725e;
+    text-shadow: 0 1px 2px #000;
+    background: linear-gradient(180deg, #161819 0%, #1f2324 50%, #141617 100%);
+    border: 1px solid #383c3d;
+    user-select: none;
+    pointer-events: none;
+    writing-mode: vertical-rl;
+    letter-spacing: 3px;
+}
+.brutalist-rune-border-left { left: 4px; border-radius: 6px 0 0 6px; }
+.brutalist-rune-border-right { right: 4px; border-radius: 0 6px 6px 0; }
+
+.brutalist-top-crest {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    background: linear-gradient(180deg, #222628 0%, #121516 100%);
+    border: 2px solid #454a4b;
+    border-radius: 6px;
+    padding: 7px 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.brutalist-crest-title {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    font-weight: 800;
+    color: #d8c8a8;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.brutalist-crest-medallion {
+    width: 32px;
+    height: 32px;
+    margin: -10px 14px;
+    background: radial-gradient(circle, #2e3336 0%, #141718 100%);
+    border: 2px solid #787163;
+    transform: rotate(45deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.9);
+}
+.brutalist-crest-medallion span {
+    transform: rotate(-45deg);
+    font-size: 16px;
+    color: #d99b43;
+    font-weight: bold;
+}
+
+.brutalist-crest-right {
+    text-align: right;
+    font-family: 'Cinzel', serif;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #c8b798;
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.riveted-commit-plate {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    width: 100%;
+    max-width: 440px;
+    margin: 12px auto 0;
+    padding: 10px 18px;
+    background: linear-gradient(180deg, #2b3032 0%, #181b1c 50%, #101213 100%);
+    border: 2px solid #5a5d5e;
+    border-radius: 5px;
+    box-shadow:
+        0 8px 20px rgba(0, 0, 0, 0.95),
+        inset 0 1px 1px rgba(255, 255, 255, 0.2),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.8);
+    color: #e2d1b0;
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.18s ease;
+}
+.riveted-commit-plate:hover {
+    border-color: #d99b43;
+    color: #fde68a;
+    box-shadow: 0 0 18px rgba(217, 155, 67, 0.35), inset 0 0 10px rgba(217, 155, 67, 0.15);
+    transform: translateY(-1px);
+}
+.riveted-commit-plate .plate-rune {
+    font-size: 20px;
+    color: #a8997c;
+    border-right: 1px solid #4a4d4e;
+    padding-right: 12px;
+}
+
+.burden-parchment-card {
+    background: linear-gradient(165deg, #d7ccb8 0%, #c0b199 55%, #a8977c 100%);
+    border: 2px solid #4a3e2e;
+    border-radius: 4px;
+    padding: 10px 12px;
+    color: #1c1610;
+    font-family: 'Share Tech Mono', monospace;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.75), inset 0 0 14px rgba(74, 58, 40, 0.28);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.burden-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1.5px solid #4a3e2e;
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+    font-family: 'Cinzel', serif;
+    font-size: 13.5px;
+    font-weight: 900;
+    color: #1a130c;
+    letter-spacing: 0.04em;
+}
+
+.redaction-bar {
+    display: inline-block;
+    height: 7px;
+    background: #18130e;
+    border-radius: 1px;
+    vertical-align: middle;
+}
+
+.hub-iron-module {
+    background: linear-gradient(180deg, #171c1d 0%, #0e1213 100%);
+    border: 1.5px solid #3c4446;
+    border-left: 3px solid #d9822b;
+    border-radius: 4px;
+    padding: 7px 10px;
+    margin-bottom: 7px;
+    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.8);
+}
+
+.hub-module-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #2b3234;
+    padding-bottom: 3px;
+    margin-bottom: 5px;
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    font-weight: 800;
+    color: #e2d1b0;
+}
+
+.execution-verb-btn {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 5px;
+    padding: 0;
+    background: linear-gradient(180deg, #292e30 0%, #171a1c 100%);
+    border: 1.5px solid #52585a;
+    border-radius: 3px;
+    color: #ded0b6;
+    font-family: 'Cinzel', serif;
+    font-size: 11.5px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.execution-verb-btn:hover {
+    border-color: #d99b43;
+    color: #fff;
+}
+.execution-verb-btn.destroy-verb {
+    border-color: #dc2626;
+    background: linear-gradient(180deg, #3b1313 0%, #1f0909 100%);
+    color: #fecaca;
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.35);
+}
+.execution-verb-btn .verb-icon {
+    width: 28px;
+    padding: 5px 0;
+    text-align: center;
+    border-right: 1px solid #454a4c;
+    color: #c98a3b;
+    font-size: 12px;
+}
+.execution-verb-btn .verb-label {
+    flex: 1;
+    text-align: center;
+    padding: 5px 8px;
+}
+

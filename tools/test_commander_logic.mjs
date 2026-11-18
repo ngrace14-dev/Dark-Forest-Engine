@@ -336,6 +336,23 @@ if (!mockElements.get('story-reader').innerText.includes('THE GENERAL LEDGER: RO
     failures.push('CommanderUI General Ledger Audit reader failed to render');
 }
 
+// Verify Manifesto §2 & §3 RealityEditorVault (6 Editor Verbs) & Gatehouse Emissary Petition
+window.viewTruthVault();
+if (!mockElements.get('story-reader').innerText.includes('REALITY EDITOR VAULT')) {
+    failures.push('CommanderUI Reality Editor Vault reader failed to render');
+}
+const leakRes = CommanderEngine.RealityEditorVault.resolveFact(null, 'LEAK');
+if (!leakRes.success || leakRes.verb !== 'LEAK') {
+    failures.push(`Expected RealityEditorVault LEAK verb to succeed, got ${JSON.stringify(leakRes)}`);
+}
+CommanderEngine.RealityEditorVault.generateEmissaryPetition(3);
+const petRes = CommanderEngine.RealityEditorVault.resolveEmissaryPetition('ACCEPT');
+if (!petRes.success || petRes.decision !== 'ACCEPT') {
+    failures.push(`Expected Emissary Petition ACCEPT resolution to succeed, got ${JSON.stringify(petRes)}`);
+}
+console.log(`[11h-RealityEditor] Manifesto §3 Editor & Emissary Verified: ${leakRes.message} | ${petRes.message}`);
+
+
 // 9. Verify Temporal Relativity, Mountain Rotation in 7-day Void, Tragic Alignment, and Entropy Breach
 const sie = CommanderEngine.ShadowInfluenceEngine;
 if (sie.relativity.perceivedForestYears !== 12000 || sie.relativity.objectiveYears !== 18000 || sie.relativity.missingGapYears !== 6000) {

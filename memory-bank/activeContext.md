@@ -9,7 +9,8 @@
 - **Phase 1 (6-Role Emergent State Machine & Living War Board):** Built `RoleStateMachine`, activated all 19 `HOUSE_MONOPOLY_MODIFIERS`, wired systemic squad/facility math into all 6 roles (including `GUILD` and `MERCHANT`), and made the 19-House War Board persistent and mutation-reactive with causal dispatches.
 - **Phase 2 (Emergent Expeditions & Will-to-Live Retreat):** Built `computeExpeditionCombatProfile`, Manifesto §8 Will-to-Live Tactical Retreats (`status = 'RETREATED'`), and early recall (`recallExpedition` / `RECALL_CARAVAN`).
 - **Phase 3 (State-Driven Crisis Synthesis & Logistical Entropy Tax):** Added `computeLogisticalEntropyTax`, scaling Crown Tithes, and `synthesizeEmergentCrisis`.
-- **Situational Pressure Collision (Dual Starving + Freezing $\rightarrow$ Feral Wendigo Rebirth):** Implemented `applySituationalStatus`, `evaluateActorDeath`, and `processShiftWendigoRebirths` in `commander_engine.js` (and updated `defeatNpc` in `src/systems/ai.js`) so actors dying from Starvation or Freezing while both effects are active rise as Feral Wendigos on the next 14-day Shift.
+- **Situational Pressure Collision (Dual Starving + Freezing $\rightarrow$ Feral Wendigo Rebirth):** Implemented `applySituationalStatus`, `evaluateActorDeath`, `processShiftWendigoRebirths`, and the `HUNT_FERAL_WENDIGO` directive in `commander_engine.js` (and updated `defeatNpc` in `src/systems/ai.js`).
+- **Genre-Leading Text-Game Loop Upgrades (Manifesto §3 Reality Editor, Emissary Petitions & Grouped Mobile Directives):** Implemented `RealityEditorVault` (`PUBLISH`, `LEAK`, `SELL`, `ARCHIVE`, `SUPPRESS`, `DESTROY` on 5-property Fact Dossiers), interactive Rival House Gatehouse Emissary Petitions (`ACCEPT` / `REJECT`), and categorized mobile directive rows (`[BASE & ARCHIVES]`, `[FIELD & LOGISTICS]`, `[POLITICS & TITHE]`) with live cost badges.
 
 ## 3. Immediate Next Steps
 1. Receive the user's **Project Brief / Consequence & Tag Specification** in Plan Mode.

@@ -239,6 +239,18 @@ export const CommanderUI = {
         window.viewWarBoard = () => this.renderWarBoardReader();
         window.viewShadowLedger = () => this.renderShadowLedgerReader();
         window.viewFacilities = () => this.renderFacilitiesReader();
+        window.viewTruthVault = () => this.renderTruthVaultReader();
+        window.resolveFactVerb = (factId, verb) => {
+            const res = CommanderEngine.RealityEditorVault.resolveFact(factId, verb);
+            this.showBanner(res.message);
+            this.render();
+            this.renderTruthVaultReader();
+        };
+        window.resolveEmissaryPetition = (decision) => {
+            const res = CommanderEngine.RealityEditorVault.resolveEmissaryPetition(decision);
+            this.showBanner(res.message);
+            this.render();
+        };
         window.unlockFacility = (facId) => {
             const res = CommanderEngine.FacilityEngine.unlockFacility(facId);
             this.showBanner(res.message);
@@ -377,7 +389,41 @@ export const CommanderUI = {
         this.setReaderContent(`${d}\n\n${p}`);
     },
 
-    setReaderContent(text, inquestTargetId = null) {
+    renderTruthVaultReader() {
+        const vault = CommanderEngine.RealityEditorVault;
+        const facts = vault?.facts || [];
+        const history = vault?.resolvedHistory || [];
+        let text = "================================================================================\n";
+        text += "📜 THE CROW'S EYE: REALITY EDITOR VAULT (BUILDER MANIFESTO §2 & §3)\n";
+        text += "================================================================================\n";
+        text += "Doctrine: Information is property. Knowledge is currency. Truth is leverage.\n";
+        text += "Select an Editor Action below to PUBLISH, LEAK, SELL, ARCHIVE, SUPPRESS, or DESTROY.\n\n";
+
+        if (facts.length === 0) {
+            text += "  [VAULT EMPTY] Dispatch field expeditions, audit anomalies, or turn double agents\n  in the Inquest Chamber to acquire new Fact & Relic Dossiers.\n";
+        } else {
+            facts.forEach((f, idx) => {
+                text += `  [${idx + 1}] FACT DOSSIER: ${f.title} (ID: ${f.id})\n`;
+                text += `      • Provenance (Source): ${f.source}\n`;
+                text += `      • Current Holder:      ${f.owner} | Implicated House: ${f.targetHouse}\n`;
+                text += `      • Credibility Score:   ${f.credibility}% | Acquisition Cost: ${f.costPaid}\n`;
+                text += `      • Market Value:        +${f.valueFuel}u Fuel/Resin, +${f.valueRes} Resources\n`;
+                text += `      • Systemic Risk:       ${f.riskDesc}\n\n`;
+            });
+        }
+
+        if (history.length > 0) {
+            text += "--------------------------------------------------------------------------------\n";
+            text += "RECENT REALITY EDITS:\n";
+            history.slice(0, 4).forEach(h => {
+                text += `  • [Day ${h.resolvedDay} — ${h.verb}] ${h.title}: ${h.effectSummary}\n`;
+            });
+        }
+
+        this.setReaderContent(text, null, facts[0]?.id || null);
+    },
+
+    setReaderContent(text, inquestTargetId = null, factTargetId = null) {
         const reader = document.getElementById('story-reader');
         if (!reader) return;
         reader.style.display = 'block';
@@ -393,6 +439,17 @@ export const CommanderUI = {
                     <button class="cmd-btn" onclick="window.renderVerdict('${inquestTargetId}','demote')">Demote</button>
                     <button class="cmd-btn" style="border-color:#dc2626; color:#fca5a5;" onclick="window.renderVerdict('${inquestTargetId}','execute')">Execute</button>
                     <button class="cmd-btn" onclick="window.renderVerdict('${inquestTargetId}','turn_agent')">Turn Double Agent</button>
+                `;
+            } else if (factTargetId) {
+                verdictBar.style.display = 'flex';
+                verdictBar.innerHTML = `
+                    <span style="color:#fbbf24; font-size:10.5px; align-self:center; margin-right:4px;">EDITOR ACTION (${factTargetId}):</span>
+                    <button class="cmd-btn" title="+12% Entropy, +18 Sig, -8 Target House Power" onclick="window.resolveFactVerb('${factTargetId}','PUBLISH')">📢 Publish</button>
+                    <button class="cmd-btn" title="-10 Target House Power -> SKIRMISH, +1 Dossier" onclick="window.resolveFactVerb('${factTargetId}','LEAK')">🗡️ Leak</button>
+                    <button class="cmd-btn" title="Trade for Barrier Fuel & Settlement Resources" onclick="window.resolveFactVerb('${factTargetId}','SELL')">💰 Sell</button>
+                    <button class="cmd-btn" title="+0.5 Squad Lore, +6% Prosperity" onclick="window.resolveFactVerb('${factTargetId}','ARCHIVE')">🏛️ Archive</button>
+                    <button class="cmd-btn" title="+12% Crown Favor, -8% Scrutiny" onclick="window.resolveFactVerb('${factTargetId}','SUPPRESS')">🤫 Suppress</button>
+                    <button class="cmd-btn" title="-10% Entropy, -10% Volatility" onclick="window.resolveFactVerb('${factTargetId}','DESTROY')">🔥 Destroy</button>
                 `;
             } else {
                 verdictBar.style.display = 'none';
@@ -631,18 +688,44 @@ export const CommanderUI = {
             }
         }
 
-        // Render Role-Scoped Directives Only
+        // Render Role-Scoped Directives Grouped into Progressive Categories
         const dirBar = document.getElementById('role-directives-bar');
         if (dirBar && CommanderEngine.CrisisEngine) {
             const roleDirs = CommanderEngine.CrisisEngine.getDirectivesForRole(roleLabel);
-            const dirsHtml = roleDirs.map(([fn, label]) => `<button class="cmd-btn" onclick="${fn}">${label}</button>`).join('');
-            dirBar.innerHTML = dirsHtml;
+            const baseGroup = [];
+            const fieldGroup = [];
+            const politicsGroup = [];
+
+            roleDirs.forEach(([fn, label]) => {
+                const btnHtml = `<button class="cmd-btn" onclick="${fn}">${label}</button>`;
+                if (fn.includes('viewFacilities') || fn.includes('viewTruthVault') || fn.includes('viewTelemetry') || fn.includes('viewShadowLedger') || fn.includes('interrogateSuspect')) {
+                    baseGroup.push(btnHtml);
+                } else if (fn.includes('sendExpedition') || fn.includes('HUNT_FERAL_WENDIGO') || fn.includes('REQUISITION_FUEL') || fn.includes('DEVELOP_AUTARKY') || fn.includes('AUDIT_ANOMALY') || fn.includes('SCRUB_MONUMENT')) {
+                    fieldGroup.push(btnHtml);
+                } else {
+                    politicsGroup.push(btnHtml);
+                }
+            });
+
+            let groupedHtml = `<div style="width:100%; display:flex; flex-direction:column; gap:5px;">`;
+            if (baseGroup.length > 0) {
+                groupedHtml += `<div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;"><span style="font-size:9.5px; color:#fbbf24; font-weight:bold; min-width:115px;">[BASE & ARCHIVES]</span>${baseGroup.join('')}</div>`;
+            }
+            if (fieldGroup.length > 0) {
+                groupedHtml += `<div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;"><span style="font-size:9.5px; color:#38bdf8; font-weight:bold; min-width:115px;">[FIELD & LOGISTICS]</span>${fieldGroup.join('')}</div>`;
+            }
+            if (politicsGroup.length > 0) {
+                groupedHtml += `<div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;"><span style="font-size:9.5px; color:#f87171; font-weight:bold; min-width:115px;">[POLITICS & TITHE]</span>${politicsGroup.join('')}</div>`;
+            }
+            groupedHtml += `</div>`;
+            dirBar.innerHTML = groupedHtml;
         }
 
-        // Render Urgent Crisis Response Triage Overlay if active
+        // Render Urgent Crisis Response Triage Overlay or Active Emissary Petition if active
         const crisisPanel = document.getElementById('crisis-triage-panel');
         if (crisisPanel) {
             const activeCrisis = CommanderEngine.CrisisEngine?.activeCrisis;
+            const activePetition = CommanderEngine.RealityEditorVault?.activeEmissaryPetition;
             if (activeCrisis) {
                 crisisPanel.style.display = 'block';
                 const choicesHtml = activeCrisis.choices.map(c => `
@@ -658,6 +741,16 @@ export const CommanderUI = {
                     <button class="cmd-btn" style="display:block; width:100%; text-align:left; padding:8px; margin-top:6px; background:#1e1b4b; border-color:#818cf8; color:#e0e7ff;" onclick="window.triggerDreamIntervention('${activeCrisis.id}', 10); window.resolveCrisis('DREAM_MITIGATE')">
                         🌙 Invoke Dream Intervention Ward (-10u Dream Siphon — Mitigates Catastrophic Flare & Stabilizes Squad Poise)
                     </button>
+                `;
+            } else if (activePetition) {
+                crisisPanel.style.display = 'block';
+                crisisPanel.innerHTML = `
+                    <div style="color:#fbbf24; font-weight:bold; font-size:12.5px; margin-bottom:4px;">📯 GATEHOUSE EMISSARY PETITION: ${activePetition.title}</div>
+                    <div style="color:#e5dccb; font-size:11px; margin-bottom:8px;">${activePetition.prompt}</div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button class="cmd-btn" style="flex:1; padding:7px; background:#14332a; border-color:#10b981; color:#d1fae5;" onclick="window.resolveEmissaryPetition('ACCEPT')">${activePetition.acceptLabel}</button>
+                        <button class="cmd-btn" style="flex:1; padding:7px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.resolveEmissaryPetition('REJECT')">${activePetition.rejectLabel}</button>
+                    </div>
                 `;
             } else {
                 crisisPanel.style.display = 'none';
