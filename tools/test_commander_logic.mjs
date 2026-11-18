@@ -289,7 +289,11 @@ if (doomedAgent) {
     if (risenList.length !== 1 || !risenList[0].isFeral || !risenList[0].name.includes(doomedAgent.name)) {
         failures.push(`Expected queued starved+frozen corpse to rise as Feral Wendigo on Shift Day 14, got ${JSON.stringify(risenList)}`);
     }
-    console.log(`[11d-FeralWendigo] Situational Pressure Collision Verified: ${deathRes.message} -> Risen: ${risenList[0]?.name} (Threat: ${risenList[0]?.threatPower})`);
+    const huntRes = CommanderEngine.CampaignManager.dispatchAction('HUNT_FERAL_WENDIGO');
+    if (!huntRes.success || !huntRes.slain || CommanderEngine.AgentRosterManager.spawnedFeralWendigos.length !== 0) {
+        failures.push(`Expected HUNT_FERAL_WENDIGO directive to slay risen Feral Wendigo, got ${JSON.stringify(huntRes)}`);
+    }
+    console.log(`[11d-FeralWendigo] Situational Pressure Collision & Hunt Verified: ${deathRes.message} -> Risen: ${risenList[0]?.name} -> ${huntRes.message}`);
 }
 
 // Verify ProceduralCollisionEngine ("Grammar of Chaos"): Tier 1 Anchor + Tier 2 Catalyst + Tier 3/4 Target -> Payload Tags & Rebound

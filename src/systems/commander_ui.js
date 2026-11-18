@@ -555,7 +555,9 @@ export const CommanderUI = {
         const fe = CommanderEngine.FacilityEngine;
         const guardInfo = fe ? ` | Village Guards: ${fe.villageGuardsCurrent}/${fe.villageGuardsMaxThreshold} (Prosperity: ${fe.settlementProsperity}% | Res: ${fe.settlementResources}u)` : '';
         const dreamInfo = typeof st.dreamSiphon === 'number' ? ` | Dream Siphon: ${st.dreamSiphon}u${CommanderEngine.CrisisEngine?.pendingDreamIntervention ? ' [WARDED]' : ''}` : '';
-        if (sb) sb.innerText = `${m}${guardInfo}${dreamInfo} | Volatility: ${gauge}`;
+        const feralCount = CommanderEngine.AgentRosterManager?.spawnedFeralWendigos?.length || 0;
+        const feralInfo = feralCount > 0 ? ` | 🩸 Feral Wendigos: ${feralCount}` : '';
+        if (sb) sb.innerText = `${m}${guardInfo}${dreamInfo}${feralInfo} | Volatility: ${gauge}`;
 
         // Render Fallout Shelter–Style Active Field Expeditions Log
         const expDiv = document.getElementById('expeditions-list');

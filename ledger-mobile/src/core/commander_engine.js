@@ -1650,9 +1650,18 @@ const CampaignManager = rootScope.CampaignManager || {
             AgentRosterManager.processShiftWendigoRebirths(day);
         }
 
+        const activeFeralCount = AgentRosterManager.spawnedFeralWendigos?.length || 0;
+        if (activeFeralCount > 0 && rootScope.CrisisEngine) {
+            rootScope.CrisisEngine.volatilityIndex = Math.min(100, (rootScope.CrisisEngine.volatilityIndex || 0) + activeFeralCount * 3);
+        }
+
+        const daysActive = day - this.dayStarted;
         this.tickDailyWarBoard(day);
         ShadowInfluenceEngine.tickDailyShadowOps(day, this.state);
-        CrisisEngine.tickDailyVolatility(day - this.dayStarted, this.activeRole || this.campaignMode, this.state.house);
+        CrisisEngine.tickDailyVolatility(daysActive, this.activeRole || this.campaignMode, this.state.house);
+        if (CrisisEngine.isGracePeriodComplete(daysActive) && !CrisisEngine.activeCrisis) {
+            ProceduralCollisionEngine.evaluateSector({}, 0.85);
+        }
         CrisisEngine.compileDailyReconciliation(day, this.activeRole || this.campaignMode);
         RoleStateMachine.transitionTo(CrisisEngine.activeCrisis ? 'CRISIS_TRIAGE' : 'EVENING_RECONCILIATION');
         LogDispatchManager.generateDailyDispatches(day, this.campaignMode, this.state);
@@ -1841,6 +1850,47 @@ const CampaignManager = rootScope.CampaignManager || {
             res = { success: true, message: `CHAINS SHATTERED! Korvan evolves into The True Pale Sovereign (Porcelain bone carapace, Imperial antler-crown, Crimson mantle)!` };
         } else if (act === 'AUDIT_SHADOW_LEDGER') {
             res = { success: true, message: `General Ledger Shadow Audit compiled. Noble Huntsman-Mark Skew: ${(ShadowInfluenceEngine.getMarkSelectionSkew() * 100).toFixed(1)}%.` };
+        } else if (act === 'HUNT_FERAL_WENDIGO') {
+            const ferals = AgentRosterManager.spawnedFeralWendigos || [];
+            if (ferals.length === 0) {
+                return { success: false, message: "No risen Feral Wendigos currently stalking the settlement perimeter." };
+            }
+            const targetFeral = ferals[0];
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
+            const squadCombatScore = Math.round((sq.totalPower * 1.4 + (FacilityEngine.villageGuardsCurrent || 0) * 3) * facMult.martialMult);
+
+            if (squadCombatScore >= targetFeral.threatPower * 0.65) {
+                AgentRosterManager.spawnedFeralWendigos.shift();
+                AgentRosterManager.squadArmoryStock.push('widow_resin_blade');
+                FacilityEngine.settlementResources += 12;
+                if (this.campaignMode === 'HOUSE') {
+                    this.state.house.crownFavor = Math.min(100, (this.state.house.crownFavor || 50) + 6);
+                }
+                AgentRosterManager.agents.forEach(a => {
+                    if (!a.alive) return;
+                    a.skills.meleeAtt = Number((a.skills.meleeAtt + 0.35).toFixed(2));
+                    a.significance = (a.significance || 20) + 10;
+                });
+                CrisisEngine.volatilityIndex = Math.max(0, (CrisisEngine.volatilityIndex || 20) - 15);
+                res = {
+                    success: true,
+                    slain: true,
+                    message: `🩸⚔️ [WENDIGO SLAIN] Squad hunted down and incinerated ${targetFeral.name} (Squad Score ${squadCombatScore} vs Threat ${targetFeral.threatPower}). +12 Resources, +1 Widow Longknife, +10 Squad Significance!`
+                };
+            } else {
+                AgentRosterManager.agents.forEach(a => {
+                    if (!a.alive) return;
+                    a.vitals.hp = Math.max(20, a.vitals.hp - 12);
+                    a.vitals.poise = Math.max(15, (a.vitals.poise || 60) - 15);
+                });
+                targetFeral.threatPower = Math.max(20, targetFeral.threatPower - 15);
+                res = {
+                    success: true,
+                    slain: false,
+                    message: `⚠️ [WENDIGO SKIRMISH] ${targetFeral.name} wounded the hunting party and retreated into the mist (Remaining Threat: ${targetFeral.threatPower}). Upgrade Barracks or equip Armory gear before striking again!`
+                };
+            }
         } else if (act === 'BREACH_BLIND_SPOT') {
             this.state.order.blindSpotEntropy = 88;
             ShadowInfluenceEngine.revealEpitaph(88);
@@ -2788,7 +2838,13 @@ const CrisisEngine = rootScope.CrisisEngine || {
 
         // Base Start: Everyone (except Sovereign) can send Unguarded Trade Caravans from Day 1
         if (r !== 'SOVEREIGN') {
-            dirs.push([`window.sendExpedition('UNGUARDED_CARAVAN','Oakhaven')`, 'ðŸ“¦ Send Unguarded Caravan']);
+            dirs.push([`window.sendExpedition('UNGUARDED_CARAVAN','Oakhaven')`, '📦 Send Unguarded Caravan']);
+        }
+
+        // Emergent Feral Wendigo Perimeter Hunt (Appears whenever a Starved+Frozen actor rises on the Shift)
+        if ((AgentRosterManager.spawnedFeralWendigos?.length || 0) > 0 && r !== 'SOVEREIGN') {
+            const topFeral = AgentRosterManager.spawnedFeralWendigos[0];
+            dirs.push([`window.dispatchCmd('HUNT_FERAL_WENDIGO')`, `🩸 Hunt ${topFeral.name}`]);
         }
 
         // Guard Barracks Unlock: Unlocks Guarded Caravans (uses regenerated Village Guards) & Squad Mist Patrols
@@ -2922,19 +2978,20 @@ const FacilityEngine = rootScope.FacilityEngine || {
         const durationHours = Math.min(720, (f.level + 1) * 48);
 
         if (f.unlocked) {
-            if (this.settlementResources < f.cost) return { success: false, message: `Insufficient Settlement Resources (${this.settlementResources}/${f.cost}).` };
-            this.settlementResources -= f.cost;
+            const upgradeCost = Math.max(6, Math.round((f.cost || 6) * (1 + f.level * 0.5)));
+            if (this.settlementResources < upgradeCost) return { success: false, message: `Insufficient Settlement Resources (${this.settlementResources}/${upgradeCost}).` };
+            this.settlementResources -= upgradeCost;
             if (!instant) {
                 f.isConstructing = true;
                 f.hoursRemaining = durationHours;
                 f.totalHours = durationHours;
                 f.targetLevel = f.level + 1;
-                return { success: true, facility: f, message: `Started upgrading [${f.name}] to Lv ${f.targetLevel}.` };
+                return { success: true, facility: f, message: `Started upgrading [${f.name}] to Lv ${f.targetLevel} (-${upgradeCost}r).` };
             }
             f.level += 1;
             this.settlementProsperity = Math.min(100, this.settlementProsperity + 8);
             if (facilityId === 'guard_barracks') this.villageGuardsMaxThreshold += 4;
-            return { success: true, facility: f, message: `Upgraded [${f.name}] to Level ${f.level}! Prosperity: ${this.settlementProsperity}%.` };
+            return { success: true, facility: f, message: `Upgraded [${f.name}] to Level ${f.level} (-${upgradeCost}r)! Prosperity: ${this.settlementProsperity}%.` };
         }
 
         if (this.settlementResources < f.cost) {
@@ -2995,8 +3052,9 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
         const targetLower = String(exp.targetName || '').toLowerCase();
         const linkedHouse = warBoard.find(w => w.name.toLowerCase().includes(targetLower) || targetLower.includes(w.name.replace('House ', '').toLowerCase()));
         const warHazardBonus = linkedHouse?.status === 'WAR_PREP' ? 8 : (linkedHouse?.status === 'SKIRMISH' ? 4 : 0);
+        const feralHazardBonus = (AgentRosterManager.spawnedFeralWendigos?.length || 0) * 4;
 
-        const hazardRating = Math.round((missionBaseHazard + shiftHazardBonus + warHazardBonus) * (hMods.volatilityDampener || 1));
+        const hazardRating = Math.round((missionBaseHazard + shiftHazardBonus + warHazardBonus + feralHazardBonus) * (hMods.volatilityDampener || 1));
 
         let agt = exp.leadAgentId && AgentRosterManager.agents.get(exp.leadAgentId);
         let agentPower = 6;
