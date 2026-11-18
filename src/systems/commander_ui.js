@@ -566,9 +566,12 @@ export const CommanderUI = {
                     const bar = `[${'█'.repeat(pct)}${'░'.repeat(10 - pct)}] ${e.hoursElapsed}h/${e.totalHours}h`;
                     return `
                         <div class="cmd-dispatch" style="border-color:#78350f;">
-                            <div style="display:flex; justify-content:space-between; color:#5e110b; font-weight:bold;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; color:#5e110b; font-weight:bold;">
                                 <span>🧭 ${e.type} → ${e.targetName} (${e.leadAgentName})</span>
-                                <span>${e.status} ${bar}</span>
+                                <span>
+                                    ${e.status} ${bar}
+                                    <button class="cmd-btn" style="padding:1px 5px; font-size:9px; margin-left:6px;" onclick="window.recallExpedition('${e.id}')">🔄 Recall</button>
+                                </span>
                             </div>
                             <div style="margin-top:4px; color:#2b1e12; font-size:10px;">
                                 ${e.logs.map(l => `<div>• ${l}</div>`).join('')}
