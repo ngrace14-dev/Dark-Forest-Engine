@@ -59,6 +59,7 @@
 
     <script type="module">
         import CommanderUI from './src/systems/commander_ui.js';
+import { CandidateOnboarding } from './src/systems/candidate_onboarding.js';
 
         const titleScreen = document.getElementById('mobile-title-screen');
         const viewport = document.getElementById('text-commander-viewport');
@@ -106,7 +107,9 @@
         launchBtn?.addEventListener('click', () => {
             titleScreen?.classList.add('hidden');
             viewport?.classList.remove('hidden');
-            CommanderUI.openRoleSelection();
+            // Ensure UI is initialized before onboarding
+            CommanderUI.init('commander-terminal-root'); 
+            CandidateOnboarding.start(CommanderUI);
         });
 
         woodsBtn?.addEventListener('click', () => {
