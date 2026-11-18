@@ -135,6 +135,24 @@ const skipRes = CommanderEngine.chronoSkipDays(1);
 console.log(`[11g] Chrono-Skip Result (Seals Left: ${skipRes.sealsRemaining}): ${skipRes.skippedEvents[0]}`);
 if (!skipRes.success) failures.push('Chrono-Skip failed');
 
+// Verify Phase 2 Emergence: Expedition Combat Profile & Manifesto §8 Will-to-Live Tactical Retreat
+const retreatAgent = CommanderEngine.AgentRosterManager.agents.get('agt_2');
+if (retreatAgent) {
+    retreatAgent.vitals.hp = 20;
+    retreatAgent.vitals.poise = 18;
+    retreatAgent.operatingStance = { mode: 'IDLE', discipline: null, task: null, daysTrained: 0 };
+}
+// Temporarily mark agt_1 busy so agt_2 leads the high-hazard raid
+const leadOne = CommanderEngine.AgentRosterManager.agents.get('agt_1');
+if (leadOne) leadOne.operatingStance.mode = 'OUT_ON_MISSION';
+const raidExpRes = CommanderEngine.ExpeditionEngine.launchExpedition('PROXY_RAID', 'Cullfield');
+if (leadOne) leadOne.operatingStance.mode = 'IDLE';
+CommanderEngine.ExpeditionEngine.tickExpeditionHours(3);
+if (raidExpRes.expedition.status !== 'RETREATED') {
+    failures.push(`Expected critically wounded/low-poise agent to trigger Will-to-Live RETREATED status, got ${raidExpRes.expedition.status}`);
+}
+console.log(`[11f-Retreat] Emergent Will-to-Live Retreat Verified: ${raidExpRes.expedition.logs[raidExpRes.expedition.logs.length - 1]}`);
+
 // Verify 30–60min / 40-Day Crisis Grace Period & House Wraith (Wraith's End) Deep-Oil Fire Crisis
 CommanderUI.selectRoleAndLaunch('NOBLE_HOUSE', 'House Wraith');
 const ce = CommanderEngine.CrisisEngine;
@@ -151,6 +169,18 @@ const waterRes = ce.resolveActiveCrisis('WATER_BRIGADE');
 console.log(`[11b] House Wraith Oil Fire + Water Brigade Outcome: [${waterRes.outcomeType}] ${waterRes.message}`);
 if (waterRes.outcomeType !== 'CATASTROPHIC_FLARE') {
     failures.push('Sending Water Brigade to House Wraith oil fire must cause CATASTROPHIC_FLARE');
+}
+
+// Verify Option B: Dream Intervention Mitigation during Active Crisis & Chrono-Skip
+const dreamRes = CommanderEngine.triggerDreamIntervention('wraith_deep_oil_fire', 10);
+if (!dreamRes.success || CommanderEngine.CampaignManager.state.house.dreamSiphon !== 20) {
+    failures.push(`Expected Dream Intervention to deduct 10u Dream Siphon (20u remaining), got ${CommanderEngine.CampaignManager.state.house.dreamSiphon}`);
+}
+ce.triggerContextualCrisis('NOBLE_HOUSE', 'House Wraith');
+const mitigatedRes = ce.resolveActiveCrisis('WATER_BRIGADE');
+console.log(`[11b-Dream] Dream-Mitigated Crisis Outcome: [${mitigatedRes.outcomeType}] ${mitigatedRes.message}`);
+if (mitigatedRes.outcomeType !== 'MITIGATED') {
+    failures.push(`Expected MITIGATED outcome when Dream Intervention is active, got ${mitigatedRes.outcomeType}`);
 }
 
 // Verify 12-Hour Real-World Day (1x) & 8x Max Time Scale Clamping
@@ -175,6 +205,49 @@ if (!ce.lastDayReport?.gains.includes('Contraband Resin')) {
     failures.push('Expected Syndicate ambush target to report Contraband Resin supply gain');
 }
 console.log(`[11d] End-of-Day Reconciliation Report: Gains="${ce.lastDayReport.gains}" | Losses="${ce.lastDayReport.losses}"`);
+
+// Verify Phase 1 Emergence: 6-Role State Machine, Active Monopoly Modifiers & Dynamic 19-House War Board
+const rsm = CommanderEngine.RoleStateMachine;
+if (rsm.currentPhase !== 'EVENING_RECONCILIATION') {
+    failures.push(`Expected RoleStateMachine phase EVENING_RECONCILIATION at end of day, got ${rsm.currentPhase}`);
+}
+const shadowfenAfterAmbush = CommanderEngine.CampaignManager.getWarBoard().find(h => h.name === 'House Shadowfen');
+if (!shadowfenAfterAmbush || shadowfenAfterAmbush.power >= 66) {
+    failures.push(`Expected House Shadowfen War Board power to drop below 66 after Syndicate convoy ambush, got ${shadowfenAfterAmbush?.power}`);
+}
+
+// Verify GUILD & MERCHANT daily reconciliation systemic math
+CommanderUI.selectRoleAndLaunch('GUILD');
+const prevAnom = CommanderEngine.CampaignManager.state.order.containedAnomalies;
+window.setNextDayGoal('GUILD_MIST_SWEEP');
+window.advanceDays(1);
+if (CommanderEngine.CampaignManager.state.order.containedAnomalies <= prevAnom) {
+    failures.push('Expected GUILD_MIST_SWEEP daily reconciliation to increment containedAnomalies');
+}
+
+CommanderUI.selectRoleAndLaunch('MERCHANT');
+const prevSig = CommanderEngine.CampaignManager.state.patron.candidateSignificance;
+window.setNextDayGoal('TRADE_RESIN_ARBITRAGE');
+window.advanceDays(1);
+if (CommanderEngine.CampaignManager.state.patron.candidateSignificance <= prevSig) {
+    failures.push('Expected TRADE_RESIN_ARBITRAGE daily reconciliation to increment candidateSignificance');
+}
+console.log(`[11d-Roles] 6-Role State Machine & Dynamic War Board Verified (Shadowfen Power=${shadowfenAfterAmbush?.power}, Guild Anomalies=${CommanderEngine.CampaignManager.state.order.containedAnomalies}, Merchant Sig=${CommanderEngine.CampaignManager.state.patron.candidateSignificance})`);
+
+// Verify Phase 3 Emergence: State-Driven Emergent Crisis Synthesis (Ward Starvation & Rival Sabotage)
+CommanderUI.selectRoleAndLaunch('NOBLE_HOUSE', 'House Oakheart');
+CommanderEngine.CampaignManager.state.house.barrierFuelUnits = 8; // Starve fuel below 12u threshold
+const starvationCrisis = ce.triggerContextualCrisis('NOBLE_HOUSE', 'House Oakheart');
+if (!starvationCrisis?.id.startsWith('emergent_ward_starvation_')) {
+    failures.push(`Expected low fuel (8u) to synthesize emergent_ward_starvation crisis, got ${starvationCrisis?.id}`);
+}
+const containRes = ce.resolveActiveCrisis('DEPLOY_WARDEN_CREWS');
+if (containRes.outcomeType !== 'CONTAINED') {
+    failures.push(`Expected DEPLOY_WARDEN_CREWS to contain emergent ward starvation crisis, got ${containRes.outcomeType}`);
+}
+console.log(`[11d-EmergentCrisis] State-Driven Crisis Verified: ${starvationCrisis?.title} -> [${containRes.outcomeType}]`);
+
+CommanderUI.selectRoleAndLaunch('SYNDICATE');
 
 // Verify Squad Armory Auto-Sort, Individual Equip & Character Stat Sheet
 const autoSortRes = CommanderEngine.AgentRosterManager.giveGearToSquadAutoSort('widow_resin_blade');

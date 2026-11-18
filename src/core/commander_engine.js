@@ -338,6 +338,10 @@ const LogDispatchManager = rootScope.LogDispatchManager || {
     generateDailyDispatches(worldDay, campaignMode = 'HOUSE', state = {}) {
         const newItems = [];
         const shiftCountdown = 14 - (worldDay % 14);
+        const warBoard = rootScope.CampaignManager?.getWarBoard?.() || [];
+        const hostileHouse = warBoard.find(w => w.status === 'WAR_PREP' || w.status === 'SKIRMISH') || { name: 'House Cull', power: 62, status: 'WAR_PREP' };
+        const aliveAgents = Array.from(AgentRosterManager.agents.values()).filter(a => a.alive);
+        const scoutSender = aliveAgents[1]?.name || aliveAgents[0]?.name || 'Sergeant Kaelen, 3rd Horizon Watch';
 
         if (shiftCountdown <= 3) {
             newItems.push({
@@ -345,8 +349,8 @@ const LogDispatchManager = rootScope.LogDispatchManager || {
                 day: worldDay,
                 type: 'URGENT DISPATCH',
                 sender: 'Border Outpost IX (The Silt-Dike)',
-                title: `Spatial Drift Warning â€” Shift in ${shiftCountdown} Days`,
-                body: `The surveyorâ€™s lead weight hung at a four-degree slant toward the forest all morning. The road is shortening; milestone twelve has slipped twenty paces into the moss. Station masters have doubled the grease on the gate pulleys.`
+                title: `Spatial Drift Warning — Shift in ${shiftCountdown} Days`,
+                body: `The surveyor's lead weight hung at a ${(5 - shiftCountdown) * 1.5}-degree slant toward the forest all morning. The road is shortening; milestone twelve has slipped ${15 + (4 - shiftCountdown) * 5} paces into the moss.`
             });
         }
 
@@ -357,55 +361,69 @@ const LogDispatchManager = rootScope.LogDispatchManager || {
                     id: `disp_${worldDay}_fuel`,
                     day: worldDay,
                     type: 'INSPECTION REPORT',
-                    sender: 'Basalt Brazier Overseer Mallow',
-                    title: `Barrier Pressure Fluctuation (${h.barrierFuelUnits} Units Left)`,
-                    body: `The violet rim above the outer moat flickered twice during third watch. Bailiffs reported copper tastes in well water. Without fresh pine resin before dusk, outer wards fall below safe radius.`
+                    sender: `Basalt Brazier Overseer (${h.settlementName || "World's End Gate"})`,
+                    title: `Barrier Pressure Fluctuation (${h.barrierFuelUnits} Units Left | Chains: ${h.chainsIntegrity}%)`,
+                    body: `The violet rim above ${h.settlementName || 'the outer moat'} flickered during third watch. Without fresh ${h.monopoly || 'pine resin'} reserves before dusk, outer wards risk dropping below safe radius.`
                 });
             } else {
                 newItems.push({
                     id: `disp_${worldDay}_patrol`,
                     day: worldDay,
                     type: 'PATROL LOG',
-                    sender: 'Sergeant Kaelen, 3rd Horizon Watch',
-                    title: 'Eastern Gully Reconnaissance',
-                    body: `Found three empty resin casks abandoned in the bracken half a league past the chained perimeter. The stamps were chiselled off. Tracked them east toward salt marshes before pine needles buried the ruts.`
+                    sender: scoutSender,
+                    title: `Perimeter Reconnaissance (${hostileHouse.name} Posture: ${hostileHouse.status})`,
+                    body: `Observed ${hostileHouse.name} outriders (Power: ${hostileHouse.power}) testing the ${h.settlementName || 'perimeter'} toll-markers. Recovered unstamped resin casks half a league past the chained ditch.`
                 });
             }
         } else if (campaignMode === 'ORDER') {
+            const o = state.order || {};
             newItems.push({
                 id: `disp_${worldDay}_ocp`,
                 day: worldDay,
                 type: 'OCP FORM 12-B',
-                sender: 'Directorate of Site Operations',
-                title: 'Containment Audit: Ledger Anomaly #77',
-                body: `Scribe Elyse flagged a discrepancy in the harvest rolls of 12,414 AF. The parchment was scraped thin and re-inked over a twenty-first parish line. The page is now sealed in basalt under three locks.`
+                sender: `${scoutSender} (Directorate Field Ops)`,
+                title: `Containment Audit: Entropy at ${o.blindSpotEntropy ?? 12}% (${o.containedAnomalies ?? 4} Contained)`,
+                body: `Flagged a spatial discrepancy in the parish rolls of ${12000 + Math.floor(worldDay / 365)} AF. Scraped-vellum index sits at ${o.blindSpotEntropy ?? 12}% while ${hostileHouse.name} couriers were turned back at the archive gate.`
             });
         } else if (campaignMode === 'DUNE') {
+            const d = state.dune || {};
             newItems.push({
                 id: `disp_${worldDay}_dune`,
                 day: worldDay,
                 type: 'PILOT LOG',
-                sender: 'Sand-Pilot Dane (Flotilla Keel Watch)',
-                title: 'Sounding Report: Silt Veil Streamline',
-                body: `Lead line touched riverbed at two hundred cubits. The subterranean current pulls inward at four knots toward the forest sinkhole. Solar stills yielded forty jugs, but brine residue smells sharply of scorched zinc.`
+                sender: scoutSender,
+                title: `Sounding Report: ${d.riverStreamline || 'Silt Veil'} (Drift: ${Number(d.driftDistanceKm || 0).toFixed(1)}km)`,
+                body: `Subterranean current pulls inward toward the forest sinkhole. Cleaned water reserves stand at ${d.cleanedWaterStock ?? 80}u; mooring tether integrity holding at ${d.mooringTetherIntegrity ?? 100}%.`
             });
         } else if (campaignMode === 'SYNDICATE') {
+            const syn = state.syndicate || {};
             newItems.push({
                 id: `disp_${worldDay}_syn`,
                 day: worldDay,
                 type: 'SMUGGLER MANIFEST',
-                sender: 'Barge-Master Vance (Gallows-Gate Sluices)',
-                title: 'Unstamped Resin Shipment Cleared',
-                body: `Three flat-bottomed skiffs slipped past the Gallows toll-chain under heavy river fog. Casks repacked in tallow barrels bound for the outer marshes.`
+                sender: `${scoutSender} (${syn.baseSettlement || 'Gallows-Gate Sluices'})`,
+                title: `Sluice Manifest: ${syn.contrabandResin ?? 45}u Resin | ${syn.gallowsTollCollected ?? 80}d Toll`,
+                body: `Flat-bottomed skiffs slipped past ${hostileHouse.name} river-patrols (${hostileHouse.status}) under heavy fog. Contraband resin stockpiles stand at ${syn.contrabandResin ?? 45} casks.`
+            });
+        } else if (campaignMode === 'PATRON') {
+            const pat = state.patron || {};
+            newItems.push({
+                id: `disp_${worldDay}_patron`,
+                day: worldDay,
+                type: 'BROKER LEDGER',
+                sender: scoutSender,
+                title: `Arbitrage & Candidate Telemetry (Sig: ${pat.candidateSignificance ?? 25} | Truths: ${pat.verifiedTruths ?? 0})`,
+                body: `Caravan factors cleared the ${hostileHouse.name} toll-gate. Candidate significance climbed to ${pat.candidateSignificance ?? 25} across ${pat.verifiedTruths ?? 0} verified canonical truths.`
             });
         } else {
+            const sov = state.sovereign || {};
             newItems.push({
                 id: `disp_${worldDay}_omen`,
                 day: worldDay,
                 type: 'OMEN RECORD',
                 sender: 'Watchtower III (The Frost-Line)',
-                title: 'Tremor in the Deep Bedrock',
-                body: `The fifty-ton anchor links rang twice at midnight without wind. Frost formed on the inner gate iron despite the braziers burning at full draft.`
+                title: `Tremor in the Deep Bedrock (Significance: ${sov.significanceHarvested ?? 0} | Heralds: ${sov.heraldsMutated ?? 0}/5)`,
+                body: `The fifty-ton anchor links rang twice at midnight. Frost-Heralds stalk the ${hostileHouse.name} frontier while ${sov.title || 'The Pale Sovereign'} broods across ${sov.yearsEndured ?? 0} endured years.`
             });
         }
 
@@ -625,22 +643,26 @@ const InterrogationDesk = rootScope.InterrogationDesk || {
         const id = data.id || 'agt_2';
         const agent = AgentRosterManager.agents.get(id);
         const name = data.name || agent?.name || id;
+        const warBoard = rootScope.CampaignManager?.getWarBoard?.() || [];
+        const rivalHouse = warBoard.find(w => w.status === 'WAR_PREP' || w.status === 'COVERT' || w.status === 'SKIRMISH')?.name || 'House Cull';
         const reasons = [
-            'Found carrying unsealed export manifests near the eastern ditch.',
-            'Discrepancy in recorded resin barrel counts following border patrol.',
-            'Body temperature measured three degrees below normal; avoids braziers.',
-            'Spotted speaking with an unbadged courier from House Cull.'
+            `Found carrying unsealed ${rivalHouse} cipher manifests near the eastern ditch.`,
+            `Discrepancy in recorded resin barrel tallies following ${agent?.assignedHouseId || 'perimeter'} patrol.`,
+            `Body temperature measured three degrees below normal; avoids the basalt braziers.`,
+            `Spotted exchanging salt-deniers with an unbadged courier from ${rivalHouse}.`
         ];
         const crimeTypes = ['RIVAL_SPY', 'EMBEZZLER', 'WENDIGO_TAINT'];
         const rolledCrime = data.crime || crimeTypes[Math.floor(Math.random() * crimeTypes.length)];
+        const baseStress = Math.round(45 + (agent?.reflexes?.shock || 0) * 0.4 + Math.random() * 35);
 
         const suspectCase = {
             id,
             name,
+            rivalHouse,
             dayFlagged: rootScope.EngineParams?.worldDay || 1,
             crime: rolledCrime,
             suspicionReason: data.reason || reasons[Math.floor(Math.random() * reasons.length)],
-            deceptionScore: Math.floor(40 + Math.random() * 50),
+            deceptionScore: Math.min(99, baseStress),
             interrogated: false,
             resolved: false,
             verdict: null
@@ -793,6 +815,160 @@ export const ROLE_CATALOG = {
 };
 
 // ============================================================================
+// 5.05 EMERGENT 6-ROLE STATE MACHINE & MONOPOLY MODIFIER ENGINE
+// ============================================================================
+export const HOUSE_MONOPOLY_MODIFIERS = {
+    "House Oakheart": { caravanYieldMult: 1.20, primaryCommodity: "Ironwood Heartwood" },
+    "House Gallows": { chainDecayMult: 0.50, primaryCommodity: "Ironbark Runic Dust" },
+    "House Mire": { stillEfficiencyMult: 1.15, primaryCommodity: "Fungal Binders" },
+    "House Blackwood": { emergencyFuelBonus: 4, primaryCommodity: "Slag-Weevil Spinal Fluids" },
+    "House Hollow": { dailyFuelBurnDelta: -1, primaryCommodity: "Swamp-Gator Anchor Seals" },
+    "House Ashen": { favorStartBonus: 10, crownTitheFavorBonus: 2, primaryCommodity: "Basalt Runic Tablets" },
+    "House Crow": { startDossiers: 1, spyDetectionBonus: 0.15, primaryCommodity: "Whisper Guild Intel" },
+    "House Widow": { patrolResinBonus: 6, primaryCommodity: "Siphon-Vine Cold Resins" },
+    "House Thorn": { unrestStartDelta: -10, dailyUnrestDecay: 2, primaryCommodity: "Pacifying Waxworks" },
+    "House Gloom": { maxFuelStorageBonus: 10, primaryCommodity: "Gloom-Glass Lenses" },
+    "House Dusken": { poiseFloorBonus: 15, primaryCommodity: "Kinetic Silk Armor" },
+    "House Grim": { chainRepairBonus: 5, primaryCommodity: "50-Ton Tether Chains" },
+    "House Shadowfen": { dailyFuelSynthBonus: 1, primaryCommodity: "Pre-Fuel Matrix" },
+    "House Blightwatch": { patrolSurvivalBonus: 0.25, primaryCommodity: "Ghost-Pine Conduit Rods" },
+    "House Bleak": { volatilityDampener: 0.85, primaryCommodity: "Pale Cap Binders" },
+    "House Wraith": { deepOilReserveBonus: 2, primaryCommodity: "Leviathan Deep Oil" },
+    "House Cull": { proxyRaidYieldMult: 1.20, primaryCommodity: "Cardiac Catalysts" },
+    "House Aethel (Cadet Stewardship)": { crownTitheFavorBonus: 4, primaryCommodity: "Crucible Tithe Audits" },
+    "House Terminus": { legalHorizonDispensation: true, guardianCultivationMult: 1.25, primaryCommodity: "Horizon Containment" }
+};
+
+export const RoleStateMachine = rootScope.RoleStateMachine || {
+    currentPhase: 'MORNING_BRIEFING',
+    PHASE_TRANSITIONS: {
+        MORNING_BRIEFING: ['FIELD_OPERATIONS', 'CRISIS_TRIAGE'],
+        FIELD_OPERATIONS: ['CRISIS_TRIAGE', 'EVENING_RECONCILIATION'],
+        CRISIS_TRIAGE: ['FIELD_OPERATIONS', 'EVENING_RECONCILIATION'],
+        EVENING_RECONCILIATION: ['MORNING_BRIEFING', 'FIELD_OPERATIONS']
+    },
+
+    ROLE_CONTROLLERS: {
+        NOBLE_HOUSE: {
+            roleId: 'NOBLE_HOUSE',
+            campaignMode: 'HOUSE',
+            primaryResource: 'barrierFuelUnits',
+            secondaryResource: 'crownFavor',
+            squadFocusSkills: ['survival', 'meleeDef', 'lore'],
+            baseFacilitySynergy: 'alchemical_still'
+        },
+        TERMINUS: {
+            roleId: 'TERMINUS',
+            campaignMode: 'HOUSE',
+            primaryResource: 'barrierFuelUnits',
+            secondaryResource: 'chainsIntegrity',
+            squadFocusSkills: ['toughness', 'meleeDef', 'strength'],
+            baseFacilitySynergy: 'war_table'
+        },
+        GUILD: {
+            roleId: 'GUILD',
+            campaignMode: 'ORDER',
+            primaryResource: 'containedAnomalies',
+            secondaryResource: 'blindSpotEntropy',
+            squadFocusSkills: ['lore', 'survival', 'meleeAtt'],
+            baseFacilitySynergy: 'inquest_chamber'
+        },
+        MERCHANT: {
+            roleId: 'MERCHANT',
+            campaignMode: 'PATRON',
+            primaryResource: 'candidateSignificance',
+            secondaryResource: 'verifiedTruths',
+            squadFocusSkills: ['athletics', 'survival', 'lore'],
+            baseFacilitySynergy: 'scriptorium'
+        },
+        SYNDICATE: {
+            roleId: 'SYNDICATE',
+            campaignMode: 'SYNDICATE',
+            primaryResource: 'contrabandResin',
+            secondaryResource: 'gallowsTollCollected',
+            squadFocusSkills: ['stealth', 'dodge', 'meleeAtt'],
+            baseFacilitySynergy: 'war_table'
+        },
+        SOVEREIGN: {
+            roleId: 'SOVEREIGN',
+            campaignMode: 'SOVEREIGN',
+            primaryResource: 'significanceHarvested',
+            secondaryResource: 'heraldsMutated',
+            squadFocusSkills: ['strength', 'meleeAtt', 'stealth'],
+            baseFacilitySynergy: 'war_table'
+        }
+    },
+
+    transitionTo(nextPhase) {
+        const target = (nextPhase || 'FIELD_OPERATIONS').toUpperCase();
+        if (this.PHASE_TRANSITIONS[this.currentPhase]?.includes(target) || target !== this.currentPhase) {
+            const prev = this.currentPhase;
+            this.currentPhase = target;
+            rootScope.EventBus?.emit('ROLE_LOOP_PHASE_CHANGED', { from: prev, to: target });
+        }
+        return this.currentPhase;
+    },
+
+    getActiveController(roleKey = null) {
+        const key = (roleKey || CampaignManager?.activeRole || CampaignManager?.campaignMode || 'NOBLE_HOUSE').toUpperCase();
+        if (this.ROLE_CONTROLLERS[key]) return this.ROLE_CONTROLLERS[key];
+        const byMode = Object.values(this.ROLE_CONTROLLERS).find(c => c.campaignMode === key);
+        return byMode || this.ROLE_CONTROLLERS.NOBLE_HOUSE;
+    },
+
+    getHouseModifiers(houseId = null) {
+        const id = houseId || CampaignManager?.state?.house?.houseId || 'House Terminus';
+        return HOUSE_MONOPOLY_MODIFIERS[id] || {};
+    },
+
+    computeSquadCapabilityMetrics() {
+        const alive = Array.from(AgentRosterManager.agents.values()).filter(a => a.alive);
+        if (alive.length === 0) {
+            return { count: 0, avgMartial: 1, avgStealth: 1, avgLore: 1, avgSurvival: 1, avgPoise: 50, totalPower: 5 };
+        }
+        let martial = 0, stealth = 0, lore = 0, survival = 0, poise = 0;
+        alive.forEach(a => {
+            const sk = a.skills || {};
+            martial += (Number(sk.meleeAtt || 2) + Number(sk.meleeDef || 2) + Number(sk.toughness || 2)) / 3;
+            stealth += (Number(sk.stealth || 2) + Number(sk.dodge || 2)) / 2;
+            lore += Number(sk.lore || 2);
+            survival += (Number(sk.survival || 2) + Number(sk.athletics || 2)) / 2;
+            poise += Number(a.vitals?.poise || 60);
+        });
+        const n = alive.length;
+        const avgMartial = Number((martial / n).toFixed(2));
+        const avgStealth = Number((stealth / n).toFixed(2));
+        const avgLore = Number((lore / n).toFixed(2));
+        const avgSurvival = Number((survival / n).toFixed(2));
+        const avgPoise = Math.round(poise / n);
+        const totalPower = Number(((avgMartial + avgStealth + avgLore + avgSurvival) * n).toFixed(1));
+        return { count: n, avgMartial, avgStealth, avgLore, avgSurvival, avgPoise, totalPower };
+    },
+
+    computeFacilityMultipliers() {
+        const fac = rootScope.FacilityEngine?.facilities || {};
+        const scriptoriumLv = fac.scriptorium?.unlocked ? (fac.scriptorium.level || 1) : 0;
+        const barracksLv = fac.guard_barracks?.unlocked ? (fac.guard_barracks.level || 1) : 0;
+        const inquestLv = fac.inquest_chamber?.unlocked ? (fac.inquest_chamber.level || 1) : 0;
+        const stillLv = fac.alchemical_still?.unlocked ? (fac.alchemical_still.level || 1) : 0;
+        const warTableLv = fac.war_table?.unlocked ? (fac.war_table.level || 1) : 0;
+
+        return {
+            scriptoriumLv,
+            barracksLv,
+            inquestLv,
+            stillLv,
+            warTableLv,
+            productionMult: Number((1 + stillLv * 0.12 + scriptoriumLv * 0.05).toFixed(2)),
+            tradeMult: Number((1 + scriptoriumLv * 0.10 + barracksLv * 0.08).toFixed(2)),
+            covertMult: Number((1 + inquestLv * 0.15 + warTableLv * 0.10).toFixed(2)),
+            martialMult: Number((1 + barracksLv * 0.15 + warTableLv * 0.12).toFixed(2))
+        };
+    }
+};
+rootScope.RoleStateMachine = RoleStateMachine;
+
+// ============================================================================
 // 5.1 CAMPAIGN COMMAND MANAGER
 // ============================================================================
 const CampaignManager = rootScope.CampaignManager || {
@@ -821,12 +997,13 @@ const CampaignManager = rootScope.CampaignManager || {
             privateWingOpen: false,
             unrest: 10,
             blackmailDossiers: 0,
-            activeCaravans: []
+            activeCaravans: [],
+            dreamSiphon: 30
         },
-        order: { orderName: "Order of the Basalt Quill & OCP", containedAnomalies: 4, form12BReports: 2, dustWardenScrubs: 5, blindSpotEntropy: 12 },
-        syndicate: { syndicateName: "Under-Chain Contraband Ring", baseSettlement: "Gallows-Gate Sluices", mineralSaltStock: 150, contrabandResin: 45, gallowsTollCollected: 80 },
-        dune: { flotillaName: "Dust-Haven", riverStreamline: "Silt Veil", cleanedWaterStock: 80, dailyWaterConsumption: 5, mooringTetherIntegrity: 100, driftDistanceKm: 0 },
-        patron: { candidateSignificance: 25, symbolicDreamsSent: 0, verifiedTruths: 0, legendaryAwakenings: 0 },
+        order: { orderName: "Order of the Basalt Quill & OCP", containedAnomalies: 4, form12BReports: 2, dustWardenScrubs: 5, blindSpotEntropy: 12, dreamSiphon: 30 },
+        syndicate: { syndicateName: "Under-Chain Contraband Ring", baseSettlement: "Gallows-Gate Sluices", mineralSaltStock: 150, contrabandResin: 45, gallowsTollCollected: 80, dreamSiphon: 30 },
+        dune: { flotillaName: "Dust-Haven", riverStreamline: "Silt Veil", cleanedWaterStock: 80, dailyWaterConsumption: 5, mooringTetherIntegrity: 100, driftDistanceKm: 0, dreamSiphon: 30 },
+        patron: { candidateSignificance: 25, symbolicDreamsSent: 0, verifiedTruths: 0, legendaryAwakenings: 0, dreamSiphon: 30 },
         sovereign: {
             title: "The Pale Sovereign (Frost-Bound)",
             isAscended: false,
@@ -835,7 +1012,8 @@ const CampaignManager = rootScope.CampaignManager || {
             heraldsMutated: 0,
             lastSummonDay: -10,
             bankedCharge: 0,
-            summonCooldown: 3
+            summonCooldown: 3,
+            dreamSiphon: 30
         }
     },
 
@@ -865,10 +1043,13 @@ const CampaignManager = rootScope.CampaignManager || {
         InterrogationDesk.suspects.clear();
         CrucibleNarrativeEngine.biographies.clear();
         CrucibleNarrativeEngine.crucibles.clear();
+        this.resetWarBoard();
+        RoleStateMachine.transitionTo('MORNING_BRIEFING');
 
         if (key === 'NOBLE_HOUSE') {
             const picked = (customHouseId && NOBLE_HOUSE_PROFILES.find(h => h.houseId.toLowerCase() === customHouseId.toLowerCase()))
                 || NOBLE_HOUSE_PROFILES[Math.floor(Math.random() * NOBLE_HOUSE_PROFILES.length)];
+            const hMods = RoleStateMachine.getHouseModifiers(picked.houseId);
 
             this.campaignMode = 'HOUSE';
             this.activeFaction = picked.houseId;
@@ -884,6 +1065,7 @@ const CampaignManager = rootScope.CampaignManager || {
                 monopoly: picked.monopoly,
                 monopolyBonus: picked.bonusDesc,
                 barrierFuelUnits: picked.fuelStart,
+                maxFuelUnits: 60 + (hMods.maxFuelStorageBonus || 0),
                 chainsIntegrity: 100,
                 guardiansCount: 0,
                 shiftCountdown: 14,
@@ -895,9 +1077,10 @@ const CampaignManager = rootScope.CampaignManager || {
                 assignedBailiffId: null,
                 sanctuaryBuilt: false,
                 privateWingOpen: false,
-                unrest: 10,
-                blackmailDossiers: picked.startDossiers || 0,
-                activeCaravans: []
+                unrest: Math.max(0, 10 + (hMods.unrestStartDelta || 0)),
+                blackmailDossiers: picked.startDossiers || hMods.startDossiers || 0,
+                activeCaravans: [],
+                dreamSiphon: 30
             });
 
             AgentRosterManager.agents.clear();
@@ -909,6 +1092,9 @@ const CampaignManager = rootScope.CampaignManager || {
             ].forEach(([id, name, arch]) => {
                 const a = AgentRosterManager.createAgent(id, name, arch);
                 a.assignedHouseId = picked.houseId;
+                if (hMods.poiseFloorBonus) {
+                    a.vitals.poise = Math.min(100, (a.vitals.poise || 60) + hMods.poiseFloorBonus);
+                }
             });
 
             LogDispatchManager.dispatches.unshift({
@@ -946,7 +1132,8 @@ const CampaignManager = rootScope.CampaignManager || {
                 privateWingOpen: false,
                 unrest: 10,
                 blackmailDossiers: 0,
-                activeCaravans: []
+                activeCaravans: [],
+                dreamSiphon: 30
             });
             return this.selectCampaign('HOUSE', 'House Terminus');
         }
@@ -974,6 +1161,12 @@ const CampaignManager = rootScope.CampaignManager || {
         this.victoryConditionsMet = false;
         this.collapseTriggered = false;
         this.collapseReason = null;
+        if (this.state[chosen.toLowerCase()]) {
+            this.state[chosen.toLowerCase()].dreamSiphon = 30;
+        }
+        if (rootScope.CrisisEngine) {
+            rootScope.CrisisEngine.pendingDreamIntervention = false;
+        }
 
         // Re-seed roster for the selected campaign mode
         AgentRosterManager.agents.clear();
@@ -1018,13 +1211,20 @@ const CampaignManager = rootScope.CampaignManager || {
 
     processDailyLogistics() {
         const day = rootScope.EngineParams?.worldDay || 1;
+        RoleStateMachine.transitionTo('FIELD_OPERATIONS');
         AgentRosterManager.tickDailyDrills();
 
         if (this.campaignMode === 'HOUSE') {
             const h = this.state.house;
-            const consumption = Math.max(1, 4 - Math.floor((h.autarkyLevel || 0) / 35));
-            h.barrierFuelUnits = Math.max(0, h.barrierFuelUnits - consumption);
+            const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
+            const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
+            const baseBurn = 4 + (hMods.dailyFuelBurnDelta || 0) - Math.floor((h.autarkyLevel || 0) / 35);
+            const consumption = Math.max(1, baseBurn - (hMods.dailyFuelSynthBonus || 0));
+            h.barrierFuelUnits = Math.max(0, Math.min(maxFuel, h.barrierFuelUnits - consumption));
             h.shiftCountdown = 14 - (day % 14);
+            if (hMods.dailyUnrestDecay) {
+                h.unrest = Math.max(0, (h.unrest || 0) - hMods.dailyUnrestDecay);
+            }
 
             if (day % 14 === 0) {
                 AgentRosterManager.applyShiftSurvivalConditions(h.barrierFuelUnits > 0, h.barrierFuelUnits <= 0, false);
@@ -1034,22 +1234,30 @@ const CampaignManager = rootScope.CampaignManager || {
                     h.barrierFuelUnits = Math.floor(h.barrierFuelUnits / 2);
                     h.autarkyLevel = Math.max(0, h.autarkyLevel - 30);
                     h.crownFavor = Math.max(0, h.crownFavor - 25);
-                    rootScope.EventBus?.emit('UI_LOG', 'âš”ï¸ [CROWN INQUEST] Inquisitorial Crusher Force raided unauthorized stills! Fuel seized.');
+                    rootScope.EventBus?.emit('UI_LOG', '⚔️ [CROWN INQUEST] Inquisitorial Crusher Force raided unauthorized stills! Fuel seized.');
                 }
             }
 
             h.activeCaravans = (h.activeCaravans || []).filter(c => {
                 c.daysLeft--;
                 if (c.daysLeft <= 0) {
-                    h.barrierFuelUnits = Math.min(60, h.barrierFuelUnits + c.yieldFuel);
-                    rootScope.EventBus?.emit('UI_LOG', `ðŸ“¦ [TRADE] Caravan returned from ${c.dest}: +${c.yieldFuel} Barrier Fuel secured.`);
+                    const yieldAdjusted = Math.round(c.yieldFuel * (hMods.caravanYieldMult || 1));
+                    h.barrierFuelUnits = Math.min(maxFuel, h.barrierFuelUnits + yieldAdjusted);
+                    rootScope.EventBus?.emit('UI_LOG', `📦 [TRADE] Caravan returned from ${c.dest}: +${yieldAdjusted} Barrier Fuel secured.`);
                     return false;
                 }
                 return true;
             });
 
+            if (h.barrierFuelUnits <= 0 && (hMods.deepOilReserveBonus || 0) > 0 && !h._usedDeepOilEmergency) {
+                h._usedDeepOilEmergency = true;
+                h.barrierFuelUnits = hMods.deepOilReserveBonus * 3;
+                rootScope.EventBus?.emit('UI_LOG', `🛢️ [HOUSE WRAITH] Leviathan Deep-Oil reserve vats tapped (+${h.barrierFuelUnits}u emergency burn).`);
+            }
+
             if (h.barrierFuelUnits <= 0) {
-                h.chainsIntegrity = Math.max(0, h.chainsIntegrity - 15);
+                const chainLoss = Math.round(15 * (hMods.chainDecayMult || 1));
+                h.chainsIntegrity = Math.max(0, h.chainsIntegrity - chainLoss);
                 if (h.chainsIntegrity <= 0) {
                     this.collapseTriggered = true;
                     this.collapseReason = "Runic barrier depleted; anchor chains snapped in the White Void.";
@@ -1057,7 +1265,9 @@ const CampaignManager = rootScope.CampaignManager || {
             }
         } else if (this.campaignMode === 'ORDER') {
             const o = this.state.order;
-            if (Math.random() < 0.25) o.blindSpotEntropy = Math.min(100, o.blindSpotEntropy + 2);
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
+            const entropyChance = Math.max(0.08, 0.25 - facMult.inquestLv * 0.05);
+            if (Math.random() < entropyChance) o.blindSpotEntropy = Math.min(100, o.blindSpotEntropy + 2);
             if (o.blindSpotEntropy >= 85) {
                 this.collapseTriggered = true;
                 this.collapseReason = "Reality leak exceeded threshold; memory of 6,000-year blind spot leaked.";
@@ -1079,9 +1289,16 @@ const CampaignManager = rootScope.CampaignManager || {
             sov.yearsEndured = Number((sov.yearsEndured + 1 / 365).toFixed(2));
         }
 
+        const currentRoleState = this.state[this.campaignMode.toLowerCase()];
+        if (currentRoleState && typeof currentRoleState.dreamSiphon === 'number') {
+            currentRoleState.dreamSiphon = Math.min(100, currentRoleState.dreamSiphon + 2);
+        }
+
+        this.tickDailyWarBoard(day);
         ShadowInfluenceEngine.tickDailyShadowOps(day, this.state);
         CrisisEngine.tickDailyVolatility(day - this.dayStarted, this.activeRole || this.campaignMode, this.state.house);
         CrisisEngine.compileDailyReconciliation(day, this.activeRole || this.campaignMode);
+        RoleStateMachine.transitionTo(CrisisEngine.activeCrisis ? 'CRISIS_TRIAGE' : 'EVENING_RECONCILIATION');
         LogDispatchManager.generateDailyDispatches(day, this.campaignMode, this.state);
     },
     dispatchAction(actionType, arg = null) {
@@ -1090,20 +1307,34 @@ const CampaignManager = rootScope.CampaignManager || {
         const act = (actionType || '').toUpperCase();
 
         if (act === 'PATROL') {
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const hMods = RoleStateMachine.getHouseModifiers(this.state.house?.houseId);
             res = { success: true, message: "Scout patrol dispatched into mist. Observed subtle coordinate drift on marker posts." };
-            if (this.campaignMode === 'HOUSE' && Math.random() < 0.4) {
-                this.state.house.barrierFuelUnits = Math.min(40, this.state.house.barrierFuelUnits + 6);
-                res.message += " Intercepted an unmonitored wagon with 6 units cold pine resin.";
+            const interceptChance = Math.min(0.85, 0.35 + (sq.avgSurvival * 0.04) + (hMods.patrolSurvivalBonus || 0));
+            if (this.campaignMode === 'HOUSE' && (Math.random() < interceptChance || hMods.patrolResinBonus)) {
+                const resinGain = Math.round((6 + (hMods.patrolResinBonus || 0)) * (1 + (sq.avgSurvival - 2) * 0.1));
+                const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
+                this.state.house.barrierFuelUnits = Math.min(maxFuel, this.state.house.barrierFuelUnits + resinGain);
+                res.message += ` Intercepted an unmonitored wagon with ${resinGain} units cold pine resin.`;
             }
         } else if (act === 'REQUISITION_FUEL') {
-            this.state.house.barrierFuelUnits += 14;
-            res = { success: true, message: "Emergency levy executed: +14 Barrier Fuel secured for World's End Gate." };
+            const h = this.state.house;
+            const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
+            const gain = Math.round((14 + (hMods.emergencyFuelBonus || 0)) * facMult.productionMult);
+            const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
+            h.barrierFuelUnits = Math.min(maxFuel, h.barrierFuelUnits + gain);
+            h.unrest = Math.min(100, (h.unrest || 10) + 4);
+            res = { success: true, message: `Emergency levy executed: +${gain} Barrier Fuel secured for ${h.settlementName || "World's End Gate"} (+4% Unrest).` };
         } else if (act === 'CROWN_FILL_FULL') {
             const h = this.state.house;
+            const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
             if (h.barrierFuelUnits < h.crownDemand) return { success: false, message: `Insufficient fuel (${h.barrierFuelUnits}/${h.crownDemand}u).` };
             h.barrierFuelUnits -= h.crownDemand;
-            h.crownFavor = Math.min(100, h.crownFavor + 20);
-            res = { success: true, message: `Full Crown quota fulfilled (-${h.crownDemand}u Fuel, +20 Crown Favor). Local moats run thin.` };
+            const favorGain = 20 + (hMods.crownTitheFavorBonus || 0);
+            h.crownFavor = Math.min(100, h.crownFavor + favorGain);
+            this.mutateWarBoard(h.houseId, 3);
+            res = { success: true, message: `Full Crown quota fulfilled (-${h.crownDemand}u Fuel, +${favorGain} Crown Favor). Local moats run thin.` };
         } else if (act === 'CROWN_FILL_PARTIAL') {
             const h = this.state.house;
             const half = Math.floor(h.crownDemand / 2);
@@ -1113,18 +1344,32 @@ const CampaignManager = rootScope.CampaignManager || {
         } else if (act === 'CROWN_DENY') {
             const h = this.state.house;
             h.crownFavor = Math.max(0, h.crownFavor - 15);
-            res = { success: true, message: `Crown requisition denied. Preserved 100% fuel. Royal courier left severe reprimand (-15 Favor).` };
+            h.crownScrutiny = Math.min(100, (h.crownScrutiny || 10) + 8);
+            this.mutateWarBoard('House Aethel', 2, 'MOBILIZED');
+            res = { success: true, message: `Crown requisition denied. Preserved 100% fuel. Royal courier left severe reprimand (-15 Favor, +8% Scrutiny).` };
         } else if (act === 'DEVELOP_AUTARKY') {
             const h = this.state.house;
-            h.autarkyLevel = Math.min(100, h.autarkyLevel + 15);
+            const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
+            const autarkyGain = Math.round(15 * (hMods.stillEfficiencyMult || 1) * facMult.productionMult);
+            h.autarkyLevel = Math.min(100, h.autarkyLevel + autarkyGain);
             if (!h.hasHorizonDispensation) h.crownScrutiny += 15;
-            res = { success: true, message: `Domestic stills expanded (Autarky: ${h.autarkyLevel}%). ${h.hasHorizonDispensation ? 'Terminus Horizon Dispensation legalizes stills.' : 'Crown scrutiny rose!'}` };
+            res = { success: true, message: `Domestic stills expanded (+${autarkyGain}% -> Autarky: ${h.autarkyLevel}%). ${h.hasHorizonDispensation ? 'Terminus Horizon Dispensation legalizes stills.' : 'Crown scrutiny rose!'}` };
         } else if (act === 'PROXY_RAID') {
             const h = this.state.house;
-            h.barrierFuelUnits = Math.min(60, h.barrierFuelUnits + 16);
-            res = { success: true, message: `Covert proxy raid ambushed rival supply line: +16 units cold resin seized without open war.` };
+            const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
+            const targetEntry = this.mutateWarBoard(arg || 'House Shadowfen', -6, 'SKIRMISH');
+            const seized = Math.round(16 * (hMods.proxyRaidYieldMult || 1) * facMult.martialMult * (1 + (sq.avgMartial - 2) * 0.08));
+            const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
+            h.barrierFuelUnits = Math.min(maxFuel, h.barrierFuelUnits + seized);
+            res = { success: true, message: `Covert proxy raid ambushed ${targetEntry?.name || 'rival'} supply line: +${seized} units cold resin seized (${targetEntry?.name || 'Rival'} power dropped to ${targetEntry?.power || 60}).` };
         } else if (act === 'PROXY_SABOTAGE') {
-            res = { success: true, message: `Rival house ballistas sabotaged with bone-dust. Their Crown ranking deteriorated.` };
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const drop = -Math.max(5, Math.round(6 + sq.avgStealth));
+            const targetEntry = this.mutateWarBoard(arg || 'House Cull', drop, 'DEFENSIVE');
+            res = { success: true, message: `${targetEntry?.name || 'Rival house'} ballistas sabotaged with bone-dust (${drop} Power -> ${targetEntry?.power || 55}, Posture: ${targetEntry?.status || 'DEFENSIVE'}).` };
         } else if (act === 'CONSTRUCT_SANCTUARY') {
             this.state.house.sanctuaryBuilt = true;
             res = { success: true, message: "Sanctuary of the Hearth sealed beneath bedrock. +15% population recovery during Shifts." };
@@ -1139,30 +1384,48 @@ const CampaignManager = rootScope.CampaignManager || {
             res = { success: true, message: `Logistics Bailiff assigned (${this.state.house.assignedBailiffId}). Official House trade caravans unlocked!` };
         } else if (act === 'DISPATCH_CARAVAN') {
             const h = this.state.house;
+            const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
             if (!h.assignedBailiffId) h.assignedBailiffId = 'agt_1';
-            h.activeCaravans.push({ dest: arg || 'Oakhaven', daysLeft: 4, yieldFuel: 18 });
-            res = { success: true, message: `Official House Trade Caravan departed for ${arg || 'Oakhaven'} under Bailiff seal (Returns in 4 days).` };
+            const expectedYield = Math.round(18 * (hMods.caravanYieldMult || 1) * facMult.tradeMult);
+            h.activeCaravans.push({ dest: arg || 'Oakhaven', daysLeft: 4, yieldFuel: expectedYield });
+            res = { success: true, message: `Official House Trade Caravan departed for ${arg || 'Oakhaven'} under Bailiff seal (Returns in 4 days with ~${expectedYield}u Fuel).` };
         } else if (act === 'CULTIVATE_RUNIC') {
             res = AgentRosterManager.cultivateTerminusRunic(arg || 'agt_1', this.state.house);
         } else if (act === 'AUDIT_ANOMALY') {
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
+            const reduction = Math.round((8 + sq.avgLore) * facMult.covertMult);
             this.state.order.containedAnomalies++;
             this.state.order.form12BReports++;
-            this.state.order.blindSpotEntropy = Math.max(0, this.state.order.blindSpotEntropy - 8);
-            res = { success: true, message: "Form 12-B issued. Non-Euclidean spatial anomaly contained in Basalt Vault." };
+            this.state.order.blindSpotEntropy = Math.max(0, this.state.order.blindSpotEntropy - reduction);
+            res = { success: true, message: `Form 12-B issued. Non-Euclidean spatial anomaly contained in Basalt Vault (-${reduction}% Entropy).` };
         } else if (act === 'SCRUB_MONUMENT') {
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const reduction = Math.round(5 + sq.avgSurvival * 0.8);
             this.state.order.dustWardenScrubs++;
-            this.state.order.blindSpotEntropy = Math.max(0, this.state.order.blindSpotEntropy - 5);
-            res = { success: true, message: "Dust-Wardens scrubbed a forbidden monolith with vinegar-ash. Blind spot record erased." };
+            this.state.order.blindSpotEntropy = Math.max(0, this.state.order.blindSpotEntropy - reduction);
+            res = { success: true, message: `Dust-Wardens scrubbed a forbidden monolith with vinegar-ash (-${reduction}% Blind-Spot Entropy).` };
         } else if (act === 'SMUGGLE_RESIN') {
-            this.state.syndicate.contrabandResin += 18;
-            this.state.syndicate.gallowsTollCollected -= 15;
-            res = { success: true, message: "Midnight barge diverted: +18 Contraband Resin seized from Crown supply chain." };
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
+            const resinGain = Math.round((16 + sq.avgStealth) * facMult.covertMult);
+            this.state.syndicate.contrabandResin += resinGain;
+            this.state.syndicate.gallowsTollCollected = Math.max(0, this.state.syndicate.gallowsTollCollected - 15);
+            this.mutateWarBoard('House Gallows', -3, 'SKIRMISH');
+            res = { success: true, message: `Midnight barge diverted: +${resinGain} Contraband Resin seized from Crown supply chain.` };
         } else if (act === 'EXTORT_HOUSE') {
-            this.state.syndicate.gallowsTollCollected += 35;
-            res = { success: true, message: "Extortion levied on House Cull: +35 Salt-Deniers extorted under threat of sabotage." };
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
+            const targetEntry = this.mutateWarBoard(arg || 'House Cull', -5, 'WAR_PREP');
+            const tollGain = Math.round((30 + sq.avgMartial * 2) * facMult.covertMult);
+            this.state.syndicate.gallowsTollCollected += tollGain;
+            res = { success: true, message: `Extortion levied on ${targetEntry?.name || 'House Cull'}: +${tollGain} Salt-Deniers extorted (${targetEntry?.name || 'House Cull'} Power -> ${targetEntry?.power || 57}, Posture: ${targetEntry?.status || 'WAR_PREP'}).` };
         } else if (act === 'CONDENSE_WATER') {
-            this.state.dune.cleanedWaterStock += 15;
-            res = { success: true, message: "Solar condensers scraped of silica. +15 Cleaned Water added to tanks." };
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
+            const waterGain = Math.round(15 * facMult.productionMult);
+            this.state.dune.cleanedWaterStock += waterGain;
+            res = { success: true, message: `Solar condensers scraped of silica. +${waterGain} Cleaned Water added to tanks.` };
         } else if (act === 'DREDGE_STREAMLINE') {
             this.state.dune.driftDistanceKm += 0.8;
             res = { success: true, message: "Sounding dredge dropped into Silt Veil: Pre-Fracture vellum cylinder recovered from the riverbed." };
@@ -1170,33 +1433,42 @@ const CampaignManager = rootScope.CampaignManager || {
             this.state.dune.mooringTetherIntegrity = Math.min(100, this.state.dune.mooringTetherIntegrity + 25);
             res = { success: true, message: "Flotilla hemp and bronze mooring tethers re-tensioned to bedrock anchor." };
         } else if (act === 'TRANSMIT_DREAM') {
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const sigGain = Math.round(8 + sq.avgLore * 1.5);
             this.state.patron.symbolicDreamsSent++;
-            this.state.patron.candidateSignificance += 8;
-            res = { success: true, message: `Symbolic dream whispered. Candidate significance reached ${this.state.patron.candidateSignificance}.` };
+            this.state.patron.candidateSignificance += sigGain;
+            res = { success: true, message: `Symbolic dream whispered (+${sigGain} Sig). Candidate significance reached ${this.state.patron.candidateSignificance}.` };
         } else if (act === 'VERIFY_TRUTH') {
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
+            const sigGain = Math.round((12 + sq.avgLore) * facMult.tradeMult);
             this.state.patron.verifiedTruths++;
-            this.state.patron.candidateSignificance += 12;
-            res = { success: true, message: "Divine revelation granted. Historical rumor verified into canonical Truth." };
+            this.state.patron.candidateSignificance += sigGain;
+            res = { success: true, message: `Divine revelation granted (+${sigGain} Sig). Historical rumor verified into canonical Truth.` };
         } else if (act === 'SUMMON_HUNTSMAN') {
             const ok = this.executeHuntsmanSummon();
             res = { success: ok, message: ok ? "The Bound Huntsman awakens from frost to harvest prey." : "Huntsman bound to void cooldown." };
         } else if (act === 'MACABRE_COMMUNION') {
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const harvest = Math.round(1500 * (1 + (sq.avgMartial - 2) * 0.1));
             this.state.sovereign.heraldsMutated++;
-            this.state.sovereign.significanceHarvested = (this.state.sovereign.significanceHarvested || 0) + 1500;
-            res = { success: true, message: "The Macabre Communion performed: Frozen fungal flesh fed to captive commander. Herald Wendigo mutated." };
-
-
+            this.state.sovereign.significanceHarvested = (this.state.sovereign.significanceHarvested || 0) + harvest;
+            this.mutateWarBoard('House Terminus', -4, 'MOBILIZED');
+            res = { success: true, message: `The Macabre Communion performed: Frozen fungal flesh fed to captive commander. Herald Wendigo mutated (+${harvest} Significance).` };
         } else if (act === 'LEVERAGE_HOUSE') {
             const h = this.state.house;
             if ((h.blackmailDossiers || 0) < 1) return { success: false, message: "No Blackmail Dossiers available. Monetize private sanctuary wing first." };
             h.blackmailDossiers--;
-            res = { success: true, message: `Blackmail Dossier spent against ${arg || 'House Cull'}: Rival house yielded monopoly leverage (+15 Standing).` };
+            const targetEntry = this.mutateWarBoard(arg || 'House Cull', -7, 'DEFENSIVE');
+            h.crownFavor = Math.min(100, (h.crownFavor || 50) + 8);
+            res = { success: true, message: `Blackmail Dossier spent against ${targetEntry?.name || 'House Cull'}: Rival house yielded monopoly leverage (+8 Crown Favor, ${targetEntry?.name || 'Rival'} Power -> ${targetEntry?.power || 55}).` };
         } else if (act === 'SPONSOR_HOUSE') {
             const h = this.state.house;
             if (h.barrierFuelUnits < 8) return { success: false, message: "Insufficient fuel to sponsor ally house." };
             h.barrierFuelUnits -= 8;
             h.crownFavor = Math.min(100, h.crownFavor + 10);
-            res = { success: true, message: `Sponsored ${arg || 'House Oakheart'} with 8u fuel: Defense coalition secured (+10 Crown Standing).` };
+            const allyEntry = this.mutateWarBoard(arg || 'House Oakheart', 6, 'ALLIED');
+            res = { success: true, message: `Sponsored ${allyEntry?.name || 'House Oakheart'} with 8u fuel: Defense coalition secured (+10 Crown Favor, ${allyEntry?.name || 'Ally'} Power -> ${allyEntry?.power || 84}).` };
         } else if (act === 'HIBERNATE') {
             const yrs = parseInt(arg, 10) || 100;
             const sov = this.state.sovereign;
@@ -1371,7 +1643,9 @@ const CampaignManager = rootScope.CampaignManager || {
         return CANONICAL_BEDROCK_SETTLEMENTS.map(s => ({ ...s }));
     },
 
-    getWarBoard() {
+    warBoardState: null,
+
+    _defaultWarBoard() {
         return [
             { name: "House Aethel", monopoly: "Royal Crucible Fuel", blessed: true, status: "PEACE", power: 95 },
             { name: "House Terminus", monopoly: "Horizon Gate Defense", blessed: true, status: "MOBILIZED", power: 90 },
@@ -1393,6 +1667,68 @@ const CampaignManager = rootScope.CampaignManager || {
             { name: "House Blightwatch", monopoly: "Parasite Antidotes", blessed: false, status: "DEFENSIVE", power: 42 },
             { name: "House Wraith", monopoly: "Abyssal Salvage Oil", blessed: false, status: "PEACE", power: 40 }
         ];
+    },
+
+    resetWarBoard() {
+        this.warBoardState = this._defaultWarBoard();
+        return this.warBoardState;
+    },
+
+    getWarBoard() {
+        if (!Array.isArray(this.warBoardState) || this.warBoardState.length !== 19) {
+            this.resetWarBoard();
+        }
+        return this.warBoardState;
+    },
+
+    mutateWarBoard(houseName, deltaPower = 0, newStatus = null) {
+        const board = this.getWarBoard();
+        const q = String(houseName || '').toLowerCase();
+        let entry = board.find(h => h.name.toLowerCase() === q || h.name.toLowerCase().includes(q));
+        if (!entry) {
+            // Pick highest-power rival house not matching active player house
+            const activeHouse = (this.state.house?.houseId || '').toLowerCase();
+            entry = board.find(h => h.name !== 'House Aethel' && h.name.toLowerCase() !== activeHouse) || board[3];
+        }
+        if (entry) {
+            entry.power = Math.max(10, Math.min(100, Math.round(entry.power + deltaPower)));
+            if (newStatus) {
+                entry.status = newStatus;
+            } else if (deltaPower <= -5) {
+                entry.status = entry.power >= 60 ? 'WAR_PREP' : 'SKIRMISH';
+            } else if (deltaPower >= 5) {
+                entry.status = 'ALLIED';
+            }
+            rootScope.EventBus?.emit('WAR_BOARD_MUTATED', { house: entry.name, power: entry.power, status: entry.status, deltaPower });
+        }
+        return entry;
+    },
+
+    tickDailyWarBoard(day) {
+        const board = this.getWarBoard();
+        const activeHouseId = this.campaignMode === 'HOUSE' ? this.state.house?.houseId : null;
+        board.forEach((h, idx) => {
+            if (activeHouseId && h.name === activeHouseId) {
+                // Player's House power emergently reflects fuel, chains, favor, and squad power
+                const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+                const fuelScore = (this.state.house.barrierFuelUnits || 0) * 0.6;
+                const favorScore = (this.state.house.crownFavor || 50) * 0.4;
+                const chainScore = (this.state.house.chainsIntegrity || 100) * 0.25;
+                h.power = Math.max(15, Math.min(100, Math.round(fuelScore + favorScore + chainScore + sq.totalPower * 0.5)));
+                return;
+            }
+            // Deterministic harmonic + status-based systemic flux (Engine Law #5: 70% scalar flux, 30% vector pressure)
+            const wave = ((day + idx * 3) % 7 === 0) ? 1 : (((day + idx * 5) % 11 === 0) ? -1 : 0);
+            if (h.status === 'WAR_PREP') {
+                h.power = Math.max(20, Math.min(98, h.power + wave));
+            } else if (h.status === 'SKIRMISH') {
+                h.power = Math.max(15, Math.min(95, h.power - 1 + Math.max(0, wave)));
+                if (day % 5 === 0 && h.power < 52) h.status = 'DEFENSIVE';
+            } else if (h.status === 'DEFENSIVE' && h.power < 65) {
+                h.power = Math.min(90, h.power + 1);
+                if (h.power >= 55) h.status = 'PEACE';
+            }
+        });
     }
 };
 CampaignManager.init();
@@ -1600,6 +1936,7 @@ const CrisisEngine = rootScope.CrisisEngine || {
     sessionStartedAtMs: Date.now(),
     volatilityIndex: 0,              // Builds gradually each day toward 100
     activeCrisis: null,
+    pendingDreamIntervention: false, // Pre-emptive or active Dream Siphon ward against Crisis catastrophe
     nextDayGoal: 'MAINTAIN_WARDS',   // Decisive end-of-day strategic posture chosen by player
     crisisHistory: [],
 
@@ -1723,30 +2060,123 @@ const CrisisEngine = rootScope.CrisisEngine || {
         const targets = this.getTargetsForRole(r);
         const chosen = targets.find(t => t.id === this.nextDayGoal) || targets[0];
         const h = CampaignManager.state.house;
+        const o = CampaignManager.state.order;
         const syn = CampaignManager.state.syndicate;
+        const pat = CampaignManager.state.patron;
         const sov = CampaignManager.state.sovereign;
+        const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+        const facMult = RoleStateMachine.computeFacilityMultipliers();
+        const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
+        const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
 
         let gains = chosen.supplyGain;
-        let losses = "Standard Garrison Rations (-4 Food)";
+        let losses = `Standard Garrison Rations (-${Math.max(2, sq.count)} Food)`;
 
         if (r === 'NOBLE_HOUSE' || r === 'TERMINUS') {
-            losses = `Barrier Brazier Burn (-3u Fuel), Garrison Upkeep (-4 Rations)`;
-            if (chosen.id === 'PROD_MONOPOLY_SURPLUS') h.barrierFuelUnits = Math.min(60, h.barrierFuelUnits + 4);
-            if (chosen.id === 'PROD_CROWN_TITHE') { h.barrierFuelUnits = Math.min(60, h.barrierFuelUnits + 3); h.crownFavor = Math.min(100, h.crownFavor + 5); }
-            if (chosen.id === 'PROD_CHAIN_FORGE') h.chainsIntegrity = Math.min(100, h.chainsIntegrity + 10);
+            const burnCost = Math.max(1, 3 + (hMods.dailyFuelBurnDelta || 0));
+            losses = `Barrier Brazier Burn (-${burnCost}u Fuel), Garrison Upkeep (-${Math.max(2, sq.count)} Rations)`;
+            if (chosen.id === 'PROD_MONOPOLY_SURPLUS') {
+                const fuelGain = Math.round(4 * facMult.productionMult * (hMods.stillEfficiencyMult || 1));
+                const resGain = Math.round(6 * facMult.productionMult);
+                h.barrierFuelUnits = Math.min(maxFuel, h.barrierFuelUnits + fuelGain);
+                FacilityEngine.settlementResources += resGain;
+                gains = `+${resGain} ${hMods.primaryCommodity || 'House Monopoly Stock'}, +${fuelGain} Barrier Fuel`;
+            } else if (chosen.id === 'PROD_CROWN_TITHE') {
+                const fuelGain = Math.round(3 * facMult.productionMult);
+                const favorGain = 5 + (hMods.crownTitheFavorBonus || 0);
+                h.barrierFuelUnits = Math.min(maxFuel, h.barrierFuelUnits + fuelGain);
+                h.crownFavor = Math.min(100, h.crownFavor + favorGain);
+                gains = `+${fuelGain} Barrier Fuel, +${favorGain}% Crown Favor`;
+            } else if (chosen.id === 'PROD_CHAIN_FORGE') {
+                const chainGain = Math.round(10 + (hMods.chainRepairBonus || 0) + facMult.barracksLv * 2);
+                h.chainsIntegrity = Math.min(100, h.chainsIntegrity + chainGain);
+                AgentRosterManager.squadArmoryStock.push('grimsby_plate');
+                gains = `+${chainGain}% Chains Integrity, +1 Grimsby Runic-Dusted Hauberk`;
+            } else if (chosen.id === 'TERM_BRAZIER_STOCK') {
+                const fuelGain = Math.round(5 * facMult.productionMult);
+                const chainGain = 5 + facMult.stillLv * 2;
+                h.barrierFuelUnits = Math.min(maxFuel, h.barrierFuelUnits + fuelGain);
+                h.chainsIntegrity = Math.min(100, h.chainsIntegrity + chainGain);
+                gains = `+${fuelGain} Barrier Fuel, +${chainGain}% Chains Integrity`;
+            } else if (chosen.id === 'TERM_BONE_CARVING') {
+                AgentRosterManager.agents.forEach(a => {
+                    if (!a.alive) return;
+                    a.vitals.poise = Math.min(100, (a.vitals.poise || 60) + 2);
+                    if (a.cultivation) a.cultivation.foundationFireDays = (a.cultivation.foundationFireDays || 0) + 1;
+                });
+                gains = `+1 Guardian Cultivation Progress, +2 Squad Poise`;
+            }
         } else if (r === 'SYNDICATE') {
             losses = `Bribes & Lookout Cut (-6 Toll Coin), Barge Wear (-2 Resin)`;
-            if (chosen.id === 'AMBUSH_SHADOWFEN_CONVOY') { syn.contrabandResin += 14; AgentRosterManager.squadArmoryStock.push('gloom_lens_lantern'); }
-            if (chosen.id === 'AMBUSH_OAKHEART_WAIN') { syn.contrabandResin += 8; AgentRosterManager.squadArmoryStock.push('ironwood_spear'); }
-            if (chosen.id === 'AMBUSH_CULL_TRAIN') { syn.gallowsTollCollected += 25; }
+            if (chosen.id === 'AMBUSH_SHADOWFEN_CONVOY') {
+                const resinGain = Math.round((12 + sq.avgStealth) * facMult.covertMult);
+                syn.contrabandResin += resinGain;
+                AgentRosterManager.squadArmoryStock.push('gloom_lens_lantern');
+                CampaignManager.mutateWarBoard('House Shadowfen', -3, 'SKIRMISH');
+                gains = `+${resinGain} Contraband Resin, +1 Gloom-Glass Lantern`;
+            } else if (chosen.id === 'AMBUSH_OAKHEART_WAIN') {
+                const resinGain = Math.round((8 + sq.avgMartial) * facMult.covertMult);
+                syn.contrabandResin += resinGain;
+                FacilityEngine.settlementResources += 12;
+                AgentRosterManager.squadArmoryStock.push('ironwood_spear');
+                CampaignManager.mutateWarBoard('House Oakheart', -3, 'SKIRMISH');
+                gains = `+12 Ironwood Timber, +${resinGain} Contraband Resin, +1 Oakheart Ironwood Spear`;
+            } else if (chosen.id === 'AMBUSH_CULL_TRAIN') {
+                const tollGain = Math.round((22 + sq.avgStealth * 1.5) * facMult.covertMult);
+                syn.gallowsTollCollected += tollGain;
+                CampaignManager.mutateWarBoard('House Cull', -4, 'WAR_PREP');
+                gains = `+18 Salted Rations, +${tollGain} Gallows Toll Coin`;
+            }
+        } else if (r === 'GUILD' || r === 'ORDER') {
+            losses = `Field Kit Wear (-3 Guild Coin), Ward-Torch Oil (-2u)`;
+            if (chosen.id === 'GUILD_MIST_SWEEP') {
+                const coinGain = Math.round((14 + sq.avgSurvival) * facMult.martialMult);
+                FacilityEngine.settlementResources += coinGain;
+                o.containedAnomalies++;
+                AgentRosterManager.agents.forEach(a => {
+                    if (!a.alive) return;
+                    a.skills.survival = Number((a.skills.survival + 0.3).toFixed(2));
+                    a.skills.meleeAtt = Number((a.skills.meleeAtt + 0.2).toFixed(2));
+                });
+                gains = `+${coinGain} Guild Coin, +1 Contained Anomaly, +0.3 Squad Survival`;
+            } else if (chosen.id === 'GUILD_RELIC_ESCORT') {
+                const entropyDrop = Math.round((4 + sq.avgLore * 0.5) * facMult.covertMult);
+                o.blindSpotEntropy = Math.max(0, o.blindSpotEntropy - entropyDrop);
+                AgentRosterManager.squadArmoryStock.push('gloom_lens_lantern');
+                gains = `+1 Armory Gear Piece, -${entropyDrop}% Anomaly Entropy`;
+            }
+        } else if (r === 'MERCHANT' || r === 'PATRON') {
+            losses = `Road Toll & Mule Feed (-5 Merchant Gold)`;
+            if (chosen.id === 'TRADE_RESIN_ARBITRAGE') {
+                const goldGain = Math.round((18 + sq.avgSurvival) * facMult.tradeMult);
+                const sigGain = Math.round((4 + sq.avgLore * 0.5) * facMult.tradeMult);
+                FacilityEngine.settlementResources += goldGain;
+                pat.candidateSignificance += sigGain;
+                CampaignManager.mutateWarBoard('House Widow', 2, 'PEACE');
+                gains = `+${goldGain} Merchant Gold, +${sigGain} Candidate Significance`;
+            } else if (chosen.id === 'TRADE_IRON_ARBITRAGE') {
+                const goldGain = Math.round((14 + sq.avgSurvival) * facMult.tradeMult);
+                FacilityEngine.settlementResources += goldGain;
+                pat.verifiedTruths++;
+                AgentRosterManager.squadArmoryStock.push('grimsby_plate');
+                CampaignManager.mutateWarBoard('House Grim', 2, 'PEACE');
+                gains = `+${goldGain} Merchant Gold, +1 Grimsby Hauberk, +1 Verified Truth`;
+            }
         } else if (r === 'SOVEREIGN') {
             losses = `Mountain Frost Metabolic Drain (-5% Herd Stamina)`;
-            sov.significanceHarvested = (sov.significanceHarvested || 0) + 120;
+            const sigHarvest = Math.round((110 + sq.avgMartial * 8) * facMult.martialMult);
+            sov.significanceHarvested = (sov.significanceHarvested || 0) + sigHarvest;
             AgentRosterManager.agents.forEach(a => {
-                if (chosen.id === 'HUNT_TWILIGHT_VALLEYS') a.skills.stealth += 0.4;
-                if (chosen.id === 'HUNT_SMOLDERING_CRAGS') { a.skills.toughness += 0.5; a.vitals.maxHp += 5; a.vitals.hp += 5; }
-                if (chosen.id === 'HUNT_DROWNED_LOWLANDS') a.skills.meleeAtt += 0.5;
+                if (!a.alive) return;
+                if (chosen.id === 'HUNT_TWILIGHT_VALLEYS') a.skills.stealth = Number((a.skills.stealth + 0.4).toFixed(2));
+                if (chosen.id === 'HUNT_SMOLDERING_CRAGS') {
+                    a.skills.toughness = Number((a.skills.toughness + 0.5).toFixed(2));
+                    a.vitals.maxHp += 5;
+                    a.vitals.hp += 5;
+                }
+                if (chosen.id === 'HUNT_DROWNED_LOWLANDS') a.skills.meleeAtt = Number((a.skills.meleeAtt + 0.5).toFixed(2));
             });
+            gains = `+${sigHarvest} Significance, Squad Huntsman Evolution Applied`;
         }
 
         this.lastDayReport = {
@@ -1791,6 +2221,48 @@ const CrisisEngine = rootScope.CrisisEngine || {
         }
     },
 
+    synthesizeEmergentCrisis(activeRole = 'NOBLE_HOUSE', activeHouseId = null) {
+        const r = (activeRole || 'NOBLE_HOUSE').toUpperCase();
+        const h = CampaignManager.state.house || {};
+        const o = CampaignManager.state.order || {};
+        const syn = CampaignManager.state.syndicate || {};
+        const warBoard = CampaignManager.getWarBoard();
+        const hostileRival = warBoard.find(w => w.name !== activeHouseId && (w.status === 'WAR_PREP' || w.status === 'SKIRMISH')) || { name: 'House Cull', power: 62, status: 'WAR_PREP' };
+        const settlement = h.settlementName || syn.baseSettlement || "World's End Gate";
+
+        if (activeHouseId === 'House Wraith') return this.CRISIS_CATALOG.find(c => c.id === 'wraith_deep_oil_fire');
+        if (r === 'SYNDICATE' && (syn.contrabandResin || 0) >= 35) return this.CRISIS_CATALOG.find(c => c.id === 'gallows_sluice_ambush');
+
+        if ((r === 'NOBLE_HOUSE' || r === 'TERMINUS') && (h.barrierFuelUnits <= 12 || h.chainsIntegrity < 75)) {
+            return {
+                id: `emergent_ward_starvation_${rootScope.EngineParams?.worldDay || 1}`,
+                title: `🚨 EMERGENT WARD CRISIS AT ${settlement.toUpperCase()}: TETHER-CHAIN FRACTURE`,
+                boundHouseId: activeHouseId || h.houseId,
+                boundSettlement: settlement,
+                allowedRoles: ['NOBLE_HOUSE', 'TERMINUS'],
+                description: `Low barrier pressure (${h.barrierFuelUnits}u Fuel, ${h.chainsIntegrity}% Chains) allowed White Void frost to seize the 50-ton anchor links at ${settlement}!`,
+                choices: [
+                    { id: 'OVERDRIVE_BRAZIERS', label: '🔥 Force Cold-Draft Overburn on Unshielded Links', outcomeType: 'CATASTROPHIC_FLARE', resolution: `💥 THERMAL SHATTER! Rapid cold-draft ignition cracked two primary anchor links across ${settlement} (-14 Fuel, -15% Chains Integrity).` },
+                    { id: 'DEPLOY_WARDEN_CREWS', label: '⛓️ Dispatch Garrison Squad with Runic Grease & Auxiliaries', outcomeType: 'CONTAINED', resolution: `✅ TETHERS STABILIZED: Squad wardens braced the capstans and sealed the frost-fissures (+6 Crown Favor, +4 Salvaged Fuel).` },
+                    { id: 'VENT_RESERVE_CASKS', label: '⚠️ Dump Reserve Resin Directly into the Moat Trench', outcomeType: 'PARTIAL_LOSS', resolution: `⚠️ CONTAINED AT COST: Moat flare held the perimeter, but emergency resin reserves were consumed (-8 Fuel).` }
+                ]
+            };
+        }
+        return {
+            id: `emergent_rival_sabotage_${rootScope.EngineParams?.worldDay || 1}`,
+            title: `⚔️ BORDER CRISIS AT ${settlement.toUpperCase()}: ${hostileRival.name.toUpperCase()} SABOTAGE`,
+            boundHouseId: hostileRival.name,
+            boundSettlement: settlement,
+            allowedRoles: ['NOBLE_HOUSE', 'TERMINUS', 'MERCHANT', 'SYNDICATE', 'SOVEREIGN', 'GUILD', 'ORDER'],
+            description: `Operatives from ${hostileRival.name} (Posture: ${hostileRival.status}, Power: ${hostileRival.power}, Entropy: ${o.blindSpotEntropy || 12}%) planted bone-dust charges along ${settlement}!`,
+            choices: [
+                { id: 'WATER_BRIGADE', label: '💧 Flood the Magazine Sluices Without Disarming Detonators', outcomeType: 'CATASTROPHIC_FLARE', resolution: `💥 MAGAZINE DETONATION! Flooding triggered primers across ${settlement} (-14 Fuel, -15% Chains Integrity).` },
+                { id: 'SMOTHER_SILT', label: '🛡️ Deploy Squad Wardens to Sever Fuse-Wires & Smother Charges', outcomeType: 'CONTAINED', resolution: `✅ SABOTAGE FOILED: Squad disarmed the ${hostileRival.name} charges (+6 Crown Favor, +4 Fuel).` },
+                { id: 'JETTISON_CASKS', label: '⚓ Jettison Threatened Casks into the Outer Ditch', outcomeType: 'PARTIAL_LOSS', resolution: `⚠️ CONTAINED AT COST: Magazine saved, but jettisoned casks were lost (-8 Fuel).` }
+            ]
+        };
+    },
+
     triggerContextualCrisis(activeRole = 'NOBLE_HOUSE', activeHouseId = null, forceCrisisId = null) {
         let candidate = null;
         if (forceCrisisId) {
@@ -1798,68 +2270,156 @@ const CrisisEngine = rootScope.CrisisEngine || {
         } else if (activeHouseId === 'House Wraith') {
             candidate = this.CRISIS_CATALOG.find(c => c.id === 'wraith_deep_oil_fire');
         } else {
-            const pool = this.CRISIS_CATALOG.filter(c => c.allowedRoles.includes(activeRole));
-            candidate = pool[0] || this.CRISIS_CATALOG[0];
+            candidate = this.synthesizeEmergentCrisis(activeRole, activeHouseId);
         }
         if (candidate) {
-            this.activeCrisis = { ...candidate, triggeredDay: rootScope.EngineParams?.worldDay || 1 };
+            this.activeCrisis = {
+                ...candidate,
+                triggeredDay: rootScope.EngineParams?.worldDay || 1,
+                isMitigationActive: Boolean(this.pendingDreamIntervention)
+            };
+            RoleStateMachine.transitionTo('CRISIS_TRIAGE');
             rootScope.EventBus?.emit('CRISIS_TRIGGERED', this.activeCrisis);
         }
         return this.activeCrisis;
     },
 
+    triggerDreamIntervention(crisisId = null, resourceCost = 10) {
+        const cost = Math.max(0, Number(resourceCost) || 10);
+        const modeKey = (CampaignManager.campaignMode || 'HOUSE').toLowerCase();
+        const roleState = CampaignManager.state[modeKey] || CampaignManager.state.house;
+
+        if (typeof roleState.dreamSiphon !== 'number') {
+            roleState.dreamSiphon = 30;
+        }
+        if (roleState.dreamSiphon < cost) {
+            return {
+                success: false,
+                message: `Insufficient Dream Siphon reserves (${roleState.dreamSiphon}/${cost}u).`
+            };
+        }
+
+        roleState.dreamSiphon -= cost;
+        this.pendingDreamIntervention = true;
+
+        if (this.activeCrisis && (!crisisId || this.activeCrisis.id === crisisId)) {
+            this.activeCrisis.isMitigationActive = true;
+        }
+
+        // Apply symbolic prescience buff to living squad members (Poise & Shock stabilization)
+        AgentRosterManager.agents.forEach(agent => {
+            if (!agent.alive) return;
+            agent.vitals.poise = Math.min(100, (agent.vitals.poise || 60) + 5);
+            if (agent.reflexes) agent.reflexes.shock = Math.max(0, (agent.reflexes.shock || 0) - 10);
+        });
+
+        rootScope.EventBus?.emit('DREAM_INTERVENTION_TRIGGERED', {
+            crisisId: crisisId || this.activeCrisis?.id || 'PREEMPTIVE_WARD',
+            cost,
+            remainingDreamSiphon: roleState.dreamSiphon
+        });
+
+        return {
+            success: true,
+            remainingDreamSiphon: roleState.dreamSiphon,
+            isMitigationActive: true,
+            message: `🌙 [DREAM INTERVENTION] Siphoned ${cost}u Dream-Resin (${roleState.dreamSiphon}u remaining). Squad Poise fortified; next Crisis catastrophe will be mitigated.`
+        };
+    },
+
     resolveActiveCrisis(choiceId) {
         if (!this.activeCrisis) return { success: false, message: "No active crisis to resolve." };
         const crisis = this.activeCrisis;
-        const choice = crisis.choices.find(c => c.id === choiceId) || crisis.choices[0];
+        let choice = crisis.choices.find(c => c.id === choiceId) || crisis.choices[0];
         const day = rootScope.EngineParams?.worldDay || 1;
         const h = CampaignManager.state.house;
         const syn = CampaignManager.state.syndicate;
+        const mitigatedByDream = Boolean(crisis.isMitigationActive || this.pendingDreamIntervention || choiceId === 'DREAM_MITIGATE');
 
-        if (choice.outcomeType === 'CATASTROPHIC_FLARE') {
+        let effectiveOutcomeType = choice.outcomeType;
+        let effectiveResolution = choice.resolution;
+
+        if (mitigatedByDream && (effectiveOutcomeType === 'CATASTROPHIC_FLARE' || choiceId === 'DREAM_MITIGATE')) {
+            effectiveOutcomeType = 'MITIGATED';
+            effectiveResolution = `🌙 [DREAM INTERVENTION MITIGATED] Prescient dream-wards guided the squad before disaster struck during ${crisis.title}. Catastrophic flare averted with minimal reserve drain.`;
+        }
+
+        if (effectiveOutcomeType === 'CATASTROPHIC_FLARE') {
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
+            const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
+            const fuelPenalty = Math.max(4, Math.round(14 / facMult.martialMult));
+            const chainPenalty = Math.max(5, Math.round(15 * (hMods.chainDecayMult || 1)));
+
             if (CampaignManager.campaignMode === 'HOUSE') {
-                h.barrierFuelUnits = Math.max(0, h.barrierFuelUnits - 14);
-                h.chainsIntegrity = Math.max(0, h.chainsIntegrity - 15);
+                h.barrierFuelUnits = Math.max(0, h.barrierFuelUnits - fuelPenalty);
+                h.chainsIntegrity = Math.max(0, h.chainsIntegrity - chainPenalty);
             } else if (CampaignManager.campaignMode === 'SYNDICATE') {
                 syn.contrabandResin = Math.max(0, syn.contrabandResin - 20);
                 syn.gallowsTollCollected = Math.max(0, syn.gallowsTollCollected - 25);
+            } else if (CampaignManager.campaignMode === 'ORDER') {
+                CampaignManager.state.order.blindSpotEntropy = Math.min(100, (CampaignManager.state.order.blindSpotEntropy || 12) + 10);
             }
-            CrucibleNarrativeEngine.recordCrucible('agt_2', {
+            const aliveAgents = Array.from(AgentRosterManager.agents.values()).filter(a => a.alive);
+            const scarredAgent = aliveAgents.find(a => a.id === 'agt_2') || aliveAgents[0] || { id: 'agt_2', name: 'Garrison Operative' };
+            if (scarredAgent.vitals) {
+                scarredAgent.vitals.hp = Math.max(20, scarredAgent.vitals.hp - 15);
+                scarredAgent.vitals.poise = Math.max(15, (scarredAgent.vitals.poise || 60) - 12);
+            }
+            CrucibleNarrativeEngine.recordCrucible(scarredAgent.id, {
                 day,
                 type: 'CRISIS_CATASTROPHE',
                 title: crisis.title,
                 location: crisis.boundSettlement,
                 catalyst: `Ordered [${choice.label}] during ${crisis.title}.`,
-                fallout: choice.resolution,
+                fallout: effectiveResolution,
                 scar: `Bears burn-scars from the ${crisis.boundSettlement} catastrophe.`
             });
-        } else if (choice.outcomeType === 'CONTAINED') {
+        } else if (effectiveOutcomeType === 'MITIGATED') {
+            if (CampaignManager.campaignMode === 'HOUSE') {
+                h.barrierFuelUnits = Math.max(0, h.barrierFuelUnits - 3);
+                h.crownFavor = Math.min(100, h.crownFavor + 2);
+            } else if (CampaignManager.campaignMode === 'SYNDICATE') {
+                syn.contrabandResin = Math.max(0, syn.contrabandResin - 4);
+            }
+            this.pendingDreamIntervention = false;
+        } else if (effectiveOutcomeType === 'CONTAINED') {
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const facMult = RoleStateMachine.computeFacilityMultipliers();
+            const bonusFuel = Math.round((4 + (sq.avgSurvival - 2) * 0.5) * facMult.productionMult);
             if (CampaignManager.campaignMode === 'HOUSE') {
                 h.crownFavor = Math.min(100, h.crownFavor + 6);
-                h.barrierFuelUnits = Math.min(60, h.barrierFuelUnits + 4);
+                h.barrierFuelUnits = Math.min(60, h.barrierFuelUnits + bonusFuel);
             } else if (CampaignManager.campaignMode === 'SYNDICATE') {
-                syn.contrabandResin += 12;
+                syn.contrabandResin += Math.round(12 * facMult.covertMult);
+            } else if (CampaignManager.campaignMode === 'ORDER') {
+                CampaignManager.state.order.containedAnomalies++;
+                CampaignManager.state.order.blindSpotEntropy = Math.max(0, CampaignManager.state.order.blindSpotEntropy - 6);
             }
-        } else if (choice.outcomeType === 'PARTIAL_LOSS') {
+            if (crisis.boundHouseId && crisis.boundHouseId !== h.houseId) {
+                CampaignManager.mutateWarBoard(crisis.boundHouseId, -4, 'DEFENSIVE');
+            }
+        } else if (effectiveOutcomeType === 'PARTIAL_LOSS') {
             if (CampaignManager.campaignMode === 'HOUSE') {
                 h.barrierFuelUnits = Math.max(0, h.barrierFuelUnits - 8);
             }
         }
 
+        RoleStateMachine.transitionTo('FIELD_OPERATIONS');
+
         LogDispatchManager.dispatches.unshift({
             id: `crisis_res_${day}_${Date.now()}`,
             day,
-            type: `CRISIS AFTERMATH [${choice.outcomeType}]`,
+            type: `CRISIS AFTERMATH [${effectiveOutcomeType}]`,
             sender: `${crisis.boundSettlement} Emergency Watch`,
             title: crisis.title,
-            body: choice.resolution,
+            body: effectiveResolution,
             read: false
         });
 
-        this.crisisHistory.push({ crisisId: crisis.id, choiceId: choice.id, outcomeType: choice.outcomeType, day });
+        this.crisisHistory.push({ crisisId: crisis.id, choiceId: choice.id, outcomeType: effectiveOutcomeType, day });
         this.activeCrisis = null;
         this.volatilityIndex = 20;
-        return { success: true, outcomeType: choice.outcomeType, message: choice.resolution };
+        return { success: true, outcomeType: effectiveOutcomeType, message: effectiveResolution };
     },
 
     getDirectivesForRole(roleKey = 'NOBLE_HOUSE') {
@@ -2063,6 +2623,52 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
     activeExpeditions: [],
     completedLogs: [],
 
+    computeExpeditionCombatProfile(exp) {
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const shiftProximity = 14 - (day % 14);
+        const shiftHazardBonus = shiftProximity <= 3 ? (4 - shiftProximity) * 4 : 0;
+        const facMult = RoleStateMachine.computeFacilityMultipliers();
+        const hMods = RoleStateMachine.getHouseModifiers(CampaignManager?.state?.house?.houseId);
+
+        let missionBaseHazard = 12;
+        if (exp.type === 'PROXY_RAID' || exp.type === 'SUMMON_HUNTSMAN') missionBaseHazard = 22;
+        else if (exp.type === 'PATROL_MIST' || exp.type === 'SMUGGLE_RESIN') missionBaseHazard = 16;
+        else if (exp.type === 'GUARDED_CARAVAN') missionBaseHazard = 14;
+
+        const warBoard = CampaignManager?.getWarBoard?.() || [];
+        const targetLower = String(exp.targetName || '').toLowerCase();
+        const linkedHouse = warBoard.find(w => w.name.toLowerCase().includes(targetLower) || targetLower.includes(w.name.replace('House ', '').toLowerCase()));
+        const warHazardBonus = linkedHouse?.status === 'WAR_PREP' ? 8 : (linkedHouse?.status === 'SKIRMISH' ? 4 : 0);
+
+        const hazardRating = Math.round((missionBaseHazard + shiftHazardBonus + warHazardBonus) * (hMods.volatilityDampener || 1));
+
+        let agt = exp.leadAgentId && AgentRosterManager.agents.get(exp.leadAgentId);
+        let agentPower = 6;
+        let equippedSummary = [];
+        if (agt && agt.alive) {
+            const sk = agt.skills || {};
+            agentPower = Number(sk.meleeAtt || 2) + Number(sk.meleeDef || 2) + Number(sk.survival || 2) + Number(sk.stealth || 2) * 0.5;
+            const eq = agt.equipment || {};
+            if (eq.weapon) equippedSummary.push(eq.weapon.name);
+            if (eq.armor) equippedSummary.push(eq.armor.name);
+            if (eq.trinket) equippedSummary.push(eq.trinket.name);
+            if (agt.birthright?.scoutBonus) agentPower += 3;
+            if (agt.birthright?.attackBonus) agentPower += 2;
+        }
+
+        const guardDefense = (exp.guardsAssigned || 0) * (4 + facMult.barracksLv * 1.5) + (exp.guarded ? 6 : 0);
+        const squadDefense = Math.round((agentPower + guardDefense) * facMult.martialMult);
+
+        return {
+            hazardRating,
+            squadDefense,
+            netAdvantage: squadDefense - hazardRating,
+            shiftProximity,
+            equippedSummary,
+            agent: agt || null
+        };
+    },
+
     launchExpedition(missionType = 'UNGUARDED_CARAVAN', targetName = 'Oakhaven') {
         const type = (missionType || 'UNGUARDED_CARAVAN').toUpperCase();
         const day = rootScope.EngineParams?.worldDay || 1;
@@ -2098,6 +2704,8 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
             targetName,
             guarded,
             guardsAssigned,
+            cargoIntegrity: 100,
+            hazardEncounters: 0,
             leadAgentId: leadAgent?.id || null,
             leadAgentName: leadAgent?.name || (guarded ? 'Village Guard Escort' : 'Unarmed Drover Crew'),
             startedDay: day,
@@ -2105,15 +2713,19 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
             totalHours,
             status: 'OUTBOUND',
             logs: [
-                `[00:00] ${leadAgent ? leadAgent.name : 'Caravan Drovers'} departed gates for ${targetName} (${guarded ? `Guarded Escort: ${guardsAssigned || 2} Guards` : 'âš ï¸ UNGUARDED â€” Vulnerable to Mist Raiders'}).`
+                `[00:00] ${leadAgent ? leadAgent.name : 'Caravan Drovers'} departed gates for ${targetName} (${guarded ? `Guarded Escort: ${guardsAssigned || 2} Guards` : '⚠️ UNGUARDED — Vulnerable to Mist Raiders'}).`
             ]
         };
+
+        const profile = this.computeExpeditionCombatProfile(exp);
+        exp.hazardRating = profile.hazardRating;
+        exp.squadDefense = profile.squadDefense;
 
         this.activeExpeditions.unshift(exp);
         return {
             success: true,
             expedition: exp,
-            message: `ðŸ§­ Dispatched [${type}] to ${targetName} (${exp.leadAgentName}). Estimated duration: ${totalHours}h.`
+            message: `🧭 Dispatched [${type}] to ${targetName} (${exp.leadAgentName} | Def: ${exp.squadDefense} vs Hazard: ${exp.hazardRating}). Est: ${totalHours}h.`
         };
     },
 
@@ -2121,43 +2733,111 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
         const step = Math.max(1, parseInt(hours, 10) || 1);
         const day = rootScope.EngineParams?.worldDay || 1;
         const h = CampaignManager.state.house;
+        const o = CampaignManager.state.order;
         const syn = CampaignManager.state.syndicate;
+        const pat = CampaignManager.state.patron;
+        const sov = CampaignManager.state.sovereign;
+        const facMult = RoleStateMachine.computeFacilityMultipliers();
+        const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
 
         this.activeExpeditions = this.activeExpeditions.filter(exp => {
             for (let i = 0; i < step; i++) {
                 exp.hoursElapsed++;
                 const hh = String(exp.hoursElapsed).padStart(2, '0');
+                const profile = this.computeExpeditionCombatProfile(exp);
+                const agt = profile.agent;
 
                 if (exp.hoursElapsed === Math.ceil(exp.totalHours * 0.35)) {
                     exp.status = 'EN_ROUTE';
-                    if (!exp.guarded && exp.type === 'UNGUARDED_CARAVAN') {
-                        exp.logs.push(`[${hh}:00] âš ï¸ Mist-stalkers shadowed the unguarded wagons near mile-stone four; drovers whipped the mules hard (-2 Cargo lost).`);
+                    exp.hazardEncounters = (exp.hazardEncounters || 0) + 1;
+
+                    if (profile.netAdvantage >= 0 || exp.guarded) {
+                        const gearUsed = profile.equippedSummary.length > 0 ? ` [${profile.equippedSummary[0]}]` : '';
+                        exp.logs.push(`[${hh}:00] ⚔️ Escort repelled a pack of bracken-hounds in the copper fog${gearUsed}; perimeter held (Def ${profile.squadDefense} vs Hazard ${profile.hazardRating}).`);
+                        if (agt && agt.skills) {
+                            agt.skills.meleeAtt = Number((agt.skills.meleeAtt + 0.15).toFixed(2));
+                        }
                     } else {
-                        exp.logs.push(`[${hh}:00] âš”ï¸ Escort repelled a pack of bracken-hounds in the copper fog; perimeter held.`);
+                        const cargoLoss = Math.min(40, Math.max(10, Math.abs(profile.netAdvantage) * 3));
+                        exp.cargoIntegrity = Math.max(20, (exp.cargoIntegrity ?? 100) - cargoLoss);
+                        exp.logs.push(`[${hh}:00] ⚠️ Mist-stalkers shadowed the unguarded wagons near mile-stone four; drovers whipped the mules hard (-${Math.round(cargoLoss / 10)} Cargo lost | Integrity: ${exp.cargoIntegrity}%).`);
+                        if (agt && agt.vitals) {
+                            const hpLoss = Math.max(8, Math.abs(profile.netAdvantage) * 2);
+                            agt.vitals.hp = Math.max(15, agt.vitals.hp - hpLoss);
+                            agt.vitals.poise = Math.max(10, (agt.vitals.poise || 60) - 18);
+                            if (agt.reflexes) agt.reflexes.shock = Math.min(100, (agt.reflexes.shock || 0) + 20);
+                        }
+                    }
+
+                    if (agt && (agt.vitals.hp <= 25 || agt.vitals.poise <= 20)) {
+                        exp.status = 'RETREATED';
+                        exp.logs.push(`[${hh}:00] 🛡️ [WILL TO LIVE] ${agt.name} (HP: ${agt.vitals.hp}, Poise: ${Math.round(agt.vitals.poise)}) ordered an emergent tactical retreat from ${exp.targetName} to preserve squad lives!`);
+                        agt.operatingStance = { mode: 'IDLE', discipline: null, task: null, daysTrained: 0 };
+                        agt.skills.survival = Number((agt.skills.survival + 0.25).toFixed(2));
+                        if (exp.guardsAssigned > 0) {
+                            FacilityEngine.villageGuardsCurrent = Math.min(FacilityEngine.villageGuardsMaxThreshold, FacilityEngine.villageGuardsCurrent + Math.max(1, exp.guardsAssigned - 1));
+                        }
+                        CrucibleNarrativeEngine.recordCrucible(agt.id, {
+                            day,
+                            type: 'TACTICAL_RETREAT',
+                            title: `The Fog-Line Retreat of ${exp.targetName}`,
+                            location: `${exp.targetName} Approach Road`,
+                            catalyst: `Ambushed at Hazard ${profile.hazardRating} vs Defense ${profile.squadDefense}.`,
+                            fallout: `${agt.name} sounded the horn and withdrew the column before slaughter.`,
+                            scar: `Wears a notched iron bracer from the ${exp.targetName} mist ambush.`
+                        });
+                        this.completedLogs.unshift(exp);
+                        return false;
                     }
                 } else if (exp.hoursElapsed === Math.ceil(exp.totalHours * 0.7)) {
                     exp.status = 'RETURNING';
-                    exp.logs.push(`[${hh}:00] ðŸ“¦ Reached ${exp.targetName} checkpoint. Loaded casks and turned back toward home gates.`);
+                    exp.logs.push(`[${hh}:00] 📦 Reached ${exp.targetName} checkpoint. Loaded casks and turned back toward home gates.`);
                 }
-
                 if (exp.hoursElapsed >= exp.totalHours) {
                     exp.status = 'COMPLETED';
-                    const yieldFuel = exp.guarded ? 14 : 7;
-                    exp.logs.push(`[${hh}:00] âœ… Returned safely through the gatehouse (+${yieldFuel} Supply/Fuel secured).`);
+                    const integrityRatio = (exp.cargoIntegrity ?? 100) / 100;
+                    const baseYield = exp.guarded ? 14 : 7;
+                    const advantageBonus = Math.max(0, Math.round(profile.netAdvantage * 0.25));
+                    const yieldFuel = Math.max(2, Math.round((baseYield + advantageBonus) * integrityRatio * (hMods.caravanYieldMult || 1) * facMult.tradeMult));
 
-                    if (exp.leadAgentId && AgentRosterManager.agents.has(exp.leadAgentId)) {
-                        const agt = AgentRosterManager.agents.get(exp.leadAgentId);
+                    exp.logs.push(`[${hh}:00] ✅ Returned safely through the gatehouse (+${yieldFuel} Supply/Fuel secured).`);
+
+                    if (agt) {
                         agt.operatingStance = { mode: 'IDLE', discipline: null, task: null, daysTrained: 0 };
-                        agt.skills.survival += 0.3;
+                        agt.skills.survival = Number((agt.skills.survival + 0.3).toFixed(2));
+                        if (exp.type === 'PROXY_RAID' || exp.type === 'SUMMON_HUNTSMAN') {
+                            agt.skills.meleeAtt = Number((agt.skills.meleeAtt + 0.25).toFixed(2));
+                        } else if (exp.type === 'SMUGGLE_RESIN' || exp.type === 'PATROL_MIST') {
+                            agt.skills.stealth = Number((agt.skills.stealth + 0.25).toFixed(2));
+                        }
                     }
                     if (exp.guardsAssigned > 0) {
                         FacilityEngine.villageGuardsCurrent = Math.min(FacilityEngine.villageGuardsMaxThreshold, FacilityEngine.villageGuardsCurrent + exp.guardsAssigned);
                     }
-                    if (CampaignManager.campaignMode === 'SYNDICATE') {
+
+                    const mode = CampaignManager.campaignMode;
+                    if (mode === 'SYNDICATE') {
                         syn.contrabandResin += yieldFuel;
+                        syn.gallowsTollCollected += Math.round(yieldFuel * 0.5);
+                    } else if (mode === 'ORDER') {
+                        o.containedAnomalies++;
+                        o.blindSpotEntropy = Math.max(0, o.blindSpotEntropy - Math.max(2, Math.round(yieldFuel * 0.3)));
+                        FacilityEngine.settlementResources += yieldFuel;
+                    } else if (mode === 'PATRON') {
+                        pat.candidateSignificance += Math.max(3, Math.round(yieldFuel * 0.5));
+                        FacilityEngine.settlementResources += yieldFuel;
+                    } else if (mode === 'SOVEREIGN') {
+                        sov.significanceHarvested = (sov.significanceHarvested || 0) + yieldFuel * 12;
                     } else {
-                        h.barrierFuelUnits = Math.min(60, (h.barrierFuelUnits || 0) + yieldFuel);
+                        const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
+                        h.barrierFuelUnits = Math.min(maxFuel, (h.barrierFuelUnits || 0) + yieldFuel);
                         FacilityEngine.settlementResources += 6;
+                    }
+
+                    if (exp.type === 'PROXY_RAID') {
+                        CampaignManager.mutateWarBoard(exp.targetName, -4, 'SKIRMISH');
+                    } else if (exp.type === 'GUARDED_CARAVAN' || exp.type === 'UNGUARDED_CARAVAN') {
+                        CampaignManager.mutateWarBoard(exp.targetName, 2, 'PEACE');
                     }
 
                     LogDispatchManager.dispatches.unshift({
@@ -2278,25 +2958,37 @@ export const CommanderEngine = {
 
         for (let i = 0; i < count; i++) {
             this.advanceDays(1);
-            // If a crisis triggered during the unattended skip, auto-resolve with the un-intervened catastrophe penalty!
+            // If a crisis triggered during the unattended skip, check for active Dream Intervention ward first!
             if (CrisisEngine.activeCrisis) {
                 const cTitle = CrisisEngine.activeCrisis.title;
-                const worstChoice = CrisisEngine.activeCrisis.choices.find(c => c.outcomeType === 'CATASTROPHIC_FLARE') || CrisisEngine.activeCrisis.choices[0];
-                const res = CrisisEngine.resolveActiveCrisis(worstChoice.id);
-                skippedEvents.push(`âš ï¸ UNATTENDED CRISIS DURING SKIP (${cTitle}): ${res.message}`);
+                if (CrisisEngine.activeCrisis.isMitigationActive || CrisisEngine.pendingDreamIntervention) {
+                    const res = CrisisEngine.resolveActiveCrisis('DREAM_MITIGATE');
+                    skippedEvents.push(`🌙 DREAM-MITIGATED CRISIS DURING SKIP (${cTitle}): ${res.message}`);
+                } else {
+                    const worstChoice = CrisisEngine.activeCrisis.choices.find(c => c.outcomeType === 'CATASTROPHIC_FLARE') || CrisisEngine.activeCrisis.choices[0];
+                    const res = CrisisEngine.resolveActiveCrisis(worstChoice.id);
+                    skippedEvents.push(`⚠️ UNATTENDED CRISIS DURING SKIP (${cTitle}): ${res.message}`);
+                }
             } else {
-                skippedEvents.push(`ðŸ“œ Day ${rootScope.EngineParams.worldDay}: ${CrisisEngine.lastDayReport?.executedGoal || 'Routine operations'} (${CrisisEngine.lastDayReport?.gains || ''})`);
+                skippedEvents.push(`📜 Day ${rootScope.EngineParams.worldDay}: ${CrisisEngine.lastDayReport?.executedGoal || 'Routine operations'} (${CrisisEngine.lastDayReport?.gains || ''})`);
             }
         }
         return {
             success: true,
             sealsRemaining: FacilityEngine.chronoSeals,
             skippedEvents,
-            message: `â­ï¸ [CHRONO-SKIP COMPLETE] Simulated ${count} full day(s) unattended. (${FacilityEngine.chronoSeals} Chrono-Seals left).\n` + skippedEvents.join('\n')
+            message: `⏭️ [CHRONO-SKIP COMPLETE] Simulated ${count} full day(s) unattended. (${FacilityEngine.chronoSeals} Chrono-Seals left).\n` + skippedEvents.join('\n')
         };
     },
 
+    triggerDreamIntervention(crisisId = null, resourceCost = 10) {
+        return CrisisEngine.triggerDreamIntervention(crisisId, resourceCost);
+    },
+
+
     CampaignManager,
+    RoleStateMachine,
+    HOUSE_MONOPOLY_MODIFIERS,
     AgentRosterManager,
     LogDispatchManager,
     CrucibleNarrativeEngine,

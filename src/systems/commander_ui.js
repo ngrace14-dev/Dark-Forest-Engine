@@ -198,6 +198,11 @@ export const CommanderUI = {
             this.showBanner(res.message || 'Crisis directive executed.');
             this.render();
         };
+        window.triggerDreamIntervention = (crisisId = null, cost = 10) => {
+            const res = CommanderEngine.triggerDreamIntervention(crisisId, cost);
+            this.showBanner(res.message);
+            this.render();
+        };
         window.viewAgentStatSheet = (agentId) => {
             const sheet = CommanderEngine.AgentRosterManager.formatAgentStatSheet(agentId);
             this.setReaderContent(sheet);
@@ -429,7 +434,8 @@ export const CommanderUI = {
                         </span>
                         <button class="cmd-btn" onclick="window.stepExpeditionHour(2)">+2H FIELD</button>
                         <button class="cmd-btn" onclick="window.advanceDays(1)">+1 DAY</button>
-                        <button class="cmd-btn" title="Instant 1-day skip (No Crisis Intervention)" onclick="window.chronoSkip(1)">+1D SKIP</button>
+                        <button class="cmd-btn" title="Pre-emptively spend 10u Dream-Resin to mitigate any Crisis during Chrono-Skip" onclick="window.triggerDreamIntervention()">🌙 DREAM WARD</button>
+                        <button class="cmd-btn" title="Instant 1-day skip (Uses Dream Ward if active)" onclick="window.chronoSkip(1)">+1D SKIP</button>
                         <button class="cmd-btn" onclick="window.exportSave()">EXPORT SAVE</button>
                     </div>
 
@@ -545,7 +551,8 @@ export const CommanderUI = {
         const gauge = `[${'|'.repeat(bars)}${'-'.repeat(10 - bars)}] ${vol}%`;
         const fe = CommanderEngine.FacilityEngine;
         const guardInfo = fe ? ` | Village Guards: ${fe.villageGuardsCurrent}/${fe.villageGuardsMaxThreshold} (Prosperity: ${fe.settlementProsperity}% | Res: ${fe.settlementResources}u)` : '';
-        if (sb) sb.innerText = `${m}${guardInfo} | Volatility: ${gauge}`;
+        const dreamInfo = typeof st.dreamSiphon === 'number' ? ` | Dream Siphon: ${st.dreamSiphon}u${CommanderEngine.CrisisEngine?.pendingDreamIntervention ? ' [WARDED]' : ''}` : '';
+        if (sb) sb.innerText = `${m}${guardInfo}${dreamInfo} | Volatility: ${gauge}`;
 
         // Render Fallout Shelter–Style Active Field Expeditions Log
         const expDiv = document.getElementById('expeditions-list');
@@ -640,6 +647,9 @@ export const CommanderUI = {
                     <div style="color:#fca5a5; font-size:11px; margin-bottom:8px;">${activeCrisis.description}</div>
                     <div style="color:#fbbf24; font-size:11px; font-weight:bold;">SELECT SQUAD TRIAGE DIRECTIVE:</div>
                     ${choicesHtml}
+                    <button class="cmd-btn" style="display:block; width:100%; text-align:left; padding:8px; margin-top:6px; background:#1e1b4b; border-color:#818cf8; color:#e0e7ff;" onclick="window.triggerDreamIntervention('${activeCrisis.id}', 10); window.resolveCrisis('DREAM_MITIGATE')">
+                        🌙 Invoke Dream Intervention Ward (-10u Dream Siphon — Mitigates Catastrophic Flare & Stabilizes Squad Poise)
+                    </button>
                 `;
             } else {
                 crisisPanel.style.display = 'none';
