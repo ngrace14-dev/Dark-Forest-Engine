@@ -1122,3 +1122,6 @@ body.mobile-landscape-fit .monolith-overlay-content,
         font-size: 11px;
     }
 }
+
+/* Add resize handles to UI panels */
+.parchment-note-box, .cmd-story-box, #roster-list, #expeditions-list, #dispatches-list, #story-archive { resize: vertical; overflow: auto; min-height: 100px; }

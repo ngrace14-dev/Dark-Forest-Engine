@@ -24,9 +24,7 @@ export const CommanderUI = {
         this.render();
         return this;
     // Temporary override to hook into the onboarding process
-    initOnboarding() {
-        CandidateOnboarding.start(this);
-    },
+
 
     },
 
