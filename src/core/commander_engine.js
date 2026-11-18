@@ -288,7 +288,39 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
         });
     },
 
-    formatAgentStatSheet(agentId) {\n        const a = this.agents.get(agentId);\n        if (!a) return No squad member found for ID: ;\n        const eq = a.equipment || {};\n        const sk = a.skills || {};\n        const vt = a.vitals || {};\n        return [\n            ================================================================================,\n            🛡️ SQUAD MEMBER:  (),\n            ================================================================================,\n            Role / Rank:      ,\n            Birthright:      [],\n            Stance:          [],\n            `,\n            --- VITALS ---,\n              • HP: / | Poise: /100,\n            `,\n            --- EQUIPMENT ---,\n              • Weapon:  ,\n              • Armor:   ,\n              • Trinket: ,\n            `,\n            --- ATTRIBUTES ---,\n              • Strength:  | Melee: ,\n              • Toughness:  | Lore: ,\n            ================================================================================\n        ].join('\n');\n    }
+    formatAgentStatSheet(agentId) {
+        const a = this.agents.get(agentId);
+        if (!a) return `No squad member found for ID: ${agentId}`;
+        const eq = a.equipment || {};
+        const sk = a.skills || {};
+        const vt = a.vitals || {};
+        const rf = a.reflexes || {};
+        return [
+            `================================================================================`,
+            `ðŸ›¡ï¸ SQUAD MEMBER CHARACTER STAT SHEET: ${a.name.toUpperCase()} (${a.id})`,
+            `================================================================================`,
+            `Role / Rank:     ${a.career?.rank || 'Novice'} ${(a.career?.id || 'scout').toUpperCase()} | House/Faction: ${a.assignedHouseId}`,
+            `Birthright:      [${a.birthright?.title || 'None'}] â€” ${a.birthright?.desc || ''}`,
+            `Shift Birthday:  Day ${a.firstShiftSurvivedDay} AF (Shifts Endured: ${a.shiftsSurvived || 0}) | Significance: ${a.significance}`,
+            `Cultivation:     Stage ${a.cultivation?.stage || 0}/3 ${a.cultivation?.isCultivatedGuardian ? 'â˜… IMMORTAL 300 GUARDIAN (+500y)' : '(Mortal)'}`,
+            `Current Stance:  [${a.operatingStance?.mode || 'IDLE'}${a.operatingStance?.discipline ? ': ' + a.operatingStance.discipline : ''}]`,
+            ``,
+            `â”€â”€â”€ â¤ï¸ VITALS & REFLEXES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
+            `  â€¢ HP: ${vt.hp}/${vt.maxHp} | Stamina: ${vt.stamina}/100 | Poise: ${vt.poise.toFixed ? vt.poise.toFixed(0) : vt.poise}/100 | Hunger: ${vt.hunger}%`,
+            `  â€¢ Shock: ${rf.shock}% | Adrenaline: ${rf.adrenaline}% | Exhaustion: ${rf.exhaustion}%`,
+            ``,
+            `â”€â”€â”€ âš”ï¸ EQUIPPED GEAR & LOADOUT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
+            `  â€¢ Weapon:  ${eq.weapon ? `${eq.weapon.name} (${eq.weapon.desc})` : '[Empty â€” Standard Issue]'}`,
+            `  â€¢ Armor:   ${eq.armor ? `${eq.armor.name} (${eq.armor.desc})` : '[Empty â€” Cloth Tunic]'}`,
+            `  â€¢ Trinket: ${eq.trinket ? `${eq.trinket.name} (${eq.trinket.desc})` : '[Empty â€” None]'}`,
+            ``,
+            `â”€â”€â”€ ðŸ“Š COMBAT & SURVIVAL ATTRIBUTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
+            `  â€¢ Strength:  ${Number(sk.strength).toFixed(1).padStart(4, ' ')}   | Melee Att: ${Number(sk.meleeAtt).toFixed(1).padStart(4, ' ')}   | Stealth:  ${Number(sk.stealth).toFixed(1).padStart(4, ' ')}`,
+            `  â€¢ Toughness: ${Number(sk.toughness).toFixed(1).padStart(4, ' ')}   | Melee Def: ${Number(sk.meleeDef).toFixed(1).padStart(4, ' ')}   | Lore:     ${Number(sk.lore).toFixed(1).padStart(4, ' ')}`,
+            `  â€¢ Athletics: ${Number(sk.athletics).toFixed(1).padStart(4, ' ')}   | Dodge:     ${Number(sk.dodge).toFixed(1).padStart(4, ' ')}   | Survival: ${Number(sk.survival).toFixed(1).padStart(4, ' ')}`,
+            `================================================================================`
+        ].join('\n');
+    }
 };
 rootScope.AgentRosterManager = AgentRosterManager;
 
@@ -913,25 +945,6 @@ export const RoleStateMachine = rootScope.RoleStateMachine || {
         return { count: n, avgMartial, avgStealth, avgLore, avgSurvival, avgPoise, totalPower };
     },
 
-    computeLogisticalEntropyTax(houseId = null) {
-        const board = CampaignManager?.getWarBoard?.() || [];
-        const h = CampaignManager?.state?.house || {};
-        const activeId = houseId || h.houseId || 'House Terminus';
-        const entry = board.find(w => w.name === activeId) || { power: 60 };
-        const hostileCount = board.filter(w => w.name !== activeId && (w.status === 'WAR_PREP' || w.status === 'SKIRMISH')).length;
-        const powerFriction = Math.max(0, (entry.power - 55) * 0.004);
-        const hostilityFriction = hostileCount * 0.03;
-        const taxRate = Math.min(0.45, Math.max(0.05, Number((0.08 + powerFriction + hostilityFriction).toFixed(2))));
-        const dailyExtraBurn = entry.power >= 80 ? 2 : (entry.power >= 65 ? 1 : 0);
-        return {
-            housePower: entry.power,
-            hostileCount,
-            taxRate,
-            retentionMult: Number((1 - taxRate).toFixed(2)),
-            dailyExtraBurn
-        };
-    },
-
     computeFacilityMultipliers() {
         const fac = rootScope.FacilityEngine?.facilities || {};
         const scriptoriumLv = fac.scriptorium?.unlocked ? (fac.scriptorium.level || 1) : 0;
@@ -1204,9 +1217,8 @@ const CampaignManager = rootScope.CampaignManager || {
         if (this.campaignMode === 'HOUSE') {
             const h = this.state.house;
             const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
-            const entropy = RoleStateMachine.computeLogisticalEntropyTax(h.houseId);
             const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
-            const baseBurn = 4 + (hMods.dailyFuelBurnDelta || 0) + entropy.dailyExtraBurn - Math.floor((h.autarkyLevel || 0) / 35);
+            const baseBurn = 4 + (hMods.dailyFuelBurnDelta || 0) - Math.floor((h.autarkyLevel || 0) / 35);
             const consumption = Math.max(1, baseBurn - (hMods.dailyFuelSynthBonus || 0));
             h.barrierFuelUnits = Math.max(0, Math.min(maxFuel, h.barrierFuelUnits - consumption));
             h.shiftCountdown = 14 - (day % 14);
@@ -1216,9 +1228,7 @@ const CampaignManager = rootScope.CampaignManager || {
 
             if (day % 14 === 0) {
                 AgentRosterManager.applyShiftSurvivalConditions(h.barrierFuelUnits > 0, h.barrierFuelUnits <= 0, false);
-                const prosperityScale = Math.max(0, Math.round(((rootScope.FacilityEngine?.settlementProsperity || 65) - 50) * 0.15));
-                const powerScale = Math.max(0, Math.round((entropy.housePower - 50) * 0.15));
-                h.crownDemand = Math.min(32, Math.max(12, 12 + powerScale + prosperityScale));
+                h.crownDemand = 14 + Math.floor(Math.random() * 8);
 
                 if (!h.hasHorizonDispensation && h.crownScrutiny > 65) {
                     h.barrierFuelUnits = Math.floor(h.barrierFuelUnits / 2);
@@ -1231,11 +1241,9 @@ const CampaignManager = rootScope.CampaignManager || {
             h.activeCaravans = (h.activeCaravans || []).filter(c => {
                 c.daysLeft--;
                 if (c.daysLeft <= 0) {
-                    const grossYield = Math.round(c.yieldFuel * (hMods.caravanYieldMult || 1));
-                    const taxedYield = Math.max(4, Math.round(grossYield * entropy.retentionMult));
-                    const entropyLoss = Math.max(0, grossYield - taxedYield);
-                    h.barrierFuelUnits = Math.min(maxFuel, h.barrierFuelUnits + taxedYield);
-                    rootScope.EventBus?.emit('UI_LOG', `📦 [TRADE] Caravan returned from ${c.dest}: +${taxedYield} Barrier Fuel secured (-${entropyLoss}u Logistical Entropy Tax).`);
+                    const yieldAdjusted = Math.round(c.yieldFuel * (hMods.caravanYieldMult || 1));
+                    h.barrierFuelUnits = Math.min(maxFuel, h.barrierFuelUnits + yieldAdjusted);
+                    rootScope.EventBus?.emit('UI_LOG', `📦 [TRADE] Caravan returned from ${c.dest}: +${yieldAdjusted} Barrier Fuel secured.`);
                     return false;
                 }
                 return true;
@@ -1313,13 +1321,11 @@ const CampaignManager = rootScope.CampaignManager || {
             const h = this.state.house;
             const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
             const facMult = RoleStateMachine.computeFacilityMultipliers();
-            const entropy = RoleStateMachine.computeLogisticalEntropyTax(h.houseId);
-            const grossGain = Math.round((14 + (hMods.emergencyFuelBonus || 0)) * facMult.productionMult);
-            const gain = Math.max(4, Math.round(grossGain * entropy.retentionMult));
+            const gain = Math.round((14 + (hMods.emergencyFuelBonus || 0)) * facMult.productionMult);
             const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
             h.barrierFuelUnits = Math.min(maxFuel, h.barrierFuelUnits + gain);
             h.unrest = Math.min(100, (h.unrest || 10) + 4);
-            res = { success: true, message: `Emergency levy executed: +${gain} Barrier Fuel secured for ${h.settlementName || "World's End Gate"} (-${Math.round(entropy.taxRate * 100)}% Logistical Entropy, +4% Unrest).` };
+            res = { success: true, message: `Emergency levy executed: +${gain} Barrier Fuel secured for ${h.settlementName || "World's End Gate"} (+4% Unrest).` };
         } else if (act === 'CROWN_FILL_FULL') {
             const h = this.state.house;
             const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
@@ -1354,17 +1360,15 @@ const CampaignManager = rootScope.CampaignManager || {
             const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
             const sq = RoleStateMachine.computeSquadCapabilityMetrics();
             const facMult = RoleStateMachine.computeFacilityMultipliers();
-            const entropy = RoleStateMachine.computeLogisticalEntropyTax(h.houseId);
-            const targetEntry = this.mutateWarBoard(arg || 'House Shadowfen', -6, 'SKIRMISH', `Covert proxy raid ambushed supply line`);
-            const grossSeized = Math.round(16 * (hMods.proxyRaidYieldMult || 1) * facMult.martialMult * (1 + (sq.avgMartial - 2) * 0.08));
-            const seized = Math.max(5, Math.round(grossSeized * entropy.retentionMult));
+            const targetEntry = this.mutateWarBoard(arg || 'House Shadowfen', -6, 'SKIRMISH');
+            const seized = Math.round(16 * (hMods.proxyRaidYieldMult || 1) * facMult.martialMult * (1 + (sq.avgMartial - 2) * 0.08));
             const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
             h.barrierFuelUnits = Math.min(maxFuel, h.barrierFuelUnits + seized);
-            res = { success: true, message: `Covert proxy raid ambushed ${targetEntry?.name || 'rival'} supply line: +${seized} units cold resin seized after logistical friction (${targetEntry?.name || 'Rival'} power dropped to ${targetEntry?.power || 60}).` };
+            res = { success: true, message: `Covert proxy raid ambushed ${targetEntry?.name || 'rival'} supply line: +${seized} units cold resin seized (${targetEntry?.name || 'Rival'} power dropped to ${targetEntry?.power || 60}).` };
         } else if (act === 'PROXY_SABOTAGE') {
             const sq = RoleStateMachine.computeSquadCapabilityMetrics();
             const drop = -Math.max(5, Math.round(6 + sq.avgStealth));
-            const targetEntry = this.mutateWarBoard(arg || 'House Cull', drop, 'DEFENSIVE', `Ballistas and resin vats sabotaged with bone-dust`);
+            const targetEntry = this.mutateWarBoard(arg || 'House Cull', drop, 'DEFENSIVE');
             res = { success: true, message: `${targetEntry?.name || 'Rival house'} ballistas sabotaged with bone-dust (${drop} Power -> ${targetEntry?.power || 55}, Posture: ${targetEntry?.status || 'DEFENSIVE'}).` };
         } else if (act === 'CONSTRUCT_SANCTUARY') {
             this.state.house.sanctuaryBuilt = true;
@@ -1382,22 +1386,10 @@ const CampaignManager = rootScope.CampaignManager || {
             const h = this.state.house;
             const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
             const facMult = RoleStateMachine.computeFacilityMultipliers();
-            const entropy = RoleStateMachine.computeLogisticalEntropyTax(h.houseId);
             if (!h.assignedBailiffId) h.assignedBailiffId = 'agt_1';
-            const expectedYield = Math.round(18 * (hMods.caravanYieldMult || 1) * facMult.tradeMult * entropy.retentionMult);
-            const caravanId = `car_${Date.now()}_${Math.floor(Math.random() * 100)}`;
-            h.activeCaravans.push({ id: caravanId, dest: arg || 'Oakhaven', daysLeft: 4, yieldFuel: expectedYield });
-            res = { success: true, caravanId, message: `Official House Trade Caravan departed for ${arg || 'Oakhaven'} under Bailiff seal (Returns in 4 days with ~${expectedYield}u net Fuel after ${Math.round(entropy.taxRate * 100)}% entropy tax).` };
-        } else if (act === 'RECALL_CARAVAN') {
-            const h = this.state.house;
-            if (!h.activeCaravans || h.activeCaravans.length === 0) {
-                return { success: false, message: "No active House trade caravans in the field to recall." };
-            }
-            const recalled = h.activeCaravans.pop();
-            const partialSalvage = Math.max(2, Math.round((recalled.yieldFuel || 12) * 0.35));
-            const maxFuel = 60 + (RoleStateMachine.getHouseModifiers(h.houseId).maxFuelStorageBonus || 0);
-            h.barrierFuelUnits = Math.min(maxFuel, h.barrierFuelUnits + partialSalvage);
-            res = { success: true, message: `🔄 Emergency horn sounded: Recalled caravan bound for ${recalled.dest} early (+${partialSalvage}u emergency fuel salvaged).` };
+            const expectedYield = Math.round(18 * (hMods.caravanYieldMult || 1) * facMult.tradeMult);
+            h.activeCaravans.push({ dest: arg || 'Oakhaven', daysLeft: 4, yieldFuel: expectedYield });
+            res = { success: true, message: `Official House Trade Caravan departed for ${arg || 'Oakhaven'} under Bailiff seal (Returns in 4 days with ~${expectedYield}u Fuel).` };
         } else if (act === 'CULTIVATE_RUNIC') {
             res = AgentRosterManager.cultivateTerminusRunic(arg || 'agt_1', this.state.house);
         } else if (act === 'AUDIT_ANOMALY') {
@@ -1689,17 +1681,16 @@ const CampaignManager = rootScope.CampaignManager || {
         return this.warBoardState;
     },
 
-    mutateWarBoard(houseName, deltaPower = 0, newStatus = null, reason = null) {
+    mutateWarBoard(houseName, deltaPower = 0, newStatus = null) {
         const board = this.getWarBoard();
         const q = String(houseName || '').toLowerCase();
         let entry = board.find(h => h.name.toLowerCase() === q || h.name.toLowerCase().includes(q));
         if (!entry) {
+            // Pick highest-power rival house not matching active player house
             const activeHouse = (this.state.house?.houseId || '').toLowerCase();
             entry = board.find(h => h.name !== 'House Aethel' && h.name.toLowerCase() !== activeHouse) || board[3];
         }
         if (entry) {
-            const oldPower = entry.power;
-            const oldStatus = entry.status;
             entry.power = Math.max(10, Math.min(100, Math.round(entry.power + deltaPower)));
             if (newStatus) {
                 entry.status = newStatus;
@@ -1708,22 +1699,7 @@ const CampaignManager = rootScope.CampaignManager || {
             } else if (deltaPower >= 5) {
                 entry.status = 'ALLIED';
             }
-            const day = rootScope.EngineParams?.worldDay || 1;
-            const causeText = reason || (deltaPower < 0 ? 'Border raid & supply interdiction' : 'Diplomatic subsidy & trade pact');
-            entry.lastMutationReason = causeText;
-
-            if (oldStatus !== entry.status || Math.abs(deltaPower) >= 3) {
-                LogDispatchManager.dispatches.unshift({
-                    id: `wb_mut_${day}_${Date.now()}_${Math.floor(Math.random() * 100)}`,
-                    day,
-                    type: 'WAR BOARD TELEMETRY',
-                    sender: 'Royal Heraldic Chancery',
-                    title: `${entry.name} Posture Shift: ${oldStatus} -> ${entry.status} (Power ${oldPower} -> ${entry.power})`,
-                    body: `Causal Audit: ${causeText} altered ${entry.name}'s regional standing (${deltaPower >= 0 ? '+' : ''}${deltaPower} Power). Current diplomatic stance is now [${entry.status}].`,
-                    read: false
-                });
-            }
-            rootScope.EventBus?.emit('WAR_BOARD_MUTATED', { house: entry.name, power: entry.power, status: entry.status, deltaPower, reason: causeText });
+            rootScope.EventBus?.emit('WAR_BOARD_MUTATED', { house: entry.name, power: entry.power, status: entry.status, deltaPower });
         }
         return entry;
     },
@@ -2750,43 +2726,6 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
             success: true,
             expedition: exp,
             message: `🧭 Dispatched [${type}] to ${targetName} (${exp.leadAgentName} | Def: ${exp.squadDefense} vs Hazard: ${exp.hazardRating}). Est: ${totalHours}h.`
-        };
-    },
-
-    recallExpedition(expeditionId) {
-        const idx = this.activeExpeditions.findIndex(e => e.id === expeditionId);
-        if (idx === -1) {
-            return { success: false, message: `Expedition ${expeditionId} not found in active field column.` };
-        }
-        const exp = this.activeExpeditions.splice(idx, 1)[0];
-        const hh = String(exp.hoursElapsed).padStart(2, '0');
-        exp.status = 'RECALLED';
-        exp.logs.push(`[${hh}:00] 🔄 Recall horn sounded from gatehouse; ${exp.leadAgentName} aborted march to ${exp.targetName} and returned to garrison.`);
-
-        if (exp.leadAgentId && AgentRosterManager.agents.has(exp.leadAgentId)) {
-            const agt = AgentRosterManager.agents.get(exp.leadAgentId);
-            agt.operatingStance = { mode: 'IDLE', discipline: null, task: null, daysTrained: 0 };
-        }
-        if (exp.guardsAssigned > 0) {
-            FacilityEngine.villageGuardsCurrent = Math.min(FacilityEngine.villageGuardsMaxThreshold, FacilityEngine.villageGuardsCurrent + exp.guardsAssigned);
-        }
-
-        const progressRatio = Math.min(0.8, exp.hoursElapsed / Math.max(1, exp.totalHours));
-        const salvaged = Math.max(1, Math.round((exp.guarded ? 8 : 4) * progressRatio));
-        if (CampaignManager.campaignMode === 'SYNDICATE') {
-            CampaignManager.state.syndicate.contrabandResin += salvaged;
-        } else if (CampaignManager.campaignMode === 'HOUSE') {
-            const maxFuel = 60 + (RoleStateMachine.getHouseModifiers(CampaignManager.state.house.houseId).maxFuelStorageBonus || 0);
-            CampaignManager.state.house.barrierFuelUnits = Math.min(maxFuel, (CampaignManager.state.house.barrierFuelUnits || 0) + salvaged);
-        }
-
-        this.completedLogs.unshift(exp);
-        rootScope.EventBus?.emit('EXPEDITION_RECALLED', { expeditionId, exp, salvaged });
-        return {
-            success: true,
-            expedition: exp,
-            salvaged,
-            message: `🔄 Recalled [${exp.type}] from ${exp.targetName} (${exp.leadAgentName} returned safely; +${salvaged}u partial supplies salvaged).`
         };
     },
 
