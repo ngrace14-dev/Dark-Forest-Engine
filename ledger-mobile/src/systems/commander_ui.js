@@ -4,6 +4,8 @@
  *
  * Zero Three.js / WebGL dependencies. Connects directly to `src/core/commander_engine.js`
  * so the Soft-Launch Prologue boots instantaneously on the Title Card and remains
+import { CandidateOnboarding } from './candidate_onboarding.js';
+
  * foldable into the 3D Sandbox as an unlockable Commander System.
  */
 
@@ -21,6 +23,11 @@ export const CommanderUI = {
         this.bindGlobalShortcuts();
         this.render();
         return this;
+    // Temporary override to hook into the onboarding process
+    initOnboarding() {
+        CandidateOnboarding.start(this);
+    },
+
     },
 
     open(showRoleGate = true) {

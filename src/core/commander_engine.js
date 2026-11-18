@@ -288,39 +288,7 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
         });
     },
 
-    formatAgentStatSheet(agentId) {
-        const a = this.agents.get(agentId);
-        if (!a) return `No squad member found for ID: ${agentId}`;
-        const eq = a.equipment || {};
-        const sk = a.skills || {};
-        const vt = a.vitals || {};
-        const rf = a.reflexes || {};
-        return [
-            `================================================================================`,
-            `ðŸ›¡ï¸ SQUAD MEMBER CHARACTER STAT SHEET: ${a.name.toUpperCase()} (${a.id})`,
-            `================================================================================`,
-            `Role / Rank:     ${a.career?.rank || 'Novice'} ${(a.career?.id || 'scout').toUpperCase()} | House/Faction: ${a.assignedHouseId}`,
-            `Birthright:      [${a.birthright?.title || 'None'}] â€” ${a.birthright?.desc || ''}`,
-            `Shift Birthday:  Day ${a.firstShiftSurvivedDay} AF (Shifts Endured: ${a.shiftsSurvived || 0}) | Significance: ${a.significance}`,
-            `Cultivation:     Stage ${a.cultivation?.stage || 0}/3 ${a.cultivation?.isCultivatedGuardian ? 'â˜… IMMORTAL 300 GUARDIAN (+500y)' : '(Mortal)'}`,
-            `Current Stance:  [${a.operatingStance?.mode || 'IDLE'}${a.operatingStance?.discipline ? ': ' + a.operatingStance.discipline : ''}]`,
-            ``,
-            `â”€â”€â”€ â¤ï¸ VITALS & REFLEXES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
-            `  â€¢ HP: ${vt.hp}/${vt.maxHp} | Stamina: ${vt.stamina}/100 | Poise: ${vt.poise.toFixed ? vt.poise.toFixed(0) : vt.poise}/100 | Hunger: ${vt.hunger}%`,
-            `  â€¢ Shock: ${rf.shock}% | Adrenaline: ${rf.adrenaline}% | Exhaustion: ${rf.exhaustion}%`,
-            ``,
-            `â”€â”€â”€ âš”ï¸ EQUIPPED GEAR & LOADOUT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
-            `  â€¢ Weapon:  ${eq.weapon ? `${eq.weapon.name} (${eq.weapon.desc})` : '[Empty â€” Standard Issue]'}`,
-            `  â€¢ Armor:   ${eq.armor ? `${eq.armor.name} (${eq.armor.desc})` : '[Empty â€” Cloth Tunic]'}`,
-            `  â€¢ Trinket: ${eq.trinket ? `${eq.trinket.name} (${eq.trinket.desc})` : '[Empty â€” None]'}`,
-            ``,
-            `â”€â”€â”€ ðŸ“Š COMBAT & SURVIVAL ATTRIBUTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
-            `  â€¢ Strength:  ${Number(sk.strength).toFixed(1).padStart(4, ' ')}   | Melee Att: ${Number(sk.meleeAtt).toFixed(1).padStart(4, ' ')}   | Stealth:  ${Number(sk.stealth).toFixed(1).padStart(4, ' ')}`,
-            `  â€¢ Toughness: ${Number(sk.toughness).toFixed(1).padStart(4, ' ')}   | Melee Def: ${Number(sk.meleeDef).toFixed(1).padStart(4, ' ')}   | Lore:     ${Number(sk.lore).toFixed(1).padStart(4, ' ')}`,
-            `  â€¢ Athletics: ${Number(sk.athletics).toFixed(1).padStart(4, ' ')}   | Dodge:     ${Number(sk.dodge).toFixed(1).padStart(4, ' ')}   | Survival: ${Number(sk.survival).toFixed(1).padStart(4, ' ')}`,
-            `================================================================================`
-        ].join('\n');
-    }
+    formatAgentStatSheet(agentId) {\n        const a = this.agents.get(agentId);\n        if (!a) return No squad member found for ID: ;\n        const eq = a.equipment || {};\n        const sk = a.skills || {};\n        const vt = a.vitals || {};\n        return [\n            ================================================================================,\n            🛡️ SQUAD MEMBER:  (),\n            ================================================================================,\n            Role / Rank:      ,\n            Birthright:      [],\n            Stance:          [],\n            `,\n            --- VITALS ---,\n              • HP: / | Poise: /100,\n            `,\n            --- EQUIPMENT ---,\n              • Weapon:  ,\n              • Armor:   ,\n              • Trinket: ,\n            `,\n            --- ATTRIBUTES ---,\n              • Strength:  | Melee: ,\n              • Toughness:  | Lore: ,\n            ================================================================================\n        ].join('\n');\n    }
 };
 rootScope.AgentRosterManager = AgentRosterManager;
 
