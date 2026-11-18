@@ -266,8 +266,9 @@
         // Initialize Commander UI immediately on Title Card boot
         CommanderUI.init('commander-terminal-root');
 
-        // 1. Access Royal Archive -> Opens Role Selection Menu
-        softLaunchBtn?.addEventListener('click', () => {
+        // 1. Access Royal Archive -> Opens Candidate Onboarding Scene 1
+        softLaunchBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
             CandidateOnboarding.start(CommanderUI);
         });
 
@@ -301,3 +302,4 @@
 
 </body>
 </html>
+

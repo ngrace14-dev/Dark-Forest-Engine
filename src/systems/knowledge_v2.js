@@ -1,4 +1,4 @@
-/**
+﻿/**
  * File: src_systems_knowledge_v2.js
  * Purpose: Implementation of Model Layer, Knowledge Inventory, Seeker Pipeline, and Belief Revision.
  * Enforces Bible §13, §14, §16 and CA-1 through CA-4.
@@ -104,6 +104,22 @@ class KnowledgeInventory {
 
     calculateRevisionFriction(existing, newData) {
         return existing.confidence * Math.min(1.0, existing.age / 100) * (this.continuityDebt / 100);
+    }
+
+    generateContracts() {
+        // Prune completed or abandoned contracts to keep memory bounded across centuries
+        if (this.contracts.length > 25) {
+            this.contracts = this.contracts.filter(c => c.status !== 'DELIVERED' && c.status !== 'ABANDONED' && c.status !== 'FAILED');
+        }
+        const deficits = this.getKnowledgeDeficits();
+        deficits.slice(0, 3).forEach(deficit => {
+            if (!this.contracts.find(c => c.targetIntelId === deficit.id && c.status !== 'FAILED' && c.status !== 'DELIVERED' && c.status !== 'ABANDONED')) {
+                if (typeof this.generateExpeditionPacket === 'function') this.generateExpeditionPacket(deficit.id);
+            }
+        });
+        if (this.stabilityScore >= this.curiosityThreshold && typeof this.generateCuriosityContracts === 'function') {
+            this.generateCuriosityContracts();
+        }
     }
 }
 
@@ -227,18 +243,4 @@ class ModelLayerSystem {
 }
 
 window.ModelLayer = new ModelLayerSystem();
-export default window.ModelLayer;    generateContracts() {
-        // Prune completed or abandoned contracts to keep memory bounded across centuries
-        if (this.contracts.length > 25) {
-            this.contracts = this.contracts.filter(c => c.status !== 'DELIVERED' && c.status !== 'ABANDONED' && c.status !== 'FAILED');
-        }
-        const deficits = this.getKnowledgeDeficits();
-        deficits.slice(0, 3).forEach(deficit => {
-            if (!this.contracts.find(c => c.targetIntelId === deficit.id && c.status !== 'FAILED' && c.status !== 'DELIVERED' && c.status !== 'ABANDONED')) {
-                this.generateExpeditionPacket(deficit.id);
-            }
-        });
-        if (this.stabilityScore >= this.curiosityThreshold) this.generateCuriosityContracts();
-    }
-
-
+export default window.ModelLayer;

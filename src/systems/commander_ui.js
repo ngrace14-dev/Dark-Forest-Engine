@@ -96,6 +96,9 @@ export const CommanderUI = {
         CommanderEngine.FacilityEngine?.resetForNewRun?.();
         if (CommanderEngine.ExpeditionEngine) CommanderEngine.ExpeditionEngine.activeExpeditions = [];
         CommanderEngine.CampaignManager.selectRole(roleKey, customHouseId);
+        if (typeof window !== 'undefined' && window.CandidateOnboarding?.state?.completed) {
+            window.CandidateOnboarding.injectCandidateIntoRoster();
+        }
         this.startAutoTick();
         const h = CommanderEngine.CampaignManager.state.house;
         this.render();

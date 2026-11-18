@@ -35,20 +35,21 @@ class PersonhoodSystem {
         };
 
         this.wendigoCandidates = []; // Array of { profile, lastPosition }
+    }
 
-                /**
-                 * Intrinsic Inheritance Variance (Gaussian Noise)
-                 * Bible §BN: Reproduction is not duplication.
-                 */
-                _gaussianRandom(mean = 0, stdev = 1) {
-                    let u = 0, v = 0;
-                    while(u === 0) u = Math.random(); // Converting [0,1) to (0,1]
-                    while(v === 0) v = Math.random();
-                    let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-                    return z * stdev + mean;
-                }
+    /**
+     * Intrinsic Inheritance Variance (Gaussian Noise)
+     * Bible §BN: Reproduction is not duplication.
+     */
+    _gaussianRandom(mean = 0, stdev = 1) {
+        let u = 0, v = 0;
+        while(u === 0) u = Math.random(); // Converting [0,1) to (0,1]
+        while(v === 0) v = Math.random();
+        let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        return z * stdev + mean;
+    }
 
-                init() {
+    init() {
 
         // --- PLAYER INTEGRATION (Node 0) ---
         // Ensure the player has a profile in the Personhood System

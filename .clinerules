@@ -48,6 +48,14 @@
 - **Fail Fast Protocol:** If a tool call or command fails repeatedly, stop and ask the user for guidance rather than brute-forcing.
 - **Investigation Budget:** 1 Problem → 1 Root Cause → 1 Fix → 1 Validation.
 
+## 01-Workflow Standards & Memory Bank Protocol
+- **Memory Bank Continuity:** At the start of every session, read all files in `memory-bank/` (`projectbrief.md`, `productContext.md`, `systemPatterns.md`, `techContext.md`, `activeContext.md`, `progress.md`) before taking action.
+- **Imperative Verification:** Never assume a command succeeded. Read outputs, check logs, and run tests.
+- **Diff Editing:** Prefer targeted diff edits over full file rewrites.
+- **No Silent Failures:** If a dependency is missing or a build fails, stop and address it. Do not attempt to bypass it silently.
+- **Context Updates:** When you reach a milestone or pivot architecture, you MUST update the `memory-bank/` files to reflect the new reality.
+- **Plan & Act Lifecycle:** Maintain `implementation_plan.md` in the project root with step-by-step technical requirements, affected files, and edge cases before executing in Act Mode.
+
 
 
 

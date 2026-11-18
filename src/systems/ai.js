@@ -131,15 +131,17 @@ function getEntitySpeed(entity) {
 function defeatNpc(entity, cause = 'combat') {
     window.AdventurerManager?.markDefeated(entity);
     
-    // --- WENDIGO REBIRTH HOOK (Bible §10, §18) ---
-        if (cause === 'starvation' && entity.def.type === 'npc' && entity.def.faction !== 'monster') {
-        const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
-        const distFromCenter = Math.hypot(entity.visual.position.x, entity.visual.position.z);
-        const inCold = distFromCenter > (forestSide * 0.4); // Outside the core temperate zone
+    // --- WENDIGO REBIRTH HOOK (Bible §10, §18: Dual Starvation + Freezing Situational Pressure Collision) ---
+    const hasStarvingEffect = cause === 'starvation' || entity.isStarving || (entity.statusEffects && entity.statusEffects.some(e => e.id === 'STARVING' || e.type === 'starvation'));
+    const forestSide = window.WorldGenConfig?.darkForestSideMeters || 575843.2;
+    const distFromCenter = entity.visual?.position ? Math.hypot(entity.visual.position.x, entity.visual.position.z) : 0;
+    const inCold = distFromCenter > (forestSide * 0.4) || entity.isFreezing || (entity.statusEffects && entity.statusEffects.some(e => e.id === 'FREEZING' || e.id === 'HYPOTHERMIA' || e.type === 'cold'));
+    const killedByStarveOrFreeze = cause === 'starvation' || cause === 'freezing' || cause === 'hypothermia' || cause === 'frostbite';
 
-        if (inCold && window.PersonhoodManager) {
+    if (killedByStarveOrFreeze && hasStarvingEffect && inCold && entity.def?.type === 'npc' && entity.def?.faction !== 'monster') {
+        if (window.PersonhoodManager) {
             window.PersonhoodManager.markForWendigoRebirth(entity.id || entity.name, entity.visual.position);
-            window.EventBus.emit('UI_LOG', `[NARRATIVE] ${entity.id || entity.name} has starved in the deep cold...`);
+            window.EventBus.emit('UI_LOG', `[NARRATIVE] ${entity.id || entity.name} perished while simultaneously starving and freezing... They will return on the next Shift as a Feral Wendigo.`);
         }
 
         // --- PLAYER WENDIGO REBIRTH ---

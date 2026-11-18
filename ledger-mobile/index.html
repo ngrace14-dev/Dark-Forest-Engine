@@ -107,8 +107,6 @@ import { CandidateOnboarding } from './src/systems/candidate_onboarding.js';
         launchBtn?.addEventListener('click', () => {
             titleScreen?.classList.add('hidden');
             viewport?.classList.remove('hidden');
-            // Ensure UI is initialized before onboarding
-            CommanderUI.init('commander-terminal-root'); 
             CandidateOnboarding.start(CommanderUI);
         });
 

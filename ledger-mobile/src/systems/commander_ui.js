@@ -4,8 +4,6 @@
  *
  * Zero Three.js / WebGL dependencies. Connects directly to `src/core/commander_engine.js`
  * so the Soft-Launch Prologue boots instantaneously on the Title Card and remains
-import { CandidateOnboarding } from './candidate_onboarding.js';
-
  * foldable into the 3D Sandbox as an unlockable Commander System.
  */
 
@@ -23,9 +21,6 @@ export const CommanderUI = {
         this.bindGlobalShortcuts();
         this.render();
         return this;
-    // Temporary override to hook into the onboarding process
-
-
     },
 
     open(showRoleGate = true) {
@@ -101,6 +96,9 @@ export const CommanderUI = {
         CommanderEngine.FacilityEngine?.resetForNewRun?.();
         if (CommanderEngine.ExpeditionEngine) CommanderEngine.ExpeditionEngine.activeExpeditions = [];
         CommanderEngine.CampaignManager.selectRole(roleKey, customHouseId);
+        if (typeof window !== 'undefined' && window.CandidateOnboarding?.state?.completed) {
+            window.CandidateOnboarding.injectCandidateIntoRoster();
+        }
         this.startAutoTick();
         const h = CommanderEngine.CampaignManager.state.house;
         this.render();
@@ -571,9 +569,12 @@ export const CommanderUI = {
                     const bar = `[${'█'.repeat(pct)}${'░'.repeat(10 - pct)}] ${e.hoursElapsed}h/${e.totalHours}h`;
                     return `
                         <div class="cmd-dispatch" style="border-color:#78350f;">
-                            <div style="display:flex; justify-content:space-between; color:#5e110b; font-weight:bold;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; color:#5e110b; font-weight:bold;">
                                 <span>🧭 ${e.type} → ${e.targetName} (${e.leadAgentName})</span>
-                                <span>${e.status} ${bar}</span>
+                                <span>
+                                    ${e.status} ${bar}
+                                    <button class="cmd-btn" style="padding:1px 5px; font-size:9px; margin-left:6px;" onclick="window.recallExpedition('${e.id}')">🔄 Recall</button>
+                                </span>
                             </div>
                             <div style="margin-top:4px; color:#2b1e12; font-size:10px;">
                                 ${e.logs.map(l => `<div>• ${l}</div>`).join('')}

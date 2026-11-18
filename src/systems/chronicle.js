@@ -91,7 +91,7 @@ window.ChronicleManager = {
             if (nodeId === 'player') {
                 window.EventBus.emit('EPOCH_ACHIEVEMENT_UNLOCKED', achievement);
             }
-        }
+        },
 
 
             recordEvent: function(event) {

@@ -332,10 +332,11 @@ window.Navigation = {
             }
         }
         return [];
-    },
-
+    }
+};
 
 window.Navigation.init();
+
 
 
 

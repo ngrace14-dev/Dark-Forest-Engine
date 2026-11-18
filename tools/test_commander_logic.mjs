@@ -87,6 +87,34 @@ globalThis.document = {
 globalThis.window = globalThis;
 
 const { CommanderUI } = await import('../src/systems/commander_ui.js');
+const { CandidateOnboarding } = await import('../src/systems/candidate_onboarding.js');
+
+// Verify 4-Scene Candidate Onboarding Sequence -> Role Selection Handoff -> Custom Candidate Injection
+CandidateOnboarding.start(CommanderUI);
+if (!mockElements.get('commander-terminal-root').innerHTML.includes('STEP 1 OF 4 : IDENTITY & FLESH RECORD') || mockElements.get('text-commander-viewport').classList.contains('hidden')) {
+    failures.push('CandidateOnboarding.start() failed to unhide text-commander-viewport and render Scene 1');
+}
+window.selectBirthright('ECHO_OF_THE_SEAL');
+window.onboardingFinish(1);
+if (!mockElements.get('commander-terminal-root').innerHTML.includes('STEP 2 OF 4 : VOCATION & RUNIC ARCHITECTURE')) {
+    failures.push('CandidateOnboarding Scene 2 (Vocation) failed to render');
+}
+window.selectVocation('SCRIBE');
+window.onboardingFinish(2);
+if (!mockElements.get('commander-terminal-root').innerHTML.includes('STEP 3 OF 4 : ORIGIN & FIVE-STRAND EXTRACTOR')) {
+    failures.push('CandidateOnboarding Scene 3 (Origin Extractor) failed to render');
+}
+window.runExtractor();
+window.onboardingFinish(3);
+if (!mockElements.get('commander-terminal-root').innerHTML.includes('STEP 4 OF 4 : VOICE & LEDGER CALIBRATION')) {
+    failures.push('CandidateOnboarding Scene 4 (Voice Calibration) failed to render');
+}
+window.onboardingFinish(4);
+if (!mockElements.get('commander-terminal-root').innerHTML.includes('SELECT YOUR VANTAGE ROLE')) {
+    failures.push('CandidateOnboarding Scene 4 handoff failed to open Role Selection menu');
+}
+console.log(`[10b] Candidate Onboarding 4-Scene Sequence & Role Gate Handoff Verified (${CandidateOnboarding.state.name} | ${CandidateOnboarding.state.birthright} | ${CandidateOnboarding.state.vocation})`);
+
 CommanderUI.openRoleSelection();
 if (!mockElements.get('commander-terminal-root').innerHTML.includes('SELECT YOUR VANTAGE ROLE')) {
     failures.push('Royal Archive Role Selection menu failed to render on openRoleSelection()');
@@ -247,6 +275,36 @@ if (containRes.outcomeType !== 'CONTAINED') {
 }
 console.log(`[11d-EmergentCrisis] State-Driven Crisis Verified: ${starvationCrisis?.title} -> [${containRes.outcomeType}]`);
 
+// Verify Situational Pressure Collision: Starving + Freezing -> Lethal Trigger -> Next Shift Feral Wendigo Rebirth
+const doomedAgent = CommanderEngine.AgentRosterManager.agents.get('agt_4');
+if (doomedAgent) {
+    doomedAgent.birthright = { id: 'STORM_BORN', title: 'Storm-Born', coldImmune: false };
+    CommanderEngine.AgentRosterManager.applySituationalStatus('agt_4', 'STARVING', 14);
+    CommanderEngine.AgentRosterManager.applySituationalStatus('agt_4', 'FREEZING', 14);
+    const deathRes = CommanderEngine.AgentRosterManager.evaluateActorDeath('agt_4', 'FREEZING');
+    if (!deathRes.queuedForFeralWendigo || CommanderEngine.AgentRosterManager.feralWendigoQueue.length !== 1) {
+        failures.push('Expected actor dying while both STARVING and FREEZING to be queued for Feral Wendigo rebirth');
+    }
+    const risenList = CommanderEngine.AgentRosterManager.processShiftWendigoRebirths(14);
+    if (risenList.length !== 1 || !risenList[0].isFeral || !risenList[0].name.includes(doomedAgent.name)) {
+        failures.push(`Expected queued starved+frozen corpse to rise as Feral Wendigo on Shift Day 14, got ${JSON.stringify(risenList)}`);
+    }
+    console.log(`[11d-FeralWendigo] Situational Pressure Collision Verified: ${deathRes.message} -> Risen: ${risenList[0]?.name} (Threat: ${risenList[0]?.threatPower})`);
+}
+
+// Verify ProceduralCollisionEngine ("Grammar of Chaos"): Tier 1 Anchor + Tier 2 Catalyst + Tier 3/4 Target -> Payload Tags & Rebound
+const pce = CommanderEngine.ProceduralCollisionEngine;
+const collisionRes = pce.evaluateSector({
+    FORCE_WENDIGO_CONSUMPTION: 0.92,
+    IRON_RUST_CONSTANT: 0.91,
+    SQUAD_POISE_DECAY: 0.89
+}, 0.85);
+if (!collisionRes || !collisionRes.payload_tags.includes('TARGET_ALL_FERROUS') || !collisionRes.payload_tags.includes('SPAWN_PREDATOR_CLASS') || !collisionRes.payload_tags.includes('TRIGGER_ROUT')) {
+    failures.push(`Expected ProceduralCollisionEngine 3-way collision to synthesize combined payload tags, got ${JSON.stringify(collisionRes)}`);
+}
+console.log(`[11d-GrammarOfChaos] Procedural Collision Verified: "${collisionRes?.eventName}" | Tags=[${collisionRes?.payload_tags.join(', ')}] | Rebound=+20% on ${collisionRes?.rebound?.pressureId}`);
+
+
 CommanderUI.selectRoleAndLaunch('SYNDICATE');
 
 // Verify Squad Armory Auto-Sort, Individual Equip & Character Stat Sheet
@@ -311,4 +369,5 @@ if (failures.length > 0) {
     process.exit(1);
 } else {
     console.log("✅ ALL PHASE 1 & PHASE 2 GENERAL LEDGER & EPITAPH RELATIVITY CHECKS PASSED!");
+    process.exit(0);
 }

@@ -99,6 +99,8 @@ export const SQUAD_ARMORY_CATALOG = {
 const AgentRosterManager = rootScope.AgentRosterManager || {
     agents: new Map(),
     squadArmoryStock: ['ironwood_spear', 'widow_resin_blade', 'kinetic_silk_coat', 'grimsby_plate', 'gloom_lens_lantern'],
+    feralWendigoQueue: [],
+    spawnedFeralWendigos: [],
 
     createAgent(id, name, archeType = 'SURVIVOR') {
         const day = rootScope.EngineParams?.worldDay || 1;
@@ -177,6 +179,9 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
     },
 
     applyShiftSurvivalConditions(barrierHealthy = true, starved = false, breachFought = false) {
+        const day = rootScope.EngineParams?.worldDay || 1;
+        this.processShiftWendigoRebirths(day);
+
         this.agents.forEach(agent => {
             if (!agent.alive) return;
             agent.shiftsSurvived = (agent.shiftsSurvived || 0) + 1;
@@ -187,15 +192,134 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
             } else if (!agent.birthright?.voidImmune) {
                 agent.statusEffects.push({ id: 'VOID_TREMORS', name: 'Void Tremors', type: 'DEBUFF', daysRemaining: 7, desc: '-10 Poise' });
                 agent.vitals.poise = Math.max(10, agent.vitals.poise - 10);
+                if (!agent.birthright?.coldImmune) {
+                    this.applySituationalStatus(agent.id, 'FREEZING', 14);
+                }
             }
             if (breachFought) {
                 agent.statusEffects.push({ id: 'VETERAN_POISE', name: 'Veteran Poise', type: 'BUFF', daysRemaining: 52, desc: '+20 Defense' });
             }
             if (starved && !agent.birthright?.coldImmune) {
+                this.applySituationalStatus(agent.id, 'STARVING', 26);
                 agent.statusEffects.push({ id: 'FAMINE_SCARRED', name: 'Famine Scarred', type: 'DEBUFF', daysRemaining: 26, desc: '-10 Max HP' });
                 agent.vitals.maxHp = Math.max(30, agent.vitals.maxHp - 10);
             }
         });
+    },
+
+    applySituationalStatus(agentId, effectId, daysRemaining = 14) {
+        const agent = this.agents.get(agentId);
+        if (!agent || !agent.alive) return false;
+        const id = String(effectId || '').toUpperCase();
+        if ((id === 'FREEZING' || id === 'HYPOTHERMIA') && agent.birthright?.coldImmune) return false;
+        agent.statusEffects ??= [];
+        const existing = agent.statusEffects.find(e => e.id === id);
+        if (existing) {
+            existing.daysRemaining = Math.max(existing.daysRemaining, daysRemaining);
+        } else {
+            agent.statusEffects.push({
+                id,
+                name: id === 'STARVING' ? 'Starving' : (id === 'FREEZING' ? 'Freezing' : id),
+                type: 'SITUATIONAL_PRESSURE',
+                daysRemaining,
+                desc: id === 'STARVING' ? 'Metabolic caloric collapse' : 'Sub-zero White Void frost exposure'
+            });
+        }
+        return true;
+    },
+
+    evaluateActorDeath(agentId, lethalCause = 'STARVING') {
+        const agent = this.agents.get(agentId);
+        if (!agent || !agent.alive) return { died: false };
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const causeUpper = String(lethalCause || '').toUpperCase();
+        const effects = agent.statusEffects || [];
+
+        const hasStarving = effects.some(e => e.id === 'STARVING' || e.id === 'FAMINE_SCARRED') || (agent.vitals?.hunger !== undefined && agent.vitals.hunger <= 0);
+        const hasFreezing = !agent.birthright?.coldImmune && (effects.some(e => e.id === 'FREEZING' || e.id === 'HYPOTHERMIA') || (agent.vitals?.temp !== undefined && agent.vitals.temp <= 0));
+        const killedByStarveOrFreeze = causeUpper.includes('STARV') || causeUpper.includes('FREEZ') || causeUpper.includes('FROST') || causeUpper.includes('COLD') || causeUpper.includes('FAMINE');
+
+        agent.alive = false;
+        agent.vitals.hp = 0;
+
+        const dualPressureCollision = hasStarving && hasFreezing && killedByStarveOrFreeze;
+
+        if (dualPressureCollision) {
+            const candidate = {
+                formerAgentId: agent.id,
+                formerName: agent.name,
+                houseId: agent.assignedHouseId || CampaignManager?.state?.house?.houseId || 'House Terminus',
+                deathDay: day,
+                lethalTrigger: causeUpper,
+                scheduledRebirthShiftDay: Math.ceil((day + 1) / 14) * 14,
+                significance: agent.significance || 20
+            };
+            this.feralWendigoQueue.push(candidate);
+            CrucibleNarrativeEngine.processActorDeath({
+                id: agent.id,
+                name: agent.name,
+                cause: `Perished from ${causeUpper} while simultaneously Starving and Freezing (Marked for Feral Wendigo Rebirth on next Shift)`
+            });
+            rootScope.EventBus?.emit('FERAL_WENDIGO_CANDIDATE_QUEUED', candidate);
+            return {
+                died: true,
+                queuedForFeralWendigo: true,
+                candidate,
+                message: `❄️🩸 [SITUATIONAL PRESSURE COLLISION] ${agent.name} succumbed to ${causeUpper} while both STARVING and FREEZING. Their corpse has crystallized in the frost — they will rise as a Feral Wendigo on the next Shift!`
+            };
+        }
+
+        CrucibleNarrativeEngine.processActorDeath({
+            id: agent.id,
+            name: agent.name,
+            cause: lethalCause
+        });
+        return {
+            died: true,
+            queuedForFeralWendigo: false,
+            message: `💀 ${agent.name} perished from ${lethalCause}.`
+        };
+    },
+
+    processShiftWendigoRebirths(day = 14) {
+        if (!this.feralWendigoQueue || this.feralWendigoQueue.length === 0) return [];
+        const newlyRisen = [];
+        const batch = [...this.feralWendigoQueue];
+        this.feralWendigoQueue = [];
+
+        batch.forEach(can => {
+            const feral = {
+                id: `feral_wendigo_${can.formerAgentId}_${day}`,
+                name: `Feral Wendigo (${can.formerName})`,
+                formerAgentId: can.formerAgentId,
+                formerName: can.formerName,
+                originHouse: can.houseId,
+                risenDay: day,
+                type: 'FERAL_WENDIGO',
+                isFeral: true,
+                isSentient: false,
+                hungerLevel: 100,
+                threatPower: Math.round(35 + (can.significance || 20) * 0.8)
+            };
+            this.spawnedFeralWendigos.push(feral);
+            newlyRisen.push(feral);
+
+            LogDispatchManager.dispatches.unshift({
+                id: `wendigo_rise_${day}_${can.formerAgentId}`,
+                day,
+                type: 'VOID HORROR ALERT',
+                sender: 'Perimeter Watchtower',
+                title: `Feral Wendigo Risen from the Shift: ${can.formerName}`,
+                body: `During the 14-day Shift reconfiguration, the frozen, starved corpse of ${can.formerName} collapsed spatially and rose from the White Void as a shrieking Feral Wendigo (Threat: ${feral.threatPower}) stalking the ${can.houseId} perimeter!`,
+                read: false
+            });
+            rootScope.EventBus?.emit('FERAL_WENDIGO_RISEN', feral);
+        });
+
+        if (newlyRisen.length > 0 && rootScope.CrisisEngine) {
+            rootScope.CrisisEngine.volatilityIndex = Math.min(100, (rootScope.CrisisEngine.volatilityIndex || 0) + newlyRisen.length * 15);
+        }
+        return newlyRisen;
     },
 
     cultivateTerminusRunic(agentId, houseState) {
@@ -968,6 +1092,232 @@ export const RoleStateMachine = rootScope.RoleStateMachine || {
 };
 rootScope.RoleStateMachine = RoleStateMachine;
 
+export const PRESSURE_TAG_REGISTRY = {
+    FORCE_WENDIGO_CONSUMPTION: {
+        id: 'FORCE_WENDIGO_CONSUMPTION',
+        tier: 1,
+        prefixDescriptor: 'Feral-Starved',
+        payload_tags: ['APPLY_MUTATION_FERAL', 'LOCK_VITAL_HP', 'SPAWN_PREDATOR_CLASS']
+    },
+    FORCE_CROW_SIGNIFICANCE: {
+        id: 'FORCE_CROW_SIGNIFICANCE',
+        tier: 1,
+        prefixDescriptor: 'Omen-Marked',
+        payload_tags: ['INFLATE_STORY_DENSITY', 'DRAIN_SANITY_POISE']
+    },
+    FORCE_CROWN_ORDER: {
+        id: 'FORCE_CROWN_ORDER',
+        tier: 1,
+        prefixDescriptor: 'Inquisitorial',
+        payload_tags: ['ENFORCE_CROWN_AUDIT', 'SEIZE_BARRIER_FUEL']
+    },
+    FORCE_FOREST_POSSIBILITY: {
+        id: 'FORCE_FOREST_POSSIBILITY',
+        tier: 1,
+        prefixDescriptor: 'Non-Euclidean',
+        payload_tags: ['SPIKE_BLIND_SPOT_ENTROPY', 'SCATTER_COORDINATES']
+    },
+    IRON_RUST_CONSTANT: {
+        id: 'IRON_RUST_CONSTANT',
+        tier: 2,
+        nounDescriptor: 'Rust-Storm',
+        payload_tags: ['TARGET_ALL_FERROUS', 'DEGRADE_TIER_MAX', 'INFECT_WOUNDS']
+    },
+    SHIFT_DRIFT_PROXIMITY: {
+        id: 'SHIFT_DRIFT_PROXIMITY',
+        tier: 2,
+        nounDescriptor: 'Void-Shear',
+        payload_tags: ['SCATTER_COORDINATES', 'FREEZE_TETHER_LINKS']
+    },
+    MIST_DEPTH_DENSITY: {
+        id: 'MIST_DEPTH_DENSITY',
+        tier: 2,
+        nounDescriptor: 'Copper-Fog Ambush',
+        payload_tags: ['OBSCURE_LOS_MIST', 'INFECT_WOUNDS']
+    },
+    SQUAD_POISE_DECAY: {
+        id: 'SQUAD_POISE_DECAY',
+        tier: 4,
+        failureNoun: 'Shattered Cohesion',
+        payload_tags: ['BREAK_COHESION', 'TRIGGER_ROUT', 'DROP_CARGO']
+    },
+    TETHER_TENSION_LIMIT: {
+        id: 'TETHER_TENSION_LIMIT',
+        tier: 3,
+        failureNoun: 'Anchor Fracture',
+        payload_tags: ['FRACTURE_ANCHOR_CHAINS', 'SEIZE_BARRIER_FUEL']
+    },
+    ANOMALY_CONTAINMENT_ENTROPY: {
+        id: 'ANOMALY_CONTAINMENT_ENTROPY',
+        tier: 3,
+        failureNoun: 'Vault Breach',
+        payload_tags: ['SPIKE_BLIND_SPOT_ENTROPY', 'DRAIN_SANITY_POISE']
+    }
+};
+
+export const ProceduralCollisionEngine = rootScope.ProceduralCollisionEngine || {
+    registry: PRESSURE_TAG_REGISTRY,
+    collisionHistory: [],
+    reboundOffsets: {},
+
+    getBoilingPressures(sectorState = {}, threshold = 0.85) {
+        const h = CampaignManager?.state?.house || {};
+        const o = CampaignManager?.state?.order || {};
+        const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const shiftProximity = 14 - (day % 14);
+
+        const scores = {
+            FORCE_WENDIGO_CONSUMPTION: sectorState.FORCE_WENDIGO_CONSUMPTION ?? (h.barrierFuelUnits <= 10 ? 0.90 : 0.45),
+            FORCE_CROW_SIGNIFICANCE: sectorState.FORCE_CROW_SIGNIFICANCE ?? ((CampaignManager?.state?.patron?.candidateSignificance || 25) / 80),
+            FORCE_CROWN_ORDER: sectorState.FORCE_CROWN_ORDER ?? ((h.crownScrutiny || 10) / 70),
+            FORCE_FOREST_POSSIBILITY: sectorState.FORCE_FOREST_POSSIBILITY ?? ((o.blindSpotEntropy || 12) / 60),
+            IRON_RUST_CONSTANT: sectorState.IRON_RUST_CONSTANT ?? (shiftProximity <= 3 ? 0.88 : 0.40),
+            SHIFT_DRIFT_PROXIMITY: sectorState.SHIFT_DRIFT_PROXIMITY ?? ((14 - shiftProximity) / 14),
+            MIST_DEPTH_DENSITY: sectorState.MIST_DEPTH_DENSITY ?? 0.50,
+            SQUAD_POISE_DECAY: sectorState.SQUAD_POISE_DECAY ?? ((100 - sq.avgPoise) / 65),
+            TETHER_TENSION_LIMIT: sectorState.TETHER_TENSION_LIMIT ?? ((100 - (h.chainsIntegrity || 100)) / 35),
+            ANOMALY_CONTAINMENT_ENTROPY: sectorState.ANOMALY_CONTAINMENT_ENTROPY ?? ((o.blindSpotEntropy || 12) / 50)
+        };
+
+        const active = [];
+        for (const [id, def] of Object.entries(this.registry)) {
+            const val = Number(((scores[id] || 0) + (this.reboundOffsets[id] || 0)).toFixed(2));
+            if (val >= threshold) {
+                active.push({ ...def, currentPressure: val, threshold_reached: true });
+            }
+        }
+        return active.sort((a, b) => b.currentPressure - a.currentPressure);
+    },
+
+    synthesizeTags(anchor, catalyst, target) {
+        return Array.from(new Set([
+            ...(anchor?.payload_tags || []),
+            ...(catalyst?.payload_tags || []),
+            ...(target?.payload_tags || [])
+        ]));
+    },
+
+    applyPayload(sectorState = {}, payloadTags = []) {
+        const effectsApplied = [];
+        const h = CampaignManager?.state?.house || {};
+        const o = CampaignManager?.state?.order || {};
+        const day = rootScope.EngineParams?.worldDay || 1;
+
+        if (payloadTags.includes('TARGET_ALL_FERROUS') && payloadTags.includes('DEGRADE_TIER_MAX')) {
+            AgentRosterManager.agents.forEach(agt => {
+                if (!agt.alive) return;
+                if (agt.equipment?.weapon) agt.equipment.weapon.degradedToZero = true;
+                if (agt.equipment?.armor) agt.equipment.armor.degradedToZero = true;
+                agt.skills.meleeAtt = Math.max(1, Number((agt.skills.meleeAtt - 1.5).toFixed(2)));
+                agt.skills.meleeDef = Math.max(1, Number((agt.skills.meleeDef - 1.5).toFixed(2)));
+            });
+            effectsApplied.push('Ferrous weapons & armor dissolved to Tier 0');
+        }
+
+        if (payloadTags.includes('APPLY_MUTATION_FERAL') || payloadTags.includes('SPAWN_PREDATOR_CLASS')) {
+            const spawned = {
+                id: `proc_pred_${day}_${this.collisionHistory.length + 1}`,
+                name: sectorState.eventName || 'Rusted Feral Stalker',
+                risenDay: day,
+                type: 'PROCEDURAL_PREDATOR',
+                isFeral: true,
+                threatPower: 55
+            };
+            AgentRosterManager.spawnedFeralWendigos.push(spawned);
+            effectsApplied.push(`Spawned ${spawned.name} (Threat: ${spawned.threatPower})`);
+        }
+
+        if (payloadTags.includes('BREAK_COHESION') || payloadTags.includes('TRIGGER_ROUT') || payloadTags.includes('DROP_CARGO')) {
+            AgentRosterManager.agents.forEach(agt => {
+                if (!agt.alive) return;
+                agt.vitals.poise = Math.max(10, (agt.vitals.poise || 60) - 20);
+                if (agt.operatingStance?.mode === 'OUT_ON_MISSION') {
+                    agt.operatingStance.mode = 'ROUTED';
+                }
+            });
+            if (ExpeditionEngine?.activeExpeditions?.length > 0) {
+                const exp = ExpeditionEngine.activeExpeditions[0];
+                exp.cargoIntegrity = Math.max(0, (exp.cargoIntegrity ?? 100) - 50);
+                exp.status = 'RETREATED';
+                exp.logs.push(`[COLLISION ROUT] Formation shattered! Squad dropped cargo and fled.`);
+            }
+            effectsApplied.push('Squad cohesion broken; cargo dropped in rout');
+        }
+
+        if (payloadTags.includes('SEIZE_BARRIER_FUEL')) {
+            h.barrierFuelUnits = Math.max(0, (h.barrierFuelUnits || 20) - 6);
+            effectsApplied.push('Barrier fuel drained (-6u)');
+        }
+        if (payloadTags.includes('FRACTURE_ANCHOR_CHAINS') || payloadTags.includes('FREEZE_TETHER_LINKS')) {
+            h.chainsIntegrity = Math.max(0, (h.chainsIntegrity || 100) - 10);
+            effectsApplied.push('Anchor chains fractured (-10%)');
+        }
+        if (payloadTags.includes('SPIKE_BLIND_SPOT_ENTROPY')) {
+            o.blindSpotEntropy = Math.min(100, (o.blindSpotEntropy || 12) + 8);
+            effectsApplied.push('Blind-Spot Entropy spiked (+8%)');
+        }
+
+        return effectsApplied;
+    },
+
+    increaseRandomLocalPressure(delta = 0.20) {
+        const keys = Object.keys(this.registry);
+        const idx = this.collisionHistory.length % keys.length;
+        const pickedKey = keys[idx];
+        this.reboundOffsets[pickedKey] = Number(((this.reboundOffsets[pickedKey] || 0) + delta).toFixed(2));
+        return { pressureId: pickedKey, newOffset: this.reboundOffsets[pickedKey] };
+    },
+
+    evaluateSector(sectorState = {}, threshold = 0.85) {
+        const activePressures = this.getBoilingPressures(sectorState, threshold);
+        if (activePressures.length >= 3) {
+            return this.generateEmergentCrisis(sectorState, activePressures);
+        }
+        return null;
+    },
+
+    generateEmergentCrisis(sectorState = {}, pressures = []) {
+        const anchor = pressures.find(p => p.tier === 1);
+        const catalyst = pressures.find(p => p.tier === 2);
+        const target = pressures.find(p => p.tier === 3 || p.tier === 4);
+        if (!anchor || !catalyst || !target) return null;
+
+        const eventName = `${anchor.prefixDescriptor || 'Anomalous'} ${catalyst.nounDescriptor || 'Surge'} of ${target.failureNoun || 'Collapse'}`;
+        const payloadTags = this.synthesizeTags(anchor, catalyst, target);
+        const effectsApplied = this.applyPayload({ ...sectorState, eventName }, payloadTags);
+        const rebound = this.increaseRandomLocalPressure(0.20);
+        const day = rootScope.EngineParams?.worldDay || 1;
+
+        const record = {
+            id: `collision_${day}_${this.collisionHistory.length + 1}`,
+            day,
+            eventName,
+            anchor: anchor.id,
+            catalyst: catalyst.id,
+            target: target.id,
+            payload_tags: payloadTags,
+            effectsApplied,
+            rebound
+        };
+        this.collisionHistory.unshift(record);
+
+        LogDispatchManager.dispatches.unshift({
+            id: record.id,
+            day,
+            type: 'PROCEDURAL COLLISION ANOMALY',
+            sender: 'Grammar of Chaos Kernel',
+            title: `⚡ ${eventName}`,
+            body: `Collision [${anchor.id} + ${catalyst.id} + ${target.id}] executed tags [${payloadTags.join(', ')}]. Effects: ${effectsApplied.join('; ')}. Rebound: +20% on ${rebound.pressureId}.`,
+            read: false
+        });
+
+        rootScope.EventBus?.emit('PROCEDURAL_COLLISION_EXECUTED', record);
+        return record;
+    }
+};
+rootScope.ProceduralCollisionEngine = ProceduralCollisionEngine;
+
 // ============================================================================
 // 5.1 CAMPAIGN COMMAND MANAGER
 // ============================================================================
@@ -1037,6 +1387,8 @@ const CampaignManager = rootScope.CampaignManager || {
             rootScope.ExpeditionEngine.completedLogs = [];
         }
         AgentRosterManager.agents.clear();
+        AgentRosterManager.feralWendigoQueue = [];
+        AgentRosterManager.spawnedFeralWendigos = [];
         AgentRosterManager.squadArmoryStock = ['ironwood_spear', 'widow_resin_blade', 'kinetic_silk_coat', 'grimsby_plate', 'gloom_lens_lantern'];
         LogDispatchManager.dispatches = [];
         LogDispatchManager.unreadCount = 0;
@@ -1292,6 +1644,10 @@ const CampaignManager = rootScope.CampaignManager || {
         const currentRoleState = this.state[this.campaignMode.toLowerCase()];
         if (currentRoleState && typeof currentRoleState.dreamSiphon === 'number') {
             currentRoleState.dreamSiphon = Math.min(100, currentRoleState.dreamSiphon + 2);
+        }
+
+        if (day % 14 === 0) {
+            AgentRosterManager.processShiftWendigoRebirths(day);
         }
 
         this.tickDailyWarBoard(day);
@@ -2988,6 +3344,8 @@ export const CommanderEngine = {
 
     CampaignManager,
     RoleStateMachine,
+    ProceduralCollisionEngine,
+    PRESSURE_TAG_REGISTRY,
     HOUSE_MONOPOLY_MODIFIERS,
     AgentRosterManager,
     LogDispatchManager,

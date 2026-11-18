@@ -1,4 +1,4 @@
-approvedimport * as THREE from 'three';
+import * as THREE from 'three';
 
 /**
  * File: src_systems_encounters.js

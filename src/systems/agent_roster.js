@@ -1,4 +1,4 @@
-﻿import { BIRTHRIGHTS } from './commander_engine.js';
+﻿import { BIRTHRIGHTS } from '../core/commander_engine.js';
 
 window.AgentRosterManager = {
     agents: new Map(),
@@ -76,14 +76,14 @@ window.AgentRosterManager = {
         const agent = this.agents.get(agentId);
         if (!agent || !agent.alive) return { success: false, message: 'Agent invalid or deceased.' };
         agent.operatingStance = { mode: 'TRAIN', discipline: discipline.toUpperCase(), task: null, daysTrained: 0 };
-        return { success: true, message: ${agent.name} assigned to drill: [TRAIN: ]. };
+        return { success: true, message: `${agent.name} assigned to drill: [TRAIN: ${discipline.toUpperCase()}].` };
     },
 
     setTask: function(agentId, taskType, targetId = null) {
         const agent = this.agents.get(agentId);
         if (!agent || !agent.alive) return { success: false, message: 'Agent invalid or deceased.' };
         agent.operatingStance = { mode: 'TASK', discipline: null, task: taskType.toUpperCase(), targetId, daysTrained: 0 };
-        return { success: true, message: ${agent.name} dispatched: [TASK: ]. };
+        return { success: true, message: `${agent.name} dispatched: [TASK: ${taskType.toUpperCase()}].` };
     },
 
     assignTask: function(agentId, taskType, targetId = null) {
@@ -100,7 +100,7 @@ window.AgentRosterManager = {
                 if (st.discipline === 'LOGISTICS' && st.daysTrained >= 7 && agent.career.rank !== 'Logistics Bailiff') {
                     agent.career.rank = 'Logistics Bailiff';
                     agent.career.id = 'quartermaster';
-                    if (window.EventBus) window.EventBus.emit('UI_LOG', 📜 [PROMOTION]  mastered logistics: Promoted to Logistics Bailiff!);
+                    if (window.EventBus) window.EventBus.emit('UI_LOG', `📜 [PROMOTION] ${agent.name} mastered logistics: Promoted to Logistics Bailiff!`);
                 } else if (st.discipline === 'MARTIAL') {
                     agent.skills.meleeAtt = Math.min(20, agent.skills.meleeAtt + 0.1);
                 } else if (st.discipline === 'DEFENSE') {
@@ -151,7 +151,7 @@ window.AgentRosterManager = {
         agent.cultivation.stage = (agent.cultivation.stage || 0) + 1;
 
         if (agent.cultivation.stage < 3) {
-            return { success: true, message: Terminus Bone-Carving Stage /3 complete for . Ancient syntax engraved. };
+            return { success: true, message: `Terminus Bone-Carving Stage ${agent.cultivation.stage}/3 complete for ${agent.name}. Ancient syntax engraved.` };
         }
 
         agent.cultivation.isCultivatedGuardian = true;
@@ -164,8 +164,8 @@ window.AgentRosterManager = {
         agent.vitals.poise = 100;
         agent.statusEffects.push({ id: 'FOUNDATION_FIRE', name: 'Foundation Fire', type: 'SURGE', daysRemaining: 14, desc: '+200% all combat effectiveness' });
 
-        if (window.EventBus) window.EventBus.emit('UI_LOG', 🔥 [TERMINUS] BREAKTHROUGH SURGE:  has ignited the Foundation Fire and joined the 300 Guardians! (+500y Lifespan));
+        if (window.EventBus) window.EventBus.emit('UI_LOG', `🔥 [TERMINUS] BREAKTHROUGH SURGE: ${agent.name} has ignited the Foundation Fire and joined the 300 Guardians! (+500y Lifespan)`);
 
-        return { success: true, message: BREAKTHROUGH ASCENSION!  is now an immortal Guardian of the 300 (+500y lifespan, Foundation Fire ignited). };
+        return { success: true, message: `BREAKTHROUGH ASCENSION! ${agent.name} is now an immortal Guardian of the 300 (+500y lifespan, Foundation Fire ignited).` };
     }
 };

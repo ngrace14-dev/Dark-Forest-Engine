@@ -423,15 +423,12 @@ class CrowsEyeSystem {
                     <!-- INSPECTION PANEL -->
                     <div style="background: rgba(15, 23, 42, 0.95); border-left: 1px solid #78350f; display: ${this.isInspectionExpanded ? 'flex' : 'none'}; flex-direction: column; height: 100%; min-height: 0; transition: width 0.3s ease; position: relative; z-index: 5;">
                         <div style="flex-grow: 1; overflow-y: auto; padding: 20px;">
-                                    <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px;">INSPECTION</div>
-                                    ${inspectedHtml || this.renderDefaultInspection()}
-                                </div>
-
+                            <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px;">INSPECTION</div>
+                            ${inspectedHtml || this.renderDefaultInspection()}
+                        </div>
                     </div>
-
-                                                   </div>
-                    </div>
-                            this.overlay.innerHTML = "<div style='display:flex; justify-content:center; align-items:center; height:100%;'>CROW'S EYE ACTIVE<br>Waiting for telemetry...</div>";
+                </div>
+            `;
         this.overlay.style.position = 'fixed';
         this.overlay.style.inset = '0';
         this.overlay.style.zIndex = '100'; // Lowered from 10000 to allow UI panels in front
@@ -801,58 +798,24 @@ class CrowsEyeSystem {
                     <!-- INSPECTION PANEL -->
                     <div style="background: rgba(15, 23, 42, 0.95); border-left: 1px solid #78350f; display: ${this.isInspectionExpanded ? 'flex' : 'none'}; flex-direction: column; height: 100%; min-height: 0; transition: width 0.3s ease; position: relative; z-index: 5;">
                         <div style="flex-grow: 1; overflow-y: auto; padding: 20px;">
-                                    <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px;">INSPECTION</div>
-                                    ${inspectedHtml || this.renderDefaultInspection()}
-                                </div>
-
-                    </div>
-
-                                                   </div>
-                    </div>
-                    // FOOTER
-        html += `<div style="grid-column: 1 / span 2; background: #000; border-top: 1px solid #451a03; padding: 3px 20px; font-size: 9px; color: #451a03; display: flex; justify-content: space-between; z-index: 10; height: 25px; box-sizing: border-box; align-items: center;">
-            <div>ACTIVE RUNTIME PATH: SIMULATION_STABLE</div>
-            <div style="color: #fbbf24; opacity: 0.5;">DARK FOREST CONSTITUTION COMPLIANT</div>
-            <div style="display:flex; gap:20px;">
-                <div style="color:${window.Navigation?.referenceFrame === 'ABSOLUTE' ? '#fbbf24' : 'inherit'}; cursor:pointer;" 
-                    onclick="window.Navigation.referenceFrame = window.Navigation.referenceFrame === 'RELATIVE' ? 'ABSOLUTE' : 'RELATIVE'; window.CrowsEye.updateTimer=1.0;">
-                    REF: ${window.Navigation?.referenceFrame || 'RELATIVE'}
-                </div>
-                <div>COORD: [${Math.round(this.pan.x)}, ${Math.round(this.pan.z)}] | ZOOM: ${this.zoom.toFixed(3)}x</div>
-            </div>
-        </div>`;
-
-        this.overlay.innerHTML = `
-            <div style="width: 100%; height: 100vh; display: grid; grid-template-columns: 1fr ${this.isInspectionExpanded ? '400px' : '0px'}; grid-template-rows: auto 1fr auto; gap: 0; box-sizing: border-box; overflow: hidden; background: #040608;">
-                <!-- HEADER -->
-                <div style="grid-column: 1 / span 2; background: #000; border-bottom: 1px solid #451a03; padding: 5px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 10; height: 40px; box-sizing: border-box;">
-                    <div style="font-size: 16px; color: #f59e0b; font-weight: bold; letter-spacing: 2px;">CROW'S EYE - ${currentEffectiveView}</div>
-                    <div style="display: flex; gap: 20px; align-items: center;">
-                        <div style="color: #78350f; font-size: 11px;">DAY: ${worldDay} | TIME: ${window.EngineParams?.timeOfDay?.toFixed(1) || 0}h</div>
-                        <div data-action="toggle-inspect" style="cursor: pointer; background: #1e1b4b; color: #fbbf24; padding: 4px 10px; font-size: 10px; border: 1px solid #451a03;">
-                            ${this.isInspectionExpanded ? 'CLOSE INSPECT' : 'OPEN INSPECT'}
+                            <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px;">INSPECTION</div>
+                            ${inspectedHtml || this.renderDefaultInspection()}
                         </div>
                     </div>
-                </div>
 
-                <!-- MAIN CONTENT AREA -->
-                <div style="display: flex; flex-direction: column; height: 100%; overflow: hidden; min-height: 0; padding: 5px 10px;">
-                    ${navHtml}
-                    <div id="ce-atlas-viewport" style="flex-grow: 1; overflow: hidden; background: rgba(0,0,0,0.3); border: 1px solid #451a03; min-height: 0; box-sizing: border-box; position: relative;">
-                        ${contentHtml}
+                    <!-- FOOTER -->
+                    <div style="grid-column: 1 / span 2; background: #000; border-top: 1px solid #451a03; padding: 3px 20px; font-size: 9px; color: #451a03; display: flex; justify-content: space-between; z-index: 10; height: 25px; box-sizing: border-box; align-items: center;">
+                        <div>ACTIVE RUNTIME PATH: SIMULATION_STABLE</div>
+                        <div style="color: #fbbf24; opacity: 0.5;">DARK FOREST CONSTITUTION COMPLIANT</div>
+                        <div style="display:flex; gap:20px;">
+                            <div style="color:${window.Navigation?.referenceFrame === 'ABSOLUTE' ? '#fbbf24' : 'inherit'}; cursor:pointer;" 
+                                onclick="window.Navigation.referenceFrame = window.Navigation.referenceFrame === 'RELATIVE' ? 'ABSOLUTE' : 'RELATIVE'; window.CrowsEye.updateTimer=1.0;">
+                                REF: ${window.Navigation?.referenceFrame || 'RELATIVE'}
+                            </div>
+                            <div>COORD: [${Math.round(this.pan.x)}, ${Math.round(this.pan.z)}] | ZOOM: ${this.zoom.toFixed(3)}x</div>
+                        </div>
                     </div>
-                </div>
-
-                <!-- INSPECTION PANEL -->
-                <div style="background: rgba(15, 23, 42, 0.95); border-left: 1px solid #78350f; display: ${this.isInspectionExpanded ? 'flex' : 'none'}; flex-direction: column; height: 100%; min-height: 0; transition: width 0.3s ease; position: relative; z-index: 5;">
-                    <div style="flex-grow: 1; overflow-y: auto; padding: 20px;">
-                        <div style="color: #fbbf24; font-size: 18px; border-bottom: 1px solid #78350f; padding-bottom: 10px; margin-bottom: 10px;">INSPECTION</div>
-                        ${inspectedHtml || this.renderDefaultInspection()}
-                    </div>
-                </div>
-
-                ${html.split('<!-- FOOTER -->')[1] || html}
-            </div>`;
+                </div>`;
     }
 
 
@@ -1430,7 +1393,11 @@ class CrowsEyeSystem {
         this.lastStats = currentStats;
     }
 
-                const ent = window.GameCore?.activeEntities.find(e => e.id === this.selectedEntityId) || 
+    renderDefaultInspection() {
+        if (!this.selectedEntityId) {
+            return '<div style="color: #451a03; text-align: center; margin-top: 50px;">Select an entity or settlement on the map to inspect.</div>';
+        }
+        const ent = window.GameCore?.activeEntities.find(e => e.id === this.selectedEntityId) || 
                     window.VillageManager?.villages.find(v => `village_${v.id}` === this.selectedEntityId);
                     
         if (!ent) return '<div style="color: #451a03; text-align: center; margin-top: 50px;">Entity no longer in simulation.</div>';
@@ -2048,4 +2015,17 @@ class CrowsEyeSystem {
 
         houses.forEach(house => {
             // KEY INFLUENCER DETECTION (Node 2)
-            const houseMembers = Arra
+            const houseMembers = Array.from(window.PersonhoodManager.profiles.values()).filter(p => p.house === house.name);
+            html += `<div style="border:1px solid #78350f; padding:10px; background:rgba(0,0,0,0.4);">
+                <div style="color:#fbbf24; font-weight:bold;">${house.name}</div>
+                <div style="font-size:11px; color:#94a3b8;">Members Tracked: ${houseMembers.length}</div>
+            </div>`;
+        });
+        html += `</div>`;
+        return html;
+    }
+}
+
+window.CrowsEye = new CrowsEyeSystem();
+export default window.CrowsEye;
+
