@@ -23,3 +23,4 @@
 
 ## 3. Immediate Next Steps
 1. Ready for user playtesting across all 5 Brutalist Runic-Iron UI pages (`src/` and `ledger-mobile/`) or the next systemic milestone.
+2. **July 3D Beta Blueprint Locked (Hybrid Tomographic Pipeline):** Recorded the **3-Layer Hybrid Tomographic Observer** specification in `memory-bank/july_beta_plan.md` (combining Pre-Baked High-Poly 3D Asset Slice Atlases + Real-Time In-Browser GPU Orthographic Slicing + Procedural GLSL Laniakea / Grammar of Chaos Shader Slices).

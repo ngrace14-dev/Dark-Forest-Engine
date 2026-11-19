@@ -18,7 +18,7 @@
 - [x] **Tag-Based Procedural Collision Engine ("Grammar of Chaos"):** Convert the 130-pressure registry into tag-bearing data objects (`Tier 1 Anchor + Tier 2 Catalyst + Tier 3/4 Target`) with automatic payload execution and pressure rebound across Desktop and `ledger-mobile/`.
 - [x] **Phase 4 Causal Narrative Manifests, Persistent World Qualities & Active Crucible Scar Modifiers:** Wired `narrativeManifest` causal synthesis, persistent `RealityEditorVault.worldQualities`, and active `crucible` scar combat/skill modifiers across `src/` and `ledger-mobile/`.
 - [x] **Multi-Century Stress Test (1,000+ Years):** Verify zero systemic runaway or memory leaks under the new Procedural Collision Engine (365,000 days / 26,071 Shifts passed in 2.69s).
-- [ ] **July Milestone (Visual Push):** 3D Crow's Eye Laniakea supercluster map & player-facing HUD integration (currently frozen per guardrails).
+- [ ] **July 3D Beta Milestone ("The Tomographic Observer" — 3-Layer Hybrid Volumetric Slice Stack):** Build the 3D world & Crow's Eye supercluster map using a **Hybrid Tomographic Pipeline** (Layer 1: Pre-baked high-poly `.glb`/`.obj` 3D asset slice atlases; Layer 2: Real-time in-browser GPU orthographic slicing for dynamic units/facilities; Layer 3: Procedural GLSL Laniakea river & *Grammar of Chaos* shader slices). See `memory-bank/july_beta_plan.md`.
 
 ## 3. Known Issues
 - None currently failing; `tools/test_commander_logic.mjs` passes 100% of Phase 1 & Phase 2 checks.

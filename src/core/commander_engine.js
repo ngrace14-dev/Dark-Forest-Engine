@@ -2077,6 +2077,8 @@ const CampaignManager = rootScope.CampaignManager || {
             const expectedYield = Math.round(18 * (hMods.caravanYieldMult || 1) * facMult.tradeMult);
             h.activeCaravans.push({ dest: arg || 'Oakhaven', daysLeft: 4, yieldFuel: expectedYield });
             res = { success: true, message: `Official House Trade Caravan departed for ${arg || 'Oakhaven'} under Bailiff seal (Returns in 4 days with ~${expectedYield}u Fuel).` };
+        } else if (act === 'RECALL_CARAVAN') {
+            res = ExpeditionEngine.recallExpedition(arg || null);
         } else if (act === 'CULTIVATE_RUNIC') {
             res = AgentRosterManager.cultivateTerminusRunic(arg || 'agt_1', this.state.house);
         } else if (act === 'AUDIT_ANOMALY') {
@@ -3645,6 +3647,37 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
             }
             return true;
         });
+    },
+
+    recallExpedition(expId = null) {
+        const idx = expId ? this.activeExpeditions.findIndex(e => e.id === expId) : 0;
+        if (idx < 0 || !this.activeExpeditions[idx]) {
+            return { success: false, message: "No active expedition in the field to recall." };
+        }
+        const exp = this.activeExpeditions.splice(idx, 1)[0];
+        const progressRatio = Math.max(0.15, Math.min(0.85, (exp.hoursElapsed || 1) / (exp.totalHours || 8)));
+        const integrityRatio = (exp.cargoIntegrity ?? 100) / 100;
+        const baseYield = exp.guarded ? 14 : 7;
+        const salvagedFuel = Math.max(1, Math.round(baseYield * progressRatio * integrityRatio * 0.6));
+
+        if (exp.leadAgentId) {
+            const agt = AgentRosterManager.agents.get(exp.leadAgentId);
+            if (agt) agt.operatingStance = { mode: 'IDLE', discipline: null, task: null, daysTrained: 0 };
+        }
+        if (exp.guardsAssigned > 0) {
+            FacilityEngine.villageGuardsCurrent = Math.min(FacilityEngine.villageGuardsMaxThreshold, FacilityEngine.villageGuardsCurrent + exp.guardsAssigned);
+        }
+
+        const h = CampaignManager.state.house;
+        const hMods = RoleStateMachine.getHouseModifiers(h.houseId);
+        const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
+        h.barrierFuelUnits = Math.min(maxFuel, (h.barrierFuelUnits || 0) + salvagedFuel);
+
+        exp.status = 'RECALLED';
+        const msg = `📯 [EARLY RECALL] Recalled ${exp.type} from ${exp.targetName} at hour ${exp.hoursElapsed}/${exp.totalHours}h. Crew & guards returned safely (+${salvagedFuel}u salvaged cargo).`;
+        exp.logs.push(msg);
+        this.completedLogs.unshift(exp);
+        return { success: true, expedition: exp, salvagedFuel, message: msg };
     }
 };
 rootScope.ExpeditionEngine = ExpeditionEngine;
