@@ -1099,6 +1099,93 @@ export const RoleStateMachine = rootScope.RoleStateMachine || {
             covertMult: Number((1 + inquestLv * 0.15 + warTableLv * 0.10).toFixed(2)),
             martialMult: Number((1 + barracksLv * 0.15 + warTableLv * 0.12).toFixed(2))
         };
+    },
+
+    getSovereignEscalationStage() {
+        const sov = CampaignManager?.state?.sovereign || {};
+        const weight = Number(sov.significanceHarvested || 0);
+        const heralds = Number(sov.heraldsMutated || 0);
+        const years = Number(sov.yearsEndured || 0);
+
+        if (sov.isAscended || (weight >= 2500 && heralds >= 5 && years >= 1000)) {
+            return {
+                stage: 3,
+                label: 'STAGE III: APOCALYPTIC VOID EMPEROR',
+                nextThresholdDesc: 'MAX ESCALATION REACHED — UNLEASH APOCALYPTIC HARVEST ON CHAINED SETTLEMENTS'
+            };
+        }
+        if (weight >= 1000 && heralds >= 2) {
+            return {
+                stage: 2,
+                label: 'STAGE II: THE PREDATOR TIDE',
+                nextThresholdDesc: `Next Gate (Stage III Void Emperor): ${weight}/2500 Historical Weight, ${heralds}/5 Heralds, ${Math.floor(years)}/1000 Years`
+            };
+        }
+        if (weight >= 300) {
+            return {
+                stage: 1,
+                label: 'STAGE I: THE MACABRE COMMUNION',
+                nextThresholdDesc: `Next Gate (Stage II Predator Tide): ${weight}/1000 Historical Weight & ${heralds}/2 Mutated Heralds`
+            };
+        }
+        return {
+            stage: 0,
+            label: 'STAGE 0: FROST-BOUND DORMANCY',
+            nextThresholdDesc: `Next Gate (Stage I Macabre Communion): Harvest ${weight}/300 Historical Weight via Brooding or Huntsman Stalking`
+        };
+    },
+
+    getGrowthProgression() {
+        const mode = (CampaignManager?.campaignMode || 'HOUSE').toUpperCase();
+        const role = (CampaignManager?.activeRole || mode).toUpperCase();
+        if (mode === 'SOVEREIGN' || role === 'SOVEREIGN' || role === 'PALE_SOVEREIGN') {
+            const sovStage = this.getSovereignEscalationStage();
+            return {
+                isSovereign: true,
+                tier: sovStage.stage,
+                label: sovStage.label,
+                nextGateDesc: sovStage.nextThresholdDesc
+            };
+        }
+        const fac = rootScope.FacilityEngine?.facilities || {};
+        const unlockedExtra = ['guard_barracks', 'inquest_chamber', 'alchemical_still', 'war_table'].filter(k => fac[k]?.unlocked).length;
+        const scriptoriumUpgrades = Math.max(0, (fac.scriptorium?.level || 1) - 1);
+        const points = unlockedExtra + scriptoriumUpgrades;
+
+        if (points >= 3 || fac.war_table?.unlocked) {
+            return {
+                isSovereign: false,
+                tier: 3,
+                points,
+                label: 'GROWTH TIER III: FULL STRATEGIC COMMAND',
+                nextGateDesc: 'All Strategic Layers Unfolded (Base, Field, Truth Vault & 19-House War Board Active)'
+            };
+        }
+        if (points >= 2) {
+            return {
+                isSovereign: false,
+                tier: 2,
+                points,
+                label: 'GROWTH TIER II: FEUDAL &ARCHIVE DIPLOMACY',
+                nextGateDesc: 'Next Gate (Tier III): Construct [Covert War & Proxy Table] to unfold full Proxy Warfare'
+            };
+        }
+        if (points >= 1) {
+            return {
+                isSovereign: false,
+                tier: 1,
+                points,
+                label: 'GROWTH TIER I: FIELD LOGISTICS & TRUTH VAULT',
+                nextGateDesc: 'Next Gate (Tier II): Construct a 2nd Base Facility to unfold Politics, Tithes & 19-House War Board'
+            };
+        }
+        return {
+            isSovereign: false,
+            tier: 0,
+            points: 0,
+            label: 'GROWTH TIER 0: FLEDGLING OUTPOST (MINIMALIST START)',
+            nextGateDesc: '🔒 GROWTH GATE: Construct your 1st Base Facility (e.g. Garrison Barracks) to unfold Field Operations & Truth Vault'
+        };
     }
 };
 rootScope.RoleStateMachine = RoleStateMachine;
@@ -1667,14 +1754,30 @@ const CampaignManager = rootScope.CampaignManager || {
 
         const roleToMode = {
             GUILD: 'ORDER',
+            GUILD_LEADER: 'ORDER',
             MERCHANT: 'PATRON',
+            MERCHANT_PATRON: 'PATRON',
             SYNDICATE: 'SYNDICATE',
             SOVEREIGN: 'SOVEREIGN',
+            PALE_SOVEREIGN: 'SOVEREIGN',
             DUNE: 'DUNE',
             ORDER: 'ORDER',
             PATRON: 'PATRON',
             HOUSE: 'HOUSE'
         };
+        if (roleToMode[key] === 'SOVEREIGN') {
+            Object.assign(this.state.sovereign, {
+                title: "The Pale Sovereign (Frost-Bound)",
+                isAscended: false,
+                yearsEndured: 0,
+                significanceHarvested: 0,
+                heraldsMutated: 0,
+                lastSummonDay: -10,
+                bankedCharge: 1,
+                summonCooldown: 3,
+                dreamSiphon: 30
+            });
+        }
         return this.selectCampaign(roleToMode[key] || 'HOUSE');
     },
 
@@ -2014,11 +2117,44 @@ const CampaignManager = rootScope.CampaignManager || {
             const allyEntry = this.mutateWarBoard(arg || 'House Oakheart', 6, 'ALLIED');
             res = { success: true, message: `Sponsored ${allyEntry?.name || 'House Oakheart'} with 8u fuel: Defense coalition secured (+10 Crown Favor, ${allyEntry?.name || 'Ally'} Power -> ${allyEntry?.power || 84}).` };
         } else if (act === 'HIBERNATE') {
-            const yrs = parseInt(arg, 10) || 100;
+            const yrs = parseInt(arg, 10) || 25;
             const sov = this.state.sovereign;
-            sov.yearsEndured = (sov.yearsEndured || 0) + yrs;
-            sov.significanceHarvested = (sov.significanceHarvested || 0) + (yrs * 10);
-            res = { success: true, message: `Korvan hibernated in deep bedrock for ${yrs} years. Endured: ${sov.yearsEndured}/1000 Years.` };
+            sov.yearsEndured = Number(((sov.yearsEndured || 0) + yrs).toFixed(2));
+            const weightGain = yrs * 10;
+            sov.significanceHarvested = (sov.significanceHarvested || 0) + weightGain;
+            res = { success: true, message: `❄️ [SLOW-BURN DORMANCY] Korvan brooded in deep bedrock for ${yrs} years (+${weightGain} Historical Weight | Endured: ${sov.yearsEndured}/1000y).` };
+        } else if (act === 'HERALD_PACK_RAID') {
+            const sov = this.state.sovereign;
+            if ((sov.heraldsMutated || 0) < 2) {
+                return { success: false, message: "Requires at least 2 mutated Herald Wendigos via The Macabre Communion." };
+            }
+            const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+            const targetEntry = this.mutateWarBoard(arg || 'House Cull', -18, 'DEFENSIVE', `Feral Herald Wendigo Pack ravaged outer palisades`);
+            const weightHarvest = Math.round(450 + (sov.heraldsMutated * 120) + sq.totalPower * 10);
+            sov.significanceHarvested = (sov.significanceHarvested || 0) + weightHarvest;
+            res = {
+                success: true,
+                message: `🩸🐺 [PREDATOR TIDE] Unleashed ${sov.heraldsMutated} Herald Wendigos upon ${targetEntry?.name || 'House Cull'}! Outer wards slaughtered (+${weightHarvest} Historical Weight, ${targetEntry?.name || 'Target'} -18 Power -> ${targetEntry?.power || 40}).`
+            };
+        } else if (act === 'APOCALYPTIC_HARVEST') {
+            const sov = this.state.sovereign;
+            if (!sov.isAscended && ((sov.significanceHarvested || 0) < 2500 || (sov.heraldsMutated || 0) < 5)) {
+                return { success: false, message: "Apocalyptic Harvest requires Stage III Ascension (2,500+ Historical Weight & 5 Herald Wendigos)." };
+            }
+            const targetEntry = this.mutateWarBoard(arg || 'House Gallows', -45, 'COLLAPSED', `The True Pale Sovereign shattered the 50-ton bedrock anchor chains`);
+            const settlementNode = CANONICAL_BEDROCK_SETTLEMENTS.find(s => s.house === targetEntry?.name && !s.isCrownSeat);
+            if (settlementNode) {
+                settlementNode.barrierFuel = 0;
+                settlementNode.chainsIntegrity = 0;
+                settlementNode.population = Math.max(200, Math.floor(settlementNode.population * 0.15));
+            }
+            const megaHarvest = 2500;
+            sov.significanceHarvested = (sov.significanceHarvested || 0) + megaHarvest;
+            res = {
+                success: true,
+                devastatedHouse: targetEntry?.name,
+                message: `💀🌌 [APOCALYPTIC HARVEST] The True Pale Sovereign descended upon ${settlementNode?.name || targetEntry?.name}! 50-ton bedrock chains shattered into the White Void (+${megaHarvest} Historical Weight, ${targetEntry?.name} Power crushed by -45!).`
+            };
         } else if (act === 'ASCEND_SOVEREIGN') {
             const sov = this.state.sovereign;
             if ((sov.yearsEndured || 0) < 1000 || (sov.heraldsMutated || 0) < 5) {
@@ -3068,15 +3204,23 @@ const CrisisEngine = rootScope.CrisisEngine || {
         } else if (r === 'MERCHANT') {
             if (fac.alchemical_still?.unlocked) dirs.push([`window.dispatchCmd('VERIFY_TRUTH')`, 'Verify Ledger Truth']);
             if (fac.war_table?.unlocked) {
-                dirs.push([`window.viewWarBoard()`, 'ðŸ° 19-House War Board']);
+                dirs.push([`window.viewWarBoard()`, '🏰 19-House War Board']);
                 dirs.push([`window.dispatchCmd('TRANSMIT_DREAM')`, 'Sponsor Candidate']);
             }
-        } else if (r === 'SOVEREIGN') {
-            dirs.push([`window.sendExpedition('SUMMON_HUNTSMAN','Twilight Valleys')`, 'ðŸº Dispatch Bound Huntsman']);
-            if (fac.war_table?.unlocked) {
-                dirs.push([`window.viewWarBoard()`, 'ðŸ° 19-House War Board']);
-                dirs.push([`window.dispatchCmd('MACABRE_COMMUNION')`, 'ðŸ©¸ Macabre Communion']);
-                dirs.push([`window.dispatchCmd('HIBERNATE',100)`, 'â„ï¸ Brood in Frost (+100y)']);
+        } else if (r === 'SOVEREIGN' || r === 'PALE_SOVEREIGN') {
+            const sovStage = RoleStateMachine.getSovereignEscalationStage();
+            dirs.push([`window.dispatchCmd('HIBERNATE',25)`, '❄️ Brood in Frost (+25y / +250 Weight)']);
+            dirs.push([`window.sendExpedition('SUMMON_HUNTSMAN','Twilight Valleys')`, '🐺 Stalk Lowlands (Bound Huntsman)']);
+            if (sovStage.stage >= 1 || fac.war_table?.unlocked) {
+                dirs.push([`window.dispatchCmd('MACABRE_COMMUNION')`, '🥩 Macabre Communion (Mutate Herald)']);
+            }
+            if (sovStage.stage >= 2 || fac.war_table?.unlocked) {
+                dirs.push([`window.viewWarBoard()`, '🏰 19-House Prey Board']);
+                dirs.push([`window.dispatchCmd('HERALD_PACK_RAID','House Cull')`, '🩸 Herald Pack Raid (-18 House Power)']);
+            }
+            if (sovStage.stage >= 3 || (CampaignManager.state.sovereign?.yearsEndured >= 1000 && CampaignManager.state.sovereign?.heraldsMutated >= 5)) {
+                dirs.push([`window.dispatchCmd('ASCEND_SOVEREIGN')`, '👑 Shatter Chains (Ascend Void Emperor)']);
+                dirs.push([`window.dispatchCmd('APOCALYPTIC_HARVEST','House Gallows')`, '💀 Apocalyptic Harvest (Destroy Settlement)']);
             }
         }
         return dirs;

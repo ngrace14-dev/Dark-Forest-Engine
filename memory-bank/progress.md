@@ -11,6 +11,7 @@
 - [x] **Situational Pressure Collision — Feral Wendigo Rebirth & Perimeter Hunt:** Dual `STARVING` + `FREEZING` death hook queuing next-Shift Feral Wendigo rebirths and active `HUNT_FERAL_WENDIGO` directive.
 - [x] **Manifesto §3 "Editor of Reality" Vault, Emissary Petitions & Grouped Mobile Directives:** 5-property Fact Dossiers with 6 Editor verbs (`PUBLISH`, `LEAK`, `SELL`, `ARCHIVE`, `SUPPRESS`, `DESTROY`), interactive rival House petitions, and progressive UI categorization.
 - [x] **5-Page Brutalist Runic-Iron Concept Art UI Replication:** Replicated all 5 custom concept art landing pages (`Page 1: Candidate Gate`, `Page 2: Civilizational Duty Roster`, `Page 3: General Ledger Hub`, `Page 4: Truth & Relic Vault`, `Page 5: War Board & Telemetry Reader`) in `src/` and `ledger-mobile/`.
+- [x] **Playable Pale Sovereign Slow-Burn Escalation & Progressive Growth-Point UI Gating:** Unchained the Pale Sovereign card for immediate play (`Stage 0 Dormancy` $\rightarrow$ `Stage I Macabre Communion` $\rightarrow$ `Stage II Herald Pack Raid` $\rightarrow$ `Stage III Apocalyptic Harvest`) and gated Page 3/4/5 UI complexity behind facility upgrades & Historical Weight milestones.
 - [x] **Memory Bank & Workflow Standards Initialization:** Created `memory-bank/` and preserved `.clinerules` guardrails.
 
 ## 2. Pending Tasks / Roadmap

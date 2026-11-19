@@ -77,7 +77,7 @@ const makeEl = (id) => ({
         contains(c) { return this._set.has(c); }
     }
 });
-['commander-terminal-root', 'text-commander-viewport', 'status-bar', 'commander-action-banner', 'crisis-triage-panel', 'btn-autotick-state', 'timescale-bar', 'daily-goal-bar', 'role-directives-bar', 'expeditions-list', 'dispatches-list', 'roster-list', 'story-archive', 'inquest-verdict-bar', 'story-reader', 'brutalist-subpage-deck', 'hub-shift-header', 'procedural-collision-readout'].forEach(id => {
+['commander-terminal-root', 'text-commander-viewport', 'status-bar', 'commander-action-banner', 'crisis-triage-panel', 'btn-autotick-state', 'timescale-bar', 'daily-goal-bar', 'role-directives-bar', 'expeditions-list', 'dispatches-list', 'roster-list', 'story-archive', 'inquest-verdict-bar', 'story-reader', 'brutalist-subpage-deck', 'hub-shift-header', 'procedural-collision-readout', 'nav-tab-page4', 'nav-tab-page5', 'btn-dream-ward', 'btn-chrono-skip', 'module-wrap-expeditions', 'module-wrap-necrology'].forEach(id => {
     mockElements.set(id, makeEl(id));
 });
 globalThis.document = {
@@ -355,6 +355,47 @@ if (!petRes.success || petRes.decision !== 'ACCEPT') {
     failures.push(`Expected Emissary Petition ACCEPT resolution to succeed, got ${JSON.stringify(petRes)}`);
 }
 console.log(`[11h-RealityEditor] Manifesto §3 Editor & Emissary Verified: ${leakRes.message} | ${petRes.message}`);
+
+// Verify Progressive Growth-Point UI Unfolding & Playable Pale Sovereign Slow-Burn -> Apocalyptic Harvest Loop
+CommanderUI.selectRoleAndLaunch('NOBLE_HOUSE', 'House Oakheart');
+const tier0Growth = CommanderEngine.RoleStateMachine.getGrowthProgression();
+if (tier0Growth.tier !== 0 || mockElements.get('role-directives-bar').innerHTML.includes('[POLITICS & TITHE]')) {
+    failures.push(`Expected Growth Tier 0 at fresh start to hide [POLITICS & TITHE], got tier=${tier0Growth.tier}`);
+}
+CommanderEngine.FacilityEngine.unlockFacility('guard_barracks');
+CommanderEngine.FacilityEngine.unlockFacility('war_table');
+CommanderUI.render();
+const tier2Growth = CommanderEngine.RoleStateMachine.getGrowthProgression();
+if (tier2Growth.tier < 2 || !mockElements.get('role-directives-bar').innerHTML.includes('[POLITICS & TITHE]')) {
+    failures.push(`Expected unlocking Barracks + War Table to unfold Growth Tier 2+ and [POLITICS & TITHE], got tier=${tier2Growth.tier}`);
+}
+
+// Launch Playable Pale Sovereign Run: Stage 0 Dormancy -> Stage 1 Communion -> Stage 2 Pack Raid -> Stage 3 Apocalyptic Harvest
+CommanderUI.selectRoleAndLaunch('PALE_SOVEREIGN');
+const sovStage0 = CommanderEngine.RoleStateMachine.getSovereignEscalationStage();
+if (CommanderEngine.CampaignManager.campaignMode !== 'SOVEREIGN' || sovStage0.stage !== 0) {
+    failures.push(`Expected PALE_SOVEREIGN to launch in Stage 0 Frost-Bound Dormancy, got mode=${CommanderEngine.CampaignManager.campaignMode}, stage=${sovStage0.stage}`);
+}
+CommanderEngine.CampaignManager.dispatchAction('HIBERNATE', 40); // +400 Weight -> Stage 1
+const sovStage1 = CommanderEngine.RoleStateMachine.getSovereignEscalationStage();
+if (sovStage1.stage !== 1) {
+    failures.push(`Expected 400 Historical Weight to unlock Sovereign Stage 1 (Macabre Communion), got stage=${sovStage1.stage}`);
+}
+for (let i = 0; i < 5; i++) CommanderEngine.CampaignManager.dispatchAction('MACABRE_COMMUNION');
+const packRaidRes = CommanderEngine.CampaignManager.dispatchAction('HERALD_PACK_RAID', 'House Cull');
+if (!packRaidRes.success) {
+    failures.push(`Expected HERALD_PACK_RAID to succeed at Stage 2+, got ${packRaidRes.message}`);
+}
+CommanderEngine.CampaignManager.dispatchAction('HIBERNATE', 960); // Reach 1,000+ years
+CommanderEngine.CampaignManager.dispatchAction('ASCEND_SOVEREIGN');
+const apocRes = CommanderEngine.CampaignManager.dispatchAction('APOCALYPTIC_HARVEST', 'House Gallows');
+if (!apocRes.success) {
+    failures.push(`Expected Stage 3 APOCALYPTIC_HARVEST to shatter settlement chains, got ${apocRes.message}`);
+}
+console.log(`[11i-PaleSovereign] Slow-Burn to Apocalyptic Endgame Verified: ${packRaidRes.message} -> ${apocRes.message}`);
+
+CommanderUI.selectRoleAndLaunch('TERMINUS');
+
 
 
 // 9. Verify Temporal Relativity, Mountain Rotation in 7-day Void, Tragic Alignment, and Entropy Breach

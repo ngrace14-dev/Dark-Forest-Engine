@@ -155,18 +155,19 @@ export const CommanderUI = {
                 <button class="vantage-init-btn" style="margin-top:6px; padding:4px; font-size:8.5px;">INITIALIZE ${title}</button>
             </div>
         `).join('') + `
-            <div class="burden-parchment-card" style="background:linear-gradient(160deg,#8c8b88 0%,#63625f 100%); cursor:pointer; overflow:hidden;" onclick="window.selectArchiveRole('PALE_SOVEREIGN')">
-                <div style="opacity:0.65;">
-                    <div class="burden-card-header" style="color:#27272a;"><span>THE PALE SOVEREIGN</span><span>ᛇ</span></div>
-                    <div style="font-size:9.5px; letter-spacing:2px; color:#27272a; text-align:center; margin:8px 0;">ᚠᚢᚦᚨᚱᚲᚷᚹ ᚺᚾᛁᛃᛇᛈᛉᛊ<br>ᛏᛒᛖᛗᛚᛜᛞᛟ ᚠᚢᚦᚨᚱᚲᚷᚹ</div>
+            <div class="burden-parchment-card" style="background:linear-gradient(160deg,#c8c2b6 0%,#9a9180 100%); border:2px solid #7f1d1d; cursor:pointer; overflow:hidden;" onclick="window.selectArchiveRole('PALE_SOVEREIGN')">
+                <div>
+                    <div class="burden-card-header" style="color:#450a0a; border-color:#7f1d1d;"><span>THE PALE SOVEREIGN</span><span>ᛇ</span></div>
+                    <div style="display:grid; grid-template-columns:1.1fr 0.9fr; gap:5px; font-size:8.5px; color:#1c1610;">
+                        <div>
+                            <b>SLOW-BURN PREDATOR</b><br>
+                            Brood in frost, consume Historical Weight &amp; mutate 5 Heralds.<br>
+                            <b style="color:#7f1d1d;">[1,000-YEAR CYCLE]</b>
+                        </div>
+                        ${this.renderSemicircleGaugeSvg('HISTORICAL WEIGHT', -45, '#7f1d1d')}
+                    </div>
                 </div>
-                <svg viewBox="0 0 200 90" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;">
-                    <line x1="0" y1="15" x2="200" y2="75" stroke="#18181b" stroke-width="6" stroke-dasharray="9,4"/>
-                    <line x1="0" y1="75" x2="200" y2="15" stroke="#27272a" stroke-width="6" stroke-dasharray="9,4"/>
-                </svg>
-                <div style="position:relative; z-index:2; text-align:center; color:#7f1d1d; font-family:'Cinzel',serif; font-weight:900; font-size:9px; background:rgba(212,212,216,0.88); padding:3px; border:1px solid #7f1d1d;">
-                    AWAITING 1,000-YEAR CYCLE
-                </div>
+                <button class="vantage-init-btn" style="margin-top:6px; padding:4px; font-size:8.5px; background:linear-gradient(180deg,#450a0a,#1f0505); color:#fecaca; border-color:#991b1b;">INITIALIZE THE PALE SOVEREIGN</button>
             </div>
         `;
 
@@ -647,23 +648,23 @@ export const CommanderUI = {
                     </div>
                 </div>
 
-                <!-- 5-PAGE QUICK NAVIGATION BAR -->
+                <!-- 5-PAGE QUICK NAVIGATION BAR (GATED BY GROWTH TIER) -->
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom:6px; padding-bottom:5px; border-bottom:1px solid #2b3234;">
-                    <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                    <div id="hub-page-nav-tabs" style="display:flex; gap:4px; flex-wrap:wrap;">
                         <button class="cmd-btn" onclick="if(window.CandidateOnboarding) window.CandidateOnboarding.start(window.CommanderUI);">PAGE 1: CANDIDATE GATE</button>
                         <button class="cmd-btn" onclick="window.openRoleGate()">PAGE 2: DUTY ROSTER</button>
                         <button class="cmd-btn" style="border-color:#d9822b; color:#fde68a;" onclick="const d=document.getElementById('brutalist-subpage-deck'); if(d) d.style.display='none';">PAGE 3: LEDGER HUB</button>
-                        <button class="cmd-btn" onclick="window.viewTruthVault()">PAGE 4: TRUTH &amp; RELIC VAULT</button>
-                        <button class="cmd-btn" onclick="window.viewWarBoard()">PAGE 5: WAR BOARD &amp; TELEMETRY</button>
+                        <button id="nav-tab-page4" class="cmd-btn" onclick="window.viewTruthVault()">PAGE 4: TRUTH &amp; RELIC VAULT</button>
+                        <button id="nav-tab-page5" class="cmd-btn" onclick="window.viewWarBoard()">PAGE 5: WAR BOARD &amp; TELEMETRY</button>
                     </div>
                     <div class="ledger-btn-row" style="margin:0;">
                         <button id="btn-autotick-state" class="cmd-btn" onclick="window.toggleAutoTick()">CLOCK: TICKING</button>
                         <span id="timescale-bar" style="display:inline-flex; gap:3px;"></span>
-                        <button class="cmd-btn" onclick="window.stepExpeditionHour(2)">+2H FIELD</button>
+                        <button id="btn-step-field" class="cmd-btn" onclick="window.stepExpeditionHour(2)">+2H FIELD</button>
                         <button class="cmd-btn" onclick="window.advanceDays(1)">+1 DAY</button>
-                        <button class="cmd-btn" onclick="window.triggerDreamIntervention()">🌙 DREAM WARD</button>
-                        <button class="cmd-btn" onclick="window.chronoSkip(1)">+1D SKIP</button>
-                        <button class="cmd-btn" onclick="window.exportSave()">EXPORT SAVE</button>
+                        <button id="btn-dream-ward" class="cmd-btn" onclick="window.triggerDreamIntervention()">🌙 DREAM WARD</button>
+                        <button id="btn-chrono-skip" class="cmd-btn" onclick="window.chronoSkip(1)">+1D SKIP</button>
+                        <button id="btn-export-save" class="cmd-btn" onclick="window.exportSave()">EXPORT SAVE</button>
                     </div>
                 </div>
 
@@ -696,10 +697,10 @@ export const CommanderUI = {
                         </div>
                     </div>
                 </div>
-                <!-- LOWER TELEMETRY & SQUAD LOGS -->
+                <!-- LOWER TELEMETRY & SQUAD LOGS (GATED BY GROWTH TIER) -->
                 <div class="ledger-lower-split" style="margin-top:8px;">
                     <div>
-                        <div class="hub-iron-module">
+                        <div id="module-wrap-expeditions" class="hub-iron-module">
                             <div class="hub-module-header"><span>FIELD EXPEDITIONS &amp; CARAVAN LOGS</span><span style="font-size:9px; color:#d9822b;">MIST TRAILS</span></div>
                             <div id="expeditions-list" style="max-height:110px; overflow-y:auto; font-size:10px;">No squads currently out in the mist.</div>
                         </div>
@@ -718,7 +719,7 @@ export const CommanderUI = {
                             <div class="hub-module-header"><span>GARRISON &amp; SQUAD ARMORY</span><span style="font-size:9px; color:#d9822b;">⚔️ ⚙️ 🛡️</span></div>
                             <div id="roster-list" style="max-height:175px; overflow-y:auto; font-size:10px;">Loading agents...</div>
                         </div>
-                        <div class="hub-iron-module">
+                        <div id="module-wrap-necrology" class="hub-iron-module">
                             <div class="hub-module-header"><span>CRUCIBLE RECORDS &amp; NECROLOGY</span><span style="font-size:9px; color:#d9822b;">DECEASED</span></div>
                             <div id="story-archive" style="max-height:95px; overflow-y:auto; font-size:10px;">Loading records...</div>
                         </div>
@@ -838,7 +839,16 @@ export const CommanderUI = {
             }
         }
 
-        // Render Page 3 Brutalist Iron Telemetry Modules ([BASE & ARCHIVES], [FIELD & LOGISTICS], [POLITICS & TITHE])
+        // Render Page 3 Brutalist Iron Telemetry Modules Gated by Growth Progression (*A Dark Room* Style Unfolding)
+        const growth = CommanderEngine.RoleStateMachine?.getGrowthProgression?.() || { tier: 0, isSovereign: false, label: 'GROWTH TIER 0', nextGateDesc: '' };
+        const setDisp = (id, show, mode = 'inline-block') => { const el = document.getElementById(id); if (el) el.style.display = show ? mode : 'none'; };
+        setDisp('nav-tab-page4', growth.tier >= 1);
+        setDisp('nav-tab-page5', growth.tier >= 2);
+        setDisp('btn-dream-ward', growth.tier >= 1);
+        setDisp('btn-chrono-skip', growth.tier >= 1);
+        setDisp('module-wrap-expeditions', growth.tier >= 1, 'block');
+        setDisp('module-wrap-necrology', growth.tier >= 2, 'block');
+
         const dirBar = document.getElementById('role-directives-bar');
         if (dirBar && CommanderEngine.CrisisEngine) {
             const roleDirs = CommanderEngine.CrisisEngine.getDirectivesForRole(roleLabel);
@@ -848,7 +858,11 @@ export const CommanderUI = {
 
             roleDirs.forEach(([fn, label]) => {
                 const btnHtml = `<button class="cmd-btn" onclick="${fn}">${label}</button>`;
-                if (fn.includes('viewFacilities') || fn.includes('viewTruthVault') || fn.includes('viewTelemetry') || fn.includes('viewShadowLedger') || fn.includes('interrogateSuspect')) {
+                if (growth.isSovereign) {
+                    if (fn.includes('HIBERNATE') || fn.includes('SUMMON_HUNTSMAN') || fn.includes('viewFacilities')) baseGroup.push(btnHtml);
+                    else if (fn.includes('MACABRE_COMMUNION') || fn.includes('viewTruthVault')) fieldGroup.push(btnHtml);
+                    else politicsGroup.push(btnHtml);
+                } else if (fn.includes('viewFacilities') || fn.includes('UNGUARDED_CARAVAN') || fn.includes('SMUGGLE_RESIN') || (growth.tier >= 1 && (fn.includes('viewTruthVault') || fn.includes('viewTelemetry') || fn.includes('viewShadowLedger') || fn.includes('interrogateSuspect')))) {
                     baseGroup.push(btnHtml);
                 } else if (fn.includes('sendExpedition') || fn.includes('HUNT_FERAL_WENDIGO') || fn.includes('REQUISITION_FUEL') || fn.includes('DEVELOP_AUTARKY') || fn.includes('AUDIT_ANOMALY') || fn.includes('SCRUB_MONUMENT')) {
                     fieldGroup.push(btnHtml);
@@ -857,9 +871,9 @@ export const CommanderUI = {
                 }
             });
 
-            const capPct = fe ? fe.settlementProsperity : 84;
-            const resSupply = fe ? fe.settlementResources * 120 : 4912;
-            const fuelSupply = (st.barrierFuelUnits || st.contrabandResin || 28) * 140;
+            const capPct = growth.isSovereign ? Math.min(100, Math.round((st.significanceHarvested || 0) / 25)) : (fe ? fe.settlementProsperity : 84);
+            const resSupply = growth.isSovereign ? `${st.significanceHarvested || 0} WEIGHT` : (fe ? fe.settlementResources * 120 : 4912);
+            const fuelSupply = growth.isSovereign ? `${st.heraldsMutated || 0}/5 HERALDS` : (st.barrierFuelUnits || st.contrabandResin || 28) * 140;
 
             const buildModule = (title, rightTag, supplyVal, statusText, buttons) => `
                 <div class="hub-iron-module">
@@ -868,10 +882,7 @@ export const CommanderUI = {
                         <span style="font-size:10px; color:#d9822b;">${rightTag}</span>
                     </div>
                     <div style="display:grid; grid-template-columns:1.1fr 0.9fr; gap:8px; align-items:center; margin-bottom:5px; font-size:8px; color:#8c8270;">
-                        <div style="font-family:monospace; line-height:1.25;">
-                            01001101 0010 100101 | 18 | 0 | 84%<br>
-                            01000101 0011 110010 | 24 | 1 | 92%
-                        </div>
+                        <div style="font-family:monospace; line-height:1.25;">${growth.label}</div>
                         <div>
                             <div style="display:flex; justify-content:space-between; color:#cbbba0; margin-bottom:2px;">
                                 <span>SUPPLY // ${supplyVal}</span><span>STATUS: ${statusText}</span>
@@ -885,10 +896,39 @@ export const CommanderUI = {
                 </div>
             `;
 
-            dirBar.innerHTML =
-                buildModule('[BASE & ARCHIVES]', `[ CAP: ${capPct}% ]`, resSupply, 'ON ●', baseGroup) +
-                buildModule('[FIELD & LOGISTICS]', `[ SUPPLY // 4SYNCED ]`, fuelSupply, 'ACTIVE ●', fieldGroup) +
-                buildModule('[POLITICS & TITHE]', `[ RECORDS // SYNCED ]`, (st.crownFavor || 65) * 45, 'SYNCED ●', politicsGroup);
+            let modulesHtml = buildModule(
+                growth.isSovereign ? '[STAGE 0: FROST-LAIR DORMANCY]' : '[BASE & ARCHIVES]',
+                `[ TIER ${growth.tier} // ${capPct}% ]`,
+                resSupply,
+                'ON ●',
+                baseGroup
+            );
+            if (growth.tier >= 1 && fieldGroup.length > 0) {
+                modulesHtml += buildModule(
+                    growth.isSovereign ? '[STAGE I: THE MACABRE COMMUNION]' : '[FIELD & LOGISTICS]',
+                    `[ SUPPLY // 4SYNCED ]`,
+                    fuelSupply,
+                    'ACTIVE ●',
+                    fieldGroup
+                );
+            }
+            if (growth.tier >= 2 && politicsGroup.length > 0) {
+                modulesHtml += buildModule(
+                    growth.isSovereign ? '[STAGE II–III: APOCALYPTIC HARVEST]' : '[POLITICS & TITHE]',
+                    `[ RECORDS // SYNCED ]`,
+                    growth.isSovereign ? `${st.yearsEndured || 0}/1000Y` : (st.crownFavor || 65) * 45,
+                    'UNLEASHED ●',
+                    politicsGroup
+                );
+            }
+            if (growth.tier < 2) {
+                modulesHtml += `
+                    <div style="border:1px dashed #4a453b; background:rgba(9,13,14,0.65); padding:6px 9px; font-size:8.5px; color:#a8997c; border-radius:4px;">
+                        <b style="color:#fbbf24;">${growth.label}</b> — ${growth.nextGateDesc}
+                    </div>
+                `;
+            }
+            dirBar.innerHTML = modulesHtml;
         }
 
         // Render Urgent Crisis Response Triage Overlay or Active Emissary Petition if active

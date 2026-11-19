@@ -1754,14 +1754,30 @@ const CampaignManager = rootScope.CampaignManager || {
 
         const roleToMode = {
             GUILD: 'ORDER',
+            GUILD_LEADER: 'ORDER',
             MERCHANT: 'PATRON',
+            MERCHANT_PATRON: 'PATRON',
             SYNDICATE: 'SYNDICATE',
             SOVEREIGN: 'SOVEREIGN',
+            PALE_SOVEREIGN: 'SOVEREIGN',
             DUNE: 'DUNE',
             ORDER: 'ORDER',
             PATRON: 'PATRON',
             HOUSE: 'HOUSE'
         };
+        if (roleToMode[key] === 'SOVEREIGN') {
+            Object.assign(this.state.sovereign, {
+                title: "The Pale Sovereign (Frost-Bound)",
+                isAscended: false,
+                yearsEndured: 0,
+                significanceHarvested: 0,
+                heraldsMutated: 0,
+                lastSummonDay: -10,
+                bankedCharge: 1,
+                summonCooldown: 3,
+                dreamSiphon: 30
+            });
+        }
         return this.selectCampaign(roleToMode[key] || 'HOUSE');
     },
 
@@ -3188,15 +3204,23 @@ const CrisisEngine = rootScope.CrisisEngine || {
         } else if (r === 'MERCHANT') {
             if (fac.alchemical_still?.unlocked) dirs.push([`window.dispatchCmd('VERIFY_TRUTH')`, 'Verify Ledger Truth']);
             if (fac.war_table?.unlocked) {
-                dirs.push([`window.viewWarBoard()`, 'ðŸ° 19-House War Board']);
+                dirs.push([`window.viewWarBoard()`, '🏰 19-House War Board']);
                 dirs.push([`window.dispatchCmd('TRANSMIT_DREAM')`, 'Sponsor Candidate']);
             }
-        } else if (r === 'SOVEREIGN') {
-            dirs.push([`window.sendExpedition('SUMMON_HUNTSMAN','Twilight Valleys')`, 'ðŸº Dispatch Bound Huntsman']);
-            if (fac.war_table?.unlocked) {
-                dirs.push([`window.viewWarBoard()`, 'ðŸ° 19-House War Board']);
-                dirs.push([`window.dispatchCmd('MACABRE_COMMUNION')`, 'ðŸ©¸ Macabre Communion']);
-                dirs.push([`window.dispatchCmd('HIBERNATE',100)`, 'â„ï¸ Brood in Frost (+100y)']);
+        } else if (r === 'SOVEREIGN' || r === 'PALE_SOVEREIGN') {
+            const sovStage = RoleStateMachine.getSovereignEscalationStage();
+            dirs.push([`window.dispatchCmd('HIBERNATE',25)`, '❄️ Brood in Frost (+25y / +250 Weight)']);
+            dirs.push([`window.sendExpedition('SUMMON_HUNTSMAN','Twilight Valleys')`, '🐺 Stalk Lowlands (Bound Huntsman)']);
+            if (sovStage.stage >= 1 || fac.war_table?.unlocked) {
+                dirs.push([`window.dispatchCmd('MACABRE_COMMUNION')`, '🥩 Macabre Communion (Mutate Herald)']);
+            }
+            if (sovStage.stage >= 2 || fac.war_table?.unlocked) {
+                dirs.push([`window.viewWarBoard()`, '🏰 19-House Prey Board']);
+                dirs.push([`window.dispatchCmd('HERALD_PACK_RAID','House Cull')`, '🩸 Herald Pack Raid (-18 House Power)']);
+            }
+            if (sovStage.stage >= 3 || (CampaignManager.state.sovereign?.yearsEndured >= 1000 && CampaignManager.state.sovereign?.heraldsMutated >= 5)) {
+                dirs.push([`window.dispatchCmd('ASCEND_SOVEREIGN')`, '👑 Shatter Chains (Ascend Void Emperor)']);
+                dirs.push([`window.dispatchCmd('APOCALYPTIC_HARVEST','House Gallows')`, '💀 Apocalyptic Harvest (Destroy Settlement)']);
             }
         }
         return dirs;
