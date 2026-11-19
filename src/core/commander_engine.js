@@ -639,6 +639,20 @@ const CrucibleNarrativeEngine = rootScope.CrucibleNarrativeEngine || {
             cast: data.cast || { witnesses: ['Bailiff Mallow'], casualties: ['Apprentice Jon'] }
         };
         this.crucibles.get(actorId).push(entry);
+
+        // Active Systemic Scar Modifier (RimWorld / Dwarf Fortress Parity: Scars actively alter agent stats)
+        const agt = rootScope.AgentRosterManager?.agents?.get?.(actorId);
+        if (agt && agt.alive) {
+            agt.scars ??= [];
+            agt.scars.push({ type: entry.type, scar: entry.scar, day: entry.day });
+            if (entry.type === 'TACTICAL_RETREAT') {
+                agt.skills.survival = Number((agt.skills.survival + 0.4).toFixed(2));
+                agt.skills.stealth = Number((agt.skills.stealth + 0.25).toFixed(2));
+            } else if (entry.type === 'CRISIS_CATASTROPHE') {
+                agt.skills.toughness = Number((agt.skills.toughness + 0.4).toFixed(2));
+                agt.vitals.poise = Math.max(15, (agt.vitals.poise || 60) - 5);
+            }
+        }
         return entry;
     },
 
@@ -1386,6 +1400,18 @@ export const ProceduralCollisionEngine = rootScope.ProceduralCollisionEngine || 
         const effectsApplied = this.applyPayload({ ...sectorState, eventName }, payloadTags);
         const rebound = this.increaseRandomLocalPressure(0.20);
         const day = rootScope.EngineParams?.worldDay || 1;
+        const houseName = CampaignManager?.state?.house?.houseId || CampaignManager?.campaignMode || 'Royal Archive';
+        const settlementName = CampaignManager?.state?.house?.settlementName || "World's End Gate";
+
+        const narrativeManifest = {
+            narrativeKernel: {
+                cause: `${anchor.id} (${anchor.currentPressure ?? 0.9}) × ${catalyst.id} (${catalyst.currentPressure ?? 0.9})`,
+                targetVector: `${target.id} (${target.currentPressure ?? 0.9})`,
+                intensity: (anchor.currentPressure || 0.9) >= 0.9 ? 'CRITICAL' : 'HIGH',
+                affectedEntities: [houseName, settlementName]
+            },
+            proceduralDescription: `Because [${anchor.id}] collided with [${catalyst.id}] while [${target.id}] was strained at ${settlementName}, the ${eventName} erupted (${effectsApplied.join('; ')}).`
+        };
 
         const record = {
             id: `collision_${day}_${this.collisionHistory.length + 1}`,
@@ -1396,7 +1422,8 @@ export const ProceduralCollisionEngine = rootScope.ProceduralCollisionEngine || 
             target: target.id,
             payload_tags: payloadTags,
             effectsApplied,
-            rebound
+            rebound,
+            narrativeManifest
         };
         this.collisionHistory.unshift(record);
 
@@ -1406,7 +1433,7 @@ export const ProceduralCollisionEngine = rootScope.ProceduralCollisionEngine || 
             type: 'PROCEDURAL COLLISION ANOMALY',
             sender: 'Grammar of Chaos Kernel',
             title: `⚡ ${eventName}`,
-            body: `Collision [${anchor.id} + ${catalyst.id} + ${target.id}] executed tags [${payloadTags.join(', ')}]. Effects: ${effectsApplied.join('; ')}. Rebound: +20% on ${rebound.pressureId}.`,
+            body: `${narrativeManifest.proceduralDescription} | Rebound: +20% on ${rebound.pressureId}.`,
             read: false
         });
 
@@ -1423,11 +1450,18 @@ export const RealityEditorVault = rootScope.RealityEditorVault || {
     facts: [],
     resolvedHistory: [],
     activeEmissaryPetition: null,
+    worldQualities: {},
 
     resetForNewRun() {
         this.facts = [];
         this.resolvedHistory = [];
         this.activeEmissaryPetition = null;
+        this.worldQualities = {
+            rivalMistrust: 0,
+            institutionalSchism: 0,
+            scholarlyAuthority: 0,
+            crownOrthodoxy: 0
+        };
         this.discoverFact({
             title: "Palimpsest of the Twenty-First Parish",
             source: "Scraped Vellum Roll #77 (Archive Basement)",
@@ -1478,17 +1512,21 @@ export const RealityEditorVault = rootScope.RealityEditorVault || {
         const maxFuel = 60 + (hMods.maxFuelStorageBonus || 0);
 
         let effectSummary = '';
+        this.worldQualities ??= { rivalMistrust: 0, institutionalSchism: 0, scholarlyAuthority: 0, crownOrthodoxy: 0 };
         if (act === 'PUBLISH') {
+            this.worldQualities.institutionalSchism = (this.worldQualities.institutionalSchism || 0) + 1;
             o.blindSpotEntropy = Math.min(100, (o.blindSpotEntropy || 12) + 12);
             h.crownFavor = Math.max(0, (h.crownFavor || 50) - 10);
             pat.candidateSignificance = (pat.candidateSignificance || 25) + 18;
             CampaignManager.mutateWarBoard(fact.targetHouse, -8, 'WAR_PREP', `Public broadcast of [${fact.title}] shattered institutional legitimacy`);
-            effectSummary = `📢 [PUBLISHED] Broadcast [${fact.title}] across all 20 settlements! (+12% Blind-Spot Entropy, +18 Significance, -10% Crown Favor, ${fact.targetHouse} humiliated -8 Power).`;
+            effectSummary = `📢 [PUBLISHED] Broadcast [${fact.title}] across all 20 settlements! (+12% Blind-Spot Entropy, +18 Significance, -10% Crown Favor, ${fact.targetHouse} humiliated -8 Power | World Quality [Institutional Schism: ${this.worldQualities.institutionalSchism}]).`;
         } else if (act === 'LEAK') {
+            this.worldQualities.rivalMistrust = (this.worldQualities.rivalMistrust || 0) + 1;
             h.blackmailDossiers = (h.blackmailDossiers || 0) + 1;
             CampaignManager.mutateWarBoard(fact.targetHouse, -10, 'SKIRMISH', `Covert leak of [${fact.title}] triggered a targeted feudal schism`);
-            effectSummary = `🗡️ [LEAKED] Secretly leaked [${fact.title}] against ${fact.targetHouse}! (${fact.targetHouse} -10 Power -> SKIRMISH, +1 Blackmail Dossier).`;
+            effectSummary = `🗡️ [LEAKED] Secretly leaked [${fact.title}] against ${fact.targetHouse}! (${fact.targetHouse} -10 Power -> SKIRMISH, +1 Blackmail Dossier | World Quality [Rival Mistrust: ${this.worldQualities.rivalMistrust}]).`;
         } else if (act === 'SELL') {
+            this.worldQualities.rivalMistrust = (this.worldQualities.rivalMistrust || 0) + 1;
             if (CampaignManager.campaignMode === 'SYNDICATE') {
                 syn.contrabandResin += fact.valueFuel;
                 syn.gallowsTollCollected += fact.valueRes;
@@ -1496,19 +1534,21 @@ export const RealityEditorVault = rootScope.RealityEditorVault || {
                 h.barrierFuelUnits = Math.min(maxFuel, (h.barrierFuelUnits || 0) + fact.valueFuel);
             }
             FacilityEngine.settlementResources += fact.valueRes;
-            effectSummary = `💰 [SOLD] Brokered [${fact.title}] for monopoly favors (+${fact.valueFuel}u Fuel/Resin, +${fact.valueRes} Settlement Resources).`;
+            effectSummary = `💰 [SOLD] Brokered [${fact.title}] for monopoly favors (+${fact.valueFuel}u Fuel/Resin, +${fact.valueRes} Settlement Resources | World Quality [Rival Mistrust: ${this.worldQualities.rivalMistrust}]).`;
         } else if (act === 'ARCHIVE') {
+            this.worldQualities.scholarlyAuthority = (this.worldQualities.scholarlyAuthority || 0) + 1;
             AgentRosterManager.agents.forEach(a => {
                 if (a.alive) a.skills.lore = Number((a.skills.lore + 0.5).toFixed(2));
             });
             FacilityEngine.settlementProsperity = Math.min(100, FacilityEngine.settlementProsperity + 6);
             CrisisEngine.volatilityIndex = Math.max(0, (CrisisEngine.volatilityIndex || 0) - 4);
-            effectSummary = `🏛️ [ARCHIVED] Sealed [${fact.title}] in private Scriptorium vault (+0.5 Squad Lore, +6% Prosperity, -4% Volatility).`;
+            effectSummary = `🏛️ [ARCHIVED] Sealed [${fact.title}] in private Scriptorium vault (+0.5 Squad Lore, +6% Prosperity, -4% Volatility | World Quality [Scholarly Authority: ${this.worldQualities.scholarlyAuthority}]).`;
         } else if (act === 'SUPPRESS') {
+            this.worldQualities.crownOrthodoxy = (this.worldQualities.crownOrthodoxy || 0) + 1;
             h.crownFavor = Math.min(100, (h.crownFavor || 50) + 12);
             h.crownScrutiny = Math.max(0, (h.crownScrutiny || 10) - 8);
             o.blindSpotEntropy = Math.max(0, (o.blindSpotEntropy || 12) - 5);
-            effectSummary = `🤫 [SUPPRESSED] Buried [${fact.title}] to protect institutional order (+12% Crown Favor, -8% Scrutiny, -5% Entropy).`;
+            effectSummary = `🤫 [SUPPRESSED] Buried [${fact.title}] to protect institutional order (+12% Crown Favor, -8% Scrutiny, -5% Entropy | World Quality [Crown Orthodoxy: ${this.worldQualities.crownOrthodoxy}]).`;
         } else if (act === 'DESTROY') {
             o.blindSpotEntropy = Math.max(0, (o.blindSpotEntropy || 12) - 10);
             CrisisEngine.volatilityIndex = Math.max(0, (CrisisEngine.volatilityIndex || 0) - 10);
@@ -3378,15 +3418,17 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
         const linkedHouse = warBoard.find(w => w.name.toLowerCase().includes(targetLower) || targetLower.includes(w.name.replace('House ', '').toLowerCase()));
         const warHazardBonus = linkedHouse?.status === 'WAR_PREP' ? 8 : (linkedHouse?.status === 'SKIRMISH' ? 4 : 0);
         const feralHazardBonus = (AgentRosterManager.spawnedFeralWendigos?.length || 0) * 4;
+        const mistrustBonus = (RealityEditorVault?.worldQualities?.rivalMistrust || 0) * 2;
 
-        const hazardRating = Math.round((missionBaseHazard + shiftHazardBonus + warHazardBonus + feralHazardBonus) * (hMods.volatilityDampener || 1));
+        const hazardRating = Math.round((missionBaseHazard + shiftHazardBonus + warHazardBonus + feralHazardBonus + mistrustBonus) * (hMods.volatilityDampener || 1));
 
         let agt = exp.leadAgentId && AgentRosterManager.agents.get(exp.leadAgentId);
         let agentPower = 6;
         let equippedSummary = [];
         if (agt && agt.alive) {
             const sk = agt.skills || {};
-            agentPower = Number(sk.meleeAtt || 2) + Number(sk.meleeDef || 2) + Number(sk.survival || 2) + Number(sk.stealth || 2) * 0.5;
+            const scarCombatBonus = (agt.scars?.length || 0) * 1.5;
+            agentPower = Number(sk.meleeAtt || 2) + Number(sk.meleeDef || 2) + Number(sk.survival || 2) + Number(sk.stealth || 2) * 0.5 + scarCombatBonus;
             const eq = agt.equipment || {};
             if (eq.weapon) equippedSummary.push(eq.weapon.name);
             if (eq.armor) equippedSummary.push(eq.armor.name);

@@ -303,10 +303,10 @@ const collisionRes = pce.evaluateSector({
     IRON_RUST_CONSTANT: 0.91,
     SQUAD_POISE_DECAY: 0.89
 }, 0.85);
-if (!collisionRes || !collisionRes.payload_tags.includes('TARGET_ALL_FERROUS') || !collisionRes.payload_tags.includes('SPAWN_PREDATOR_CLASS') || !collisionRes.payload_tags.includes('TRIGGER_ROUT')) {
-    failures.push(`Expected ProceduralCollisionEngine 3-way collision to synthesize combined payload tags, got ${JSON.stringify(collisionRes)}`);
+if (!collisionRes || !collisionRes.payload_tags.includes('TARGET_ALL_FERROUS') || !collisionRes.payload_tags.includes('SPAWN_PREDATOR_CLASS') || !collisionRes.payload_tags.includes('TRIGGER_ROUT') || !collisionRes.narrativeManifest?.proceduralDescription) {
+    failures.push(`Expected ProceduralCollisionEngine 3-way collision to synthesize combined payload tags and narrativeManifest, got ${JSON.stringify(collisionRes)}`);
 }
-console.log(`[11d-GrammarOfChaos] Procedural Collision Verified: "${collisionRes?.eventName}" | Tags=[${collisionRes?.payload_tags.join(', ')}] | Rebound=+20% on ${collisionRes?.rebound?.pressureId}`);
+console.log(`[11d-GrammarOfChaos] Procedural Collision & Narrative Manifest Verified: "${collisionRes?.eventName}" | Cause="${collisionRes?.narrativeManifest?.narrativeKernel?.cause}" | Rebound=+20% on ${collisionRes?.rebound?.pressureId}`);
 
 
 CommanderUI.selectRoleAndLaunch('SYNDICATE');
@@ -346,8 +346,8 @@ if (!mockElements.get('brutalist-subpage-deck').innerHTML.includes('THE WAR BOAR
     failures.push('CommanderUI Page 5 War Board & Telemetry spatial probability deck failed to render');
 }
 const leakRes = CommanderEngine.RealityEditorVault.resolveFact(null, 'LEAK');
-if (!leakRes.success || leakRes.verb !== 'LEAK') {
-    failures.push(`Expected RealityEditorVault LEAK verb to succeed, got ${JSON.stringify(leakRes)}`);
+if (!leakRes.success || leakRes.verb !== 'LEAK' || (CommanderEngine.RealityEditorVault.worldQualities?.rivalMistrust || 0) < 1) {
+    failures.push(`Expected RealityEditorVault LEAK verb to succeed and increment worldQualities.rivalMistrust, got ${JSON.stringify(leakRes)}`);
 }
 CommanderEngine.RealityEditorVault.generateEmissaryPetition(3);
 const petRes = CommanderEngine.RealityEditorVault.resolveEmissaryPetition('ACCEPT');

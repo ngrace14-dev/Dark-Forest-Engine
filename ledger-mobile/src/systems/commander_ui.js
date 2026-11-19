@@ -979,8 +979,13 @@ export const CommanderUI = {
         const colReadout = document.getElementById('procedural-collision-readout');
         if (colReadout) {
             const latestCol = CommanderEngine.ProceduralCollisionEngine?.collisionHistory?.[0];
+            const wq = CommanderEngine.RealityEditorVault?.worldQualities || {};
+            const wqSummary = `[World Qualities: Mistrust=${wq.rivalMistrust || 0} | Schism=${wq.institutionalSchism || 0} | Authority=${wq.scholarlyAuthority || 0}]`;
             if (latestCol) {
-                colReadout.innerHTML = `<b>${latestCol.eventName}</b> (Day ${latestCol.day}): [${latestCol.anchor} + ${latestCol.catalyst} + ${latestCol.target}] → Tags: ${latestCol.payload_tags.slice(0, 4).join(', ')}. Rebound: +20% on ${latestCol.rebound?.pressureId}.`;
+                const nm = latestCol.narrativeManifest;
+                colReadout.innerHTML = `<b>${latestCol.eventName}</b> (Day ${latestCol.day}): ${nm ? nm.proceduralDescription : `[${latestCol.anchor} + ${latestCol.catalyst} + ${latestCol.target}]`}<br><span style="color:#fde68a;">Rebound: +20% on ${latestCol.rebound?.pressureId} | ${wqSummary}</span>`;
+            } else {
+                colReadout.innerHTML = `Grammar of Chaos Kernel Active: Monitoring 130+ Pressure Vectors.<br><span style="color:#fde68a;">${wqSummary}</span>`;
             }
         }
 

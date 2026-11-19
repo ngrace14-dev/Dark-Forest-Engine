@@ -16,6 +16,7 @@
 
 ## 2. Pending Tasks / Roadmap
 - [x] **Tag-Based Procedural Collision Engine ("Grammar of Chaos"):** Convert the 130-pressure registry into tag-bearing data objects (`Tier 1 Anchor + Tier 2 Catalyst + Tier 3/4 Target`) with automatic payload execution and pressure rebound across Desktop and `ledger-mobile/`.
+- [x] **Phase 4 Causal Narrative Manifests, Persistent World Qualities & Active Crucible Scar Modifiers:** Wired `narrativeManifest` causal synthesis, persistent `RealityEditorVault.worldQualities`, and active `crucible` scar combat/skill modifiers across `src/` and `ledger-mobile/`.
 - [x] **Multi-Century Stress Test (1,000+ Years):** Verify zero systemic runaway or memory leaks under the new Procedural Collision Engine (365,000 days / 26,071 Shifts passed in 2.69s).
 - [ ] **July Milestone (Visual Push):** 3D Crow's Eye Laniakea supercluster map & player-facing HUD integration (currently frozen per guardrails).
 
