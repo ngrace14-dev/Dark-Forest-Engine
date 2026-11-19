@@ -77,7 +77,7 @@ const makeEl = (id) => ({
         contains(c) { return this._set.has(c); }
     }
 });
-['commander-terminal-root', 'text-commander-viewport', 'status-bar', 'commander-action-banner', 'crisis-triage-panel', 'btn-autotick-state', 'timescale-bar', 'daily-goal-bar', 'role-directives-bar', 'expeditions-list', 'dispatches-list', 'roster-list', 'story-archive', 'inquest-verdict-bar', 'story-reader'].forEach(id => {
+['commander-terminal-root', 'text-commander-viewport', 'status-bar', 'commander-action-banner', 'crisis-triage-panel', 'btn-autotick-state', 'timescale-bar', 'daily-goal-bar', 'role-directives-bar', 'expeditions-list', 'dispatches-list', 'roster-list', 'story-archive', 'inquest-verdict-bar', 'story-reader', 'brutalist-subpage-deck', 'hub-shift-header', 'procedural-collision-readout'].forEach(id => {
     mockElements.set(id, makeEl(id));
 });
 globalThis.document = {
@@ -336,10 +336,14 @@ if (!mockElements.get('story-reader').innerText.includes('THE GENERAL LEDGER: RO
     failures.push('CommanderUI General Ledger Audit reader failed to render');
 }
 
-// Verify Manifesto §2 & §3 RealityEditorVault (6 Editor Verbs) & Gatehouse Emissary Petition
+// Verify Manifesto §2 & §3 RealityEditorVault (6 Editor Verbs), Gatehouse Emissary Petition & 5-Page Brutalist Concept Art Deck
 window.viewTruthVault();
-if (!mockElements.get('story-reader').innerText.includes('REALITY EDITOR VAULT')) {
-    failures.push('CommanderUI Reality Editor Vault reader failed to render');
+if (!mockElements.get('story-reader').innerText.includes('REALITY EDITOR VAULT') || !mockElements.get('brutalist-subpage-deck').innerHTML.includes('THE TRUTH &amp; RELIC VAULT')) {
+    failures.push('CommanderUI Page 4 Reality Editor Vault reader/deck failed to render');
+}
+window.viewWarBoard();
+if (!mockElements.get('brutalist-subpage-deck').innerHTML.includes('THE WAR BOARD &amp; TELEMETRY READER')) {
+    failures.push('CommanderUI Page 5 War Board & Telemetry spatial probability deck failed to render');
 }
 const leakRes = CommanderEngine.RealityEditorVault.resolveFact(null, 'LEAK');
 if (!leakRes.success || leakRes.verb !== 'LEAK') {

@@ -109,55 +109,84 @@ export const CommanderUI = {
         }
     },
 
+    pendingRoleId: 'NOBLE_HOUSE',
+
+    renderSemicircleGaugeSvg(label = 'BARRIER FUEL', angleDeg = 35, alertColor = '#c97a36') {
+        const rad = ((angleDeg - 90) * Math.PI) / 180;
+        const nx = (50 + 28 * Math.cos(rad)).toFixed(1);
+        const ny = (46 + 28 * Math.sin(rad)).toFixed(1);
+        return `
+            <div style="text-align:center;">
+                <div style="font-size:8px; font-weight:bold; color:#2b1e12; margin-bottom:1px;">${label}</div>
+                <svg viewBox="0 0 100 54" style="width:82px; height:42px; display:block; margin:0 auto;">
+                    <path d="M 12 46 A 38 38 0 0 1 88 46" fill="none" stroke="#3f3224" stroke-width="6"/>
+                    <path d="M 12 46 A 38 38 0 0 1 42 10" fill="none" stroke="${alertColor}" stroke-width="5"/>
+                    <line x1="50" y1="46" x2="${nx}" y2="${ny}" stroke="#14110e" stroke-width="2.5" stroke-linecap="round"/>
+                    <circle cx="50" cy="46" r="4" fill="#14110e"/>
+                </svg>
+            </div>
+        `;
+    },
+
     renderRoleSelection() {
         if (typeof document === 'undefined') return;
         const container = document.getElementById(this.containerId);
         if (!container) return;
         container.dataset.initialized = 'role_gate';
+        const sel = this.pendingRoleId || 'NOBLE_HOUSE';
+        const h = CommanderEngine.CampaignManager.state.house || {};
+        const o = CommanderEngine.CampaignManager.state.order || {};
+        const syn = CommanderEngine.CampaignManager.state.syndicate || {};
 
-        const runeIcons = {
-            NOBLE_HOUSE: 'ᛉ',
-            TERMINUS: 'ᛦ',
-            GUILD_LEADER: 'ᚷ',
-            MERCHANT_PATRON: 'ᛒ',
-            SYNDICATE: 'ᚱ',
-            PALE_SOVEREIGN: 'ᛇ'
-        };
+        const cardData = [
+            ['MERCHANT_PATRON', 'THE CROWN', 'ᛒ', `<div><b>ADMINISTRATIVE</b><br>Fuel Monopoly &amp; Arbitrage.<br><b style="color:#14532d;">[STATUS: ACTIVE]</b></div>`, this.renderSemicircleGaugeSvg('FUEL MONOPOLY', 45, '#57753b')],
+            ['NOBLE_HOUSE', 'NOBLE HOUSE', 'ᛉ', `<div><b>MILITARY:</b> 288<br><b>STATS:</b> 18/5-30<br><b>RESERVES:</b> ${h.barrierFuelUnits || 28}u<br><b style="color:#991b1b;">TITHE: ${h.crownDemand || 16}u</b></div>`, this.renderSemicircleGaugeSvg('BARRIER FUEL', -30, '#c97a36')],
+            ['TERMINUS', 'HOUSE TERMINUS', 'ᛦ', `<div style="grid-column:1 / span 2;"><b>ANOMALOUS CONTAINMENT</b><br><span style="font-size:8px;">STABILITY // 300 GUARDIANS</span><div style="display:grid; grid-template-columns:repeat(12,1fr); gap:1px; height:9px; margin-top:3px;">${Array.from({ length: 12 }).map((_, i) => `<div style="background:${i < 9 ? '#576838' : '#9c8d74'}; border:1px solid #2b1e12;"></div>`).join('')}</div></div>`, ''],
+            ['GUILD_LEADER', 'OBSIDIAN CITADEL', 'ᚷ', `<div><b>CONFIDENTIAL:</b> <span class="redaction-bar" style="width:42px;"></span><br><span class="redaction-bar" style="width:68px;"></span><br><b>ENTROPY:</b> ${o.blindSpotEntropy || 12}%</div>`, this.renderSemicircleGaugeSvg('CONTAINMENT', 25, '#8c5828')],
+            ['SYNDICATE', 'SCARCITY SYNDICATE', 'ᚱ', `<div><b>TRADE:</b> 28% / 7%<br><b>RESIN:</b> ${syn.contrabandResin || 45}u<br><b>TOLL:</b> ${syn.gallowsTollCollected || 80}d</div>`, this.renderSemicircleGaugeSvg('TOLL / RESIN', 15, '#c97a36')]
+        ];
 
-        const roles = Object.values(CommanderEngine.ROLE_CATALOG || {});
-        const cardsHtml = roles.map(r => {
-            const isSovereign = r.roleId === 'PALE_SOVEREIGN';
-            const rune = runeIcons[r.roleId] || 'ᛟ';
-            const shortTitle = r.title.replace(/^\d+\.\s*/, '');
-            return `
-            <div class="vantage-role-card ${isSovereign ? 'sovereign-special' : ''}">
+        const cardsHtml = cardData.map(([roleId, title, rune, leftCol, rightCol]) => `
+            <div class="burden-parchment-card" style="cursor:pointer;" onclick="window.selectArchiveRole('${roleId}')">
                 <div>
-                    <div class="vantage-rune-watermark">${rune}</div>
-                    <div class="vantage-card-title">${r.title}</div>
-                    <div class="vantage-card-sub">${r.subtitle}</div>
-                    <div class="vantage-card-desc">${r.desc}</div>
+                    <div class="burden-card-header"><span>${title}</span><span>${rune}</span></div>
+                    <div style="display:grid; grid-template-columns:1.1fr 0.9fr; gap:5px; font-size:8.5px;">${leftCol}${rightCol}</div>
                 </div>
-                <div style="margin-top:8px;">
-                    <button class="vantage-init-btn" onclick="window.selectArchiveRole('${r.roleId}')">
-                        Initialize ${r.roleId === 'NOBLE_HOUSE' ? 'Noble House Scion' : shortTitle}
-                    </button>
+                <button class="vantage-init-btn" style="margin-top:6px; padding:4px; font-size:8.5px;">INITIALIZE ${title}</button>
+            </div>
+        `).join('') + `
+            <div class="burden-parchment-card" style="background:linear-gradient(160deg,#8c8b88 0%,#63625f 100%); cursor:pointer; overflow:hidden;" onclick="window.selectArchiveRole('PALE_SOVEREIGN')">
+                <div style="opacity:0.65;">
+                    <div class="burden-card-header" style="color:#27272a;"><span>THE PALE SOVEREIGN</span><span>ᛇ</span></div>
+                    <div style="font-size:9.5px; letter-spacing:2px; color:#27272a; text-align:center; margin:8px 0;">ᚠᚢᚦᚨᚱᚲᚷᚹ ᚺᚾᛁᛃᛇᛈᛉᛊ<br>ᛏᛒᛖᛗᛚᛜᛞᛟ ᚠᚢᚦᚨᚱᚲᚷᚹ</div>
+                </div>
+                <svg viewBox="0 0 200 90" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;">
+                    <line x1="0" y1="15" x2="200" y2="75" stroke="#18181b" stroke-width="6" stroke-dasharray="9,4"/>
+                    <line x1="0" y1="75" x2="200" y2="15" stroke="#27272a" stroke-width="6" stroke-dasharray="9,4"/>
+                </svg>
+                <div style="position:relative; z-index:2; text-align:center; color:#7f1d1d; font-family:'Cinzel',serif; font-weight:900; font-size:9px; background:rgba(212,212,216,0.88); padding:3px; border:1px solid #7f1d1d;">
+                    AWAITING 1,000-YEAR CYCLE
                 </div>
             </div>
-        `}).join('');
+        `;
 
         container.innerHTML = `
-            <div class="scroll-column active-scroll" style="max-width:720px; margin:0 auto;">
-                <div class="scroll-roller"></div>
-                <div class="parchment-sheet">
-                    <div class="rune-margin left">ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚ</div>
-                    <div class="rune-margin right">ᛟᛞᛜᛚᛗᛖᛒᛏᛊᛉᛈᛇᛃᛁᚾᚺᚹᚷᚲᚱᚨ</div>
-                    <div class="role-scroll-header">
-                        <h2 class="role-scroll-title">THE ROYAL ARCHIVE & GENERAL LEDGER</h2>
-                        <div class="role-scroll-subtitle">— SELECT YOUR VANTAGE ROLE —</div>
-                    </div>
-                    <div class="vantage-role-grid">${cardsHtml}</div>
+            <div class="brutalist-runic-frame">
+                <div class="brutalist-rune-border-left">ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊ</div>
+                <div class="brutalist-rune-border-right">ᛟᛞᛜᛚᛗᛖᛒᛏᛊᛉᛈᛇᛃᛁᚾᚺ</div>
+
+                <div class="brutalist-top-crest">
+                    <div class="brutalist-crest-title">CIVILIZATIONAL DUTY ROSTER</div>
+                    <div class="brutalist-crest-medallion"><span>ᛝ</span></div>
+                    <div class="brutalist-crest-right">// LAYER 2 — SELECT YOUR VANTAGE ROLE</div>
                 </div>
-                <div class="scroll-roller"></div>
+
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">${cardsHtml}</div>
+
+                <button type="button" class="riveted-commit-plate" onclick="window.selectArchiveRole('${sel}')">
+                    <span class="plate-rune">ᛝ</span>
+                    <span>[CONFIRM ASSIGNMENT &amp; COMMENCE DUTY]</span>
+                </button>
             </div>
         `;
     },
@@ -328,6 +357,7 @@ export const CommanderUI = {
         if (revealed) {
             text += "\n[⚠️ ARCHIVE ANOMALY: Scraped vellum layers have exposed an unindexed 21st settlement record!]\n";
         }
+        this.renderWarBoardReader();
         this.setReaderContent(text);
     },
 
@@ -376,6 +406,66 @@ export const CommanderUI = {
             text += `  ${i + 10}. ${h.name.padEnd(16, ' ')} | Output:   ${h.monopoly.padEnd(28, ' ')} | [${h.status}] | Power: ${h.power}\n`;
         });
         this.setReaderContent(text);
+
+        const visualDeck = document.getElementById('brutalist-subpage-deck');
+        if (visualDeck) {
+            const rowsHtml = board.slice(0, 6).map((h, idx) => `
+                <div style="background:${idx === 0 ? 'linear-gradient(90deg,#8c4f19,#5c3412)' : 'linear-gradient(160deg,#d7ccb8,#b8a88e)'}; color:${idx === 0 ? '#fde68a' : '#1c1610'}; border:1.5px solid #4a3e2e; padding:4px 7px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; font-size:9.5px; font-weight:bold;">
+                    <span style="font-family:'Cinzel',serif;">${h.name.toUpperCase()}</span>
+                    <span style="font-size:8.5px;">ᛉ POWER: ${h.power}% [POSTURE: ${h.status}]</span>
+                </div>
+            `).join('');
+
+            const auditItems = board.filter(h => h.lastMutationReason).slice(0, 3);
+            const auditHtml = (auditItems.length > 0 ? auditItems : [
+                { name: 'SECTOR 4', status: 'RECON', lastMutationReason: 'PROXY RAID AMBUSH' },
+                { name: 'CITADEL ARTERY', status: 'CRITICAL', lastMutationReason: 'FUEL CRATE DELAYED' },
+                { name: 'BORDERLANDS', status: 'ACTIVE', lastMutationReason: 'TRADE EMBARGO REJECTED' }
+            ]).map(a => `
+                <div style="border-bottom:1px dashed #6b5a45; padding:2px 0; font-size:8px;">
+                    <b>• ${a.lastMutationReason.toUpperCase()}</b> ⚠️ [${a.name.toUpperCase()} | ${a.status}]
+                </div>
+            `).join('');
+
+            visualDeck.style.display = 'block';
+            visualDeck.innerHTML = `
+                <div class="brutalist-top-crest" style="margin-top:6px;">
+                    <div class="brutalist-crest-title">THE WAR BOARD &amp; TELEMETRY READER</div>
+                    <div class="brutalist-crest-medallion"><span>ᛝ</span></div>
+                    <div class="brutalist-crest-right">// PAGE 5: SPATIAL PROBABILITY</div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1.15fr; gap:10px;">
+                    <div style="border:1px solid #383e40; background:rgba(9,13,14,0.8); padding:8px;">
+                        <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold; margin-bottom:6px;">[19-HOUSE TABLE]</div>
+                        ${rowsHtml}
+                    </div>
+                    <div style="border:1px solid #383e40; background:rgba(9,13,14,0.8); padding:8px; display:flex; flex-direction:column; justify-content:space-between;">
+                        <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold;">TELEMETRY GRID // 20 CHAINED SETTLEMENTS</div>
+                        <svg viewBox="0 0 260 120" style="width:100%; height:112px; display:block; margin:2px auto;">
+                            <ellipse cx="130" cy="60" rx="102" ry="38" fill="none" stroke="#4a453b" stroke-width="1" stroke-dasharray="3,2"/>
+                            <line x1="130" y1="60" x2="48" y2="28" stroke="#8c7a5b" stroke-width="1.5" stroke-dasharray="2,2"/>
+                            <line x1="130" y1="60" x2="210" y2="30" stroke="#8c7a5b" stroke-width="1.5" stroke-dasharray="2,2"/>
+                            <line x1="130" y1="60" x2="54" y2="94" stroke="#8c7a5b" stroke-width="1.5" stroke-dasharray="2,2"/>
+                            <line x1="130" y1="60" x2="206" y2="92" stroke="#8c7a5b" stroke-width="1.5" stroke-dasharray="2,2"/>
+                            <rect x="116" y="45" width="28" height="30" fill="#141819" stroke="#d99b43" stroke-width="1.5"/>
+                            <text x="130" y="65" text-anchor="middle" fill="#fbbf24" font-size="14">ᛝ</text>
+                            <circle cx="48" cy="28" r="5" fill="#991b1b"/><text x="48" y="18" text-anchor="middle" fill="#f87171" font-size="6.5">NEAR COLLAPSE</text>
+                            <circle cx="210" cy="30" r="5" fill="#576838"/><text x="210" y="20" text-anchor="middle" fill="#a3e635" font-size="6.5">PROSPEROUS</text>
+                            <circle cx="54" cy="94" r="5" fill="#b45309"/><text x="54" y="108" text-anchor="middle" fill="#fbbf24" font-size="6.5">NODE_07 // SKIPPED</text>
+                            <circle cx="206" cy="92" r="5" fill="#991b1b"/><text x="206" y="106" text-anchor="middle" fill="#f87171" font-size="6.5">ALERT</text>
+                        </svg>
+                        <div class="burden-parchment-card" style="padding:5px 7px;">
+                            <div style="font-family:'Cinzel',serif; font-weight:900; font-size:9.5px; border-bottom:1px solid #4a3e2e; margin-bottom:2px;">[CAUSAL AUDIT TRAIL]</div>
+                            ${auditHtml}
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="riveted-commit-plate" onclick="document.getElementById('brutalist-subpage-deck').style.display='none';">
+                    <span class="plate-rune">ᛝ</span>
+                    <span>[CALCULATE PROBABILITY &amp; COMMENCE COMMAND]</span>
+                </button>
+            `;
+        }
     },
 
     renderInquestReader(targetId = 'agt_2') {
@@ -421,6 +511,76 @@ export const CommanderUI = {
         }
 
         this.setReaderContent(text, null, facts[0]?.id || null);
+
+        const visualDeck = document.getElementById('brutalist-subpage-deck');
+        if (visualDeck) {
+            const targetId = facts[0]?.id || '';
+            const dossierCards = (facts.length > 0 ? facts : [
+                { id: 'f1', title: 'RELIC: FRAGMENT 09', credibility: 94 },
+                { id: 'f2', title: 'TRUTH: THE SILENT REIGN', credibility: 82 },
+                { id: 'f3', title: 'RELIC: OBSIDIAN KEY', credibility: 41 }
+            ]).slice(0, 4).map(f => `
+                <div style="border-bottom:1.5px solid #4a3e2e; padding:4px 0; margin-bottom:4px;">
+                    <div style="display:flex; justify-content:space-between; font-family:'Cinzel',serif; font-weight:900; font-size:9.5px;">
+                        <span>[${f.title.toUpperCase()}]</span><span>ᛉ</span>
+                    </div>
+                    <div style="margin:2px 0;"><span class="redaction-bar" style="width:70%;"></span> <span class="redaction-bar" style="width:20%;"></span></div>
+                    <div style="font-size:8px; font-weight:bold;">CREDIBILITY: <span style="background:#5c3d1e; color:#fde68a; padding:1px 4px;">${f.credibility}% ${f.credibility >= 75 ? 'CERTAINTY' : 'DUBIOUS'}</span></div>
+                </div>
+            `).join('');
+
+            const verbs = [['PUBLISH','ᛉ'],['LEAK','ᛇ'],['SELL','ᛒ'],['ARCHIVE','🏛️'],['SUPPRESS','🤫'],['DESTROY','ᛦ']];
+            const verbsHtml = verbs.map(([v, ic]) => `
+                <button class="execution-verb-btn ${v === 'DESTROY' ? 'destroy-verb' : ''}" onclick="window.resolveFactVerb('${targetId}','${v}')">
+                    <span class="verb-icon">${ic}</span><span class="verb-label">${v}</span>
+                </button>
+            `).join('');
+
+            visualDeck.style.display = 'block';
+            visualDeck.innerHTML = `
+                <div class="brutalist-top-crest" style="margin-top:6px;">
+                    <div class="brutalist-crest-title">THE TRUTH &amp; RELIC VAULT</div>
+                    <div class="brutalist-crest-medallion"><span>ᛝ</span></div>
+                    <div class="brutalist-crest-right">// PAGE 4: DEEP ARCHIVE REALITY EDITOR</div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1.15fr 0.95fr; gap:10px;">
+                    <div class="burden-parchment-card">
+                        <div>
+                            <div class="burden-card-header"><span>FACT DOSSIER LIST</span><span>ᛦ</span></div>
+                            ${dossierCards}
+                        </div>
+                    </div>
+                    <div style="border:1px solid #383e40; background:rgba(9,13,14,0.85); padding:8px; text-align:center; display:flex; flex-direction:column; justify-content:space-between;">
+                        <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold; text-align:left;">RELIC TELEMETRY</div>
+                        <svg viewBox="0 0 180 150" style="width:142px; height:118px; margin:0 auto;">
+                            <circle cx="90" cy="75" r="50" fill="#171b1c" stroke="#94a3b8" stroke-width="2" stroke-dasharray="18,3,30,4"/>
+                            <circle cx="90" cy="75" r="32" fill="none" stroke="#64748b" stroke-width="1" stroke-dasharray="6,3"/>
+                            <path d="M55,42 L92,75 L132,55 M92,75 L74,124 M65,82 L125,95" stroke="#e2e8f0" stroke-width="1.5" fill="none"/>
+                            <text x="90" y="42" text-anchor="middle" fill="#cbd5e1" font-size="11">ᚠ ᚢ ᚦ ᚨ ᚱ</text>
+                            <text x="90" y="114" text-anchor="middle" fill="#cbd5e1" font-size="11">ᚲ ᚷ ᚹ ᚺ ᚾ</text>
+                        </svg>
+                        <div style="display:flex; justify-content:space-between; font-size:8px; color:#8c8270;">
+                            <span>STATUS: NOMINAL</span><span>6,000Y SEAL</span>
+                        </div>
+                    </div>
+                    <div style="border:1px solid #383e40; background:rgba(9,13,14,0.85); padding:8px; display:flex; flex-direction:column; justify-content:space-between;">
+                        <div>
+                            <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold; margin-bottom:5px;">EXECUTION DIRECTIVES</div>
+                            ${verbsHtml}
+                        </div>
+                        <div class="burden-parchment-card" style="padding:5px 7px; margin-top:4px;">
+                            <div style="font-family:'Cinzel',serif; font-weight:900; font-size:9px; border-bottom:1px solid #4a3e2e; margin-bottom:2px;">CONSEQUENCE PREVIEW</div>
+                            <div style="background:#8c4f19; color:#fde68a; font-size:8px; padding:2px 4px; margin-bottom:2px; font-weight:bold;">▲ +12% BLIND-SPOT ENTROPY</div>
+                            <div style="background:#5c3412; color:#fed7aa; font-size:8px; padding:2px 4px; font-weight:bold;">▼ -10% CROWN FAVOR</div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="riveted-commit-plate" onclick="window.resolveFactVerb('${targetId}','ARCHIVE')">
+                    <span class="plate-rune">ᛝ</span>
+                    <span>[EXECUTE DIRECTIVE &amp; COMMIT TO HISTORY]</span>
+                </button>
+            `;
+        }
     },
 
     setReaderContent(text, inquestTargetId = null, factTargetId = null) {
@@ -470,117 +630,105 @@ export const CommanderUI = {
         }).join('');
 
         container.innerHTML = `
-            <div class="scroll-column active-scroll" style="max-width:760px; margin:0 auto;">
-                <div class="scroll-roller"></div>
-                <div class="parchment-sheet">
-                    <div class="ledger-top-slate">
-                        <div class="ledger-slate-header">
-                            <div class="ledger-slate-title">DARK FOREST ENGINE // <span>THE GENERAL LEDGER</span></div>
-                            <button class="cmd-btn" style="background:#3f1212; border-color:#991b1b; color:#fecaca; font-size:10px; padding:3px 8px;" onclick="window.openRoleGate()">🚪 Role Scroll</button>
-                        </div>
-                        <div id="status-bar" style="font-family:'Share Tech Mono',monospace; font-size: 11px; color: #f3ead8; line-height:1.45;">Initializing...</div>
-                        <div id="commander-action-banner" style="display:none; background:#271f16; border-left:3px solid #22d3ee; color:#a5f3fc; padding:5px 9px; margin-top:6px; font-family:'Share Tech Mono',monospace; font-size:10.5px;"></div>
-                        <div id="crisis-triage-panel" style="display:none; background:#2a0a0a; border:2px solid #ef4444; padding:10px; margin-top:8px;"></div>
-                    </div>
+            <div class="brutalist-runic-frame">
+                <div class="brutalist-rune-border-left">ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊ</div>
+                <div class="brutalist-rune-border-right">ᛟᛞᛜᛚᛗᛖᛒᛏᛊᛉᛈᛇᛃᛁᚾᚺ</div>
 
-                    <div class="iron-section-bar">SESSION & CLOCK</div>
-                    <div class="ledger-btn-row">
+                <div class="brutalist-top-crest">
+                    <div class="brutalist-crest-title">THE GENERAL LEDGER HUB</div>
+                    <div class="brutalist-crest-medallion"><span>ᛝ</span></div>
+                    <div class="brutalist-crest-right">
+                        <span id="hub-shift-header">DAY 1 // SHIFT COUNTDOWN</span>
+                        <svg viewBox="0 0 80 22" style="width:70px; height:18px;">
+                            <polyline points="0,12 18,12 24,4 30,19 36,2 42,18 48,8 54,14 60,12 80,12" fill="none" stroke="#d9822b" stroke-width="1.5"/>
+                        </svg>
+                        <span>VOLATILITY ▲</span>
+                        <button class="cmd-btn" style="background:#3f1212; border-color:#991b1b; color:#fecaca; font-size:9px; padding:2px 6px;" onclick="window.openRoleGate()">🚪 Role Roster</button>
+                    </div>
+                </div>
+
+                <!-- 5-PAGE QUICK NAVIGATION BAR -->
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom:6px; padding-bottom:5px; border-bottom:1px solid #2b3234;">
+                    <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                        <button class="cmd-btn" onclick="if(window.CandidateOnboarding) window.CandidateOnboarding.start(window.CommanderUI);">PAGE 1: CANDIDATE GATE</button>
+                        <button class="cmd-btn" onclick="window.openRoleGate()">PAGE 2: DUTY ROSTER</button>
+                        <button class="cmd-btn" style="border-color:#d9822b; color:#fde68a;" onclick="const d=document.getElementById('brutalist-subpage-deck'); if(d) d.style.display='none';">PAGE 3: LEDGER HUB</button>
+                        <button class="cmd-btn" onclick="window.viewTruthVault()">PAGE 4: TRUTH &amp; RELIC VAULT</button>
+                        <button class="cmd-btn" onclick="window.viewWarBoard()">PAGE 5: WAR BOARD &amp; TELEMETRY</button>
+                    </div>
+                    <div class="ledger-btn-row" style="margin:0;">
                         <button id="btn-autotick-state" class="cmd-btn" onclick="window.toggleAutoTick()">CLOCK: TICKING</button>
-                        <span id="timescale-bar" style="display:inline-flex; gap:4px; flex-wrap:wrap;">
-                            <button class="cmd-btn" onclick="window.setTimeScale(1)">1x</button>
-                            <button class="cmd-btn" onclick="window.setTimeScale(2)">2x</button>
-                            <button class="cmd-btn" onclick="window.setTimeScale(4)">4x</button>
-                            <button class="cmd-btn" onclick="window.setTimeScale(8)">8x</button>
-                        </span>
+                        <span id="timescale-bar" style="display:inline-flex; gap:3px;"></span>
                         <button class="cmd-btn" onclick="window.stepExpeditionHour(2)">+2H FIELD</button>
                         <button class="cmd-btn" onclick="window.advanceDays(1)">+1 DAY</button>
-                        <button class="cmd-btn" title="Pre-emptively spend 10u Dream-Resin to mitigate any Crisis during Chrono-Skip" onclick="window.triggerDreamIntervention()">🌙 DREAM WARD</button>
-                        <button class="cmd-btn" title="Instant 1-day skip (Uses Dream Ward if active)" onclick="window.chronoSkip(1)">+1D SKIP</button>
+                        <button class="cmd-btn" onclick="window.triggerDreamIntervention()">🌙 DREAM WARD</button>
+                        <button class="cmd-btn" onclick="window.chronoSkip(1)">+1D SKIP</button>
                         <button class="cmd-btn" onclick="window.exportSave()">EXPORT SAVE</button>
                     </div>
+                </div>
 
-                    <div class="iron-section-bar">NEXT DAY GOAL</div>
-                    <div id="daily-goal-bar" class="ledger-btn-row"></div>
+                <div id="status-bar" style="font-family:'Share Tech Mono',monospace; font-size:10px; color:#d8c8a8; background:#090c0d; border:1px solid #383e40; padding:4px 8px; margin-bottom:6px;">Initializing...</div>
+                <div id="commander-action-banner" style="display:none; background:#1c1610; border-left:3px solid #fbbf24; color:#fde68a; padding:4px 8px; margin-bottom:6px; font-size:10px;"></div>
+                <div id="daily-goal-bar" class="ledger-btn-row" style="margin-bottom:6px;"></div>
 
-                    <div class="iron-section-bar">ROLE DIRECTIVES</div>
-                    <div id="role-directives-bar" class="ledger-btn-row"></div>
-                    <div class="ledger-lower-split">
+                <div id="brutalist-subpage-deck" style="display:none; margin-bottom:10px;"></div>
+
+                <!-- PAGE 3 MAIN SPLIT: LEFT 3 IRON MODULES + RIGHT PARCHMENT TRIAGE SLATE -->
+                <div style="display:grid; grid-template-columns: 1.25fr 0.95fr; gap:12px; align-items:stretch;">
+                    <div id="role-directives-bar" style="display:flex; flex-direction:column;"></div>
+
+                    <div class="burden-parchment-card">
                         <div>
-                            <div class="parchment-note-box">
-                                <div class="parchment-note-title">
-                                    <span>COURIER DISPATCHES</span>
-                                    <span style="font-size:9px; color:#574532;">LIVE LOG</span>
+                            <div class="burden-card-header"><span>TRIAGE SLATE</span><span>ᛟ</span></div>
+                            <div id="crisis-triage-panel" style="display:block;"></div>
+                            <div style="margin-top:6px; background:linear-gradient(180deg,#8c4f19 0%,#5c3412 100%); border:1.5px solid #3f2209; padding:7px; color:#fde68a;">
+                                <div style="display:flex; justify-content:space-between; font-family:'Cinzel',serif; font-weight:900; font-size:11px; margin-bottom:3px;">
+                                    <span>⚡ PROCEDURAL COLLISION</span><span>⚠️</span>
                                 </div>
-                                <div id="dispatches-list" style="max-height: 155px; overflow-y: auto;">Waiting...</div>
-                            </div>
-
-                            <div class="parchment-note-box">
-                                <div class="parchment-note-title">
-                                    <span>ACTIVE FIELD EXPEDITIONS</span>
-                                    <span style="font-size:9px; color:#574532;">MIST TRAILS</span>
+                                <div id="procedural-collision-readout" style="font-size:8.5px; color:#fed7aa; line-height:1.25;">
+                                    Grammar of Chaos Kernel Active: Monitoring 130+ Pressure Vectors across Tier 1 Anchors, Tier 2 Catalysts, and Tier 3/4 Targets.
                                 </div>
-                                <div id="expeditions-list" style="max-height: 145px; overflow-y: auto;">No squads currently out in the mist.</div>
-                            </div>
-
-                            <div class="parchment-note-box">
-                                <div class="parchment-note-title">
-                                    <span>GARRISON ROSTER</span>
-                                    <span style="font-size:9px; color:#574532;">⚔️ ⚙️ 🛡️</span>
-                                </div>
-                                <div id="roster-list" style="max-height: 230px; overflow-y: auto;">Loading agents...</div>
                             </div>
                         </div>
-
-                        <div>
-                            <div class="astrolabe-widget">
-                                <div class="parchment-note-title" style="width:100%; justify-content:space-between;">
-                                    <span>CRUCIBLE STORY ARCHIVE</span>
-                                    <span>MOUNTAIN RING</span>
-                                </div>
-                                <svg class="astrolabe-svg" viewBox="0 0 240 240" onclick="window.viewTelemetry()" style="cursor:pointer;" title="Click Mountain Ring Astrolabe to inspect the 20 Chained Settlements Census">
-                                    <defs>
-                                        <radialGradient id="attractorGlow" cx="50%" cy="50%" r="50%">
-                                            <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.55"/>
-                                            <stop offset="65%" stop-color="#0d9488" stop-opacity="0.18"/>
-                                            <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
-                                        </radialGradient>
-                                    </defs>
-                                    <circle cx="120" cy="120" r="108" fill="url(#attractorGlow)" stroke="#3b2f22" stroke-width="3"/>
-                                    <circle cx="120" cy="120" r="99" fill="none" stroke="#5a4632" stroke-width="1.5" stroke-dasharray="4 3"/>
-                                    <g class="astrolabe-ring-slow">
-                                        <circle cx="120" cy="120" r="92" fill="none" stroke="#6b533b" stroke-width="6" opacity="0.65"/>
-                                        ${nodesSvg}
-                                    </g>
-                                    <g class="astrolabe-ring-reverse">
-                                        <circle cx="120" cy="120" r="72" fill="none" stroke="#856544" stroke-width="4"/>
-                                        <circle cx="120" cy="120" r="64" fill="none" stroke="#22d3ee" stroke-width="1" stroke-dasharray="8 6" opacity="0.7"/>
-                                        <line x1="120" y1="22" x2="120" y2="218" stroke="#22d3ee" stroke-width="0.7" opacity="0.45"/>
-                                        <line x1="22" y1="120" x2="218" y2="120" stroke="#22d3ee" stroke-width="0.7" opacity="0.45"/>
-                                    </g>
-                                    <g class="astrolabe-core-pulse">
-                                        <polygon points="120,72 162,142 78,142" fill="none" stroke="#22d3ee" stroke-width="1.6"/>
-                                        <polygon points="120,168 162,98 78,98" fill="none" stroke="#22d3ee" stroke-width="1.6"/>
-                                        <polygon points="120,84 156,120 120,156 84,120" fill="rgba(34,211,238,0.15)" stroke="#a5f3fc" stroke-width="1.4"/>
-                                        <circle cx="120" cy="120" r="6" fill="#a5f3fc"/>
-                                    </g>
-                                </svg>
-                                <div style="font-family:'Share Tech Mono',monospace; font-size:9.5px; color:#3b2d1f; text-align:center; margin-top:2px;">
-                                    Tap Astrolabe for 20-Settlement Bedrock Census
-                                </div>
-                            </div>
-
-                            <div class="parchment-note-box">
-                                <div class="parchment-note-title">
-                                    <span>CRUCIBLE RECORDS & READER</span>
-                                </div>
-                                <div id="story-archive" style="font-size:11px; color:#2b1f14;">Loading records...</div>
-                                <div id="inquest-verdict-bar" style="display:none; gap:5px; margin-top:6px; flex-wrap:wrap;"></div>
-                                <div id="story-reader" class="cmd-story-box" style="display:none; margin-top:8px;"></div>
-                            </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:8.5px; border-top:1px solid #4a3e2e; padding-top:5px; margin-top:6px;">
+                            <div><b>STATUS:</b> 18/5-300<br><b>ADMINISTRATIVE:</b> 100%<br><b>MILITARY:</b> ACTIVE</div>
+                            <div style="text-align:right;"><b>TELEMETRY:</b> SYNCED<br><b>SHIFT CYCLE:</b> 14D</div>
                         </div>
                     </div>
                 </div>
-                <div class="scroll-roller"></div>
+                <!-- LOWER TELEMETRY & SQUAD LOGS -->
+                <div class="ledger-lower-split" style="margin-top:8px;">
+                    <div>
+                        <div class="hub-iron-module">
+                            <div class="hub-module-header"><span>FIELD EXPEDITIONS &amp; CARAVAN LOGS</span><span style="font-size:9px; color:#d9822b;">MIST TRAILS</span></div>
+                            <div id="expeditions-list" style="max-height:110px; overflow-y:auto; font-size:10px;">No squads currently out in the mist.</div>
+                        </div>
+                        <div class="hub-iron-module">
+                            <div class="hub-module-header"><span>UI_LOG // COURIER DISPATCHES</span><span style="font-size:9px; color:#d9822b;">LIVE STREAM</span></div>
+                            <div id="dispatches-list" style="max-height:115px; overflow-y:auto; font-size:10px;">Waiting...</div>
+                        </div>
+                        <div class="hub-iron-module">
+                            <div class="hub-module-header"><span>DOSSIER &amp; ARCHIVE READER</span><span style="font-size:9px; color:#d9822b;">CASE FILE</span></div>
+                            <div id="inquest-verdict-bar" style="display:none; gap:5px; margin-bottom:6px; flex-wrap:wrap;"></div>
+                            <div id="story-reader" class="cmd-story-box" style="display:none; max-height:150px; overflow-y:auto;"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="hub-iron-module">
+                            <div class="hub-module-header"><span>GARRISON &amp; SQUAD ARMORY</span><span style="font-size:9px; color:#d9822b;">⚔️ ⚙️ 🛡️</span></div>
+                            <div id="roster-list" style="max-height:175px; overflow-y:auto; font-size:10px;">Loading agents...</div>
+                        </div>
+                        <div class="hub-iron-module">
+                            <div class="hub-module-header"><span>CRUCIBLE RECORDS &amp; NECROLOGY</span><span style="font-size:9px; color:#d9822b;">DECEASED</span></div>
+                            <div id="story-archive" style="max-height:95px; overflow-y:auto; font-size:10px;">Loading records...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="riveted-commit-plate" onclick="window.advanceDays(1)">
+                    <span class="plate-rune">ᛝ</span>
+                    <span>[CONFIRM HUB SELECTIONS &amp; UPDATE LEDGER]</span>
+                </button>
             </div>
         `;
     },
@@ -615,6 +763,8 @@ export const CommanderUI = {
         const feralCount = CommanderEngine.AgentRosterManager?.spawnedFeralWendigos?.length || 0;
         const feralInfo = feralCount > 0 ? ` | 🩸 Feral Wendigos: ${feralCount}` : '';
         if (sb) sb.innerText = `${m}${guardInfo}${dreamInfo}${feralInfo} | Volatility: ${gauge}`;
+        const hubShiftEl = document.getElementById('hub-shift-header');
+        if (hubShiftEl) hubShiftEl.innerText = `DAY ${d} // SHIFT COUNTDOWN (${shiftDays}D)`;
 
         // Render Fallout Shelter–Style Active Field Expeditions Log
         const expDiv = document.getElementById('expeditions-list');
@@ -688,7 +838,7 @@ export const CommanderUI = {
             }
         }
 
-        // Render Role-Scoped Directives Grouped into Progressive Categories
+        // Render Page 3 Brutalist Iron Telemetry Modules ([BASE & ARCHIVES], [FIELD & LOGISTICS], [POLITICS & TITHE])
         const dirBar = document.getElementById('role-directives-bar');
         if (dirBar && CommanderEngine.CrisisEngine) {
             const roleDirs = CommanderEngine.CrisisEngine.getDirectivesForRole(roleLabel);
@@ -707,18 +857,38 @@ export const CommanderUI = {
                 }
             });
 
-            let groupedHtml = `<div style="width:100%; display:flex; flex-direction:column; gap:5px;">`;
-            if (baseGroup.length > 0) {
-                groupedHtml += `<div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;"><span style="font-size:9.5px; color:#fbbf24; font-weight:bold; min-width:115px;">[BASE & ARCHIVES]</span>${baseGroup.join('')}</div>`;
-            }
-            if (fieldGroup.length > 0) {
-                groupedHtml += `<div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;"><span style="font-size:9.5px; color:#38bdf8; font-weight:bold; min-width:115px;">[FIELD & LOGISTICS]</span>${fieldGroup.join('')}</div>`;
-            }
-            if (politicsGroup.length > 0) {
-                groupedHtml += `<div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;"><span style="font-size:9.5px; color:#f87171; font-weight:bold; min-width:115px;">[POLITICS & TITHE]</span>${politicsGroup.join('')}</div>`;
-            }
-            groupedHtml += `</div>`;
-            dirBar.innerHTML = groupedHtml;
+            const capPct = fe ? fe.settlementProsperity : 84;
+            const resSupply = fe ? fe.settlementResources * 120 : 4912;
+            const fuelSupply = (st.barrierFuelUnits || st.contrabandResin || 28) * 140;
+
+            const buildModule = (title, rightTag, supplyVal, statusText, buttons) => `
+                <div class="hub-iron-module">
+                    <div class="hub-module-header">
+                        <span>${title}</span>
+                        <span style="font-size:10px; color:#d9822b;">${rightTag}</span>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1.1fr 0.9fr; gap:8px; align-items:center; margin-bottom:5px; font-size:8px; color:#8c8270;">
+                        <div style="font-family:monospace; line-height:1.25;">
+                            01001101 0010 100101 | 18 | 0 | 84%<br>
+                            01000101 0011 110010 | 24 | 1 | 92%
+                        </div>
+                        <div>
+                            <div style="display:flex; justify-content:space-between; color:#cbbba0; margin-bottom:2px;">
+                                <span>SUPPLY // ${supplyVal}</span><span>STATUS: ${statusText}</span>
+                            </div>
+                            <div style="height:6px; background:#07090a; border:1px solid #4a453b;">
+                                <div style="width:${Math.min(100, capPct)}%; height:100%; background:#d9822b;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:4px;">${buttons.join('')}</div>
+                </div>
+            `;
+
+            dirBar.innerHTML =
+                buildModule('[BASE & ARCHIVES]', `[ CAP: ${capPct}% ]`, resSupply, 'ON ●', baseGroup) +
+                buildModule('[FIELD & LOGISTICS]', `[ SUPPLY // 4SYNCED ]`, fuelSupply, 'ACTIVE ●', fieldGroup) +
+                buildModule('[POLITICS & TITHE]', `[ RECORDS // SYNCED ]`, (st.crownFavor || 65) * 45, 'SYNCED ●', politicsGroup);
         }
 
         // Render Urgent Crisis Response Triage Overlay or Active Emissary Petition if active
@@ -745,15 +915,32 @@ export const CommanderUI = {
             } else if (activePetition) {
                 crisisPanel.style.display = 'block';
                 crisisPanel.innerHTML = `
-                    <div style="color:#fbbf24; font-weight:bold; font-size:12.5px; margin-bottom:4px;">📯 GATEHOUSE EMISSARY PETITION: ${activePetition.title}</div>
-                    <div style="color:#e5dccb; font-size:11px; margin-bottom:8px;">${activePetition.prompt}</div>
-                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        <button class="cmd-btn" style="flex:1; padding:7px; background:#14332a; border-color:#10b981; color:#d1fae5;" onclick="window.resolveEmissaryPetition('ACCEPT')">${activePetition.acceptLabel}</button>
-                        <button class="cmd-btn" style="flex:1; padding:7px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.resolveEmissaryPetition('REJECT')">${activePetition.rejectLabel}</button>
+                    <div style="color:#1a130c; font-family:'Cinzel',serif; font-weight:900; font-size:11.5px; margin-bottom:3px;">EMISSARY PETITION // ${activePetition.senderHouse.toUpperCase()}</div>
+                    <div style="color:#2b1e12; font-size:9.5px; margin-bottom:6px;">${activePetition.prompt}</div>
+                    <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                        <button class="cmd-btn" style="flex:1; padding:5px; background:#14332a; border-color:#10b981; color:#d1fae5;" onclick="window.resolveEmissaryPetition('ACCEPT')">${activePetition.acceptLabel}</button>
+                        <button class="cmd-btn" style="flex:1; padding:5px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.resolveEmissaryPetition('REJECT')">${activePetition.rejectLabel}</button>
                     </div>
                 `;
             } else {
-                crisisPanel.style.display = 'none';
+                crisisPanel.style.display = 'block';
+                crisisPanel.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <span style="font-family:'Cinzel',serif; font-weight:900; font-size:11.5px;">EMISSARY PETITION</span>
+                        <span style="font-size:8.5px; color:#463523;">STATUS: STANDBY</span>
+                    </div>
+                    <div style="font-size:9px; color:#3f2e1e; line-height:1.25;">
+                        Gatehouse envoys arrive every 3 days from competing Noble Houses on the War Board.
+                    </div>
+                `;
+            }
+        }
+
+        const colReadout = document.getElementById('procedural-collision-readout');
+        if (colReadout) {
+            const latestCol = CommanderEngine.ProceduralCollisionEngine?.collisionHistory?.[0];
+            if (latestCol) {
+                colReadout.innerHTML = `<b>${latestCol.eventName}</b> (Day ${latestCol.day}): [${latestCol.anchor} + ${latestCol.catalyst} + ${latestCol.target}] → Tags: ${latestCol.payload_tags.slice(0, 4).join(', ')}. Rebound: +20% on ${latestCol.rebound?.pressureId}.`;
             }
         }
 
