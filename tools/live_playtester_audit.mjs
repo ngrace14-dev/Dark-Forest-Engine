@@ -215,6 +215,16 @@ CommanderUI.render();
 let sovProg0 = CommanderEngine.RoleStateMachine.getGrowthProgression();
 logPlay('SOVEREIGN STAGE 0', `Started Pale Sovereign run at ${sovProg0.label} (Weight: ${CommanderEngine.CampaignManager.state.sovereign.significanceHarvested}, Heralds: ${CommanderEngine.CampaignManager.state.sovereign.heraldsMutated}/5).`);
 
+const sovDailyTargets = CommanderEngine.CrisisEngine.getTargetsForRole('SOVEREIGN');
+const sovDirsHtml = document.getElementById('role-directives-bar')?.innerHTML || '';
+if (!sovDailyTargets.some(t => t.id === 'CULT_AQUIFER_ROOTS') || !sovDailyTargets.some(t => t.id === 'HARVEST_NOBLE_ESSENCE') || sovDirsHtml.includes('Base Upgrades & Facilities')) {
+    auditReport.bugsFound.push(`Expected Pale Sovereign daily goals to be Cultivation & Harvest (no Base Facility Management), got targets=${JSON.stringify(sovDailyTargets)}`);
+} else {
+    window.setNextDayGoal('HARVEST_NOBLE_ESSENCE');
+    window.advanceDays(1);
+    logPlay('SOVEREIGN CULTIVATION & HARVEST', `Verified pure Cultivation & Harvest daily goals (${sovDailyTargets.map(t => t.id).join(', ')}) and zero settlement-management buttons.`);
+}
+
 const prematureRaid = CommanderEngine.CampaignManager.dispatchAction('HERALD_PACK_RAID', 'House Cull');
 if (prematureRaid.success !== false) {
     auditReport.bugsFound.push(`Pale Sovereign Stage II raid was not locked at Stage 0! Got: ${JSON.stringify(prematureRaid)}`);

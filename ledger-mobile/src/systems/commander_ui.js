@@ -872,13 +872,14 @@ export const CommanderUI = {
 
             if (ce.pendingDailyReconciliation && ce.lastDayReport) {
                 const rep = ce.lastDayReport;
+                const isSovReport = (rep.role === 'SOVEREIGN' || rep.role === 'PALE_SOVEREIGN');
                 goalBar.innerHTML = `
-                    <div style="background:#1c1610; border:2px solid #d97706; padding:10px; margin-bottom:8px; width:100%; text-align:left;">
-                        <div style="color:#fbbf24; font-weight:bold; font-size:12px; margin-bottom:4px;">⏸️ END OF DAY ${rep.day} RECONCILIATION — SIMULATION PAUSED</div>
-                        <div style="font-size:11px; color:#e5dccb; margin-bottom:4px;"><b>Executed Target:</b> ${rep.executedGoal}</div>
-                        <div style="font-size:11px; color:#4ade80; margin-bottom:2px;"><b>📈 Supplies & Training Gained (+):</b> ${rep.gains}</div>
-                        <div style="font-size:11px; color:#f87171; margin-bottom:8px;"><b>📉 Supplies & Upkeep Expended (-):</b> ${rep.losses}</div>
-                        <div style="color:#fde68a; font-size:11px; font-weight:bold; margin-bottom:4px;">SELECT TOMORROW'S TARGET TO RESUME SIMULATION:</div>
+                    <div style="background:#1c1610; border:2px solid ${isSovReport ? '#991b1b' : '#d97706'}; padding:10px; margin-bottom:8px; width:100%; text-align:left;">
+                        <div style="color:${isSovReport ? '#fca5a5' : '#fbbf24'}; font-weight:bold; font-size:12px; margin-bottom:4px;">${isSovReport ? `🩸 CYCLE ${rep.day} CULTIVATION & HARVEST COMMUNION — TORPOR PAUSED` : `⏸️ END OF DAY ${rep.day} RECONCILIATION — SIMULATION PAUSED`}</div>
+                        <div style="font-size:11px; color:#e5dccb; margin-bottom:4px;"><b>${isSovReport ? 'Executed Rite:' : 'Executed Target:'}</b> ${rep.executedGoal}</div>
+                        <div style="font-size:11px; color:#4ade80; margin-bottom:2px;"><b>${isSovReport ? '📈 Essence & Historical Weight Harvested (+):' : '📈 Supplies & Training Gained (+):'}</b> ${rep.gains}</div>
+                        <div style="font-size:11px; color:#f87171; margin-bottom:8px;"><b>${isSovReport ? '❄️ Void Entropy & Frost Torpor:' : '📉 Supplies & Upkeep Expended (-):'}</b> ${rep.losses}</div>
+                        <div style="color:#fde68a; font-size:11px; font-weight:bold; margin-bottom:4px;">${isSovReport ? 'SELECT NEXT CULTIVATION OR HARVEST RITE:' : "SELECT TOMORROW'S TARGET TO RESUME SIMULATION:"}</div>
                         <div class="ledger-btn-row">${targetsHtml}</div>
                     </div>
                 `;

@@ -2815,6 +2815,7 @@ const CrisisEngine = rootScope.CrisisEngine || {
     ],
 
     setNextDayGoal(goalId) {
+        this.getTargetsForRole('SOVEREIGN');
         if (this.DAILY_GOALS[goalId]) {
             this.nextDayGoal = goalId;
             return { success: true, goal: this.DAILY_GOALS[goalId] };
@@ -2832,6 +2833,12 @@ const CrisisEngine = rootScope.CrisisEngine || {
 
     getTargetsForRole(roleKey = 'NOBLE_HOUSE') {
         const r = (roleKey || 'NOBLE_HOUSE').toUpperCase();
+        this.ROLE_DAILY_TARGETS.SOVEREIGN = [
+            { id: 'CULT_AQUIFER_ROOTS', label: '🌿 Cultivation: Infiltrate Subterranean Aquifer Roots', supplyGain: '+180 Historical Weight, +0.4 Herald Stealth & Frost-Marrow', desc: 'Send Frost-Marrow tendrils along subterranean river filaments to drink from the 20 Chained Parishes.' },
+            { id: 'HARVEST_NOBLE_ESSENCE', label: '🩸 Harvest: Gorge Frost-Heralds on Captured Noble Essence', supplyGain: '+240 Historical Weight, +0.5 Pack Savagery, -4 Rival House Power', desc: 'Devour the marrow and memories of marked noble patrols to accelerate Herald mutation.' },
+            { id: 'CULT_VOID_FRACTURE', label: '🌌 Cultivation: Meditate in the White Void Fracture', supplyGain: '+300 Historical Weight, +15 Endured Years, +0.5 Carapace Toughness', desc: 'Draw 6,000-year blind-spot entropy directly into your Porcelain Bone Carapace.' }
+        ];
+        if (r === 'PALE_SOVEREIGN' || r === 'SOVEREIGN') return this.ROLE_DAILY_TARGETS.SOVEREIGN;
         return this.ROLE_DAILY_TARGETS[r] || this.ROLE_DAILY_TARGETS.NOBLE_HOUSE;
     },
 
@@ -2942,21 +2949,32 @@ const CrisisEngine = rootScope.CrisisEngine || {
                 CampaignManager.mutateWarBoard('House Grim', 2, 'PEACE');
                 gains = `+${goldGain} Merchant Gold, +1 Grimsby Hauberk, +1 Verified Truth`;
             }
-        } else if (r === 'SOVEREIGN') {
-            losses = `Mountain Frost Metabolic Drain (-5% Herd Stamina)`;
-            const sigHarvest = Math.round((110 + sq.avgMartial * 8) * facMult.martialMult);
+        } else if (r === 'SOVEREIGN' || r === 'PALE_SOVEREIGN') {
+            losses = `Deep-Bedrock Frost Torpor & Void Entropy Bleed (Zero Settlement Upkeep)`;
+            let baseWeight = 180;
+            let cultNote = 'Aquifer Root Infiltration';
+            if (chosen.id === 'HARVEST_NOBLE_ESSENCE') {
+                baseWeight = 240;
+                cultNote = 'Noble Essence Harvest (-4 Rival House Power)';
+                CampaignManager.mutateWarBoard('House Cull', -4, 'DEFENSIVE', 'Noble scions harvested in the mist by Frost-Heralds');
+            } else if (chosen.id === 'CULT_VOID_FRACTURE') {
+                baseWeight = 300;
+                sov.yearsEndured = Number(((sov.yearsEndured || 0) + 15).toFixed(2));
+                cultNote = 'White Void Fracture Cultivation (+15 Endured Years)';
+            }
+            const sigHarvest = Math.round((baseWeight + sq.avgMartial * 12) * facMult.martialMult);
             sov.significanceHarvested = (sov.significanceHarvested || 0) + sigHarvest;
             AgentRosterManager.agents.forEach(a => {
                 if (!a.alive) return;
-                if (chosen.id === 'HUNT_TWILIGHT_VALLEYS') a.skills.stealth = Number((a.skills.stealth + 0.4).toFixed(2));
-                if (chosen.id === 'HUNT_SMOLDERING_CRAGS') {
+                if (chosen.id === 'CULT_AQUIFER_ROOTS') a.skills.stealth = Number((a.skills.stealth + 0.4).toFixed(2));
+                if (chosen.id === 'CULT_VOID_FRACTURE') {
                     a.skills.toughness = Number((a.skills.toughness + 0.5).toFixed(2));
                     a.vitals.maxHp += 5;
                     a.vitals.hp += 5;
                 }
-                if (chosen.id === 'HUNT_DROWNED_LOWLANDS') a.skills.meleeAtt = Number((a.skills.meleeAtt + 0.5).toFixed(2));
+                if (chosen.id === 'HARVEST_NOBLE_ESSENCE') a.skills.meleeAtt = Number((a.skills.meleeAtt + 0.5).toFixed(2));
             });
-            gains = `+${sigHarvest} Significance, Squad Huntsman Evolution Applied`;
+            gains = `+${sigHarvest} Historical Weight, ${cultNote}`;
         }
 
         this.lastDayReport = {
@@ -3204,21 +3222,27 @@ const CrisisEngine = rootScope.CrisisEngine || {
 
     getDirectivesForRole(roleKey = 'NOBLE_HOUSE') {
         const r = (roleKey || 'NOBLE_HOUSE').toUpperCase();
+        const isSov = (r === 'SOVEREIGN' || r === 'PALE_SOVEREIGN');
         const fac = FacilityEngine.facilities;
         const factCount = RealityEditorVault.facts?.length || 0;
-        const dirs = [
-            [`window.viewFacilities()`, '🏗️ Base Upgrades & Facilities'],
-            [`window.viewTruthVault()`, `📜 Truth & Relic Vault (${factCount})`],
-            [`window.viewTelemetry()`, '🏛️ 20 Bedrock Settlements']
-        ];
+        const dirs = isSov
+            ? [
+                [`window.viewTruthVault()`, `📜 Harvested Truths & Relics (${factCount})`],
+                [`window.viewTelemetry()`, '🏛️ Survey 20 Bedrock Prey Parishes']
+            ]
+            : [
+                [`window.viewFacilities()`, '🏗️ Base Upgrades & Facilities'],
+                [`window.viewTruthVault()`, `📜 Truth & Relic Vault (${factCount})`],
+                [`window.viewTelemetry()`, '🏛️ 20 Bedrock Settlements']
+            ];
 
         // Base Start: Everyone (except Sovereign) can send Unguarded Trade Caravans from Day 1
-        if (r !== 'SOVEREIGN') {
+        if (!isSov) {
             dirs.push([`window.sendExpedition('UNGUARDED_CARAVAN','Oakhaven')`, '📦 Send Unguarded Caravan']);
         }
 
         // Emergent Feral Wendigo Perimeter Hunt (Appears whenever a Starved+Frozen actor rises on the Shift)
-        if ((AgentRosterManager.spawnedFeralWendigos?.length || 0) > 0 && r !== 'SOVEREIGN') {
+        if ((AgentRosterManager.spawnedFeralWendigos?.length || 0) > 0 && !isSov) {
             const topFeral = AgentRosterManager.spawnedFeralWendigos[0];
             dirs.push([`window.dispatchCmd('HUNT_FERAL_WENDIGO')`, `🩸 Hunt ${topFeral.name}`]);
         }
