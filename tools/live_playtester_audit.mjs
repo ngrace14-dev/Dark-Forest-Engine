@@ -240,7 +240,22 @@ CommanderEngine.CampaignManager.dispatchAction('ASCEND_SOVEREIGN');
 CommanderUI.render();
 let sovProg3 = CommanderEngine.RoleStateMachine.getGrowthProgression();
 const apocMsg = CommanderEngine.CampaignManager.dispatchAction('APOCALYPTIC_HARVEST', 'House Gallows');
+if (apocMsg.triggerVisualShock) CommanderUI.triggerVisualShock(apocMsg.triggerVisualShock);
 logPlay('SOVEREIGN STAGE III', `Reached ${sovProg3.label} -> Executed Apocalyptic Harvest: "${apocMsg.message}"`);
+
+// Verify Angry Joe Hardening Patch (P1 High-Contrast Mode, P2 Narrative Summary & Coalition Retaliation, P3 Sovereign UI Corruption & Chain-Shatter Quake)
+window.toggleHighContrast();
+if (!CommanderUI.highContrastMode || !document.body.classList.contains('high-contrast-runic')) {
+    auditReport.bugsFound.push('P1 High-Contrast Runic Bus-Commuter Mode failed to toggle.');
+} else {
+    logPlay('PATCH P1 (HIGH-CONTRAST)', 'Verified High-Contrast Runic Bus-Commuter Mode toggle & enlarged gauge value readouts.');
+}
+
+if (!rootEl.classList.contains('sovereign-corruption-stage-3') || !rootEl.classList.contains('chain-shatter-quake')) {
+    auditReport.bugsFound.push('P3 Pale Sovereign Stage 3 UI corruption or Chain-Shatter Quake class missing on root terminal.');
+} else {
+    logPlay('PATCH P3 (SOVEREIGN MADNESS)', `Verified Stage 3 UI Corruption, Chain-Shatter Quake animation, and Anti-Sovereign Huntsman Coalition Threat (${CommanderEngine.CampaignManager.state.sovereign.counterCoalitionThreat}%).`);
+}
 
 // ============================================================================
 // TEST 4: EXPLOIT, STRESS & EDGE-CASE AUDIT (CRISES, COLLISIONS, WENDIGOS, RECALL)

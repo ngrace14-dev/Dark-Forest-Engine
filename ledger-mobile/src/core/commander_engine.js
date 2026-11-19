@@ -1402,14 +1402,18 @@ export const ProceduralCollisionEngine = rootScope.ProceduralCollisionEngine || 
         const day = rootScope.EngineParams?.worldDay || 1;
         const houseName = CampaignManager?.state?.house?.houseId || CampaignManager?.campaignMode || 'Royal Archive';
         const settlementName = CampaignManager?.state?.house?.settlementName || "World's End Gate";
+        const leadSurvivor = Array.from(AgentRosterManager.agents.values()).find(a => a.alive)?.name || 'Bailiff Mallow';
+
+        const narrativeSummary = `At the stroke of the watch in ${settlementName}, ${leadSurvivor} watched the iron wards buckle as [${anchor.prefixDescriptor} ${catalyst.nounDescriptor}] tore through the bailey—forcing the garrison to ${effectsApplied[0]?.toLowerCase() || 'fall back'} while ${houseName}'s reserves bled into the mist.`;
 
         const narrativeManifest = {
             narrativeKernel: {
                 cause: `${anchor.id} (${anchor.currentPressure ?? 0.9}) × ${catalyst.id} (${catalyst.currentPressure ?? 0.9})`,
                 targetVector: `${target.id} (${target.currentPressure ?? 0.9})`,
                 intensity: (anchor.currentPressure || 0.9) >= 0.9 ? 'CRITICAL' : 'HIGH',
-                affectedEntities: [houseName, settlementName]
+                affectedEntities: [houseName, settlementName, leadSurvivor]
             },
+            narrativeSummary,
             proceduralDescription: `Because [${anchor.id}] collided with [${catalyst.id}] while [${target.id}] was strained at ${settlementName}, the ${eventName} erupted (${effectsApplied.join('; ')}).`
         };
 
@@ -1423,6 +1427,7 @@ export const ProceduralCollisionEngine = rootScope.ProceduralCollisionEngine || 
             payload_tags: payloadTags,
             effectsApplied,
             rebound,
+            narrativeSummary,
             narrativeManifest
         };
         this.collisionHistory.unshift(record);
@@ -1433,7 +1438,7 @@ export const ProceduralCollisionEngine = rootScope.ProceduralCollisionEngine || 
             type: 'PROCEDURAL COLLISION ANOMALY',
             sender: 'Grammar of Chaos Kernel',
             title: `⚡ ${eventName}`,
-            body: `${narrativeManifest.proceduralDescription} | Rebound: +20% on ${rebound.pressureId}.`,
+            body: `${narrativeSummary} [Audit: ${narrativeManifest.proceduralDescription} | Rebound: +20% on ${rebound.pressureId}].`,
             read: false
         });
 
@@ -2174,9 +2179,19 @@ const CampaignManager = rootScope.CampaignManager || {
             const targetEntry = this.mutateWarBoard(arg || 'House Cull', -18, 'DEFENSIVE', `Feral Herald Wendigo Pack ravaged outer palisades`);
             const weightHarvest = Math.round(450 + (sov.heraldsMutated * 120) + sq.totalPower * 10);
             sov.significanceHarvested = (sov.significanceHarvested || 0) + weightHarvest;
+
+            // Anti-Sovereign Noble House Counter-Coalition (Stage II+ Pushback)
+            let coalitionCounterNote = '';
+            if (sov.significanceHarvested >= 1200) {
+                const coalitionLeader = this.mutateWarBoard('House Terminus', 6, 'MOBILIZED', 'Rallied Anti-Sovereign Huntsman Counter-Coalition');
+                sov.counterCoalitionThreat = Math.min(100, (sov.counterCoalitionThreat || 0) + 18);
+                coalitionCounterNote = ` ⚠️ [COALITION RETALIATION] ${coalitionLeader?.name || 'House Terminus'} mobilized an Anti-Sovereign Huntsman Coalition (Lair Threat: ${sov.counterCoalitionThreat}%)!`;
+            }
+
             res = {
                 success: true,
-                message: `🩸🐺 [PREDATOR TIDE] Unleashed ${sov.heraldsMutated} Herald Wendigos upon ${targetEntry?.name || 'House Cull'}! Outer wards slaughtered (+${weightHarvest} Historical Weight, ${targetEntry?.name || 'Target'} -18 Power -> ${targetEntry?.power || 40}).`
+                triggerVisualShock: 'PREDATOR_RAID',
+                message: `🩸🐺 [PREDATOR TIDE] Unleashed ${sov.heraldsMutated} Herald Wendigos upon ${targetEntry?.name || 'House Cull'}! Outer wards slaughtered (+${weightHarvest} Historical Weight, ${targetEntry?.name || 'Target'} -18 Power -> ${targetEntry?.power || 40}).${coalitionCounterNote}`
             };
         } else if (act === 'APOCALYPTIC_HARVEST') {
             const sov = this.state.sovereign;
@@ -2192,9 +2207,11 @@ const CampaignManager = rootScope.CampaignManager || {
             }
             const megaHarvest = 2500;
             sov.significanceHarvested = (sov.significanceHarvested || 0) + megaHarvest;
+            sov.shatteredSettlements = (sov.shatteredSettlements || 0) + 1;
             res = {
                 success: true,
                 devastatedHouse: targetEntry?.name,
+                triggerVisualShock: 'CHAIN_SHATTER',
                 message: `💀🌌 [APOCALYPTIC HARVEST] The True Pale Sovereign descended upon ${settlementNode?.name || targetEntry?.name}! 50-ton bedrock chains shattered into the White Void (+${megaHarvest} Historical Weight, ${targetEntry?.name} Power crushed by -45!).`
             };
         } else if (act === 'ASCEND_SOVEREIGN') {

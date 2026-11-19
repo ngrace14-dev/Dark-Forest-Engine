@@ -98,31 +98,64 @@ export const CommanderUI = {
         CommanderEngine.CampaignManager.selectRole(roleKey, customHouseId);
         if (typeof window !== 'undefined' && window.CandidateOnboarding?.state?.completed) {
             window.CandidateOnboarding.injectCandidateIntoRoster();
+            // P2 Accelerated Onboarding Cache: Respect the player's time if they completed the 4-Scene Candidate Gate
+            if (CommanderEngine.FacilityEngine) {
+                CommanderEngine.FacilityEngine.settlementResources += 15;
+            }
+            if (CommanderEngine.CampaignManager?.state?.house) {
+                CommanderEngine.CampaignManager.state.house.barrierFuelUnits = Math.min(60, (CommanderEngine.CampaignManager.state.house.barrierFuelUnits || 28) + 6);
+            }
         }
         this.startAutoTick();
         const h = CommanderEngine.CampaignManager.state.house;
         this.render();
+        const starterCacheNote = (typeof window !== 'undefined' && window.CandidateOnboarding?.state?.completed)
+            ? ' | 🎁 [RUNIC SCRIBE STARTER CACHE: +15 Resources, +6u Fuel]'
+            : '';
         if (roleKey === 'NOBLE_HOUSE') {
-            this.showBanner(`Rolled [${h.houseId}] (${h.settlementName}) — Ruler: ${h.rulerName} | Monopoly: ${h.monopoly} (${h.monopolyBonus})`);
+            this.showBanner(`Rolled [${h.houseId}] (${h.settlementName}) — Ruler: ${h.rulerName} | Monopoly: ${h.monopoly} (${h.monopolyBonus})${starterCacheNote}`);
         } else {
-            this.showBanner(`Initialized Royal Archive Lens: [${roleKey}] — Simulation clock active.`);
+            this.showBanner(`Initialized Royal Archive Lens: [${roleKey}] — Simulation clock active.${starterCacheNote}`);
         }
     },
 
     pendingRoleId: 'NOBLE_HOUSE',
+    highContrastMode: false,
+    visualShockState: null,
 
-    renderSemicircleGaugeSvg(label = 'BARRIER FUEL', angleDeg = 35, alertColor = '#c97a36') {
+    toggleHighContrast() {
+        this.highContrastMode = !this.highContrastMode;
+        if (typeof document !== 'undefined' && document.body) {
+            if (this.highContrastMode) document.body.classList.add('high-contrast-runic');
+            else document.body.classList.remove('high-contrast-runic');
+        }
+        this.showBanner(`High-Contrast Runic Bus-Commuter Mode: ${this.highContrastMode ? 'ENABLED (Enhanced Legibility & Gauge Needles)' : 'STANDARD'}`);
+        this.render();
+    },
+
+    triggerVisualShock(shockType = 'CHAIN_SHATTER') {
+        this.visualShockState = shockType;
+        const container = typeof document !== 'undefined' ? document.getElementById(this.containerId) : null;
+        if (container && container.classList) {
+            container.classList.add(shockType === 'CHAIN_SHATTER' ? 'chain-shatter-quake' : 'predator-raid-pulse');
+        }
+    },
+
+    renderSemicircleGaugeSvg(label = 'BARRIER FUEL', angleDeg = 35, alertColor = '#c97a36', isCritical = false, valueText = '') {
         const rad = ((angleDeg - 90) * Math.PI) / 180;
         const nx = (50 + 28 * Math.cos(rad)).toFixed(1);
         const ny = (46 + 28 * Math.sin(rad)).toFixed(1);
+        const critClass = isCritical ? 'gauge-critical-pulse' : '';
+        const strokeColor = isCritical ? '#ef4444' : alertColor;
         return `
-            <div style="text-align:center;">
-                <div style="font-size:8px; font-weight:bold; color:#2b1e12; margin-bottom:1px;">${label}</div>
-                <svg viewBox="0 0 100 54" style="width:82px; height:42px; display:block; margin:0 auto;">
-                    <path d="M 12 46 A 38 38 0 0 1 88 46" fill="none" stroke="#3f3224" stroke-width="6"/>
-                    <path d="M 12 46 A 38 38 0 0 1 42 10" fill="none" stroke="${alertColor}" stroke-width="5"/>
-                    <line x1="50" y1="46" x2="${nx}" y2="${ny}" stroke="#14110e" stroke-width="2.5" stroke-linecap="round"/>
-                    <circle cx="50" cy="46" r="4" fill="#14110e"/>
+            <div class="${critClass}" style="text-align:center; padding:2px; border-radius:4px;">
+                <div style="font-size:9.5px; font-weight:900; color:#1a120b; margin-bottom:1px; letter-spacing:0.03em;">${label}</div>
+                <svg viewBox="0 0 100 58" style="width:92px; height:48px; display:block; margin:0 auto;">
+                    <path d="M 12 46 A 38 38 0 0 1 88 46" fill="none" stroke="#2b2118" stroke-width="7.5"/>
+                    <path d="M 12 46 A 38 38 0 0 1 42 10" fill="none" stroke="${strokeColor}" stroke-width="6.5"/>
+                    <line x1="50" y1="46" x2="${nx}" y2="${ny}" stroke="#090705" stroke-width="3.5" stroke-linecap="round"/>
+                    <circle cx="50" cy="46" r="4.8" fill="${isCritical ? '#dc2626' : '#090705'}"/>
+                    ${valueText ? `<text x="50" y="56" text-anchor="middle" fill="#1a120b" font-size="9.5" font-weight="bold">${valueText}</text>` : ''}
                 </svg>
             </div>
         `;
@@ -138,12 +171,17 @@ export const CommanderUI = {
         const o = CommanderEngine.CampaignManager.state.order || {};
         const syn = CommanderEngine.CampaignManager.state.syndicate || {};
 
+        const fuelVal = h.barrierFuelUnits ?? 28;
+        const entropyVal = o.blindSpotEntropy ?? 12;
+        const resinVal = syn.contrabandResin ?? 45;
+        const sovWeight = CommanderEngine.CampaignManager.state.sovereign?.significanceHarvested ?? 0;
+
         const cardData = [
-            ['MERCHANT_PATRON', 'THE CROWN', 'ᛒ', `<div><b>ADMINISTRATIVE</b><br>Fuel Monopoly &amp; Arbitrage.<br><b style="color:#14532d;">[STATUS: ACTIVE]</b></div>`, this.renderSemicircleGaugeSvg('FUEL MONOPOLY', 45, '#57753b')],
-            ['NOBLE_HOUSE', 'NOBLE HOUSE', 'ᛉ', `<div><b>MILITARY:</b> 288<br><b>STATS:</b> 18/5-30<br><b>RESERVES:</b> ${h.barrierFuelUnits || 28}u<br><b style="color:#991b1b;">TITHE: ${h.crownDemand || 16}u</b></div>`, this.renderSemicircleGaugeSvg('BARRIER FUEL', -30, '#c97a36')],
+            ['MERCHANT_PATRON', 'THE CROWN', 'ᛒ', `<div><b>ADMINISTRATIVE</b><br>Fuel Monopoly &amp; Arbitrage.<br><b style="color:#14532d;">[STATUS: ACTIVE]</b></div>`, this.renderSemicircleGaugeSvg('FUEL MONOPOLY', 45, '#57753b', false, '100%')],
+            ['NOBLE_HOUSE', 'NOBLE HOUSE', 'ᛉ', `<div><b>MILITARY:</b> 288<br><b>STATS:</b> 18/5-30<br><b>RESERVES:</b> ${fuelVal}u<br><b style="color:#991b1b;">TITHE: ${h.crownDemand || 16}u</b></div>`, this.renderSemicircleGaugeSvg('BARRIER FUEL', -30, '#c97a36', fuelVal < 15, `${fuelVal}u`)],
             ['TERMINUS', 'HOUSE TERMINUS', 'ᛦ', `<div style="grid-column:1 / span 2;"><b>ANOMALOUS CONTAINMENT</b><br><span style="font-size:8px;">STABILITY // 300 GUARDIANS</span><div style="display:grid; grid-template-columns:repeat(12,1fr); gap:1px; height:9px; margin-top:3px;">${Array.from({ length: 12 }).map((_, i) => `<div style="background:${i < 9 ? '#576838' : '#9c8d74'}; border:1px solid #2b1e12;"></div>`).join('')}</div></div>`, ''],
-            ['GUILD_LEADER', 'OBSIDIAN CITADEL', 'ᚷ', `<div><b>CONFIDENTIAL:</b> <span class="redaction-bar" style="width:42px;"></span><br><span class="redaction-bar" style="width:68px;"></span><br><b>ENTROPY:</b> ${o.blindSpotEntropy || 12}%</div>`, this.renderSemicircleGaugeSvg('CONTAINMENT', 25, '#8c5828')],
-            ['SYNDICATE', 'SCARCITY SYNDICATE', 'ᚱ', `<div><b>TRADE:</b> 28% / 7%<br><b>RESIN:</b> ${syn.contrabandResin || 45}u<br><b>TOLL:</b> ${syn.gallowsTollCollected || 80}d</div>`, this.renderSemicircleGaugeSvg('TOLL / RESIN', 15, '#c97a36')]
+            ['GUILD_LEADER', 'OBSIDIAN CITADEL', 'ᚷ', `<div><b>CONFIDENTIAL:</b> <span class="redaction-bar" style="width:42px;"></span><br><span class="redaction-bar" style="width:68px;"></span><br><b>ENTROPY:</b> ${entropyVal}%</div>`, this.renderSemicircleGaugeSvg('CONTAINMENT', 25, '#8c5828', entropyVal >= 70, `${entropyVal}%`)],
+            ['SYNDICATE', 'SCARCITY SYNDICATE', 'ᚱ', `<div><b>TRADE:</b> 28% / 7%<br><b>RESIN:</b> ${resinVal}u<br><b>TOLL:</b> ${syn.gallowsTollCollected || 80}d</div>`, this.renderSemicircleGaugeSvg('TOLL / RESIN', 15, '#c97a36', resinVal < 15, `${resinVal}u`)]
         ];
 
         const cardsHtml = cardData.map(([roleId, title, rune, leftCol, rightCol]) => `
@@ -164,7 +202,7 @@ export const CommanderUI = {
                             Brood in frost, consume Historical Weight &amp; mutate 5 Heralds.<br>
                             <b style="color:#7f1d1d;">[1,000-YEAR CYCLE]</b>
                         </div>
-                        ${this.renderSemicircleGaugeSvg('HISTORICAL WEIGHT', -45, '#7f1d1d')}
+                        ${this.renderSemicircleGaugeSvg('HISTORICAL WEIGHT', -45, '#7f1d1d', true, `${sovWeight}W`)}
                     </div>
                 </div>
                 <button class="vantage-init-btn" style="margin-top:6px; padding:4px; font-size:8.5px; background:linear-gradient(180deg,#450a0a,#1f0505); color:#fecaca; border-color:#991b1b;">INITIALIZE THE PALE SOVEREIGN</button>
@@ -262,7 +300,16 @@ export const CommanderUI = {
         };
         window.dispatchCmd = (a, arg = null) => {
             const res = CommanderEngine.CampaignManager.dispatchAction(a, arg);
+            if (res?.triggerVisualShock) {
+                this.triggerVisualShock(res.triggerVisualShock);
+            }
             this.showBanner(res?.message || 'Directive executed.');
+            this.render();
+        };
+        window.toggleHighContrast = () => this.toggleHighContrast();
+        window.recallExpedition = (expId = null) => {
+            const res = CommanderEngine.ExpeditionEngine.recallExpedition(expId);
+            this.showBanner(res.message);
             this.render();
         };
         window.viewTelemetry = () => this.renderTelemetryReader();
@@ -664,6 +711,7 @@ export const CommanderUI = {
                         <button class="cmd-btn" onclick="window.advanceDays(1)">+1 DAY</button>
                         <button id="btn-dream-ward" class="cmd-btn" onclick="window.triggerDreamIntervention()">🌙 DREAM WARD</button>
                         <button id="btn-chrono-skip" class="cmd-btn" onclick="window.chronoSkip(1)">+1D SKIP</button>
+                        <button class="cmd-btn" onclick="window.toggleHighContrast()">👁️ HIGH-CONTRAST</button>
                         <button id="btn-export-save" class="cmd-btn" onclick="window.exportSave()">EXPORT SAVE</button>
                     </div>
                 </div>
@@ -841,6 +889,15 @@ export const CommanderUI = {
 
         // Render Page 3 Brutalist Iron Telemetry Modules Gated by Growth Progression (*A Dark Room* Style Unfolding)
         const growth = CommanderEngine.RoleStateMachine?.getGrowthProgression?.() || { tier: 0, isSovereign: false, label: 'GROWTH TIER 0', nextGateDesc: '' };
+        if (container) {
+            container.dataset.sovereignStage = growth.isSovereign ? String(growth.tier) : 'none';
+            if (container.classList) {
+                ['sovereign-corruption-stage-1', 'sovereign-corruption-stage-2', 'sovereign-corruption-stage-3'].forEach(c => container.classList.remove(c));
+                if (growth.isSovereign && growth.tier >= 1) {
+                    container.classList.add(`sovereign-corruption-stage-${Math.min(3, growth.tier)}`);
+                }
+            }
+        }
         const setDisp = (id, show, mode = 'inline-block') => { const el = document.getElementById(id); if (el) el.style.display = show ? mode : 'none'; };
         setDisp('nav-tab-page4', growth.tier >= 1);
         setDisp('nav-tab-page5', growth.tier >= 2);
@@ -983,7 +1040,8 @@ export const CommanderUI = {
             const wqSummary = `[World Qualities: Mistrust=${wq.rivalMistrust || 0} | Schism=${wq.institutionalSchism || 0} | Authority=${wq.scholarlyAuthority || 0}]`;
             if (latestCol) {
                 const nm = latestCol.narrativeManifest;
-                colReadout.innerHTML = `<b>${latestCol.eventName}</b> (Day ${latestCol.day}): ${nm ? nm.proceduralDescription : `[${latestCol.anchor} + ${latestCol.catalyst} + ${latestCol.target}]`}<br><span style="color:#fde68a;">Rebound: +20% on ${latestCol.rebound?.pressureId} | ${wqSummary}</span>`;
+                const humanStory = latestCol.narrativeSummary ? `<div style="color:#fff7ed; font-weight:bold; margin-bottom:2px;">"${latestCol.narrativeSummary}"</div>` : '';
+                colReadout.innerHTML = `${humanStory}<b>${latestCol.eventName}</b> (Day ${latestCol.day}): ${nm ? nm.proceduralDescription : `[${latestCol.anchor} + ${latestCol.catalyst} + ${latestCol.target}]`}<br><span style="color:#fde68a;">Rebound: +20% on ${latestCol.rebound?.pressureId} | ${wqSummary}</span>`;
             } else {
                 colReadout.innerHTML = `Grammar of Chaos Kernel Active: Monitoring 130+ Pressure Vectors.<br><span style="color:#fde68a;">${wqSummary}</span>`;
             }

@@ -1366,3 +1366,86 @@ body.mobile-landscape-fit .monolith-overlay-content,
     padding: 5px 8px;
 }
 
+/* ============================================================================
+   "ANGRY JOE" HARDENING PATCH: P1 HIGH-CONTRAST BUS-COMMUTER MODE,
+   CRITICAL GAUGE PULSES & P3 PALE SOVEREIGN UI CORRUPTION / CHAIN-SHATTER
+   ============================================================================ */
+@keyframes criticalGaugePulse {
+    0%, 100% {
+        box-shadow: 0 0 4px rgba(239, 68, 68, 0.35), inset 0 0 4px rgba(239, 68, 68, 0.25);
+        border-color: #991b1b;
+    }
+    50% {
+        box-shadow: 0 0 14px rgba(239, 68, 68, 0.9), inset 0 0 10px rgba(239, 68, 68, 0.55);
+        border-color: #ef4444;
+    }
+}
+
+.gauge-critical-pulse {
+    border: 1.5px solid #dc2626;
+    background: rgba(127, 29, 29, 0.16);
+    animation: criticalGaugePulse 1.8s ease-in-out infinite;
+}
+
+body.high-contrast-runic .cmd-dispatch,
+body.high-contrast-runic #dispatches-list,
+body.high-contrast-runic #expeditions-list,
+body.high-contrast-runic #roster-list,
+body.high-contrast-runic #status-bar {
+    font-size: 12.5px !important;
+    line-height: 1.45 !important;
+    color: #090604 !important;
+    font-weight: 700;
+}
+
+body.high-contrast-runic #status-bar {
+    color: #fef08a !important;
+    background: #000000 !important;
+    border: 2px solid #fbbf24 !important;
+}
+
+body.high-contrast-runic .cmd-btn {
+    font-size: 12px !important;
+    padding: 7px 11px !important;
+    min-height: 36px;
+    border-width: 2px !important;
+    font-weight: 900 !important;
+}
+
+/* Pale Sovereign Progressive UI Corruption (Stage I -> Stage II -> Stage III) */
+.sovereign-corruption-stage-1 .brutalist-runic-frame {
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 28px rgba(56, 189, 248, 0.35), inset 0 0 24px rgba(12, 74, 110, 0.55) !important;
+}
+
+.sovereign-corruption-stage-2 .brutalist-runic-frame {
+    border-color: #b91c1c !important;
+    box-shadow: 0 0 36px rgba(220, 38, 38, 0.55), inset 0 0 32px rgba(69, 10, 10, 0.75) !important;
+}
+
+.sovereign-corruption-stage-3 .brutalist-runic-frame {
+    border-color: #ef4444 !important;
+    background:
+        radial-gradient(ellipse at 50% 45%, #2a0707 0%, #050203 100%) !important;
+    box-shadow: 0 0 52px rgba(239, 68, 68, 0.85), inset 0 0 45px rgba(153, 27, 27, 0.85) !important;
+}
+
+@keyframes chainShatterQuake {
+    0% { transform: translate(0, 0) scale(1); filter: brightness(2.4) contrast(1.5); }
+    15% { transform: translate(-8px, 6px) rotate(-0.8deg); }
+    30% { transform: translate(8px, -6px) rotate(0.8deg); filter: invert(0.85); }
+    45% { transform: translate(-6px, -4px) rotate(-0.5deg); }
+    60% { transform: translate(6px, 5px) rotate(0.5deg); }
+    80% { transform: translate(-3px, 2px); }
+    100% { transform: translate(0, 0) scale(1); filter: none; }
+}
+
+.chain-shatter-quake {
+    animation: chainShatterQuake 0.75s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+.predator-raid-pulse {
+    animation: criticalGaugePulse 0.9s ease-in-out 2;
+}
+
+
