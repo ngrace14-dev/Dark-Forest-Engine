@@ -14,6 +14,7 @@ export const CommanderUI = {
     modalId: 'text-commander-viewport',
     activeBannerMsg: null,
     roleSelected: false,
+    isRunCommitted: false,
 
     init(customContainerId = null) {
         if (customContainerId) this.containerId = customContainerId;
@@ -34,8 +35,8 @@ export const CommanderUI = {
     },
 
     openRoleSelection(forceUnlock = false) {
-        if (this.roleSelected && !forceUnlock) {
-            this.showBanner("Role Assignment is sealed under Royal Archive Charter for this campaign.");
+        if (this.isRunCommitted && !forceUnlock) {
+            this.showBanner("Campaign run is already committed under Royal Archive Seal. Complete or end your current run first.");
             return;
         }
         const modal = document.getElementById(this.modalId);
@@ -91,10 +92,7 @@ export const CommanderUI = {
 
     selectRoleAndLaunch(roleKey, customHouseId = null) {
         this.roleSelected = true;
-        if (typeof document !== 'undefined') {
-            const roleNavBtn = document.getElementById('btn-nav-role-scroll');
-            if (roleNavBtn) roleNavBtn.style.display = 'none';
-        }
+        this.isRunCommitted = false;
         const container = document.getElementById(this.containerId);
         if (container) container.dataset.initialized = 'false';
         CommanderEngine.CrisisEngine.sessionStartedAtMs = Date.now();
@@ -154,6 +152,20 @@ export const CommanderUI = {
         } else if (deck) {
             deck.style.display = 'none';
         }
+        this.render();
+    },
+
+    commitHubRun() {
+        this.isRunCommitted = true;
+        if (typeof document !== 'undefined') {
+            ['btn-nav-page1-gate', 'btn-nav-page2-roster', 'btn-top-role-roster', 'btn-commit-hub-run', 'btn-nav-role-scroll'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+        }
+        this.startAutoTick();
+        const roleLabel = CommanderEngine.CampaignManager.activeRole || CommanderEngine.CampaignManager.campaignMode;
+        this.showBanner(`🔒 Campaign Run Committed as [${roleLabel}]! Candidate Gate & Role Roster are now locked until your current run ends.`);
         this.render();
     },
 
@@ -379,6 +391,7 @@ export const CommanderUI = {
             this.render();
         };
         window.switchBookTab = (tabId) => this.switchBookTab(tabId, true);
+        window.commitHubRun = () => this.commitHubRun();
         window.closeStoryReader = () => this.closeReader();
         window.showTutorialTip = (topicId) => {
             CommanderEngine.TutorialAdvisor?.checkAndTrigger?.(topicId, true);
@@ -811,6 +824,7 @@ export const CommanderUI = {
                             <polyline points="0,12 18,12 24,4 30,19 36,2 42,18 48,8 54,14 60,12 80,12" fill="none" stroke="#d9822b" stroke-width="1.5"/>
                         </svg>
                         <span>VOLATILITY ▲</span>
+                        <button id="btn-top-role-roster" class="cmd-btn" style="background:#3f1212; border-color:#991b1b; color:#fecaca; font-size:9px; padding:2px 6px;" onclick="window.openRoleGate()">🚪 Role Roster</button>
                         <button class="cmd-btn" style="background:#1e293b; border-color:#38bdf8; color:#e0f2fe; font-size:9px; padding:2px 6px;" onclick="window.showTutorialTip('BOOK_TAB_COMMAND')">🎓 Advisor Help</button>
                     </div>
                 </div>
@@ -818,6 +832,8 @@ export const CommanderUI = {
                 <!-- ROYAL LEDGER BOOK PAGE TABS & SIMULATION CLOCK BAR -->
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom:6px; padding-bottom:5px; border-bottom:2px solid #4a3e2e;">
                     <div id="hub-page-nav-tabs" style="display:flex; gap:4px; flex-wrap:wrap;">
+                        <button id="btn-nav-page1-gate" class="cmd-btn" onclick="if(!window.CommanderUI?.isRunCommitted && window.CandidateOnboarding) window.CandidateOnboarding.start(window.CommanderUI);">PAGE 1: CANDIDATE GATE</button>
+                        <button id="btn-nav-page2-roster" class="cmd-btn" onclick="window.openRoleGate()">PAGE 2: DUTY ROSTER</button>
                         <button id="book-tab-command" class="cmd-btn" style="border-color:#d9822b; color:#fde68a;" onclick="window.switchBookTab('COMMAND')">📖 TAB I: COMMAND &amp; TRIAGE</button>
                         <button id="book-tab-garrison" class="cmd-btn" onclick="window.switchBookTab('GARRISON')">🛡️ TAB II: GARRISON &amp; MARKET</button>
                         <button id="book-tab-field" class="cmd-btn" onclick="window.switchBookTab('FIELD')">🧭 TAB III: EXPEDITIONS &amp; LOGS</button>
@@ -911,9 +927,9 @@ export const CommanderUI = {
                     </div>
                 </div>
 
-                <button type="button" class="riveted-commit-plate" onclick="window.advanceDays(1)">
+                <button id="btn-commit-hub-run" type="button" class="riveted-commit-plate" onclick="window.commitHubRun()">
                     <span class="plate-rune">◆</span>
-                    <span>[CONFIRM HUB SELECTIONS &amp; ADVANCE +1 DAY]</span>
+                    <span>[CONFIRM HUB SELECTIONS &amp; UPDATE LEDGER]</span>
                 </button>
             </div>
         `;
@@ -1037,6 +1053,16 @@ export const CommanderUI = {
             }
         }
         const setDisp = (id, show, mode = 'inline-block') => { const el = document.getElementById(id); if (el) el.style.display = show ? mode : 'none'; };
+        const runEnded = Boolean(s.victory || s.collapsed);
+        if (runEnded && this.isRunCommitted) {
+            this.isRunCommitted = false;
+        }
+        const showPreRunNav = !this.isRunCommitted;
+        setDisp('btn-nav-page1-gate', showPreRunNav);
+        setDisp('btn-nav-page2-roster', showPreRunNav);
+        setDisp('btn-top-role-roster', showPreRunNav);
+        setDisp('btn-nav-role-scroll', showPreRunNav);
+        setDisp('btn-commit-hub-run', showPreRunNav, 'flex');
         setDisp('nav-tab-page4', growth.tier >= 1);
         setDisp('nav-tab-page5', growth.tier >= 2);
         setDisp('btn-dream-ward', growth.tier >= 1);

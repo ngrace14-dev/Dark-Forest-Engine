@@ -335,11 +335,12 @@ if (!roleGateHtml.includes('ROLE: MERCHANT PATRON') || !roleGateHtml.includes('R
     logPlay('ROLE SELECTOR REDACTION', 'Verified Merchant Patron under Crown, Noble House under Noble House, and Obsidian Citadel name + Containment ?% gauge blacked out.');
 }
 CommanderUI.selectRoleAndLaunch('GUILD_LEADER');
+window.commitHubRun();
 CommanderUI.openRoleSelection(false);
-if (!CommanderUI.roleSelected) {
-    auditReport.bugsFound.push('Expected one-way role selection lockout to prevent returning to role selector once launched.');
+if (!CommanderUI.isRunCommitted || document.getElementById('btn-nav-page1-gate')?.style.display !== 'none' || document.getElementById('btn-nav-page2-roster')?.style.display !== 'none' || document.getElementById('btn-commit-hub-run')?.style.display !== 'none') {
+    auditReport.bugsFound.push('Expected clicking [CONFIRM HUB SELECTIONS & UPDATE LEDGER] (commitHubRun) to hide Page 1, Page 2, and Commit Run buttons until the current run ends.');
 } else {
-    logPlay('ROLE LOCKOUT & CITADEL TAX EXEMPTION', `Verified one-way role lockout and Obsidian Citadel tax exemption (crownDemand=${CommanderEngine.CampaignManager.state.order.crownDemand}, taxExempt=${CommanderEngine.CampaignManager.state.order.taxExempt}).`);
+    logPlay('ROLE LOCKOUT & CITADEL TAX EXEMPTION', `Verified clicking [CONFIRM HUB SELECTIONS & UPDATE LEDGER] locks out Page 1/Page 2/Commit buttons and verified Obsidian Citadel tax exemption (crownDemand=${CommanderEngine.CampaignManager.state.order.crownDemand}, taxExempt=${CommanderEngine.CampaignManager.state.order.taxExempt}).`);
 }
 
 // 5B. Fallout Shelter 6h Patrol -> +4h Advance -> Recall Return March & Log
