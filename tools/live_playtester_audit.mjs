@@ -274,6 +274,7 @@ CommanderUI.selectRoleAndLaunch('NOBLE_HOUSE', 'House Oakheart');
 CommanderEngine.FacilityEngine.unlockFacility('guard_barracks');
 
 // 4A. Caravan Launch -> Mid-Route Hazard -> Player Early Recall
+CommanderEngine.FacilityEngine.chronoSeals = 20;
 const expLaunch = CommanderEngine.ExpeditionEngine.launchExpedition('GUARDED_CARAVAN', 'Gallows Hill');
 CommanderEngine.tickInGameHour(3);
 const recallRes = CommanderEngine.ExpeditionEngine.recallExpedition(expLaunch.expedition.id);
@@ -285,6 +286,7 @@ if (!recallRes.success) {
 
 // 4B. Dual Starvation + Freezing -> Next-Shift Feral Wendigo Rebirth -> Hunt Directive
 const testVictim = Array.from(CommanderEngine.AgentRosterManager.agents.values()).find(a => a.alive);
+testVictim.birthright = { id: 'STORM_BORN', title: 'Storm-Born', coldImmune: false };
 CommanderEngine.AgentRosterManager.applySituationalStatus(testVictim.id, 'STARVING');
 CommanderEngine.AgentRosterManager.applySituationalStatus(testVictim.id, 'FREEZING');
 CommanderEngine.AgentRosterManager.evaluateActorDeath(testVictim.id, 'Froze while starving on the northern dike');
@@ -403,16 +405,16 @@ if (petA.archetypeId === petB.archetypeId && petA.senderHouse === petB.senderHou
 }
 
 // 5E. Premium-Gated Time Acceleration & Scaling Chrono-Seal Costs
-CommanderEngine.FacilityEngine.chronoSeals = 15;
+CommanderEngine.FacilityEngine.chronoSeals = 30;
 const sealsStart = CommanderEngine.FacilityEngine.chronoSeals;
 const boost2h = CommanderEngine.premiumStepHours(2); // costs 1 seal
-const boost6h = CommanderEngine.premiumStepHours(6); // costs 3 seals
-const skip1d = CommanderEngine.chronoSkipDays(1);    // costs 1 seal
-const skip3d = CommanderEngine.chronoSkipDays(3);    // costs 9 seals
-if (!boost2h.success || boost2h.sealCost !== 1 || !boost6h.success || boost6h.sealCost !== 3 || !skip1d.success || skip1d.sealCost !== 1 || !skip3d.success || skip3d.sealCost !== 9) {
-    auditReport.bugsFound.push(`Expected scaling premium Chrono-Seal costs (2h=1, 6h=3, 1d=1, 3d=9), got 2h=${boost2h.sealCost}, 6h=${boost6h.sealCost}, 1d=${skip1d.sealCost}, 3d=${skip3d.sealCost}`);
+const boost6h = CommanderEngine.premiumStepHours(6); // costs 3 seals (most expensive hour skip)
+const skip1d = CommanderEngine.chronoSkipDays(1);    // costs 6 seals (> 3 seals)
+const skip3d = CommanderEngine.chronoSkipDays(3);    // costs 18 seals (3 * 6 seals)
+if (!boost2h.success || boost2h.sealCost !== 1 || !boost6h.success || boost6h.sealCost !== 3 || !skip1d.success || skip1d.sealCost !== 6 || skip1d.sealCost <= boost6h.sealCost || !skip3d.success || skip3d.sealCost !== 18) {
+    auditReport.bugsFound.push(`Expected scaling premium Chrono-Seal costs (2h=1, 6h=3, 1d=6, 3d=18 with 1d > 6h), got 2h=${boost2h.sealCost}, 6h=${boost6h.sealCost}, 1d=${skip1d.sealCost}, 3d=${skip3d.sealCost}`);
 } else {
-    logPlay('PREMIUM SCALING TIME ACCELERATION', `Verified scaling Royal Chrono-Seal costs: +2H Boost (-1 Seal), +6H Boost (-3 Seals), +1D Skip (-1 Seal), +3D Skip (-9 Seals) | Remaining Seals: ${CommanderEngine.FacilityEngine.chronoSeals}/${sealsStart}.`);
+    logPlay('PREMIUM SCALING TIME ACCELERATION', `Verified scaling Royal Chrono-Seal costs: +2H Boost (-1 Seal), +6H Boost (-3 Seals), +1D Skip (-6 Seals), +3D Skip (-18 Seals) | Remaining Seals: ${CommanderEngine.FacilityEngine.chronoSeals}/${sealsStart}.`);
 }
 
 console.log('--------------------------------------------------------------------------------');

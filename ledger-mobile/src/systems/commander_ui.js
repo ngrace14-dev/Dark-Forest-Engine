@@ -134,10 +134,15 @@ export const CommanderUI = {
         const starterCacheNote = (typeof window !== 'undefined' && window.CandidateOnboarding?.state?.completed)
             ? ' | 🎁 [RUNIC SCRIBE STARTER CACHE: +15 Resources, +6u Fuel]'
             : '';
+        const leadAgt = CommanderEngine.AgentRosterManager?.agents?.get?.('agt_1');
+        const leaderName = leadAgt?.name || h?.rulerName || 'Royal Auditor';
+        const modTitle = (typeof window !== 'undefined' && window.CandidateOnboarding?.state?.originModifierId)
+            ? ` | ⚙️ Modifier: [${window.CandidateOnboarding.state.originModifierId}]`
+            : '';
         if (roleKey === 'NOBLE_HOUSE') {
-            this.showBanner(`Rolled [${h.houseId}] (${h.settlementName}) — Ruler: ${h.rulerName} | Monopoly: ${h.monopoly} (${h.monopolyBonus})${starterCacheNote}`);
+            this.showBanner(`Royal Auditor & Faction Leader: [${leaderName}] of [${h.houseId}] (${h.settlementName}) | Monopoly: ${h.monopoly} (${h.monopolyBonus})${starterCacheNote}${modTitle}`);
         } else {
-            this.showBanner(`Initialized Royal Archive Lens: [${roleKey}] — Simulation clock active.${starterCacheNote}`);
+            this.showBanner(`Royal Auditor & Faction Leader: [${leaderName}] — Initialized [${roleKey}] Command Terminal.${starterCacheNote}${modTitle}`);
         }
     },
 
@@ -861,8 +866,8 @@ export const CommanderUI = {
                         <button id="btn-step-field" class="cmd-btn" title="Premium Time Boost: Spend 1 Royal Chrono-Seal to advance +2h on the Day Timer" onclick="window.stepExpeditionHour(2)">⏩ +2H BOOST (1 Seal)</button>
                         <button id="btn-step-6h" class="cmd-btn" title="Premium Time Boost: Spend 3 Royal Chrono-Seals to advance +6h on the Day Timer" onclick="window.stepExpeditionHour(6)">⏩ +6H BOOST (3 Seals)</button>
                         <button id="btn-dream-ward" class="cmd-btn" title="Spend 10u Dream Siphon to weave a prescient ward that mitigates the next Crisis catastrophe" onclick="window.triggerDreamIntervention()">🌙 DREAM WARD (-10u)</button>
-                        <button id="btn-chrono-skip" class="cmd-btn" title="Premium Full-Day Skip: Spend 1 Royal Chrono-Seal to fast-forward +1 Full Day (24h)" onclick="window.chronoSkip(1)">⏭️ +1D SKIP (1 Seal)</button>
-                        <button id="btn-chrono-skip-3d" class="cmd-btn" title="Premium Multi-Day Skip: Spend 9 Royal Chrono-Seals to fast-forward +3 Full Days (72h)" onclick="window.chronoSkip(3)">⏭️ +3D SKIP (9 Seals)</button>
+                        <button id="btn-chrono-skip" class="cmd-btn" title="Premium Full-Day Skip: Spend 6 Royal Chrono-Seals to fast-forward +1 Full Day (24h)" onclick="window.chronoSkip(1)">⏭️ +1D SKIP (6 Seals)</button>
+                        <button id="btn-chrono-skip-3d" class="cmd-btn" title="Premium Multi-Day Skip: Spend 18 Royal Chrono-Seals to fast-forward +3 Full Days (72h)" onclick="window.chronoSkip(3)">⏭️ +3D SKIP (18 Seals)</button>
                         <button class="cmd-btn" onclick="window.toggleHighContrast()">👁️ HIGH-CONTRAST</button>
                         <button id="btn-export-save" class="cmd-btn" onclick="window.exportSave()">EXPORT SAVE</button>
                     </div>
@@ -961,7 +966,9 @@ export const CommanderUI = {
         const shiftDays = 14 - (d % 14);
         const st = s.state;
         const roleLabel = CommanderEngine.CampaignManager.activeRole || s.mode;
-        let m = `Day: ${d} (Perceived: Year ${Math.floor(d / 365) + 12000} AF) | Shift in: ${shiftDays}d | Role: [${roleLabel}]`;
+        const leadAgt = CommanderEngine.AgentRosterManager?.agents?.get?.('agt_1');
+        const leaderName = leadAgt?.name || st.rulerName || 'High Marshal Vane';
+        let m = `Day: ${d} (Perceived: Year ${Math.floor(d / 365) + 12000} AF) | Shift in: ${shiftDays}d | Auditor-Leader: [${leaderName}] (${roleLabel})`;
         if (s.mode === 'HOUSE') {
             m += ` | ${st.houseId || 'House Terminus'} (${st.settlementName || "World's End Gate"}) | Monopoly: [${st.monopoly || 'Horizon Defense'}] | Fuel: ${st.barrierFuelUnits}u | Chains: ${st.chainsIntegrity}% | Crown Favor: ${st.crownFavor}% | Scrutiny: ${st.crownScrutiny || 10}%`;
         }

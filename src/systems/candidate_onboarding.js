@@ -14,14 +14,49 @@ const rootScope = typeof window !== 'undefined' ? window : globalThis;
 
 export const CandidateOnboarding = {
     state: {
-        name: 'Corin of Ash-Ford',
-        appearance: 'Lean, mud-spattered wool cloak over patched leather; calloused hands, weathered face, and completely unmarked skin beneath the collar.',
+        name: 'Lord-Auditor Vane (Royal Archive Commission)',
+        appearance: 'Royal Crucible Audit Mandate — Authorized to assume direct executive command of the assigned institution.',
         birthright: 'FUEL_BORN',
         vocation: 'ADVENTURER',
-        originText: 'Survived the Silt-Dike wagon wreck before the last Shift; carrying a stamped copper toll-token and an unpaid blood-debt to House Gallows.',
-        extractedStrands: ['[STEEL] Stamped Copper Toll-Token logged', '[INK] House Gallows Debt Ledger indexed'],
+        originModifierId: 'MOD_CROWN_SURPLUS',
+        originText: 'MODIFIER [CROWN_SURPLUS]: +10u Barrier Fuel, +12 Settlement Resources, +10% Crown Favor.',
+        extractedStrands: [
+            '[STEEL] +10u Barrier Fuel & +12 Resources pre-allocated to faction magazine',
+            '[INK] +10% Crown Favor & Royal Audit Mandate sealed in the General Ledger'
+        ],
         voice: 'dust_warden',
         completed: false
+    },
+
+    ORIGIN_MODIFIER_CATALOG: {
+        MOD_CROWN_SURPLUS: {
+            id: 'MOD_CROWN_SURPLUS',
+            title: '📦 Crown Supply Surplus Charter',
+            desc: '+10u Barrier Fuel/Resin, +12 Settlement Resources, +10% Crown Favor',
+            strands: ['[STEEL] +10u Barrier Fuel/Resin & +12 Settlement Resources pre-allocated', '[INK] +10% Crown Favor registered under Royal Audit Seal'],
+            fuelDelta: 10, resDelta: 12, favorDelta: 10, guardsDelta: 0, dossierDelta: 0, entropyDelta: 0, weightDelta: 150
+        },
+        MOD_FORTIFIED_CHAINS: {
+            id: 'MOD_FORTIFIED_CHAINS',
+            title: '⛓️ Fortified Anchor-Chains & Garrison Levy',
+            desc: '+4 Village Guards, +1 Grimsby Runic Hauberk in Armory, +10% Prosperity',
+            strands: ['[STONE] 50-Ton Bedrock Anchor Chains reinforced (+10% Prosperity)', '[STEEL] +4 Regenerated Village Guards & +1 Grimsby Plate Hauberk mustered'],
+            fuelDelta: 4, resDelta: 6, favorDelta: 5, guardsDelta: 4, extraGear: 'grimsby_plate', prosperityDelta: 10, weightDelta: 200
+        },
+        MOD_SHADOW_DOSSIERS: {
+            id: 'MOD_SHADOW_DOSSIERS',
+            title: '🕵️ Shadow Blackmail & Cipher Cache',
+            desc: '+2 Blackmail Dossiers, +1 Discovered Truth Vault Fact, +1.5 Squad Stealth',
+            strands: ['[INK] +2 Blackmail Dossiers & +1 Discovered Fact Dossier pre-loaded into Truth Vault', '[MIND] +1.5 Squad Stealth & Covert Audit clearance unlocked'],
+            fuelDelta: 4, resDelta: 8, favorDelta: 0, dossierDelta: 2, stealthBonus: 1.5, discoverExtraFact: true, weightDelta: 220
+        },
+        MOD_HIGH_ENTROPY_CRUCIBLE: {
+            id: 'MOD_HIGH_ENTROPY_CRUCIBLE',
+            title: '⚡ High-Entropy Frontier Crucible (Hardcore)',
+            desc: '+20 Settlement Resources & +15u Dream Siphon, but +15% Volatility & +10% Entropy',
+            strands: ['[VERSE] +15u Dream Siphon & +20 Resources allocated for frontier hazard', '[MIND] ⚠️ +15% Starting Volatility & +10% Blind-Spot Entropy'],
+            fuelDelta: 6, resDelta: 20, dreamDelta: 15, volatilityDelta: 15, entropyDelta: 10, weightDelta: 300
+        }
     },
 
     start(uiInstance = CommanderUI) {
@@ -103,44 +138,39 @@ export const CandidateOnboarding = {
         container.innerHTML = `
             <div class="brutalist-runic-frame">
                 <div class="brutalist-top-crest">
-                    <div class="brutalist-crest-title">CANDIDATE: ${this.state.name.toUpperCase()}</div>
+                    <div class="brutalist-crest-title">ROYAL AUDITOR &amp; FACTION LEADER COMMISSION</div>
                     <div class="brutalist-crest-medallion"><span>◆</span></div>
-                    <div class="brutalist-crest-right">BIRTHRIGHT: ${b.replace(/_/g, ' ')}</div>
+                    <div class="brutalist-crest-right">DOCTRINE: ${b.replace(/_/g, ' ')}</div>
                 </div>
 
-                <div style="font-size:10px; color:#fbbf24; margin-bottom:6px;">[ STEP 1 OF 4 : IDENTITY & FLESH RECORD ]</div>
+                <div style="font-size:10px; color:#fbbf24; margin-bottom:6px;">[ STEP 1 OF 4 : ROYAL AUDITOR MANDATE &amp; EXECUTIVE DOCTRINE ]</div>
 
                 <div style="display:grid; grid-template-columns: 1.25fr 0.9fr 0.75fr; gap:10px;">
                     <div style="border:1px solid #383e40; background:rgba(9,13,14,0.75); padding:9px;">
-                        <div style="color:#cbbba0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold; border-bottom:1px solid #383e40; padding-bottom:4px; margin-bottom:5px;">FORENSIC PROVENANCE LOG</div>
+                        <div style="color:#cbbba0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold; border-bottom:1px solid #383e40; padding-bottom:4px; margin-bottom:5px;">ARCHIVAL TELEMETRY &amp; LEADER IDENTITY</div>
                         ${this.renderFiveStrandLogHtml()}
-                        <div style="margin-top:7px; display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-                            <div>
-                                <label style="display:block; color:#d99b43; font-size:9px;">&gt; CALLSIGN:</label>
-                                <input type="text" id="onboard-name" value="${this.state.name}" style="width:100%; background:#07090a; border:1px solid #575043; color:#e7e5e4; padding:4px; font-size:10.5px;">
-                            </div>
-                            <div>
-                                <label style="display:block; color:#d99b43; font-size:9px;">&gt; FLESH RECORD:</label>
-                                <input type="text" id="onboard-appearance" value="${this.state.appearance}" style="width:100%; background:#07090a; border:1px solid #575043; color:#e7e5e4; padding:4px; font-size:10.5px;">
-                            </div>
+                        <div style="margin-top:7px; padding:6px; background:#07090a; border:1px solid #575043; font-size:9.5px; color:#d8c8a8;">
+                            <b style="color:#fbbf24;">EXECUTIVE AUTHORITY:</b> You play as the <b>Royal Auditor &amp; Lore-Specific Faction Leader</b> of the group you select on the Duty Roster (e.g. <i>High Marshal Vane</i> of House Terminus, <i>Director Jess Nedaf</i> of the Obsidian Citadel, <i>King Alaric's Royal Factor</i>, <i>Sluice-Boss Harl</i>, or <i>Korvan the Pale Sovereign</i>).
+                            <input type="hidden" id="onboard-name" value="${this.state.name}">
+                            <input type="hidden" id="onboard-appearance" value="${this.state.appearance}">
                         </div>
                     </div>
 
                     <div style="border:1px solid #383e40; background:rgba(9,13,14,0.75); padding:9px; display:flex; flex-direction:column; justify-content:space-between;">
                         <div>
-                            <div style="color:#cbbba0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold; border-bottom:1px solid #383e40; padding-bottom:4px; margin-bottom:7px;">BRUTALIST CALIBRATION</div>
+                            <div style="color:#cbbba0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold; border-bottom:1px solid #383e40; padding-bottom:4px; margin-bottom:7px;">SYSTEMIC PRESSURE CALIBRATION</div>
                             <div style="font-size:8.5px; color:#8c8270;">RESONANCE GAIN // 14-DAY DRIFT</div>
                             <input type="range" min="1" max="100" value="64" style="width:100%; accent-color:#d9822b; margin-bottom:5px;">
                             <div style="font-size:8.5px; color:#8c8270;">SIGNAL DAMPING // WHITE VOID</div>
                             <input type="range" min="1" max="100" value="42" style="width:100%; accent-color:#d9822b; margin-bottom:6px;">
                         </div>
                         <div>
-                            <div style="color:#d99b43; font-size:9px; margin-bottom:4px;">&gt; SELECT BIRTHRIGHT:</div>
+                            <div style="color:#d99b43; font-size:9px; margin-bottom:4px;">&gt; SELECT LEADER BIRTHRIGHT MODIFIER:</div>
                             <div id="birthright-options" style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-                                <button type="button" onclick="window.selectBirthright('HOUSE_REMNANT')" style="${btnStyle('HOUSE_REMNANT')}">${b === 'HOUSE_REMNANT' ? '★' : '•'} HOUSE REMNANT</button>
-                                <button type="button" onclick="window.selectBirthright('FUEL_BORN')" style="${btnStyle('FUEL_BORN')}">${b === 'FUEL_BORN' ? '★' : '•'} FUEL-BORN</button>
-                                <button type="button" onclick="window.selectBirthright('CHAMPION_KIN')" style="${btnStyle('CHAMPION_KIN')}">${b === 'CHAMPION_KIN' ? '★' : '•'} CHAMPION-KIN</button>
-                                <button type="button" onclick="window.selectBirthright('ECHO_OF_THE_SEAL')" style="${btnStyle('ECHO_OF_THE_SEAL')}">${b === 'ECHO_OF_THE_SEAL' ? '★' : '•'} ECHO OF SEAL</button>
+                                <button type="button" onclick="window.selectBirthright('HOUSE_REMNANT')" style="${btnStyle('HOUSE_REMNANT')}">${b === 'HOUSE_REMNANT' ? '★' : '•'} HOUSE REMNANT (+20 Sig)</button>
+                                <button type="button" onclick="window.selectBirthright('FUEL_BORN')" style="${btnStyle('FUEL_BORN')}">${b === 'FUEL_BORN' ? '★' : '•'} FUEL-BORN (Cold Immune)</button>
+                                <button type="button" onclick="window.selectBirthright('CHAMPION_KIN')" style="${btnStyle('CHAMPION_KIN')}">${b === 'CHAMPION_KIN' ? '★' : '•'} CHAMPION-KIN (+15% Att)</button>
+                                <button type="button" onclick="window.selectBirthright('ECHO_OF_THE_SEAL')" style="${btnStyle('ECHO_OF_THE_SEAL')}">${b === 'ECHO_OF_THE_SEAL' ? '★' : '•'} ECHO OF SEAL (+25% Scout)</button>
                             </div>
                         </div>
                     </div>
@@ -252,9 +282,20 @@ export const CandidateOnboarding = {
 
                     <div style="border:1px solid #383e40; background:rgba(9,13,14,0.75); padding:9px; display:flex; flex-direction:column; justify-content:space-between;">
                         <div>
-                            <label style="display:block; color:#d99b43; font-size:9.5px; margin-bottom:4px;">&gt; PRE-SHIFT ORIGIN &amp; BLOOD-DEBT RECORD:</label>
-                            <textarea id="onboard-origin" style="width:100%; background:#07090a; border:1px solid #575043; color:#fff; padding:6px; height:64px; font-size:10.5px;">${this.state.originText}</textarea>
-                            <button type="button" onclick="window.runExtractor()" style="width:100%; margin-top:6px; background:#2b2318; color:#fde68a; padding:6px; border:1px solid #d99b43; cursor:pointer; font-family:'Cinzel',serif; font-size:10px; font-weight:bold;">RUN FIVE-STRAND EXTRACTOR</button>
+                            <div style="color:#d99b43; font-size:9.5px; margin-bottom:4px; font-weight:bold;">&gt; SELECT JURISDICTIONAL CAMPAIGN MODIFIER:</div>
+                            <div style="display:grid; grid-template-columns:1fr; gap:5px;">
+                                ${Object.values(this.ORIGIN_MODIFIER_CATALOG).map(mod => {
+                                    const active = (this.state.originModifierId || 'MOD_CROWN_SURPLUS') === mod.id;
+                                    return `
+                                        <button type="button" onclick="window.selectOriginModifier('${mod.id}')" style="background:${active ? '#2b2114' : '#121617'}; border:1.5px solid ${active ? '#fbbf24' : '#4a453b'}; color:#e2d1b0; padding:6px 8px; cursor:pointer; text-align:left; font-size:9.5px;">
+                                            <div style="font-weight:bold; color:${active ? '#fde68a' : '#cbbba0'};">${active ? '★' : '•'} ${mod.title}</div>
+                                            <div style="font-size:8.5px; color:#a8997c; margin-top:2px;">${mod.desc}</div>
+                                        </button>
+                                    `;
+                                }).join('')}
+                            </div>
+                            <input type="hidden" id="onboard-origin" value="${this.state.originText}">
+                            <button type="button" onclick="window.runExtractor()" style="width:100%; margin-top:6px; background:#2b2318; color:#fde68a; padding:6px; border:1px solid #d99b43; cursor:pointer; font-family:'Cinzel',serif; font-size:10px; font-weight:bold;">APPLY &amp; VERIFY MODIFIER TELEMETRY</button>
                         </div>
                         <div id="extraction-result" style="margin-top:6px; padding:6px; background:#07090a; border:1px dashed #787163; color:#fbbf24; font-size:10px;">
                             ${this.state.extractedStrands.join('<br>')}
@@ -363,7 +404,9 @@ export const CandidateOnboarding = {
         const bKey = prof.birthright === 'FUEL_BORN' ? 'ASH_BOUND' : (CommanderEngine.BIRTHRIGHTS?.[prof.birthright] ? prof.birthright : 'HOUSE_REMNANT');
         const agt = arm.agents.get('agt_1');
         if (agt) {
-            agt.name = prof.name || agt.name;
+            // Preserve the lore-specific leader name seeded by the chosen faction role (e.g. High Marshal Vane, Director Jess Nedaf, Baron Kaelen Oakheart)
+            agt.isFactionLeader = true;
+            agt.royalAuditorTitle = 'Royal Auditor & Faction Leader';
             agt.birthright = CommanderEngine.BIRTHRIGHTS?.[bKey] || agt.birthright;
             agt.appearance = prof.appearance;
             agt.originStrands = prof.extractedStrands;
@@ -372,7 +415,54 @@ export const CandidateOnboarding = {
             else if (prof.vocation === 'WARDEN') { agt.skills.meleeDef += 2; agt.skills.toughness += 2; }
             else { agt.skills.meleeAtt += 2; agt.skills.survival += 2; }
         }
+
+        // Apply selected Jurisdictional Campaign Modifier directly to starting faction state
+        const mod = this.ORIGIN_MODIFIER_CATALOG[prof.originModifierId || 'MOD_CROWN_SURPLUS'] || this.ORIGIN_MODIFIER_CATALOG.MOD_CROWN_SURPLUS;
+        const cm = CommanderEngine.CampaignManager;
+        const fe = CommanderEngine.FacilityEngine;
+        if (mod && cm && fe) {
+            if (mod.resDelta) fe.settlementResources += mod.resDelta;
+            if (mod.prosperityDelta) fe.settlementProsperity = Math.min(100, fe.settlementProsperity + mod.prosperityDelta);
+            if (mod.guardsDelta) {
+                fe.villageGuardsMaxThreshold += mod.guardsDelta;
+                fe.villageGuardsCurrent = Math.min(fe.villageGuardsMaxThreshold, fe.villageGuardsCurrent + mod.guardsDelta);
+            }
+            if (mod.extraGear) arm.squadArmoryStock.push(mod.extraGear);
+            if (mod.stealthBonus) {
+                arm.agents.forEach(a => { if (a.alive) a.skills.stealth = Number((a.skills.stealth + mod.stealthBonus).toFixed(1)); });
+            }
+            if (mod.discoverExtraFact && CommanderEngine.RealityEditorVault) {
+                CommanderEngine.RealityEditorVault.discoverFact({
+                    title: 'Royal Auditor Pre-Clearance Cipher Dossier',
+                    source: 'Royal Archive Commission Vault',
+                    targetHouse: 'House Cull',
+                    valueFuel: 14,
+                    valueRes: 18
+                });
+            }
+            if (cm.state?.house) {
+                if (mod.fuelDelta) cm.state.house.barrierFuelUnits = Math.min(70, (cm.state.house.barrierFuelUnits || 28) + mod.fuelDelta);
+                if (mod.favorDelta) cm.state.house.crownFavor = Math.min(100, (cm.state.house.crownFavor || 60) + mod.favorDelta);
+                if (mod.dossierDelta) cm.state.house.blackmailDossiers = (cm.state.house.blackmailDossiers || 0) + mod.dossierDelta;
+                if (mod.dreamDelta) cm.state.house.dreamSiphon = (cm.state.house.dreamSiphon || 30) + mod.dreamDelta;
+            }
+            if (cm.state?.syndicate && mod.fuelDelta) cm.state.syndicate.contrabandResin += mod.fuelDelta;
+            if (cm.state?.order && mod.entropyDelta) cm.state.order.blindSpotEntropy = Math.min(100, (cm.state.order.blindSpotEntropy || 12) + mod.entropyDelta);
+            if (cm.state?.sovereign && mod.weightDelta) cm.state.sovereign.significanceHarvested = (cm.state.sovereign.significanceHarvested || 0) + mod.weightDelta;
+            if (mod.volatilityDelta && CommanderEngine.CrisisEngine) {
+                CommanderEngine.CrisisEngine.volatilityIndex = Math.min(100, (CommanderEngine.CrisisEngine.volatilityIndex || 0) + mod.volatilityDelta);
+            }
+        }
     }
+};
+
+rootScope.selectOriginModifier = (modId) => {
+    const mod = CandidateOnboarding.ORIGIN_MODIFIER_CATALOG[modId];
+    if (!mod) return;
+    CandidateOnboarding.state.originModifierId = mod.id;
+    CandidateOnboarding.state.originText = `${mod.title}: ${mod.desc}`;
+    CandidateOnboarding.state.extractedStrands = [...mod.strands];
+    CandidateOnboarding.startScene3(rootScope.CandidateUIInstance || CommanderUI);
 };
 
 rootScope.selectBirthright = (id) => {

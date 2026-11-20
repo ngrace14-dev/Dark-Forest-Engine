@@ -4346,7 +4346,8 @@ export const CommanderEngine = {
 
     computeChronoSealCostForDays(days = 1) {
         const d = Math.max(1, parseInt(days, 10) || 1);
-        return d * 3;
+        // Most expensive hour skip (+6H) costs 3 Seals; full-day skip (24h) costs 6 Seals per day
+        return d * 6;
     },
 
     premiumStepHours(hours = 2) {
@@ -4441,7 +4442,7 @@ export const CommanderEngine = {
      */
     chronoSkipDays(days = 1) {
         const count = Math.max(1, parseInt(days, 10) || 1);
-        const scaledSealCost = count === 1 ? 1 : this.computeChronoSealCostForDays(count);
+        const scaledSealCost = this.computeChronoSealCostForDays(count);
         if (FacilityEngine.chronoSeals < scaledSealCost) {
             return { success: false, sealCost: scaledSealCost, message: `Insufficient Royal Chrono-Seals (${FacilityEngine.chronoSeals}/${scaledSealCost} Seals required for +${count}D Skip).` };
         }

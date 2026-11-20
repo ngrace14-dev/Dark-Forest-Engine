@@ -91,7 +91,7 @@ const { CandidateOnboarding } = await import('../src/systems/candidate_onboardin
 
 // Verify 4-Scene Candidate Onboarding Sequence -> Role Selection Handoff -> Custom Candidate Injection
 CandidateOnboarding.start(CommanderUI);
-if (!mockElements.get('commander-terminal-root').innerHTML.includes('STEP 1 OF 4 : IDENTITY & FLESH RECORD') || mockElements.get('text-commander-viewport').classList.contains('hidden')) {
+if (!mockElements.get('commander-terminal-root').innerHTML.includes('ROYAL AUDITOR MANDATE') || mockElements.get('text-commander-viewport').classList.contains('hidden')) {
     failures.push('CandidateOnboarding.start() failed to unhide text-commander-viewport and render Scene 1');
 }
 window.selectBirthright('ECHO_OF_THE_SEAL');
