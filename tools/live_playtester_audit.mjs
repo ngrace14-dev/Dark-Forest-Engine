@@ -455,6 +455,22 @@ if (!tier4Res.success || tier4Res.tier !== 4 || !combatExp.expedition.combatEven
     logPlay('ADDENDUM CA-13 RUNIC CARVING & LIVE COMBAT LOG', `${tier4Res.message}\n   ↳ Live Combat Log: ${combatExp.expedition.combatEvents.join(' | ')}`);
 }
 
+// 5G. Interactive 20-Settlement Tactical Dominion Map, Dragon-Sim Encounter Arena & Auditor's Retreat Fallback
+window.viewWarBoard();
+window.selectMapSettlement(2); // Select Gallows Hill
+window.openTacticalEncounter(2);
+const encRound1 = window.executeEncounterAction('CAUSAL_WARP');
+const encRound2 = window.executeEncounterAction('RUNIC_SURGE');
+const encRound3 = window.executeEncounterAction('STRIKE');
+window.toggleMapViewMode(); // Test Auditor's Retreat Fallback toggle
+window.toggleMapViewMode();
+const warDeckHtml = document.getElementById('brutalist-subpage-deck')?.innerHTML || '';
+if (!encRound1.success || !warDeckHtml.includes('TACTICAL ENCOUNTER ARENA') || !warDeckHtml.includes('SELECTED NODE: GALLOWS HILL')) {
+    auditReport.bugsFound.push('Expected Interactive 20-Settlement Tactical Dominion Map and Tactical Encounter Arena modal to render and execute combat rounds.');
+} else {
+    logPlay('TACTICAL DOMINION MAP & ENCOUNTER ARENA', `${encRound1.message} | ${encRound2.message} | ${encRound3.message}`);
+}
+
 console.log('--------------------------------------------------------------------------------');
 if (auditReport.bugsFound.length > 0) {
     console.error('LIVE PLAYTESTER AUDIT FOUND ISSUES:', auditReport.bugsFound);

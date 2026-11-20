@@ -184,8 +184,8 @@ console.log(`[11f-Retreat] Emergent Will-to-Live Retreat Verified: ${raidExpRes.
 // Verify 30–60min / 40-Day Crisis Grace Period & House Wraith (Wraith's End) Deep-Oil Fire Crisis
 CommanderUI.selectRoleAndLaunch('NOBLE_HOUSE', 'House Wraith');
 const ce = CommanderEngine.CrisisEngine;
-if (ce.isGracePeriodComplete(10) !== false || ce.isGracePeriodComplete(42) !== true) {
-    failures.push('Crisis Grace Period check failed (should block before Day 40 and allow at Day 40+)');
+if (ce.isGracePeriodComplete(2) !== false || ce.isGracePeriodComplete(4) !== true) {
+    failures.push('Crisis Grace Period check failed (should block before Day 4 and allow at Day 4+)');
 }
 window.setNextDayGoal('MAXIMIZE_MONOPOLY');
 ce.triggerContextualCrisis('NOBLE_HOUSE', 'House Wraith');

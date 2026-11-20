@@ -150,6 +150,133 @@ export const CommanderUI = {
     highContrastMode: false,
     visualShockState: null,
     activeBookTab: 'COMMAND',
+    mapViewMode: 'TACTICAL_MAP',
+    selectedMapSettlementId: 1,
+    activeEncounterState: null,
+
+    toggleMapViewMode() {
+        this.mapViewMode = this.mapViewMode === 'TACTICAL_MAP' ? 'CLASSIC_LEDGER' : 'TACTICAL_MAP';
+        this.showBanner(`Auditor's View Switched: ${this.mapViewMode === 'TACTICAL_MAP' ? '🗺️ TACTICAL DOMINION MAP (Interactive 20-Settlement Canvas)' : '📜 CLASSIC ARCHIVE LEDGER (Auditor\'s Retreat Fallback)'}`);
+        this.renderWarBoardReader();
+        this.render();
+    },
+
+    selectMapSettlement(settlementId) {
+        this.selectedMapSettlementId = Number(settlementId) || 0;
+        const settlements = CommanderEngine.CampaignManager.getBedrockTelemetry({
+            allowTwentyFirst: CommanderEngine.ShadowInfluenceEngine?.isEpitaphRevealed?.() || false
+        }) || [];
+        const node = settlements.find(s => Number(s.id) === this.selectedMapSettlementId) || settlements[0];
+        if (node) {
+            this.showBanner(`🎯 Selected Parish Node #${node.id}: [${node.name}] (${node.house} | Fuel: ${node.barrierFuel}u | Chains: ${node.chainsIntegrity}%)`);
+        }
+        this.renderWarBoardReader();
+    },
+
+    openTacticalEncounterModal(settlementId = null) {
+        const targetId = settlementId !== null ? Number(settlementId) : this.selectedMapSettlementId;
+        const settlements = CommanderEngine.CampaignManager.getBedrockTelemetry({
+            allowTwentyFirst: CommanderEngine.ShadowInfluenceEngine?.isEpitaphRevealed?.() || false
+        }) || [];
+        const node = settlements.find(s => Number(s.id) === targetId) || settlements[1] || { id: 1, name: 'Oakhaven', house: 'House Oakheart', barrierFuel: 50, chainsIntegrity: 100 };
+        const warBoard = CommanderEngine.CampaignManager.getWarBoard() || [];
+        const houseEntry = warBoard.find(w => w.name === node.house) || { name: node.house, power: 65, status: 'PEACE', monopoly: 'Ironwood' };
+        const leadAgt = CommanderEngine.AgentRosterManager?.agents?.get?.('agt_1') || Array.from(CommanderEngine.AgentRosterManager?.agents?.values?.() || []).find(a => a.alive);
+        const isSov = CommanderEngine.CampaignManager.campaignMode === 'SOVEREIGN';
+        const enemyTitle = isSov ? `${node.name} Chain-Garrison & 300 Watch` : `${node.house} Border Wardens (${node.name})`;
+        const enemyMaxHp = Math.max(80, Math.round((houseEntry.power || 60) * 2.2));
+
+        this.activeEncounterState = {
+            settlementId: node.id,
+            settlementName: node.name,
+            houseName: node.house,
+            housePower: houseEntry.power || 65,
+            houseStatus: houseEntry.status || 'PEACE',
+            monopoly: houseEntry.monopoly || 'Runic Reserves',
+            playerName: leadAgt?.name || (isSov ? 'Korvan the Pale Sovereign' : 'Royal Auditor Vanguard'),
+            playerHp: leadAgt?.vitals?.hp || 120,
+            playerMaxHp: leadAgt?.vitals?.maxHp || 120,
+            playerStamina: leadAgt?.vitals?.stamina || 100,
+            playerPoise: Math.round(leadAgt?.vitals?.poise || 80),
+            cultTier: leadAgt?.cultivation?.stage || 0,
+            warpUnlocked: Boolean(leadAgt?.cultivation?.causalCombatWarp),
+            enemyName: enemyTitle,
+            enemyHp: enemyMaxHp,
+            enemyMaxHp,
+            round: 1,
+            resolved: false,
+            combatLogs: [
+                `[ROUND 1 — TACTICAL ENGAGEMENT AT ${node.name.toUpperCase()}] ${leadAgt?.name || 'Vanguard'} approached the 50-ton anchor perimeter of ${node.name} (${node.house} | Power: ${houseEntry.power}/100). Select a tactical combat action below.`
+            ]
+        };
+        this.renderWarBoardReader();
+    },
+
+    executeTacticalEncounterAction(actionType = 'STRIKE') {
+        const enc = this.activeEncounterState;
+        if (!enc || enc.resolved) return { success: false, message: 'No active tactical encounter.' };
+        const act = String(actionType || 'STRIKE').toUpperCase();
+        const leadAgt = CommanderEngine.AgentRosterManager?.agents?.get?.('agt_1') || Array.from(CommanderEngine.AgentRosterManager?.agents?.values?.() || []).find(a => a.alive);
+        const sq = CommanderEngine.RoleStateMachine.computeSquadCapabilityMetrics();
+        const isSov = CommanderEngine.CampaignManager.campaignMode === 'SOVEREIGN';
+
+        if (act === 'RETREAT') {
+            enc.resolved = true;
+            const msg = `🛡️ [TACTICAL WITHDRAWAL] ${enc.playerName} broke off the engagement at ${enc.settlementName} and withdrew into the mist with intact forces.`;
+            enc.combatLogs.push(msg);
+            this.showBanner(msg);
+            this.renderWarBoardReader();
+            return { success: true, action: act, message: msg };
+        }
+
+        let dmgDealt = Math.round(24 + sq.avgMartial * 4 + (enc.cultTier * 6));
+        let dmgTaken = Math.max(6, Math.round((enc.housePower * 0.25) - sq.avgSurvival * 1.5));
+        let actionLog = '';
+
+        if (act === 'RUNIC_SURGE') {
+            dmgDealt = Math.round(dmgDealt * 1.65);
+            enc.playerStamina = Math.max(0, enc.playerStamina - 25);
+            actionLog = `🔥 [FOUNDATION FIRE / RUNIC SURGE] ${enc.playerName} ignited Tier ${enc.cultTier} body-runes (or Frost-Herald fury), dealing ${dmgDealt} heavy runic damage to ${enc.enemyName}!`;
+        } else if (act === 'CAUSAL_WARP') {
+            dmgDealt = Math.round(dmgDealt * 1.45);
+            dmgTaken = 0;
+            enc.playerStamina = Math.max(0, enc.playerStamina - 20);
+            actionLog = `⚡ [CAUSAL COMBAT WARP] ${enc.playerName} refracted through the blind-spot, completely evading ${enc.enemyName}'s counter-volley (0 damage taken) and striking for ${dmgDealt} vitals damage!`;
+        } else {
+            actionLog = `⚔️ [VANGUARD ASSAULT] ${enc.playerName} clashed with ${enc.enemyName} for ${dmgDealt} damage (Counter-fire inflicted -${dmgTaken} HP).`;
+        }
+
+        enc.enemyHp = Math.max(0, enc.enemyHp - dmgDealt);
+        enc.playerHp = Math.max(15, enc.playerHp - dmgTaken);
+        if (leadAgt?.vitals) {
+            leadAgt.vitals.hp = enc.playerHp;
+            if (leadAgt.cultivation) leadAgt.cultivation.currentMasteryPool = Math.min(100, (leadAgt.cultivation.currentMasteryPool || 25) + 8);
+        }
+        enc.round++;
+        enc.combatLogs.push(actionLog);
+
+        if (enc.enemyHp <= 0) {
+            enc.resolved = true;
+            const fuelLoot = isSov ? 0 : 10;
+            const resLoot = 16;
+            const weightLoot = isSov ? 450 : 0;
+            if (isSov) {
+                CommanderEngine.CampaignManager.state.sovereign.significanceHarvested = (CommanderEngine.CampaignManager.state.sovereign.significanceHarvested || 0) + weightLoot;
+            } else {
+                const h = CommanderEngine.CampaignManager.state.house;
+                h.barrierFuelUnits = Math.min(70, (h.barrierFuelUnits || 20) + fuelLoot);
+                CommanderEngine.FacilityEngine.settlementResources += resLoot;
+            }
+            CommanderEngine.CampaignManager.mutateWarBoard(enc.houseName, -8, 'DEFENSIVE', `Defeated in tactical encounter at ${enc.settlementName}`);
+            const winMsg = isSov
+                ? `💀🏆 [DOMINION VICTORY AT ${enc.settlementName.toUpperCase()}] Devoured ${enc.enemyName}! Harvested +${weightLoot} Historical Weight (${enc.houseName} -8 Power -> DEFENSIVE).`
+                : `🏆 [TACTICAL VICTORY AT ${enc.settlementName.toUpperCase()}] Overran ${enc.enemyName}! Plundered +${fuelLoot}u Barrier Fuel & +${resLoot} Resources (${enc.houseName} -8 Power -> DEFENSIVE).`;
+            enc.combatLogs.push(winMsg);
+            this.showBanner(winMsg);
+        }
+        this.renderWarBoardReader();
+        return { success: true, encounter: enc, message: actionLog };
+    },
 
     switchBookTab(tabId = 'COMMAND', triggerTutorial = true) {
         this.activeBookTab = String(tabId || 'COMMAND').toUpperCase();
@@ -505,6 +632,14 @@ export const CommanderUI = {
             this.showBanner(res.message);
             this.render();
         };
+        window.toggleMapViewMode = () => this.toggleMapViewMode();
+        window.selectMapSettlement = (id) => this.selectMapSettlement(id);
+        window.openTacticalEncounter = (id = null) => this.openTacticalEncounterModal(id);
+        window.executeEncounterAction = (act) => this.executeTacticalEncounterAction(act);
+        window.closeTacticalEncounter = () => {
+            this.activeEncounterState = null;
+            this.renderWarBoardReader();
+        };
         window.interrogateSuspect = (targetId = 'agt_2') => {
             CommanderEngine.TutorialAdvisor?.checkAndTrigger?.('INQUEST_BTN');
             this.renderInquestReader(targetId);
@@ -601,6 +736,55 @@ export const CommanderUI = {
         }
     },
 
+    buildEncounterArenaHtml(isSov = false) {
+        const enc = this.activeEncounterState;
+        if (!enc) return '';
+        const pPct = Math.max(5, Math.min(100, Math.round((enc.playerHp / enc.playerMaxHp) * 100)));
+        const ePct = Math.max(0, Math.min(100, Math.round((enc.enemyHp / enc.enemyMaxHp) * 100)));
+        return `
+            <div style="margin-top:8px; border:2px solid #dc2626; background:linear-gradient(180deg,#140c0a 0%,#090605 100%); padding:10px; color:#f8fafc; border-radius:6px; box-shadow:0 12px 28px rgba(0,0,0,0.95);">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #7f1d1d; padding-bottom:5px; margin-bottom:8px;">
+                    <span style="font-family:'Cinzel',serif; font-weight:900; font-size:12px; color:#fca5a5;">⚔️ TACTICAL ENCOUNTER ARENA // ${enc.settlementName.toUpperCase()} (${enc.houseName} — Round ${enc.round})</span>
+                    <button class="cmd-btn" style="background:#3f1212; border-color:#ef4444; color:#fecaca; padding:2px 8px; font-size:9px;" onclick="window.closeTacticalEncounter()">✖ Close Arena</button>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:8px; font-size:9.5px;">
+                    <div style="background:#1e293b; border:1px solid #38bdf8; padding:6px;">
+                        <div style="display:flex; justify-content:space-between; font-weight:bold; color:#bae6fd;">
+                            <span>${isSov ? '🐺' : '🛡️'} ${enc.playerName} (Tier ${enc.cultTier}/8)</span>
+                            <span>HP: ${enc.playerHp}/${enc.playerMaxHp} | Stam: ${enc.playerStamina}</span>
+                        </div>
+                        <div style="height:7px; background:#090d0e; border:1px solid #334155; margin-top:4px;">
+                            <div style="width:${pPct}%; height:100%; background:#22c55e;"></div>
+                        </div>
+                    </div>
+                    <div style="background:#2a1212; border:1px solid #ef4444; padding:6px;">
+                        <div style="display:flex; justify-content:space-between; font-weight:bold; color:#fecaca;">
+                            <span>🏰 ${enc.enemyName} (Power ${enc.housePower})</span>
+                            <span>HP: ${enc.enemyHp}/${enc.enemyMaxHp} | [${enc.houseStatus}]</span>
+                        </div>
+                        <div style="height:7px; background:#090d0e; border:1px solid #450a0a; margin-top:4px;">
+                            <div style="width:${ePct}%; height:100%; background:#ef4444;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="background:#07090a; border:1px solid #334155; padding:6px 8px; max-height:95px; overflow-y:auto; font-family:'Share Tech Mono',monospace; font-size:9.5px; color:#e2e8f0; margin-bottom:8px;">
+                    ${enc.combatLogs.map(l => `<div style="margin-bottom:3px;">• ${l}</div>`).join('')}
+                </div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    ${enc.resolved
+                        ? `<button class="cmd-btn" style="flex:1; background:#14532d; border-color:#22c55e; color:#dcfce7; padding:6px;" onclick="window.closeTacticalEncounter()">✅ Conclude Engagement &amp; Return to Dominion Map</button>`
+                        : `
+                            <button class="cmd-btn" style="flex:1; padding:5px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.executeEncounterAction('STRIKE')">${isSov ? '🩸 Predator Rend (Strike)' : '⚔️ Vanguard Assault (Strike)'}</button>
+                            <button class="cmd-btn" style="flex:1; padding:5px; background:#451a03; border-color:#f59e0b; color:#fde68a;" onclick="window.executeEncounterAction('RUNIC_SURGE')">${isSov ? '❄️ Frost-Herald Swarm (-25 Stam)' : '🔥 Foundation Fire Surge (-25 Stam)'}</button>
+                            <button class="cmd-btn" style="flex:1; padding:5px; background:#2e1065; border-color:#a855f7; color:#f3e8ff;" onclick="window.executeEncounterAction('CAUSAL_WARP')">⚡ Causal Combat Warp (-20 Stam, 0 Dmg)</button>
+                            <button class="cmd-btn" style="padding:5px 10px;" onclick="window.executeEncounterAction('RETREAT')">🛡️ Withdraw</button>
+                        `
+                    }
+                </div>
+            </div>
+        `;
+    },
+
     renderWarBoardReader() {
         const board = CommanderEngine.CampaignManager.getWarBoard() || [];
         let text = "================================================================================\n";
@@ -639,32 +823,84 @@ export const CommanderUI = {
                 </div>
             `).join('');
 
+            const settlements = CommanderEngine.CampaignManager.getBedrockTelemetry({
+                allowTwentyFirst: CommanderEngine.ShadowInfluenceEngine?.isEpitaphRevealed?.() || false
+            }) || [];
+            const selNode = settlements.find(s => Number(s.id) === Number(this.selectedMapSettlementId)) || settlements[1] || { id: 1, name: 'Oakhaven', house: 'House Oakheart', barrierFuel: 50, chainsIntegrity: 100 };
+            const selHouse = board.find(w => w.name === selNode.house) || { name: selNode.house, power: 65, status: 'PEACE', monopoly: 'Ironwood' };
+            const isSov = CommanderEngine.CampaignManager.campaignMode === 'SOVEREIGN';
+
+            const svgNodes = settlements.map((s, i) => {
+                if (i === 0) {
+                    return `<g style="cursor:pointer;" onclick="window.selectMapSettlement(0)"><rect x="132" y="54" width="16" height="16" fill="#1e1b4b" stroke="#fbbf24" stroke-width="1.8"/><text x="140" y="65" text-anchor="middle" fill="#fde68a" font-size="9">👑</text></g>`;
+                }
+                const angle = ((i - 1) / Math.max(1, settlements.length - 1)) * Math.PI * 2 - Math.PI / 2;
+                const rx = (i % 2 === 0) ? 108 : 74;
+                const ry = (i % 2 === 0) ? 46 : 31;
+                const cx = (140 + rx * Math.cos(angle)).toFixed(1);
+                const cy = (64 + ry * Math.sin(angle)).toFixed(1);
+                const hEntry = board.find(w => w.name === s.house);
+                const isSelected = Number(s.id) === Number(selNode.id);
+                const isHostile = hEntry?.status === 'WAR_PREP' || hEntry?.status === 'SKIRMISH' || s.chainsIntegrity < 50;
+                const fillCol = isSelected ? '#38bdf8' : (isHostile ? '#dc2626' : (hEntry?.status === 'ALLIED' ? '#10b981' : '#d97706'));
+                return `
+                    <g style="cursor:pointer;" onclick="window.selectMapSettlement(${s.id})">
+                        <line x1="140" y1="62" x2="${cx}" y2="${cy}" stroke="${isSelected ? '#38bdf8' : '#4a453b'}" stroke-width="${isSelected ? '1.6' : '0.8'}" stroke-dasharray="2,2"/>
+                        <circle cx="${cx}" cy="${cy}" r="${isSelected ? '6.5' : '4.5'}" fill="${fillCol}" stroke="#090d0e" stroke-width="1.2"/>
+                        <text x="${cx}" y="${(Number(cy) - 7).toFixed(1)}" text-anchor="middle" fill="${isSelected ? '#7dd3fc' : '#e2d1b0'}" font-size="${isSelected ? '6.5' : '5.3'}" font-weight="bold">${s.name.slice(0, 10)}</text>
+                    </g>
+                `;
+            }).join('');
+
+            const encounterOverlayHtml = this.buildEncounterArenaHtml(isSov);
+
             visualDeck.style.display = 'block';
             visualDeck.innerHTML = `
                 <div class="brutalist-top-crest" style="margin-top:6px;">
                     <div class="brutalist-crest-title">THE WAR BOARD &amp; TELEMETRY READER</div>
-                    <div class="brutalist-crest-medallion"><span>ᛝ</span></div>
-                    <div class="brutalist-crest-right">// PAGE 5: SPATIAL PROBABILITY</div>
-                </div>
-                <div style="display:grid; grid-template-columns: 1fr 1.15fr; gap:10px;">
-                    <div style="border:1px solid #383e40; background:rgba(9,13,14,0.8); padding:8px;">
-                        <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold; margin-bottom:6px;">[19-HOUSE TABLE]</div>
-                        ${rowsHtml}
+                    <div class="brutalist-crest-medallion"><span>◆</span></div>
+                    <div class="brutalist-crest-right">
+                        <span>// PAGE 5: SPATIAL PROBABILITY</span>
+                        <button class="cmd-btn" style="padding:2px 7px; font-size:8.5px; border-color:#38bdf8; color:#bae6fd;" onclick="window.toggleMapViewMode()">
+                            ${this.mapViewMode === 'TACTICAL_MAP' ? '📜 Auditor\'s Retreat: Classic Ledger' : '🗺️ Tactical Dominion Map'}
+                        </button>
                     </div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1.25fr; gap:10px;">
                     <div style="border:1px solid #383e40; background:rgba(9,13,14,0.8); padding:8px; display:flex; flex-direction:column; justify-content:space-between;">
-                        <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold;">TELEMETRY GRID // 20 CHAINED SETTLEMENTS</div>
-                        <svg viewBox="0 0 260 120" style="width:100%; height:112px; display:block; margin:2px auto;">
-                            <ellipse cx="130" cy="60" rx="102" ry="38" fill="none" stroke="#4a453b" stroke-width="1" stroke-dasharray="3,2"/>
-                            <line x1="130" y1="60" x2="48" y2="28" stroke="#8c7a5b" stroke-width="1.5" stroke-dasharray="2,2"/>
-                            <line x1="130" y1="60" x2="210" y2="30" stroke="#8c7a5b" stroke-width="1.5" stroke-dasharray="2,2"/>
-                            <line x1="130" y1="60" x2="54" y2="94" stroke="#8c7a5b" stroke-width="1.5" stroke-dasharray="2,2"/>
-                            <line x1="130" y1="60" x2="206" y2="92" stroke="#8c7a5b" stroke-width="1.5" stroke-dasharray="2,2"/>
-                            <rect x="116" y="45" width="28" height="30" fill="#141819" stroke="#d99b43" stroke-width="1.5"/>
-                            <text x="130" y="65" text-anchor="middle" fill="#fbbf24" font-size="14">ᛝ</text>
-                            <circle cx="48" cy="28" r="5" fill="#991b1b"/><text x="48" y="18" text-anchor="middle" fill="#f87171" font-size="6.5">NEAR COLLAPSE</text>
-                            <circle cx="210" cy="30" r="5" fill="#576838"/><text x="210" y="20" text-anchor="middle" fill="#a3e635" font-size="6.5">PROSPEROUS</text>
-                            <circle cx="54" cy="94" r="5" fill="#b45309"/><text x="54" y="108" text-anchor="middle" fill="#fbbf24" font-size="6.5">NODE_07 // SKIPPED</text>
-                            <circle cx="206" cy="92" r="5" fill="#991b1b"/><text x="206" y="106" text-anchor="middle" fill="#f87171" font-size="6.5">ALERT</text>
+                        <div>
+                            <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold; margin-bottom:6px;">[19-HOUSE TABLE]</div>
+                            ${rowsHtml}
+                        </div>
+                        <div class="burden-parchment-card" style="padding:6px 8px; margin-top:6px;">
+                            <div style="font-family:'Cinzel',serif; font-weight:900; font-size:10px; border-bottom:1px solid #4a3e2e; margin-bottom:4px; color:#5e110b;">
+                                🎯 SELECTED NODE: ${selNode.name.toUpperCase()} (${selNode.house})
+                            </div>
+                            <div style="font-size:8.5px; color:#1c1610; margin-bottom:5px;">
+                                <b>Power:</b> ${selHouse.power}/100 [${selHouse.status}] | <b>Fuel:</b> ${selNode.barrierFuel}u | <b>50-Ton Chains:</b> ${selNode.chainsIntegrity}%
+                            </div>
+                            <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.openTacticalEncounter(${selNode.id})">${isSov ? '🐺 Hunt &amp; Devour Parish' : '⚔️ Tactical Encounter'}</button>
+                                ${isSov
+                                    ? `<button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('SUMMON_HUNTSMAN','${selNode.name}')">🧭 Stalk Node</button>`
+                                    : `
+                                        <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('GUARDED_CARAVAN','${selNode.name}')">🛡️ Caravan</button>
+                                        <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('PATROL_MIST','${selNode.name}')">🧭 Patrol</button>
+                                        <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('PROXY_RAID','${selNode.name}')">🗡️ Proxy Raid</button>
+                                    `
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div style="border:1px solid #383e40; background:rgba(9,13,14,0.85); padding:8px; display:flex; flex-direction:column; justify-content:space-between;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold;">TELEMETRY GRID // 20 CHAINED SETTLEMENTS (CLICK NODE TO TARGET)</div>
+                            <span style="font-size:8px; color:#38bdf8;">[${this.mapViewMode}]</span>
+                        </div>
+                        <svg viewBox="0 0 280 128" style="width:100%; height:132px; display:block; margin:2px auto; background:radial-gradient(circle at 50% 50%, rgba(14,116,144,0.16) 0%, rgba(7,10,11,0.95) 85%); border:1px solid #2b3234;">
+                            <ellipse cx="140" cy="64" rx="112" ry="48" fill="none" stroke="#4a453b" stroke-width="1" stroke-dasharray="3,2"/>
+                            <ellipse cx="140" cy="64" rx="76" ry="32" fill="none" stroke="#334155" stroke-width="0.8" stroke-dasharray="2,2"/>
+                            ${svgNodes}
                         </svg>
                         <div class="burden-parchment-card" style="padding:5px 7px;">
                             <div style="font-family:'Cinzel',serif; font-weight:900; font-size:9.5px; border-bottom:1px solid #4a3e2e; margin-bottom:2px;">[CAUSAL AUDIT TRAIL]</div>
@@ -672,10 +908,7 @@ export const CommanderUI = {
                         </div>
                     </div>
                 </div>
-                <button type="button" class="riveted-commit-plate" onclick="document.getElementById('brutalist-subpage-deck').style.display='none';">
-                    <span class="plate-rune">ᛝ</span>
-                    <span>[CALCULATE PROBABILITY &amp; COMMENCE COMMAND]</span>
-                </button>
+                ${encounterOverlayHtml}
             `;
         }
     },
