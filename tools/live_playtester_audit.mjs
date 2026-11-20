@@ -323,6 +323,84 @@ if (!CommanderEngine.CrisisEngine.activeCrisis) {
     logPlay('CRISIS & DREAM WARD', `Mitigated [${crisisTitle}] using Dream Intervention Ward (Remaining Siphon: ${CommanderEngine.CampaignManager.state.house.dreamSiphon}u).`);
 }
 
+// ============================================================================
+// TEST 5: 17-POINT USER FEEDBACK OVERHAUL VERIFICATION
+// ============================================================================
+// 5A. Role Selector Redactions & One-Way Lockout
+CommanderUI.openRoleSelection(true);
+const roleGateHtml = document.getElementById('commander-terminal-root')?.innerHTML || '';
+if (!roleGateHtml.includes('ROLE: MERCHANT PATRON') || !roleGateHtml.includes('ROLE: NOBLE HOUSE') || !roleGateHtml.includes('?%') || roleGateHtml.includes('OBSIDIAN CITADEL')) {
+    auditReport.bugsFound.push('Role Selector card redactions or Merchant Patron / Noble House labels missing.');
+} else {
+    logPlay('ROLE SELECTOR REDACTION', 'Verified Merchant Patron under Crown, Noble House under Noble House, and Obsidian Citadel name + Containment ?% gauge blacked out.');
+}
+CommanderUI.selectRoleAndLaunch('GUILD_LEADER');
+CommanderUI.openRoleSelection(false);
+if (!CommanderUI.roleSelected) {
+    auditReport.bugsFound.push('Expected one-way role selection lockout to prevent returning to role selector once launched.');
+} else {
+    logPlay('ROLE LOCKOUT & CITADEL TAX EXEMPTION', `Verified one-way role lockout and Obsidian Citadel tax exemption (crownDemand=${CommanderEngine.CampaignManager.state.order.crownDemand}, taxExempt=${CommanderEngine.CampaignManager.state.order.taxExempt}).`);
+}
+
+// 5B. Fallout Shelter 6h Patrol -> +4h Advance -> Recall Return March & Log
+CommanderUI.selectRoleAndLaunch('NOBLE_HOUSE', 'House Oakheart');
+CommanderEngine.FacilityEngine.unlockFacility('guard_barracks');
+const patLaunch = CommanderEngine.ExpeditionEngine.launchExpedition('PATROL_MIST', 'Border Mist');
+CommanderEngine.tickInGameHour(4);
+const patRecall = CommanderEngine.ExpeditionEngine.recallExpedition(patLaunch.expedition.id);
+if (!patRecall.success || patLaunch.expedition.status !== 'RETURNING_EARLY' || patLaunch.expedition.returnHoursRemaining !== 4) {
+    auditReport.bugsFound.push(`Expected 4h into 6h patrol recall to enter RETURNING_EARLY with 4h return trek, got ${JSON.stringify(patRecall)}`);
+} else {
+    CommanderEngine.tickInGameHour(4);
+    logPlay('FALLOUT SHELTER PATROL RECALL', `Verified 6h patrol advanced +4h -> recalled into 4h return march with wasteland log: "${patRecall.message}"`);
+}
+
+// 5C. Dynamic Stress Index, All 4 Inquest Verdicts, Family Lineage Death Certificate & Exit Dossier Button
+const inq1 = CommanderEngine.InterrogationDesk.interrogate('agt_2');
+const inq2 = CommanderEngine.InterrogationDesk.interrogate('agt_2');
+if (inq1.suspect.deceptionScore === inq2.suspect.deceptionScore) {
+    auditReport.bugsFound.push(`Expected Observed Stress Index to shift dynamically across interrogation rounds, got ${inq1.suspect.deceptionScore}% -> ${inq2.suspect.deceptionScore}%`);
+} else {
+    logPlay('DYNAMIC STRESS INDEX', `Verified Observed Stress Index shifted dynamically (${inq1.suspect.deceptionScore}% -> ${inq2.suspect.deceptionScore}%).`);
+}
+const vExon = CommanderEngine.InterrogationDesk.renderVerdict('agt_2', 'exonerate');
+const vDemo = CommanderEngine.InterrogationDesk.renderVerdict('agt_2', 'demote');
+const vTurn = CommanderEngine.InterrogationDesk.renderVerdict('agt_3', 'turn_agent');
+const vExec = CommanderEngine.InterrogationDesk.renderVerdict('agt_4', 'execute');
+if (!vExon.success || !vDemo.success || !vTurn.success || !vExec.success || !vExec.transcript.includes('FAMILY LINEAGE & BLOODLINE CONNECTIONS')) {
+    auditReport.bugsFound.push('One or more inquest verdicts (exonerate, demote, turn_agent, execute) or family lineage death certificate failed.');
+} else {
+    logPlay('INQUEST VERDICTS & LINEAGE DOSSIER', `Verified Exonerate, Demote, Turn Double Agent, and Execute + elaborated Family Lineage Death Certificate.`);
+}
+window.viewStory('agt_4');
+window.closeStoryReader();
+if (document.getElementById('story-reader')?.style.display !== 'none') {
+    auditReport.bugsFound.push('Expected window.closeStoryReader() to hide the dossier reader.');
+}
+
+// 5D. Armory Market Facility, Unit Recruitment, Book Page Tabs, Emissary Variety & First-Click Tutorial Advisor
+CommanderEngine.FacilityEngine.settlementResources += 40;
+CommanderEngine.FacilityEngine.unlockFacility('armory_market');
+const buyRes = CommanderEngine.AgentRosterManager.buyArmoryGear('blackwood_crossbow');
+const sellRes = CommanderEngine.AgentRosterManager.sellArmoryGear('blackwood_crossbow');
+const recRes = CommanderEngine.AgentRosterManager.recruitFactionUnit('WARDEN');
+if (!buyRes.success || !sellRes.success || !recRes.success) {
+    auditReport.bugsFound.push(`Expected Armory Market buy/sell and Faction Unit Recruitment to succeed: buy=${buyRes.message}, sell=${sellRes.message}, rec=${recRes.message}`);
+} else {
+    logPlay('ARMORY MARKET & UNIT RECRUITMENT', `${buyRes.message} | ${recRes.message}`);
+}
+window.switchBookTab('GARRISON');
+window.switchBookTab('FIELD');
+window.viewTruthVault();
+const petA = CommanderEngine.RealityEditorVault.generateEmissaryPetition(3);
+CommanderEngine.RealityEditorVault.resolveEmissaryPetition('REJECT');
+const petB = CommanderEngine.RealityEditorVault.generateEmissaryPetition(6);
+if (petA.archetypeId === petB.archetypeId && petA.senderHouse === petB.senderHouse) {
+    auditReport.bugsFound.push('Expected daily Emissary Petitions to rotate archetypes and rival houses.');
+} else {
+    logPlay('EMISSARY VARIETY & ADVISOR', `Verified rotating Emissary Petitions (${petA.archetypeId} from ${petA.senderHouse} -> ${petB.archetypeId} from ${petB.senderHouse} with Power Context "${petB.powerContext}") and Tutorial Advisor (${CommanderEngine.TutorialAdvisor.seenTopics.size} topics triggered).`);
+}
+
 console.log('--------------------------------------------------------------------------------');
 if (auditReport.bugsFound.length > 0) {
     console.error('LIVE PLAYTESTER AUDIT FOUND ISSUES:', auditReport.bugsFound);

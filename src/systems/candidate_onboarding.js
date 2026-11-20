@@ -102,12 +102,9 @@ export const CandidateOnboarding = {
         const btnStyle = (id) => `background:#171a1b; border:1px solid ${b === id ? '#fbbf24' : '#4a453b'}; color:#e2d1b0; padding:5px; cursor:pointer; font-size:9px; text-align:left;`;
         container.innerHTML = `
             <div class="brutalist-runic-frame">
-                <div class="brutalist-rune-border-left">ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊ</div>
-                <div class="brutalist-rune-border-right">ᛟᛞᛜᛚᛗᛖᛒᛏᛊᛉᛈᛇᛃᛁᚾᚺ</div>
-
                 <div class="brutalist-top-crest">
                     <div class="brutalist-crest-title">CANDIDATE: ${this.state.name.toUpperCase()}</div>
-                    <div class="brutalist-crest-medallion"><span>ᛝ</span></div>
+                    <div class="brutalist-crest-medallion"><span>◆</span></div>
                     <div class="brutalist-crest-right">BIRTHRIGHT: ${b.replace(/_/g, ' ')}</div>
                 </div>
 
@@ -179,12 +176,9 @@ export const CandidateOnboarding = {
 
         container.innerHTML = `
             <div class="brutalist-runic-frame">
-                <div class="brutalist-rune-border-left">ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊ</div>
-                <div class="brutalist-rune-border-right">ᛟᛞᛜᛚᛗᛖᛒᛏᛊᛉᛈᛇᛃᛁᚾᚺ</div>
-
                 <div class="brutalist-top-crest">
                     <div class="brutalist-crest-title">CANDIDATE: ${this.state.name.toUpperCase()}</div>
-                    <div class="brutalist-crest-medallion"><span>ᛝ</span></div>
+                    <div class="brutalist-crest-medallion"><span>◆</span></div>
                     <div class="brutalist-crest-right">BIRTHRIGHT: ${b.replace(/_/g, ' ')}</div>
                 </div>
 
@@ -242,12 +236,9 @@ export const CandidateOnboarding = {
 
         container.innerHTML = `
             <div class="brutalist-runic-frame">
-                <div class="brutalist-rune-border-left">ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊ</div>
-                <div class="brutalist-rune-border-right">ᛟᛞᛜᛚᛗᛖᛒᛏᛊᛉᛈᛇᛃᛁᚾᚺ</div>
-
                 <div class="brutalist-top-crest">
                     <div class="brutalist-crest-title">CANDIDATE: ${this.state.name.toUpperCase()}</div>
-                    <div class="brutalist-crest-medallion"><span>ᛝ</span></div>
+                    <div class="brutalist-crest-medallion"><span>◆</span></div>
                     <div class="brutalist-crest-right">BIRTHRIGHT: ${b.replace(/_/g, ' ')}</div>
                 </div>
 
@@ -299,12 +290,9 @@ export const CandidateOnboarding = {
 
         container.innerHTML = `
             <div class="brutalist-runic-frame">
-                <div class="brutalist-rune-border-left">ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊ</div>
-                <div class="brutalist-rune-border-right">ᛟᛞᛜᛚᛗᛖᛒᛏᛊᛉᛈᛇᛃᛁᚾᚺ</div>
-
                 <div class="brutalist-top-crest">
                     <div class="brutalist-crest-title">CANDIDATE: ${this.state.name.toUpperCase()}</div>
-                    <div class="brutalist-crest-medallion"><span>ᛝ</span></div>
+                    <div class="brutalist-crest-medallion"><span>◆</span></div>
                     <div class="brutalist-crest-right">BIRTHRIGHT: ${b.replace(/_/g, ' ')}</div>
                 </div>
 

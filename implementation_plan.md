@@ -1,33 +1,55 @@
-# Implementation Plan: Playable Slow-Burn Pale Sovereign & Progressive Growth-Point UI Unfolding
+# Implementation Plan: Full Playtester Audit & 17-Point General Ledger Overhaul
 
 ## 1. Objective & Design Mandate
-1. **Playable Pale Sovereign Slow-Burn Escalation Loop (`SOVEREIGN` / `PALE_SOVEREIGN`):**
-   - Make **The Pale Sovereign** immediately playable from the Layer 2 Civilizational Duty Roster (`CommanderUI.renderRoleSelection`).
-   - Implement a **4-Stage Historical Weight / Significance Escalation Ladder** for the Pale Sovereign:
-     - **Stage 0 — Frost-Bound Dormancy (`0–299` Historical Weight / Significance):** Korvan broods in deep bedrock. Only `[Brood in Frost (+25y / +80 Weight)]` and `[Dispatch Bound Huntsman (Stalk Lowlands)]` are available.
-     - **Stage 1 — The Macabre Communion (`300–999` Weight):** Unlocks `[Macabre Communion (Mutate Herald Wendigo)]` to turn captured commanders into sentient Herald lieutenants (`heraldsMutated: 0 -> 5`) and unlocks the `[Field & Pack Logs]` panel.
-     - **Stage 2 — The Predator Tide (`1,000–2,499` Weight & $\ge 2$ Heralds):** Unlocks `[Unleash Herald Pack Raid (Ravage Chained Settlement)]` and unlocks the `[19-House War Board]` & `[Politics & Devastation]` panel, allowing the Sovereign to shatter Noble House power by `-18` per raid.
-     - **Stage 3 — The Void Emperor Apocalypse ($\ge 2,500$ Weight, $\ge 1,000$ Years Endured, & $5/5$ Heralds):** Unlocks `[Shatter Bedrock Chains (True Pale Sovereign Ascension)]` and `[Apocalyptic Harvest (Consume Chained Settlement)]`, violently collapsing settlement chains and harvesting massive historical mass.
+Address every playtester issue audited across the General Ledger UI (`src/systems/commander_ui.js`, `ledger-mobile/src/systems/commander_ui.js`, `ledger-mobile/index.html`, `ledger-mobile/theme.css`) and Headless Simulation Engine (`src/core/commander_engine.js`, `ledger-mobile/src/core/commander_engine.js`, `src/systems/candidate_onboarding.js`).
 
-2. **Progressive UI Unfolding Behind Growth Points (Facility Upgrades & Historical Weight):**
-   - Stop dumping all 3 directive modules, all 5 top page tabs, and all lower panels onto a brand-new Turn 1 player.
-   - Compute **`getGrowthTier()`** dynamically:
-     - For **Civilization Roles (`NOBLE_HOUSE`, `TERMINUS`, `GUILD`, `MERCHANT`, `SYNDICATE`):** Growth Tier = Number of constructed/upgraded Facilities beyond Base Start (`Tier 0` at start $\rightarrow$ `Tier 1` with 1 facility unlocked $\rightarrow$ `Tier 2` with 2+ facilities $\rightarrow$ `Tier 3` with War Table / 3+ facilities).
-     - For **The Pale Sovereign (`SOVEREIGN`):** Growth Tier = Historical Weight / Significance Stage (`Stage 0` at `<300` Weight $\rightarrow$ `Stage 1` at `300+` Weight $\rightarrow$ `Stage 2` at `1,000+` Weight $\rightarrow$ `Stage 3` at `2,500+` Weight).
-   - **UI Gating by Growth Tier:**
-     - **Tier 0 (Minimalist Start — *A Dark Room* Style):**
-       - Shows ONLY the primary `[BASE & SURVIVAL]` module (or `[FROST-LAIR DORMANCY]` for Sovereign), the basic `CLOCK / +1 DAY` controls, and the `Garrison / Pack Roster`.
-       - Hides `PAGE 4: TRUTH & RELIC VAULT`, `PAGE 5: WAR BOARD`, `[FIELD & LOGISTICS]`, `[POLITICS & TITHE]`, `DREAM WARD`, `+1D SKIP`, and `NECROLOGY ARCHIVE` behind a clean **`[🔒 GROWTH GATE: Construct 1 Base Facility (or Harvest 300 Historical Weight) to Unfold Field Operations & Truth Vault]`** indicator.
-     - **Tier 1 (First Growth Point Reached):**
-       - Unfolds `[FIELD & LOGISTICS]`, `PAGE 4: TRUTH & RELIC VAULT`, and `FIELD EXPEDITIONS & CARAVAN LOGS`.
-     - **Tier 2+ (Mid/Late Game Escalation):**
-       - Unfolds `[POLITICS & TITHE]`, `PAGE 5: WAR BOARD & TELEMETRY`, `🌙 DREAM WARD`, `+1D SKIP`, and full apocalyptic/feudal warfare controls.
+## 2. Phase-by-Phase Technical Specification
 
-## 2. Affected Files
-- `src/core/commander_engine.js` & `ledger-mobile/src/core/commander_engine.js`
-- `src/systems/commander_ui.js` & `ledger-mobile/src/systems/commander_ui.js`
-- `tools/test_commander_logic.mjs`
-- `memory-bank/activeContext.md` & `memory-bank/progress.md`
+### Phase 1: Role Selector Redactions, Role Lockout & Stat Sheet Runic Cleanup
+1. **Role Selector Title Card Redactions & Role Titles:**
+   - **Under The Crown (`MERCHANT_PATRON`):** Role title clearly labeled **`THE CROWN (MERCHANT PATRON)`**.
+   - **Under Noble House (`NOBLE_HOUSE`):** Role title clearly labeled **`NOBLE HOUSE`**.
+   - **Obsidian Citadel (`GUILD_LEADER`) Card Redaction:** Black out the group name (`<span class="redaction-bar">████████████████</span>`), black out the Containment gauge (`#090705` blacked-out gauge), and display **`?%`** for the percentage.
+2. **One-Way Role Selection Lockout:**
+   - Once a role is selected (`selectRoleAndLaunch`), remove/hide all options to return to the Role Selector (`btn-nav-role-scroll` in `ledger-mobile/index.html`, `🚪 Role Roster`, `PAGE 1`, and `PAGE 2` buttons in `CommanderUI`).
+3. **Stat Sheet Fluff Runic Lettering Removal:**
+   - Remove decorative Futhark runic borders/lettering from character stat sheets and clean up any encoding artifacts in `formatAgentStatSheet`.
+4. **Dynamic Procedural Courier Dispatches:**
+   - Upgrade `LogDispatchManager.generateDailyDispatches()` with dynamic, state-reactive dispatches driven by active expeditions, agent drills, market trades, and war board shifts.
+
+### Phase 2: Fallout Shelter–Style Patrol Recall, Dynamic Stress Index, Death Certificate Lineage & Verdicts
+1. **Fallout Shelter–Style Expedition Return March:**
+   - Refactor `ExpeditionEngine.recallExpedition(expId)` so recalling a squad after $N$ hours logs an immediate turnaround & waste-land encounter/salvage entry in `exp.logs` and transitions the squad to `status = 'RETURNING_EARLY'` with `returnHoursRemaining = Math.max(1, exp.hoursElapsed)` (marching back over the elapsed hours like Fallout Shelter, while crediting salvaged cargo and logging the full return trail).
+2. **Dynamic Observed Stress Index:**
+   - Dynamically compute `deceptionScore` in `InterrogationDesk.interrogate(targetId)` from live agent `shock`, `poise`, `hunger`, settlement `unrest`, `volatilityIndex`, and interrogation pressure increments.
+3. **Elaborated Family Lineage & Connections on Death Certificate Dossier:**
+   - Generate a rich, cohesive family tree & bloodline network (Parents of the same House/Parish, Spouse/Betrothed, Siblings, Children/Heirs, and Sworn Shield-Companion from the active Garrison roster) under `─── 🌳 FAMILY LINEAGE & BLOODLINE CONNECTIONS ───`.
+4. **Inquest Verdicts (`Exonerate`, `Demote`, `Execute`, `Turn Double Agent`) & Mobile Exit Button:**
+   - Fix `InterrogationDesk.renderVerdict(targetId, verdictType)` so all 4 verdicts reliably update agent state/loyalty/rank/death/double-agent status, display the signed verdict transcript in the reader, and add a dedicated **`[✖ EXIT DOSSIER / CLOSE READER]`** button (`window.closeStoryReader()`).
+
+### Phase 3: Obsidian Citadel Tax Exemption, Triage Missive Consequences, Emissary Variety & Power Rating Context
+1. **Obsidian Citadel (`GUILD_LEADER` / `ORDER`) Crown Tax Exemption:**
+   - Set `crownDemand: 0`, `taxExempt: true` for Obsidian Citadel (`ORDER` / `GUILD`), ensuring zero Crown tax/tithe obligations.
+2. **Triage Missives & Anti-Crown Consequence Parity:**
+   - Ensure anti-Crown options in Triage Missives and directives declare and inflict explicit penalties (`-15% Crown Favor`, `+12% Crown Scrutiny`, `-5u Royal Assessor Supply Seizure`, and Inquisitorial Retaliation raids at high Scrutiny).
+3. **Dynamic Daily Emissary Variety & Power Rating Context:**
+   - Overhaul `RealityEditorVault.generateEmissaryPetition(day)` with 6+ distinct emissary archetypes rotating across all competing Houses, and add explicit **Power Rating Context** (`Power: 66/100 [Rank #8/19 — Military & Monopoly Leverage Index]`).
+
+### Phase 4: Armory & Weapon Market Facility, Faction Unit Recruitment & Book-Page Tabbed UI Architecture
+1. **Gear & Weapon Trading/Buying Market Facility (`armory_market`):**
+   - Add upgradable `armory_market` (*⚔️ Armory & Weaponry Exchange Market*) to `FacilityEngine.facilities` unlocking `buyArmoryGear(itemId)` and `sellArmoryGear(itemId)`.
+2. **Clear Faction Unit Generation & Recruitment System:**
+   - Add `recruitFactionUnit(archetype)` to `AgentRosterManager` and a dedicated recruitment panel in the Garrison tab.
+3. **Book-Page Tabbed Main Gameplay UI & Functional Truth / Relic Vault Buttons:**
+   - Organize the main gameplay UI into a clean **5-Tab Royal Ledger Book** with book-page tabs (`📖 Page I: Command & Triage`, `🛡️ Page II: Garrison, Recruitment & Armory Market`, `🧭 Page III: Field Expeditions & Courier Dispatches`, `📜 Page IV: Truth & Relic Vault`, `🏰 Page V: 19-House War Board & Telemetry`).
+   - Ensure Truth & Relic Vault buttons always open Page IV and display interactive Fact/Relic dossiers immediately.
+
+### Phase 5: Time Clock & Dream World Skip Audit + First-Click Tutorial Advisor System
+1. **Time Clock (`+1 DAY`) vs. Dream World (`🌙 DREAM WARD` / `+1D CHRONO-SKIP`) Audit:**
+   - Clearly differentiate and label interactive `+1 DAY (END TURN)` vs. `🌙 DREAM WARD (-10u Siphon)` vs. `⏭️ +1D DREAM CHRONO-SKIP (Unattended Auto-Resolve)`.
+2. **Interactive First-Click Tutorial Advisor (`TutorialAdvisor`):**
+   - Pop up an on-screen **Royal Archive Advisor** on the first click of each interface button/tab explaining its systems, and automatically trigger an **Emissary Arrival Walkthrough** on the first emissary explaining pros, cons, and hidden cascading consequences.
+
 
 
 
