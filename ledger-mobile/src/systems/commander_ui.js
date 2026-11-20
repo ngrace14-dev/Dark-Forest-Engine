@@ -1179,6 +1179,14 @@ export const CommanderUI = {
                 <div id="commander-action-banner" style="display:none; background:#1c1610; border-left:3px solid #fbbf24; color:#fde68a; padding:4px 8px; margin-bottom:6px; font-size:10px;"></div>
                 <div id="daily-goal-bar" class="ledger-btn-row" style="margin-bottom:6px;"></div>
 
+                <!-- PROMINENT QUICK-JUMP LAUNCHER BAR FOR NEW SYSTEMS (RUNIC BODY-CARVING, DOMINION MAP & SEAL FORGE) -->
+                <div id="quick-access-feature-bar" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; background:linear-gradient(90deg, rgba(46,16,101,0.55) 0%, rgba(15,23,42,0.85) 50%, rgba(20,83,45,0.45) 100%); border:1.5px solid #a855f7; border-radius:4px; padding:5px 8px; margin-bottom:7px;">
+                    <span style="font-family:'Cinzel',serif; font-size:9.5px; font-weight:900; color:#e9d5ff; letter-spacing:0.05em;">⚡ ROYAL AUDITOR DIRECT ACCESS:</span>
+                    <button class="cmd-btn" style="background:#2e1065; border-color:#c084fc; color:#f3e8ff; font-weight:bold; padding:3px 8px; font-size:9.5px;" onclick="window.switchBookTab('GARRISON')">🪡🛡️ 8-Tier Runic Body-Carving, Stat Training &amp; Armory (Tab II)</button>
+                    <button class="cmd-btn" style="background:#0c4a6e; border-color:#38bdf8; color:#e0f2fe; font-weight:bold; padding:3px 8px; font-size:9.5px;" onclick="window.viewWarBoard()">🗺️🌫️ 20-Settlement Dominion Map, Fog of War &amp; Combat Arena (Tab V)</button>
+                    <button class="cmd-btn" style="background:#3b2410; border-color:#f59e0b; color:#fde68a; font-weight:bold; padding:3px 8px; font-size:9.5px;" onclick="window.viewFacilities()">🏗️ Base Facilities &amp; Runic Scriptorium</button>
+                </div>
+
                 <!-- BOOK PAGE IV & V: TRUTH VAULT / WAR BOARD VISUAL DECK -->
                 <div id="brutalist-subpage-deck" style="display:none; margin-bottom:10px;"></div>
 
@@ -1409,7 +1417,7 @@ export const CommanderUI = {
         setDisp('btn-nav-role-scroll', showPreRunNav);
         setDisp('btn-commit-hub-run', showPreRunNav, 'flex');
         setDisp('nav-tab-page4', growth.tier >= 1);
-        setDisp('nav-tab-page5', growth.tier >= 2);
+        setDisp('nav-tab-page5', growth.tier >= 1);
         setDisp('btn-dream-ward', growth.tier >= 1);
         setDisp('btn-chrono-skip', growth.tier >= 1);
         setDisp('module-wrap-expeditions', true, 'block');
@@ -1436,10 +1444,10 @@ export const CommanderUI = {
 
         const tabLabels = {
             'book-tab-command': `📖 TAB I: COMMAND & TRIAGE${cmdAlertBadge}`,
-            'book-tab-garrison': `🛡️ TAB II: GARRISON & MARKET (${livingUnitsCount} Units | ${armoryCount} Gear)`,
-            'book-tab-field': `🧭 TAB III: EXPEDITIONS & LOGS (${activeExpCount} Active)`,
+            'book-tab-garrison': `🛡️🪡 TAB II: GARRISON, RUNIC CARVING & MARKET (${livingUnitsCount} Units | ${armoryCount} Gear)`,
+            'book-tab-field': `🧭 TAB III: EXPEDITIONS & COMBAT LOGS (${activeExpCount} Active)`,
             'nav-tab-page4': `📜 TAB IV: TRUTH & RELIC VAULT (${factDossierCount} Dossiers)`,
-            'nav-tab-page5': `🏰 TAB V: WAR BOARD & TELEMETRY (${hostileHouseCount} Hostile)`
+            'nav-tab-page5': `🗺️🏰 TAB V: DOMINION MAP, FOG OF WAR & WAR BOARD (${hostileHouseCount} Hostile)`
         };
 
         [
@@ -1718,51 +1726,60 @@ export const CommanderUI = {
 
             const nextGearId = armoryStock[0] || 'ironwood_spear';
             const tierCatalog = CommanderEngine.AgentRosterManager.RUNIC_CARVING_TIERS || {};
-            rosterDiv.innerHTML = recruitHtml + carvingFacilityBanner + marketHtml + armoryHtml + (agents.map(a => {
-                const eq = a.equipment || {};
-                const gearSummary = [eq.weapon?.name, eq.armor?.name, eq.trinket?.name].filter(Boolean).join(', ') || 'Standard Issue';
-                const cStage = a.cultivation?.stage || 0;
-                const nextTier = Math.min(8, cStage + 1);
-                const tCfg = tierCatalog[nextTier] || { fuelCost: 10, resCost: 12, sealCost: 0, tool: 'Bone Needles' };
-                const totalLife = (a.cultivation?.naturalLifespanYears || 311) + (a.cultivation?.bonusLifespanYears || 0);
-                const activeDrill = a.operatingStance?.mode === 'TRAIN' ? a.operatingStance.discipline : '';
-                const sealBadge = tCfg.sealCost > 0 ? `, ${tCfg.sealCost}💎` : '';
-                const carveBtnLabel = cStage >= 8
-                    ? `🪡 Tier VIII/8 Max (48/48 Runes)`
-                    : `🪡 Carve Tier ${nextTier}/8 (${nextTier * 6}/48 Runes | -${nextTier <= 3 ? 10 : tCfg.fuelCost}u, -${tCfg.resCost}r${sealBadge})`;
-
-                const trainStats = [
-                    ['STRENGTH', 'STR', a.skills.strength],
-                    ['TOUGHNESS', 'TGH', a.skills.toughness],
-                    ['MELEE_ATT', 'ATT', a.skills.meleeAtt],
-                    ['MELEE_DEF', 'DEF', a.skills.meleeDef],
-                    ['ATHLETICS', 'ATH', a.skills.athletics],
-                    ['DODGE', 'DDG', a.skills.dodge],
-                    ['STEALTH', 'STL', a.skills.stealth],
-                    ['LORE', 'LOR', a.skills.lore],
-                    ['SURVIVAL', 'SRV', a.skills.survival]
-                ];
-                const trainBtnsHtml = trainStats.map(([key, short, val]) => {
-                    const isDrilling = activeDrill === key || (activeDrill === 'MARTIAL' && key === 'MELEE_ATT') || (activeDrill === 'LOGISTICS' && key === 'LORE');
-                    const hiStyle = isDrilling ? 'background:#14532d; border-color:#22c55e; color:#dcfce7;' : '';
-                    return `<button class="cmd-btn" style="padding:1px 4px; font-size:8.5px; ${hiStyle}" onclick="window.trainAgentStat('${a.id}','${key}')">🏋️ ${short}:${Number(val).toFixed(1)}</button>`;
-                }).join('');
-
-                return `
-                <div style="padding: 6px 0; border-bottom: 1px dashed #7c664d;">
-                    <b style="color:#5e110b;">${a.name}</b> <span style="font-size:10px; color:#0e7490; font-weight:bold;">${a.cultivation?.isCultivatedGuardian ? `★ TIER ${cStage} ASCENDANT` : `(Tier ${cStage}/8)`}</span>
-                    <span style="color:#463523; font-weight:bold;">(${a.career?.rank || 'Novice'} ${a.career?.id})</span>
-                    <div style="font-size:9.5px; color:#1f160e; font-family:'Share Tech Mono',monospace;">HP: ${a.vitals.hp}/${a.vitals.maxHp} | Poise: ${Math.round(a.vitals.poise)} | Runes: ${a.cultivation?.inscriptionsCount || 0}/48 | Purity: ${a.cultivation?.foundationPurity ?? 100}% | Potential: ${a.cultivation?.potentialRemaining ?? 100}% | Lifespan: ${totalLife}y</div>
-                    <div style="font-size:9.5px; color:#3f2e1e;">🗡️ Gear: [${gearSummary}] | Birthright: [${a.birthright?.title || 'None'}] ${activeDrill ? `| <b style="color:#15803d;">[TRAINING: ${activeDrill}]</b>` : ''}</div>
-                    <div style="margin-top:3px; display:flex; flex-wrap:wrap; gap:2px;">${trainBtnsHtml}</div>
-                    <div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:3px;">
-                        <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.viewAgentStatSheet('${a.id}')">📋 Sheet</button>
-                        <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.equipAgentGear('${a.id}','${nextGearId}')">🗡️ Equip</button>
-                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px; border-color:#a855f7; background:#2e1065; color:#f3e8ff;" onclick="window.carveAgentRunes('${a.id}')">${carveBtnLabel}</button>
-                        <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.interrogateSuspect('${a.id}')">⚖️ Inquest</button>
+            const agentsHtml = `
+                <div style="background:rgba(46,16,101,0.12); border:1.5px solid #a855f7; padding:6px 8px; margin-bottom:8px;">
+                    <div style="font-family:'Cinzel',serif; font-weight:900; font-size:10.5px; color:#581c87; border-bottom:1px solid #a855f7; padding-bottom:3px; margin-bottom:4px;">
+                        🪡🛡️ ACTIVE GARRISON ROSTER — 8-TIER RUNIC BODY-CARVING (CA-13) &amp; 9-STAT DRILLS
                     </div>
+                    ${agents.map(a => {
+                        const eq = a.equipment || {};
+                        const gearSummary = [eq.weapon?.name, eq.armor?.name, eq.trinket?.name].filter(Boolean).join(', ') || 'Standard Issue';
+                        const cStage = a.cultivation?.stage || 0;
+                        const nextTier = Math.min(8, cStage + 1);
+                        const tCfg = tierCatalog[nextTier] || { fuelCost: 10, resCost: 12, sealCost: 0, tool: 'Bone Needles' };
+                        const totalLife = (a.cultivation?.naturalLifespanYears || 311) + (a.cultivation?.bonusLifespanYears || 0);
+                        const activeDrill = a.operatingStance?.mode === 'TRAIN' ? a.operatingStance.discipline : '';
+                        const sealBadge = tCfg.sealCost > 0 ? `, ${tCfg.sealCost}💎` : '';
+                        const carveBtnLabel = cStage >= 8
+                            ? `🪡 Tier VIII/8 Max (48/48 Runes)`
+                            : `🪡 Carve Tier ${nextTier}/8 (${nextTier * 6}/48 Runes | -${nextTier <= 3 ? 10 : tCfg.fuelCost}u, -${tCfg.resCost}r${sealBadge})`;
+
+                        const trainStats = [
+                            ['STRENGTH', 'STR', a.skills.strength],
+                            ['TOUGHNESS', 'TGH', a.skills.toughness],
+                            ['MELEE_ATT', 'ATT', a.skills.meleeAtt],
+                            ['MELEE_DEF', 'DEF', a.skills.meleeDef],
+                            ['ATHLETICS', 'ATH', a.skills.athletics],
+                            ['DODGE', 'DDG', a.skills.dodge],
+                            ['STEALTH', 'STL', a.skills.stealth],
+                            ['LORE', 'LOR', a.skills.lore],
+                            ['SURVIVAL', 'SRV', a.skills.survival]
+                        ];
+                        const trainBtnsHtml = trainStats.map(([key, short, val]) => {
+                            const isDrilling = activeDrill === key || (activeDrill === 'MARTIAL' && key === 'MELEE_ATT') || (activeDrill === 'LOGISTICS' && key === 'LORE');
+                            const hiStyle = isDrilling ? 'background:#14532d; border-color:#22c55e; color:#dcfce7;' : '';
+                            return `<button class="cmd-btn" style="padding:1px 4px; font-size:8.5px; ${hiStyle}" onclick="window.trainAgentStat('${a.id}','${key}')">🏋️ ${short}:${Number(val).toFixed(1)}</button>`;
+                        }).join('');
+
+                        return `
+                        <div style="padding: 6px 0; border-bottom: 1px dashed #7c664d;">
+                            <b style="color:#5e110b;">${a.name}</b> <span style="font-size:10px; color:#0e7490; font-weight:bold;">${a.cultivation?.isCultivatedGuardian ? `★ TIER ${cStage} ASCENDANT` : `(Tier ${cStage}/8)`}</span>
+                            <span style="color:#463523; font-weight:bold;">(${a.career?.rank || 'Novice'} ${a.career?.id})</span>
+                            <div style="font-size:9.5px; color:#1f160e; font-family:'Share Tech Mono',monospace;">HP: ${a.vitals.hp}/${a.vitals.maxHp} | Poise: ${Math.round(a.vitals.poise)} | Runes: ${a.cultivation?.inscriptionsCount || 0}/48 | Purity: ${a.cultivation?.foundationPurity ?? 100}% | Potential: ${a.cultivation?.potentialRemaining ?? 100}% | Lifespan: ${totalLife}y</div>
+                            <div style="font-size:9.5px; color:#3f2e1e;">🗡️ Gear: [${gearSummary}] | Birthright: [${a.birthright?.title || 'None'}] ${activeDrill ? `| <b style="color:#15803d;">[TRAINING: ${activeDrill}]</b>` : ''}</div>
+                            <div style="margin-top:3px; display:flex; flex-wrap:wrap; gap:2px;">${trainBtnsHtml}</div>
+                            <div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:3px;">
+                                <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px; border-color:#a855f7; background:#2e1065; color:#f3e8ff; font-weight:bold;" onclick="window.carveAgentRunes('${a.id}')">${carveBtnLabel}</button>
+                                <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.viewAgentStatSheet('${a.id}')">📋 Sheet</button>
+                                <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.equipAgentGear('${a.id}','${nextGearId}')">🗡️ Equip</button>
+                                <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.interrogateSuspect('${a.id}')">⚖️ Inquest</button>
+                            </div>
+                        </div>
+                        `;
+                    }).join('') || '<div style="color:#991b1b;">All garrison agents deceased.</div>'}
                 </div>
-            `}).join('') || '<div style="color:#991b1b;">All garrison agents deceased.</div>');
+            `;
+            rosterDiv.innerHTML = carvingFacilityBanner + agentsHtml + recruitHtml + marketHtml + armoryHtml;
         }
 
         const necDiv = document.getElementById('story-archive');

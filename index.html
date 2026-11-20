@@ -273,12 +273,7 @@
         onEngineReady();
     </script>
 
-    <!-- 2. LEGACY 3D ENGINE RELIC VIEWPORT DISABLED BY DEFAULT (Use ?legacy3d=1 to opt-in) -->
-    <script type="module">
-        if (new URLSearchParams(window.location.search).get('legacy3d') === '1') {
-            import('./src/main.js');
-        }
-    </script>
+    <!-- 2. LEGACY 3D ENGINE RELIC VIEWPORT DISABLED (Pure Royal Archive & General Ledger Standalone) -->
 
 </body>
 </html>

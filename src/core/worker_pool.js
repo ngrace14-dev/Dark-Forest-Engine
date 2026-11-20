@@ -17,10 +17,20 @@ class UnifiedWorkerPool {
         this.nextTaskId = 0;
         this.callbacks = new Map();
 
+        // Do not boot legacy 3D terrain workers unless Legacy 3D Sandbox mode is explicitly enabled
+        const isLegacy3DEnabled = typeof window !== 'undefined' && (
+            window.EngineConfig?.enable3D === true ||
+            (typeof URLSearchParams !== 'undefined' && new URLSearchParams(window.location?.search || '').get('legacy3d') === '1')
+        );
+        if (!isLegacy3DEnabled) {
+            return;
+        }
+
         // Boot the workers
         for (let i = 0; i < this.size; i++) {
-            // We use a generic router worker that can handle multiple domain modules
-            const worker = new Worker('./workers/router.js', { type: 'module' });
+            // Resolve router.js relative to this module so it never 404s from root index.html
+            const workerUrl = new URL('../workers/router.js', import.meta.url);
+            const worker = new Worker(workerUrl, { type: 'module' });
             
             worker.onmessage = (e) => {
                 console.log(String.fromCharCode(91,77,97,105,110,93,32,82,101,99,101,105,118,101,100,32,101,46,100,97,116,97), e.data);

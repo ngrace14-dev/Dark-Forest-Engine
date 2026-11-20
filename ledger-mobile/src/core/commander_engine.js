@@ -1592,9 +1592,9 @@ export const RoleStateMachine = rootScope.RoleStateMachine || {
             };
         }
         const fac = rootScope.FacilityEngine?.facilities || {};
-        const unlockedExtra = ['guard_barracks', 'inquest_chamber', 'alchemical_still', 'war_table', 'armory_market'].filter(k => fac[k]?.unlocked).length;
-        const scriptoriumUpgrades = Math.max(0, (fac.scriptorium?.level || 1) - 1);
-        const points = unlockedExtra + scriptoriumUpgrades;
+        const unlockedExtra = ['guard_barracks', 'inquest_chamber', 'alchemical_still', 'war_table', 'armory_market', 'runic_carving_facility', 'crow_loft'].filter(k => fac[k]?.unlocked).length;
+        const levelUpgrades = Object.values(fac).reduce((acc, f) => acc + (f.unlocked ? Math.max(0, (f.level || 1) - 1) : 0), 0);
+        const points = unlockedExtra + levelUpgrades;
 
         if (points >= 3 || fac.war_table?.unlocked) {
             return {
