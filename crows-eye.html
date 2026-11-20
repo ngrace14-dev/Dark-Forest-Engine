@@ -14,8 +14,9 @@
     <div id="commander-terminal-root"></div>
     <script type="module">
         import CommanderUI from './src/systems/commander_ui.js';
+        import { CandidateOnboarding } from './src/systems/candidate_onboarding.js';
         CommanderUI.init('commander-terminal-root');
-        CommanderUI.openRoleSelection();
+        CandidateOnboarding.start(CommanderUI);
     </script>
 </body>
 </html>

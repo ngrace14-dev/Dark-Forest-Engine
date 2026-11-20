@@ -32,9 +32,6 @@
                 <button id="btn-mobile-access-archive" class="monolith-stone-btn">
                     📜 ACCESS ROYAL ARCHIVE
                 </button>
-                <button id="btn-mobile-enter-woods" class="monolith-stone-btn secondary">
-                    ⚔️ ENTER THE WOODS (3D SANDBOX)
-                </button>
                 <button id="btn-title-landscape-fit" class="monolith-stone-btn secondary" style="font-size: 10.5px; padding: 8px 12px;">
                     📱 Landscape Fit: ON (No-Scroll)
                 </button>
@@ -108,10 +105,6 @@ import { CandidateOnboarding } from './src/systems/candidate_onboarding.js';
             titleScreen?.classList.add('hidden');
             viewport?.classList.remove('hidden');
             CandidateOnboarding.start(CommanderUI);
-        });
-
-        woodsBtn?.addEventListener('click', () => {
-            window.location.href = '../index.html';
         });
 
         roleScrollBtn?.addEventListener('click', () => {
