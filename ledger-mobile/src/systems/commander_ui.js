@@ -482,6 +482,16 @@ export const CommanderUI = {
             this.setReaderContent(res.message);
             this.render();
         };
+        window.claimDailyLogin = (force = false) => {
+            const res = CommanderEngine.FacilityEngine.claimDailyLoginFragments(force);
+            this.showBanner(res.message);
+            this.render();
+        };
+        window.mintChronoSeal = (cost = 10) => {
+            const res = CommanderEngine.FacilityEngine.mintChronoSealFromResources(cost);
+            this.showBanner(res.message);
+            this.render();
+        };
         window.interrogateSuspect = (targetId = 'agt_2') => {
             CommanderEngine.TutorialAdvisor?.checkAndTrigger?.('INQUEST_BTN');
             this.renderInquestReader(targetId);
@@ -868,6 +878,8 @@ export const CommanderUI = {
                         <button id="btn-dream-ward" class="cmd-btn" title="Spend 10u Dream Siphon to weave a prescient ward that mitigates the next Crisis catastrophe" onclick="window.triggerDreamIntervention()">🌙 DREAM WARD (-10u)</button>
                         <button id="btn-chrono-skip" class="cmd-btn" title="Premium Full-Day Skip: Spend 6 Royal Chrono-Seals to fast-forward +1 Full Day (24h)" onclick="window.chronoSkip(1)">⏭️ +1D SKIP (6 Seals)</button>
                         <button id="btn-chrono-skip-3d" class="cmd-btn" title="Premium Multi-Day Skip: Spend 18 Royal Chrono-Seals to fast-forward +3 Full Days (72h)" onclick="window.chronoSkip(3)">⏭️ +3D SKIP (18 Seals)</button>
+                        <button id="btn-daily-login-shard" class="cmd-btn" style="border-color:#38bdf8; color:#bae6fd;" title="Daily Log-In Reward: Claim Chrono-Seal Fragments (7 Fragments = 1 Full Royal Chrono-Seal)" onclick="window.claimDailyLogin()">📅 DAILY LOG-IN (0/7💎)</button>
+                        <button id="btn-mint-chrono-seal" class="cmd-btn" style="border-color:#f59e0b; color:#fde68a;" title="Royal Procurement Mint: Exchange 10 Settlement Resources for +1 Royal Chrono-Seal" onclick="window.mintChronoSeal(10)">💎 MINT SEAL (10r)</button>
                         <button class="cmd-btn" onclick="window.toggleHighContrast()">👁️ HIGH-CONTRAST</button>
                         <button id="btn-export-save" class="cmd-btn" onclick="window.exportSave()">EXPORT SAVE</button>
                     </div>
@@ -1024,11 +1036,19 @@ export const CommanderUI = {
         const effHrs = Number((12 / ts).toFixed(2));
         const curHr = String(CommanderEngine.currentHour || 6).padStart(2, '0');
         const sealsLeft = fe?.chronoSeals ?? 0;
+        const shardsLeft = fe?.chronoSealFragments ?? 0;
         if (tickBtn) {
             tickBtn.innerText = this.autoTickEnabled
-                ? `⏱️ DAY TIMER: ${curHr}:00 / 24:00 (${ts}x | 💎 ${sealsLeft} Seals)`
-                : `⏸️ DAY TIMER PAUSED: ${curHr}:00 (${ts}x | 💎 ${sealsLeft} Seals)`;
+                ? `⏱️ DAY TIMER: ${curHr}:00 / 24:00 (${ts}x | 💎 ${sealsLeft} Seals | 🧩 ${shardsLeft}/7 Shards)`
+                : `⏸️ DAY TIMER PAUSED: ${curHr}:00 (${ts}x | 💎 ${sealsLeft} Seals | 🧩 ${shardsLeft}/7 Shards)`;
             tickBtn.style.borderColor = this.autoTickEnabled ? '#0e7490' : '#78350f';
+        }
+        const dailyLoginBtn = document.getElementById('btn-daily-login-shard');
+        if (dailyLoginBtn) {
+            const alreadyClaimed = fe?.lastDailyLoginClaimDay === d;
+            dailyLoginBtn.innerText = alreadyClaimed
+                ? `📅 LOG-IN CLAIMED (${shardsLeft}/7🧩)`
+                : `📅 CLAIM DAILY SHARD (${shardsLeft}/7🧩)`;
         }
 
         const tsBar = document.getElementById('timescale-bar');
@@ -1099,7 +1119,7 @@ export const CommanderUI = {
         setDisp('module-wrap-expeditions', true, 'block');
         setDisp('module-wrap-necrology', true, 'block');
 
-        // Book-Page Tab Visibility & Active Tab Highlight
+        // Book-Page Tab Visibility, Live Telemetry Count Badges & Active Tab Highlight
         const curTab = this.activeBookTab || 'COMMAND';
         setDisp('book-page-command', curTab === 'COMMAND', 'grid');
         setDisp('book-page-garrison', curTab === 'GARRISON', 'block');
@@ -1108,6 +1128,24 @@ export const CommanderUI = {
         if (subDeckEl) {
             subDeckEl.style.display = (curTab === 'TRUTH' || curTab === 'WARBOARD') ? 'block' : 'none';
         }
+
+        const hasActiveCrisis = Boolean(CommanderEngine.CrisisEngine?.activeCrisis);
+        const hasActiveEmissary = Boolean(CommanderEngine.RealityEditorVault?.activeEmissaryPetition);
+        const cmdAlertBadge = hasActiveCrisis ? ' [🚨 CRISIS!]' : (hasActiveEmissary ? ' [📯 EMISSARY!]' : '');
+        const livingUnitsCount = Array.from(CommanderEngine.AgentRosterManager?.agents?.values?.() || []).filter(a => a.alive).length;
+        const armoryCount = CommanderEngine.AgentRosterManager?.squadArmoryStock?.length || 0;
+        const activeExpCount = CommanderEngine.ExpeditionEngine?.activeExpeditions?.length || 0;
+        const factDossierCount = CommanderEngine.RealityEditorVault?.facts?.length || 0;
+        const hostileHouseCount = (CommanderEngine.CampaignManager?.getWarBoard?.() || []).filter(w => w.status === 'WAR_PREP' || w.status === 'SKIRMISH').length;
+
+        const tabLabels = {
+            'book-tab-command': `📖 TAB I: COMMAND & TRIAGE${cmdAlertBadge}`,
+            'book-tab-garrison': `🛡️ TAB II: GARRISON & MARKET (${livingUnitsCount} Units | ${armoryCount} Gear)`,
+            'book-tab-field': `🧭 TAB III: EXPEDITIONS & LOGS (${activeExpCount} Active)`,
+            'nav-tab-page4': `📜 TAB IV: TRUTH & RELIC VAULT (${factDossierCount} Dossiers)`,
+            'nav-tab-page5': `🏰 TAB V: WAR BOARD & TELEMETRY (${hostileHouseCount} Hostile)`
+        };
+
         [
             ['book-tab-command', 'COMMAND'],
             ['book-tab-garrison', 'GARRISON'],
@@ -1117,7 +1155,8 @@ export const CommanderUI = {
         ].forEach(([btnId, tabKey]) => {
             const btn = document.getElementById(btnId);
             if (btn) {
-                btn.style.borderColor = curTab === tabKey ? '#d9822b' : '';
+                if (tabLabels[btnId]) btn.innerText = tabLabels[btnId];
+                btn.style.borderColor = curTab === tabKey ? '#d9822b' : (btnId === 'book-tab-command' && (hasActiveCrisis || hasActiveEmissary) ? '#ef4444' : '');
                 btn.style.color = curTab === tabKey ? '#fde68a' : '';
             }
         });

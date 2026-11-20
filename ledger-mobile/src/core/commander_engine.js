@@ -3083,7 +3083,7 @@ rootScope.ShadowInfluenceEngine = ShadowInfluenceEngine;
 // 5.6 CRISIS RESPONSE TRIAGE & DAILY GOAL ENGINE
 // ============================================================================
 const CrisisEngine = rootScope.CrisisEngine || {
-    minCrisisDayThreshold: 40,       // ~30â€“60 minutes into a run before major crisis events trigger
+    minCrisisDayThreshold: 4,        // 4-day onboarding grace window before emergent crises & procedural collisions unlock
     minRealTimeElapsedMs: 30 * 60 * 1000,
     sessionStartedAtMs: Date.now(),
     volatilityIndex: 0,              // Builds gradually each day toward 100
@@ -3349,6 +3349,12 @@ const CrisisEngine = rootScope.CrisisEngine || {
             gains = `+${sigHarvest} Historical Weight, ${cultNote}`;
         }
 
+        // Award +1 Chrono-Seal Fragment automatically on each completed Daily Reconciliation
+        const shardRes = FacilityEngine.addChronoSealFragments(1, 'End-of-Day Reconciliation Stipend');
+        if (shardRes) {
+            gains += ` | 💎 +1 Chrono-Fragment (${shardRes.fragments}/7${shardRes.sealsMinted > 0 ? ' -> ✨ +1 SEAL MINTED!' : ''})`;
+        }
+
         this.lastDayReport = {
             day,
             role: r,
@@ -3385,8 +3391,8 @@ const CrisisEngine = rootScope.CrisisEngine || {
 
         this.volatilityIndex = Math.min(100, Number((this.volatilityIndex + deltaVol).toFixed(1)));
 
-        // Enforce 30â€“60 minute / 40-day grace period before any crisis event can interrupt
-        if (!this.activeCrisis && this.isGracePeriodComplete(daysActive) && this.volatilityIndex >= 85) {
+        // Enforce 4-day grace period before any crisis event can interrupt
+        if (!this.activeCrisis && this.isGracePeriodComplete(daysActive) && this.volatilityIndex >= 65) {
             this.triggerContextualCrisis(activeRole, houseState?.houseId);
         }
     },
@@ -3750,6 +3756,9 @@ const FacilityEngine = rootScope.FacilityEngine || {
         this.villageGuardsCurrent = 6;
         this.villageGuardsMaxThreshold = 12;
         this.chronoSeals = 10;
+        this.chronoSealFragments = 0;
+        this.loginStreakDays = 0;
+        this.lastDailyLoginClaimDay = 0;
         Object.values(this.facilities).forEach(f => {
             f.unlocked = false;
             f.level = 0;
@@ -3803,6 +3812,77 @@ const FacilityEngine = rootScope.FacilityEngine || {
         }
         rootScope.EventBus?.emit('FACILITY_UNLOCKED', f);
         return { success: true, facility: f, message: `ðŸ—ï¸ Constructed [${f.name}]! ${f.unlocksDesc}` };
+    },
+
+    addChronoSealFragments(count = 1, reason = 'Daily Archivist Login') {
+        const added = Math.max(1, parseInt(count, 10) || 1);
+        this.chronoSealFragments = (this.chronoSealFragments || 0) + added;
+        let sealsMinted = 0;
+        while (this.chronoSealFragments >= 7) {
+            this.chronoSealFragments -= 7;
+            this.chronoSeals = (this.chronoSeals || 0) + 1;
+            sealsMinted++;
+        }
+        const day = rootScope.EngineParams?.worldDay || 1;
+        let msg = `💎 [CHRONO-FRAGMENT ACQUIRED] +${added} Chrono-Seal Fragment(s) from ${reason} (Progress: ${this.chronoSealFragments}/7 Fragments).`;
+        if (sealsMinted > 0) {
+            msg += ` ✨ [7/7 FRAGMENTS ASSEMBLED] Forged +${sealsMinted} full Royal Chrono-Seal(s)! (Total Seals: ${this.chronoSeals}💎).`;
+            LogDispatchManager.dispatches.unshift({
+                id: `seal_mint_${day}_${Date.now()}`,
+                day,
+                type: 'ROYAL CHRONO-SEAL FORGED',
+                sender: 'Royal Crucible Mint',
+                title: `7/7 Fragments Assembled -> +${sealsMinted} Royal Chrono-Seal`,
+                body: msg,
+                read: false
+            });
+        }
+        return {
+            success: true,
+            added,
+            fragments: this.chronoSealFragments,
+            sealsMinted,
+            chronoSeals: this.chronoSeals,
+            message: msg
+        };
+    },
+
+    claimDailyLoginFragments(forceClaim = false) {
+        const day = rootScope.EngineParams?.worldDay || 1;
+        if (!forceClaim && this.lastDailyLoginClaimDay === day) {
+            return {
+                success: false,
+                fragments: this.chronoSealFragments || 0,
+                chronoSeals: this.chronoSeals || 0,
+                message: `Daily Log-In Fragment already claimed for Day ${day} AF (Current Fragments: ${this.chronoSealFragments || 0}/7 | Seals: ${this.chronoSeals || 0}💎).`
+            };
+        }
+        this.lastDailyLoginClaimDay = day;
+        this.loginStreakDays = (this.loginStreakDays || 0) + 1;
+        const bonusFragments = (this.loginStreakDays % 7 === 0) ? 2 : 1;
+        const res = this.addChronoSealFragments(bonusFragments, `Day #${this.loginStreakDays} Royal Auditor Log-In Check-In`);
+        return {
+            ...res,
+            streak: this.loginStreakDays,
+            message: `📅 [DAILY LOG-IN REWARD — STREAK DAY #${this.loginStreakDays}] ${res.message}`
+        };
+    },
+
+    mintChronoSealFromResources(resCost = 10) {
+        const cost = Math.max(5, parseInt(resCost, 10) || 10);
+        if ((this.settlementResources || 0) < cost) {
+            return {
+                success: false,
+                message: `Insufficient Settlement Resources (${this.settlementResources || 0}/${cost}u) to mint a Royal Chrono-Seal.`
+            };
+        }
+        this.settlementResources -= cost;
+        this.chronoSeals = (this.chronoSeals || 0) + 1;
+        return {
+            success: true,
+            chronoSeals: this.chronoSeals,
+            message: `💎 [ROYAL PROCUREMENT MINT] Exchanged -${cost}u Settlement Resources for +1 full Royal Chrono-Seal (Total: ${this.chronoSeals}💎).`
+        };
     },
 
     tickDailyGuardGeneration() {

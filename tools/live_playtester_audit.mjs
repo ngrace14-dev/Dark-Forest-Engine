@@ -404,8 +404,22 @@ if (petA.archetypeId === petB.archetypeId && petA.senderHouse === petB.senderHou
     logPlay('EMISSARY VARIETY & ADVISOR', `Verified rotating Emissary Petitions (${petA.archetypeId} from ${petA.senderHouse} -> ${petB.archetypeId} from ${petB.senderHouse} with Power Context "${petB.powerContext}") and Tutorial Advisor (${CommanderEngine.TutorialAdvisor.seenTopics.size} topics triggered).`);
 }
 
-// 5E. Premium-Gated Time Acceleration & Scaling Chrono-Seal Costs
+// 5E. Premium-Gated Time Acceleration, Scaling Chrono-Seal Costs & 7-Fragment Daily Log-In Assembly
 CommanderEngine.FacilityEngine.chronoSeals = 30;
+CommanderEngine.FacilityEngine.chronoSealFragments = 0;
+for (let sDay = 1; sDay <= 6; sDay++) {
+    CommanderEngine.FacilityEngine.claimDailyLoginFragments(true);
+}
+if (CommanderEngine.FacilityEngine.chronoSealFragments !== 6 || CommanderEngine.FacilityEngine.chronoSeals !== 30) {
+    auditReport.bugsFound.push(`Expected 6 daily log-in claims to accumulate 6/7 fragments, got ${CommanderEngine.FacilityEngine.chronoSealFragments}/7 and ${CommanderEngine.FacilityEngine.chronoSeals} seals.`);
+}
+const seventhClaim = CommanderEngine.FacilityEngine.claimDailyLoginFragments(true); // 7th streak day grants +2 bonus fragments -> 8 total -> 1 seal minted + 1 fragment remainder
+if (!seventhClaim.success || seventhClaim.sealsMinted !== 1 || CommanderEngine.FacilityEngine.chronoSeals !== 31) {
+    auditReport.bugsFound.push(`Expected 7th daily log-in fragment claim to assemble 7/7 fragments into +1 Royal Chrono-Seal, got ${JSON.stringify(seventhClaim)}`);
+} else {
+    logPlay('DAILY LOG-IN 7-FRAGMENT SEAL FORGE', seventhClaim.message);
+}
+
 const sealsStart = CommanderEngine.FacilityEngine.chronoSeals;
 const boost2h = CommanderEngine.premiumStepHours(2); // costs 1 seal
 const boost6h = CommanderEngine.premiumStepHours(6); // costs 3 seals (most expensive hour skip)

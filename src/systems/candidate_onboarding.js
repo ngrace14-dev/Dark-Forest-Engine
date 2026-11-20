@@ -32,28 +32,28 @@ export const CandidateOnboarding = {
         MOD_CROWN_SURPLUS: {
             id: 'MOD_CROWN_SURPLUS',
             title: '📦 Crown Supply Surplus Charter',
-            desc: '+10u Barrier Fuel/Resin, +12 Settlement Resources, +10% Crown Favor',
-            strands: ['[STEEL] +10u Barrier Fuel/Resin & +12 Settlement Resources pre-allocated', '[INK] +10% Crown Favor registered under Royal Audit Seal'],
+            desc: '[Houses/Crown]: +10u Fuel, +12 Res, +10% Favor | [Syndicate]: +10u Resin | [Sovereign]: +150 Weight',
+            strands: ['[STEEL] +10u Barrier Fuel/Resin & +12 Settlement Resources pre-allocated', '[INK] +10% Crown Favor (or +150 Sovereign Weight) registered under Royal Audit Seal'],
             fuelDelta: 10, resDelta: 12, favorDelta: 10, guardsDelta: 0, dossierDelta: 0, entropyDelta: 0, weightDelta: 150
         },
         MOD_FORTIFIED_CHAINS: {
             id: 'MOD_FORTIFIED_CHAINS',
             title: '⛓️ Fortified Anchor-Chains & Garrison Levy',
-            desc: '+4 Village Guards, +1 Grimsby Runic Hauberk in Armory, +10% Prosperity',
+            desc: '[All Factions]: +4 Village Guards, +1 Grimsby Runic Hauberk in Armory, +10% Prosperity | [Sovereign]: +200 Weight',
             strands: ['[STONE] 50-Ton Bedrock Anchor Chains reinforced (+10% Prosperity)', '[STEEL] +4 Regenerated Village Guards & +1 Grimsby Plate Hauberk mustered'],
             fuelDelta: 4, resDelta: 6, favorDelta: 5, guardsDelta: 4, extraGear: 'grimsby_plate', prosperityDelta: 10, weightDelta: 200
         },
         MOD_SHADOW_DOSSIERS: {
             id: 'MOD_SHADOW_DOSSIERS',
             title: '🕵️ Shadow Blackmail & Cipher Cache',
-            desc: '+2 Blackmail Dossiers, +1 Discovered Truth Vault Fact, +1.5 Squad Stealth',
+            desc: '[All Factions]: +2 Blackmail Dossiers, +1 Truth Vault Fact Dossier, +1.5 Squad Stealth | [Sovereign]: +220 Weight',
             strands: ['[INK] +2 Blackmail Dossiers & +1 Discovered Fact Dossier pre-loaded into Truth Vault', '[MIND] +1.5 Squad Stealth & Covert Audit clearance unlocked'],
             fuelDelta: 4, resDelta: 8, favorDelta: 0, dossierDelta: 2, stealthBonus: 1.5, discoverExtraFact: true, weightDelta: 220
         },
         MOD_HIGH_ENTROPY_CRUCIBLE: {
             id: 'MOD_HIGH_ENTROPY_CRUCIBLE',
             title: '⚡ High-Entropy Frontier Crucible (Hardcore)',
-            desc: '+20 Settlement Resources & +15u Dream Siphon, but +15% Volatility & +10% Entropy',
+            desc: '[All Factions]: +20 Resources & +15u Dream Siphon, but +15% Volatility & +10% Entropy | [Sovereign]: +300 Weight',
             strands: ['[VERSE] +15u Dream Siphon & +20 Resources allocated for frontier hazard', '[MIND] ⚠️ +15% Starting Volatility & +10% Blind-Spot Entropy'],
             fuelDelta: 6, resDelta: 20, dreamDelta: 15, volatilityDelta: 15, entropyDelta: 10, weightDelta: 300
         }
