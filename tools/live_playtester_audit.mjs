@@ -402,6 +402,19 @@ if (petA.archetypeId === petB.archetypeId && petA.senderHouse === petB.senderHou
     logPlay('EMISSARY VARIETY & ADVISOR', `Verified rotating Emissary Petitions (${petA.archetypeId} from ${petA.senderHouse} -> ${petB.archetypeId} from ${petB.senderHouse} with Power Context "${petB.powerContext}") and Tutorial Advisor (${CommanderEngine.TutorialAdvisor.seenTopics.size} topics triggered).`);
 }
 
+// 5E. Premium-Gated Time Acceleration & Scaling Chrono-Seal Costs
+CommanderEngine.FacilityEngine.chronoSeals = 15;
+const sealsStart = CommanderEngine.FacilityEngine.chronoSeals;
+const boost2h = CommanderEngine.premiumStepHours(2); // costs 1 seal
+const boost6h = CommanderEngine.premiumStepHours(6); // costs 3 seals
+const skip1d = CommanderEngine.chronoSkipDays(1);    // costs 1 seal
+const skip3d = CommanderEngine.chronoSkipDays(3);    // costs 9 seals
+if (!boost2h.success || boost2h.sealCost !== 1 || !boost6h.success || boost6h.sealCost !== 3 || !skip1d.success || skip1d.sealCost !== 1 || !skip3d.success || skip3d.sealCost !== 9) {
+    auditReport.bugsFound.push(`Expected scaling premium Chrono-Seal costs (2h=1, 6h=3, 1d=1, 3d=9), got 2h=${boost2h.sealCost}, 6h=${boost6h.sealCost}, 1d=${skip1d.sealCost}, 3d=${skip3d.sealCost}`);
+} else {
+    logPlay('PREMIUM SCALING TIME ACCELERATION', `Verified scaling Royal Chrono-Seal costs: +2H Boost (-1 Seal), +6H Boost (-3 Seals), +1D Skip (-1 Seal), +3D Skip (-9 Seals) | Remaining Seals: ${CommanderEngine.FacilityEngine.chronoSeals}/${sealsStart}.`);
+}
+
 console.log('--------------------------------------------------------------------------------');
 if (auditReport.bugsFound.length > 0) {
     console.error('LIVE PLAYTESTER AUDIT FOUND ISSUES:', auditReport.bugsFound);

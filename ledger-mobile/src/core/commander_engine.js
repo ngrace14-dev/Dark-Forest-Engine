@@ -3749,6 +3749,7 @@ const FacilityEngine = rootScope.FacilityEngine || {
         this.settlementResources = 35;
         this.villageGuardsCurrent = 6;
         this.villageGuardsMaxThreshold = 12;
+        this.chronoSeals = 10;
         Object.values(this.facilities).forEach(f => {
             f.unlocked = false;
             f.level = 0;
@@ -4310,16 +4311,66 @@ export const CommanderEngine = {
     timeScale: 1,
     currentHour: 6,                         // 0â€“23 in-game hour within the current day
 
-    setTimeScale(scale = 1) {
+    setTimeScale(scale = 1, requirePremium = false) {
         const clamped = Math.max(1, Math.min(this.maxTimeScale, Number(scale) || 1));
+        const costMap = { 1: 0, 2: 1, 4: 2, 8: 4 };
+        const sealCost = costMap[clamped] ?? Math.max(0, Math.floor(clamped / 2));
+        if (requirePremium && clamped > (this.timeScale || 1) && sealCost > 0) {
+            if ((FacilityEngine.chronoSeals || 0) < sealCost) {
+                return {
+                    success: false,
+                    timeScale: this.timeScale,
+                    sealCost,
+                    sealsRemaining: FacilityEngine.chronoSeals,
+                    message: `Insufficient Royal Chrono-Seals (${FacilityEngine.chronoSeals}/${sealCost} Seals required) to accelerate Day Timer to ${clamped}x.`
+                };
+            }
+            FacilityEngine.chronoSeals -= sealCost;
+        }
         this.timeScale = clamped;
         if (rootScope.EngineParams) rootScope.EngineParams.timeScale = clamped;
         rootScope.EventBus?.emit('TIMESCALE_CHANGED', {
             timeScale: clamped,
+            sealCost: requirePremium ? sealCost : 0,
+            sealsRemaining: FacilityEngine.chronoSeals,
             effectiveDayHours: Number((12 / clamped).toFixed(2)),
             effectiveDayDurationMs: this.getEffectiveDayDurationMs()
         });
         return this.timeScale;
+    },
+
+    computeChronoSealCostForHours(hours = 2) {
+        const h = Math.max(1, parseInt(hours, 10) || 1);
+        return Math.max(1, Math.ceil(h / 2));
+    },
+
+    computeChronoSealCostForDays(days = 1) {
+        const d = Math.max(1, parseInt(days, 10) || 1);
+        return d * 3;
+    },
+
+    premiumStepHours(hours = 2) {
+        const step = Math.max(1, parseInt(hours, 10) || 2);
+        const sealCost = this.computeChronoSealCostForHours(step);
+        if ((FacilityEngine.chronoSeals || 0) < sealCost) {
+            return {
+                success: false,
+                sealCost,
+                sealsRemaining: FacilityEngine.chronoSeals,
+                message: `Insufficient Royal Chrono-Seals (${FacilityEngine.chronoSeals}/${sealCost} Seals required) to fast-forward +${step}h on the Day Timer.`
+            };
+        }
+        FacilityEngine.chronoSeals -= sealCost;
+        const tickRes = this.tickInGameHour(step);
+        return {
+            success: true,
+            hoursAdvanced: step,
+            sealCost,
+            sealsRemaining: FacilityEngine.chronoSeals,
+            day: tickRes.day,
+            hour: tickRes.hour,
+            message: `⏭️ [CHRONO-SEAL TIME BOOST] Spent -${sealCost} Royal Chrono-Seal(s) (${FacilityEngine.chronoSeals} left) to fast-forward +${step}h (Now Day ${tickRes.day}, ${String(tickRes.hour).padStart(2, '0')}:00).`
+        };
     },
 
     getEffectiveDayDurationMs() {
@@ -4390,10 +4441,11 @@ export const CommanderEngine = {
      */
     chronoSkipDays(days = 1) {
         const count = Math.max(1, parseInt(days, 10) || 1);
-        if (FacilityEngine.chronoSeals < count) {
-            return { success: false, message: `Insufficient Royal Chrono-Seals (${FacilityEngine.chronoSeals}/${count}). Acquire Chrono-Seals in the Royal Procurement Store.` };
+        const scaledSealCost = count === 1 ? 1 : this.computeChronoSealCostForDays(count);
+        if (FacilityEngine.chronoSeals < scaledSealCost) {
+            return { success: false, sealCost: scaledSealCost, message: `Insufficient Royal Chrono-Seals (${FacilityEngine.chronoSeals}/${scaledSealCost} Seals required for +${count}D Skip).` };
         }
-        FacilityEngine.chronoSeals -= count;
+        FacilityEngine.chronoSeals -= scaledSealCost;
         const skippedEvents = [];
 
         for (let i = 0; i < count; i++) {
@@ -4417,9 +4469,10 @@ export const CommanderEngine = {
         }
         return {
             success: true,
+            sealCost: scaledSealCost,
             sealsRemaining: FacilityEngine.chronoSeals,
             skippedEvents,
-            message: `⏭️ [DREAM WORLD +1D CHRONO-SKIP COMPLETE] Fast-forwarded ${count} full day(s) unattended (Auto-resolved daily reconciliation; ${FacilityEngine.chronoSeals} Chrono-Seals left).\n` + skippedEvents.join('\n')
+            message: `⏭️ [CHRONO-SEAL +${count}D SKIP COMPLETE] Spent -${scaledSealCost} Royal Chrono-Seal(s) (${FacilityEngine.chronoSeals} left) to fast-forward ${count} full day(s).\n` + skippedEvents.join('\n')
         };
     },
 

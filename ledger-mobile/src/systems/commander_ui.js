@@ -83,10 +83,24 @@ export const CommanderUI = {
     },
 
     changeTimeScale(scale) {
-        const applied = CommanderEngine.setTimeScale(scale);
+        const currentScale = CommanderEngine.timeScale || 1;
+        const targetScale = Math.max(1, Math.min(CommanderEngine.maxTimeScale || 8, Number(scale) || 1));
+        if (targetScale > currentScale) {
+            const res = CommanderEngine.setTimeScale(targetScale, true);
+            if (typeof res === 'object' && res.success === false) {
+                this.showBanner(res.message);
+                this.render();
+                return;
+            }
+        } else {
+            CommanderEngine.setTimeScale(targetScale, false);
+        }
+        const applied = CommanderEngine.timeScale;
         if (this.autoTickEnabled) this.startAutoTick();
         const hrs = Number((12 / applied).toFixed(2));
-        this.showBanner(`Time scale set to ${applied}x (1 In-Game Day = ${hrs} Real-World Hours).`);
+        const costMap = { 1: 0, 2: 1, 4: 2, 8: 4 };
+        const paidNote = targetScale > currentScale && costMap[applied] ? ` (-${costMap[applied]} Chrono-Seal[s], ${CommanderEngine.FacilityEngine.chronoSeals} left)` : '';
+        this.showBanner(`Time scale set to ${applied}x (1 In-Game Day = ${hrs} Real-World Hours)${paidNote}.`);
         this.render();
     },
 
@@ -451,8 +465,9 @@ export const CommanderUI = {
             this.render();
         };
         window.stepExpeditionHour = (hrs = 2) => {
-            CommanderEngine.tickInGameHour(hrs);
-            this.showBanner(`Advanced field clock by +${hrs}h.`);
+            CommanderEngine.TutorialAdvisor?.checkAndTrigger?.('TIME_DREAM_SKIP');
+            const res = CommanderEngine.premiumStepHours(hrs);
+            this.showBanner(res.message);
             this.render();
         };
         window.chronoSkip = (days = 1) => {
@@ -841,12 +856,13 @@ export const CommanderUI = {
                         <button id="nav-tab-page5" class="cmd-btn" onclick="window.viewWarBoard()">🏰 TAB V: WAR BOARD &amp; TELEMETRY</button>
                     </div>
                     <div class="ledger-btn-row" style="margin:0;">
-                        <button id="btn-autotick-state" class="cmd-btn" onclick="window.toggleAutoTick()">CLOCK: TICKING</button>
+                        <button id="btn-autotick-state" class="cmd-btn" onclick="window.toggleAutoTick()">DAY TIMER: TICKING</button>
                         <span id="timescale-bar" style="display:inline-flex; gap:3px;"></span>
-                        <button id="btn-step-field" class="cmd-btn" title="Advance field expedition march clock by +2 hours" onclick="window.stepExpeditionHour(2)">+2H FIELD</button>
-                        <button class="cmd-btn" title="Interactive +1 Day Turn: Advances 24h and pauses at End-of-Day Reconciliation" onclick="window.advanceDays(1)">⏩ +1 DAY (END TURN)</button>
+                        <button id="btn-step-field" class="cmd-btn" title="Premium Time Boost: Spend 1 Royal Chrono-Seal to advance +2h on the Day Timer" onclick="window.stepExpeditionHour(2)">⏩ +2H BOOST (1 Seal)</button>
+                        <button id="btn-step-6h" class="cmd-btn" title="Premium Time Boost: Spend 3 Royal Chrono-Seals to advance +6h on the Day Timer" onclick="window.stepExpeditionHour(6)">⏩ +6H BOOST (3 Seals)</button>
                         <button id="btn-dream-ward" class="cmd-btn" title="Spend 10u Dream Siphon to weave a prescient ward that mitigates the next Crisis catastrophe" onclick="window.triggerDreamIntervention()">🌙 DREAM WARD (-10u)</button>
-                        <button id="btn-chrono-skip" class="cmd-btn" title="Dream World Unattended +1D Skip: Consumes 1 Royal Chrono-Seal to fast-forward 24h and auto-resolve reconciliation" onclick="window.chronoSkip(1)">⏭️ DREAM +1D SKIP (1 Seal)</button>
+                        <button id="btn-chrono-skip" class="cmd-btn" title="Premium Full-Day Skip: Spend 1 Royal Chrono-Seal to fast-forward +1 Full Day (24h)" onclick="window.chronoSkip(1)">⏭️ +1D SKIP (1 Seal)</button>
+                        <button id="btn-chrono-skip-3d" class="cmd-btn" title="Premium Multi-Day Skip: Spend 9 Royal Chrono-Seals to fast-forward +3 Full Days (72h)" onclick="window.chronoSkip(3)">⏭️ +3D SKIP (9 Seals)</button>
                         <button class="cmd-btn" onclick="window.toggleHighContrast()">👁️ HIGH-CONTRAST</button>
                         <button id="btn-export-save" class="cmd-btn" onclick="window.exportSave()">EXPORT SAVE</button>
                     </div>
@@ -999,16 +1015,22 @@ export const CommanderUI = {
         const tickBtn = document.getElementById('btn-autotick-state');
         const ts = CommanderEngine.timeScale || 1;
         const effHrs = Number((12 / ts).toFixed(2));
+        const curHr = String(CommanderEngine.currentHour || 6).padStart(2, '0');
+        const sealsLeft = fe?.chronoSeals ?? 0;
         if (tickBtn) {
-            tickBtn.innerText = this.autoTickEnabled ? `CLOCK: TICKING (${ts}x / ${effHrs}h)` : `CLOCK: PAUSED (${ts}x)`;
+            tickBtn.innerText = this.autoTickEnabled
+                ? `⏱️ DAY TIMER: ${curHr}:00 / 24:00 (${ts}x | 💎 ${sealsLeft} Seals)`
+                : `⏸️ DAY TIMER PAUSED: ${curHr}:00 (${ts}x | 💎 ${sealsLeft} Seals)`;
             tickBtn.style.borderColor = this.autoTickEnabled ? '#0e7490' : '#78350f';
         }
 
         const tsBar = document.getElementById('timescale-bar');
         if (tsBar) {
+            const costMap = { 1: 0, 2: 1, 4: 2, 8: 4 };
             tsBar.innerHTML = [1, 2, 4, 8].map(s => {
                 const active = s === ts ? 'background:#451a03; color:#fde68a; border-color:#d97706;' : '';
-                return `<button class="cmd-btn" style="${active}" onclick="window.setTimeScale(${s})">${s}x (${Number((12 / s).toFixed(1))}h)</button>`;
+                const costTag = s > 1 ? ` [${costMap[s]}💎]` : ' [Free]';
+                return `<button class="cmd-btn" style="${active}" title="Accelerate Real-Time Day Timer to ${s}x (${Number((12 / s).toFixed(1))}h/day)${costTag}" onclick="window.setTimeScale(${s})">${s}x${costTag}</button>`;
             }).join('');
         }
 
