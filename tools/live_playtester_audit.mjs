@@ -431,6 +431,30 @@ if (!boost2h.success || boost2h.sealCost !== 1 || !boost6h.success || boost6h.se
     logPlay('PREMIUM SCALING TIME ACCELERATION', `Verified scaling Royal Chrono-Seal costs: +2H Boost (-1 Seal), +6H Boost (-3 Seals), +1D Skip (-6 Seals), +3D Skip (-18 Seals) | Remaining Seals: ${CommanderEngine.FacilityEngine.chronoSeals}/${sealsStart}.`);
 }
 
+// 5F. Addendum CA-13 8-Tier Runic Body-Carving, Fallout Shelter Stat Training & Live Combat Events Log
+window.trainAgentStat('agt_1', 'STRENGTH');
+CommanderEngine.AgentRosterManager.tickDailyDrills();
+CommanderEngine.CampaignManager.state.house.barrierFuelUnits = 60;
+CommanderEngine.FacilityEngine.settlementResources = 200;
+CommanderEngine.FacilityEngine.chronoSeals = 10;
+CommanderEngine.AgentRosterManager.cultivateTerminusRunic('agt_1'); // Tier 1
+CommanderEngine.AgentRosterManager.cultivateTerminusRunic('agt_1'); // Tier 2
+CommanderEngine.AgentRosterManager.cultivateTerminusRunic('agt_1'); // Tier 3 (300 Guardian)
+const blockedTier4 = CommanderEngine.AgentRosterManager.cultivateTerminusRunic('agt_1'); // Blocked until runic_carving_facility built
+if (blockedTier4.success) {
+    auditReport.bugsFound.push('Expected Tier 4 Runic Body-Carving to be blocked before constructing Runic Body-Carving Scriptorium.');
+}
+CommanderEngine.FacilityEngine.unlockFacility('runic_carving_facility');
+CommanderEngine.CampaignManager.state.house.barrierFuelUnits = 60;
+const tier4Res = CommanderEngine.AgentRosterManager.cultivateTerminusRunic('agt_1'); // Tier 4 (Apex Phantom, costs 1 Seal)
+const combatExp = CommanderEngine.ExpeditionEngine.launchExpedition('PATROL_MIST', 'Cullfield');
+CommanderEngine.tickInGameHour(3); // Reaches 35% combat encounter hour
+if (!tier4Res.success || tier4Res.tier !== 4 || !combatExp.expedition.combatEvents || combatExp.expedition.combatEvents.length < 3) {
+    auditReport.bugsFound.push(`Expected Tier 4 Runic Body-Carving (Apex Phantom) and 3-round Live Combat Telemetry log to succeed, got tier4=${JSON.stringify(tier4Res)}, combatEvents=${JSON.stringify(combatExp.expedition?.combatEvents)}`);
+} else {
+    logPlay('ADDENDUM CA-13 RUNIC CARVING & LIVE COMBAT LOG', `${tier4Res.message}\n   ↳ Live Combat Log: ${combatExp.expedition.combatEvents.join(' | ')}`);
+}
+
 console.log('--------------------------------------------------------------------------------');
 if (auditReport.bugsFound.length > 0) {
     console.error('LIVE PLAYTESTER AUDIT FOUND ISSUES:', auditReport.bugsFound);

@@ -492,6 +492,19 @@ export const CommanderUI = {
             this.showBanner(res.message);
             this.render();
         };
+        window.carveAgentRunes = (agentId) => {
+            const res = CommanderEngine.AgentRosterManager.cultivateTerminusRunic(agentId);
+            this.showBanner(res.message);
+            if (res.success) {
+                this.setReaderContent(CommanderEngine.AgentRosterManager.formatAgentStatSheet(agentId));
+            }
+            this.render();
+        };
+        window.trainAgentStat = (agentId, statKey) => {
+            const res = CommanderEngine.AgentRosterManager.setTraining(agentId, statKey);
+            this.showBanner(res.message);
+            this.render();
+        };
         window.interrogateSuspect = (targetId = 'agt_2') => {
             CommanderEngine.TutorialAdvisor?.checkAndTrigger?.('INQUEST_BTN');
             this.renderInquestReader(targetId);
@@ -1003,16 +1016,24 @@ export const CommanderUI = {
         const hubShiftEl = document.getElementById('hub-shift-header');
         if (hubShiftEl) hubShiftEl.innerText = `DAY ${d} // SHIFT COUNTDOWN (${shiftDays}D)`;
 
-        // Render Fallout Shelter–Style Active Field Expeditions Log
+        // Render Fallout Shelter–Style Active Field Expeditions & Live Combat Events Log
         const expDiv = document.getElementById('expeditions-list');
         if (expDiv && CommanderEngine.ExpeditionEngine) {
             const exps = CommanderEngine.ExpeditionEngine.activeExpeditions || [];
             if (exps.length === 0) {
-                expDiv.innerHTML = `<div style="color:#463523; font-size:11px;">No squads or caravans currently out in the mist. Dispatch a caravan or squad above to track their live field log.</div>`;
+                expDiv.innerHTML = `<div style="color:#463523; font-size:11px;">No squads or caravans currently out in the mist. Dispatch a caravan or squad above to track their live field &amp; combat event log.</div>`;
             } else {
                 expDiv.innerHTML = exps.map(e => {
                     const pct = Math.min(10, Math.round((e.hoursElapsed / e.totalHours) * 10));
                     const bar = `[${'█'.repeat(pct)}${'░'.repeat(10 - pct)}] ${e.hoursElapsed}h/${e.totalHours}h`;
+                    const combatEventsHtml = (e.combatEvents && e.combatEvents.length > 0)
+                        ? `
+                            <div style="margin-top:5px; padding:5px 7px; background:#1c0d0a; border:1px solid #dc2626; color:#fecaca; font-family:'Share Tech Mono',monospace; font-size:9.5px;">
+                                <div style="color:#f87171; font-weight:bold; margin-bottom:2px;">⚔️ LIVE TACTICAL COMBAT TELEMETRY (Def ${e.squadDefense || 12} vs Hazard ${e.hazardRating || 12} | Cargo: ${e.cargoIntegrity ?? 100}%):</div>
+                                ${e.combatEvents.map(ce => `<div style="margin-bottom:2px;">• ${ce}</div>`).join('')}
+                            </div>
+                        `
+                        : '';
                     return `
                         <div class="cmd-dispatch" style="border-color:#78350f;">
                             <div style="display:flex; justify-content:space-between; align-items:center; color:#5e110b; font-weight:bold;">
@@ -1022,6 +1043,7 @@ export const CommanderUI = {
                                     <button class="cmd-btn" style="padding:1px 5px; font-size:9px; margin-left:6px;" onclick="window.recallExpedition('${e.id}')">🔄 Recall</button>
                                 </span>
                             </div>
+                            ${combatEventsHtml}
                             <div style="margin-top:4px; color:#2b1e12; font-size:10px;">
                                 ${e.logs.map(l => `<div>• ${l}</div>`).join('')}
                             </div>
@@ -1406,22 +1428,64 @@ export const CommanderUI = {
                 </div>
             `;
 
+            const carvingFac = fe?.facilities?.runic_carving_facility;
+            const carvingFacilityBanner = carvingFac?.unlocked
+                ? `
+                    <div style="background:rgba(88,28,135,0.16); border:1px solid #a855f7; padding:5px 7px; margin-bottom:6px; font-size:9.5px; color:#3b0764;">
+                        <b>🪡 RUNIC BODY-CARVING SCRIPTORIUM UNLOCKED (Lv.${carvingFac.level} — Addendum CA-13):</b> Tiers IV–VIII active! All 6 Body Sites (48 Runes) &amp; Longevity Ladder up to 4,936y available (Requires 💎 Chrono-Seals for Tiers 4–8).
+                    </div>
+                `
+                : `
+                    <div style="background:rgba(42,31,20,0.1); border:1px dashed #7e22ce; padding:5px 7px; margin-bottom:6px; font-size:9.5px; color:#574532; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+                        <span>🔒 <b>End-Game Runic Body-Carving Scriptorium (Tiers IV–VIII):</b> Tiers I–III available now. Build Scriptorium (28r) for Tiers IV–VIII (💎 Chrono-Seals).</span>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:9px; border-color:#a855f7;" onclick="window.unlockFacility('runic_carving_facility')">🔨 Build Runic Scriptorium (28r)</button>
+                    </div>
+                `;
+
             const nextGearId = armoryStock[0] || 'ironwood_spear';
-            rosterDiv.innerHTML = recruitHtml + marketHtml + armoryHtml + (agents.map(a => {
+            const tierCatalog = CommanderEngine.AgentRosterManager.RUNIC_CARVING_TIERS || {};
+            rosterDiv.innerHTML = recruitHtml + carvingFacilityBanner + marketHtml + armoryHtml + (agents.map(a => {
                 const eq = a.equipment || {};
                 const gearSummary = [eq.weapon?.name, eq.armor?.name, eq.trinket?.name].filter(Boolean).join(', ') || 'Standard Issue';
+                const cStage = a.cultivation?.stage || 0;
+                const nextTier = Math.min(8, cStage + 1);
+                const tCfg = tierCatalog[nextTier] || { fuelCost: 10, resCost: 12, sealCost: 0, tool: 'Bone Needles' };
+                const totalLife = (a.cultivation?.naturalLifespanYears || 311) + (a.cultivation?.bonusLifespanYears || 0);
+                const activeDrill = a.operatingStance?.mode === 'TRAIN' ? a.operatingStance.discipline : '';
+                const sealBadge = tCfg.sealCost > 0 ? `, ${tCfg.sealCost}💎` : '';
+                const carveBtnLabel = cStage >= 8
+                    ? `🪡 Tier VIII/8 Max (48/48 Runes)`
+                    : `🪡 Carve Tier ${nextTier}/8 (${nextTier * 6}/48 Runes | -${nextTier <= 3 ? 10 : tCfg.fuelCost}u, -${tCfg.resCost}r${sealBadge})`;
+
+                const trainStats = [
+                    ['STRENGTH', 'STR', a.skills.strength],
+                    ['TOUGHNESS', 'TGH', a.skills.toughness],
+                    ['MELEE_ATT', 'ATT', a.skills.meleeAtt],
+                    ['MELEE_DEF', 'DEF', a.skills.meleeDef],
+                    ['ATHLETICS', 'ATH', a.skills.athletics],
+                    ['DODGE', 'DDG', a.skills.dodge],
+                    ['STEALTH', 'STL', a.skills.stealth],
+                    ['LORE', 'LOR', a.skills.lore],
+                    ['SURVIVAL', 'SRV', a.skills.survival]
+                ];
+                const trainBtnsHtml = trainStats.map(([key, short, val]) => {
+                    const isDrilling = activeDrill === key || (activeDrill === 'MARTIAL' && key === 'MELEE_ATT') || (activeDrill === 'LOGISTICS' && key === 'LORE');
+                    const hiStyle = isDrilling ? 'background:#14532d; border-color:#22c55e; color:#dcfce7;' : '';
+                    return `<button class="cmd-btn" style="padding:1px 4px; font-size:8.5px; ${hiStyle}" onclick="window.trainAgentStat('${a.id}','${key}')">🏋️ ${short}:${Number(val).toFixed(1)}</button>`;
+                }).join('');
+
                 return `
                 <div style="padding: 6px 0; border-bottom: 1px dashed #7c664d;">
-                    <b style="color:#5e110b;">${a.name}</b> <span style="font-size:10px; color:#0e7490; font-weight:bold;">${a.cultivation?.isCultivatedGuardian ? '★ 300 GUARDIAN' : ''}</span>
+                    <b style="color:#5e110b;">${a.name}</b> <span style="font-size:10px; color:#0e7490; font-weight:bold;">${a.cultivation?.isCultivatedGuardian ? `★ TIER ${cStage} ASCENDANT` : `(Tier ${cStage}/8)`}</span>
                     <span style="color:#463523; font-weight:bold;">(${a.career?.rank || 'Novice'} ${a.career?.id})</span>
-                    <div style="font-size:10px; color:#1f160e; font-family:'Share Tech Mono',monospace;">HP: ${a.vitals.hp}/${a.vitals.maxHp} | Poise: ${Math.round(a.vitals.poise)} | Att: ${Number(a.skills.meleeAtt).toFixed(1)} | Def: ${Number(a.skills.meleeDef).toFixed(1)}</div>
-                    <div style="font-size:10px; color:#3f2e1e;">🗡️ Gear: [${gearSummary}] | Birthright: [${a.birthright?.title || 'None'}]</div>
+                    <div style="font-size:9.5px; color:#1f160e; font-family:'Share Tech Mono',monospace;">HP: ${a.vitals.hp}/${a.vitals.maxHp} | Poise: ${Math.round(a.vitals.poise)} | Runes: ${a.cultivation?.inscriptionsCount || 0}/48 | Purity: ${a.cultivation?.foundationPurity ?? 100}% | Potential: ${a.cultivation?.potentialRemaining ?? 100}% | Lifespan: ${totalLife}y</div>
+                    <div style="font-size:9.5px; color:#3f2e1e;">🗡️ Gear: [${gearSummary}] | Birthright: [${a.birthright?.title || 'None'}] ${activeDrill ? `| <b style="color:#15803d;">[TRAINING: ${activeDrill}]</b>` : ''}</div>
+                    <div style="margin-top:3px; display:flex; flex-wrap:wrap; gap:2px;">${trainBtnsHtml}</div>
                     <div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:3px;">
                         <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.viewAgentStatSheet('${a.id}')">📋 Sheet</button>
                         <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.equipAgentGear('${a.id}','${nextGearId}')">🗡️ Equip</button>
-                        <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.AgentRosterManager.setTraining('${a.id}','logistics'); window.CommanderUI.showBanner('${a.name} assigned to Logistics drill.'); window.refreshUI();">Logistics</button>
-                        <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.AgentRosterManager.setTraining('${a.id}','martial'); window.CommanderUI.showBanner('${a.name} assigned to Martial drill.'); window.refreshUI();">Martial</button>
-                        <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.interrogateSuspect('${a.id}')">Inquest</button>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px; border-color:#a855f7; background:#2e1065; color:#f3e8ff;" onclick="window.carveAgentRunes('${a.id}')">${carveBtnLabel}</button>
+                        <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.interrogateSuspect('${a.id}')">⚖️ Inquest</button>
                     </div>
                 </div>
             `}).join('') || '<div style="color:#991b1b;">All garrison agents deceased.</div>');

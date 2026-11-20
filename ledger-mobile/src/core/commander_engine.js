@@ -128,7 +128,22 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
             operatingStance: { mode: 'IDLE', discipline: null, task: null, daysTrained: 0 },
             statusEffects: [],
             career: { id: archeType === 'WAR_MASTER' || archeType === 'WARDEN' || archeType === 'ENFORCER' ? 'warden' : 'scout', level: 1, rank: 'Novice', xp: 0 },
-            cultivation: { stage: 0, foundationFireDays: 0, bonusLifespanYears: 0, isCultivatedGuardian: false },
+            cultivation: {
+                stage: 0,
+                maxTier: 8,
+                toolUsed: 'Uninscribed Flesh',
+                bodySites: { neck: 0, chest: 0, leftArm: 0, rightArm: 0, leftLeg: 0, rightLeg: 0 },
+                inscriptionsCount: 0,
+                currentMasteryPool: 25,
+                preservedMastery: 0,
+                potentialRemaining: 100,
+                foundationPurity: 100,
+                foundationFireDays: 0,
+                naturalLifespanYears: 311,
+                bonusLifespanYears: 0,
+                isCultivatedGuardian: false,
+                causalCombatWarp: false
+            },
             significance: 20 + (birthright.sigBonus || 0),
             assignedHouseId: 'House Terminus'
         };
@@ -140,8 +155,9 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
     setTraining(agentId, discipline) {
         const agent = this.agents.get(agentId);
         if (!agent || !agent.alive) return { success: false, message: "Agent invalid or deceased." };
-        agent.operatingStance = { mode: 'TRAIN', discipline: discipline.toUpperCase(), task: null, daysTrained: 0 };
-        return { success: true, message: `${agent.name} assigned to drill: [TRAIN: ${discipline.toUpperCase()}].` };
+        const disc = String(discipline || 'MARTIAL').toUpperCase();
+        agent.operatingStance = { mode: 'TRAIN', discipline: disc, task: null, daysTrained: (agent.operatingStance?.daysTrained || 0) };
+        return { success: true, message: `🏋️ ${agent.name} assigned to Fallout Shelter Training Room: [DRILL: ${disc}].` };
     },
 
     setTask(agentId, taskType, targetId = null) {
@@ -156,22 +172,49 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
     },
 
     tickDailyDrills() {
+        const facMult = rootScope.RoleStateMachine?.computeFacilityMultipliers?.() || { barracksLv: 0, scriptoriumLv: 1 };
+        const drillMult = 1 + (facMult.barracksLv || 0) * 0.2;
         this.agents.forEach(agent => {
             if (!agent.alive) return;
             const st = agent.operatingStance;
+            if (agent.cultivation) {
+                agent.cultivation.currentMasteryPool = Math.min(100, (agent.cultivation.currentMasteryPool || 20) + 6);
+                if (agent.cultivation.foundationFireDays > 0) {
+                    agent.cultivation.foundationFireDays = Math.max(0, agent.cultivation.foundationFireDays - 1);
+                }
+            }
             if (st.mode === 'TRAIN' && st.discipline) {
                 st.daysTrained = (st.daysTrained || 0) + 1;
-                if (st.discipline === 'LOGISTICS') {
-                    agent.skills.lore = Math.min(20, agent.skills.lore + 0.25);
+                const d = st.discipline.toUpperCase();
+                const gain = Number((0.25 * drillMult).toFixed(2));
+                if (d === 'LOGISTICS' || d === 'LORE') {
+                    agent.skills.lore = Math.min(30, Number((agent.skills.lore + gain).toFixed(2)));
                     if (st.daysTrained >= 7 && agent.career.rank !== 'Logistics Bailiff') {
                         agent.career.rank = 'Logistics Bailiff';
-                        rootScope.EventBus?.emit('UI_LOG', `ðŸ“œ [ROSTER] ${agent.name} promoted to Logistics Bailiff!`);
+                        rootScope.EventBus?.emit('UI_LOG', `[ROSTER] ${agent.name} promoted to Logistics Bailiff!`);
                     }
-                } else if (st.discipline === 'MARTIAL') {
-                    agent.skills.meleeAtt = Math.min(20, agent.skills.meleeAtt + 0.1);
-                } else if (st.discipline === 'DEFENSE') {
-                    agent.skills.meleeDef = Math.min(20, agent.skills.meleeDef + 0.1);
-                    agent.vitals.poise = Math.min(100, agent.vitals.poise + 0.2);
+                } else if (d === 'MARTIAL' || d === 'MELEE_ATT') {
+                    agent.skills.meleeAtt = Math.min(30, Number((agent.skills.meleeAtt + gain).toFixed(2)));
+                } else if (d === 'DEFENSE' || d === 'MELEE_DEF') {
+                    agent.skills.meleeDef = Math.min(30, Number((agent.skills.meleeDef + gain).toFixed(2)));
+                    agent.vitals.poise = Math.min(100, agent.vitals.poise + 2);
+                } else if (d === 'STRENGTH') {
+                    agent.skills.strength = Math.min(30, Number((agent.skills.strength + gain).toFixed(2)));
+                } else if (d === 'TOUGHNESS') {
+                    agent.skills.toughness = Math.min(30, Number((agent.skills.toughness + gain).toFixed(2)));
+                    agent.vitals.maxHp += 2;
+                    agent.vitals.hp = Math.min(agent.vitals.maxHp, agent.vitals.hp + 2);
+                } else if (d === 'ATHLETICS') {
+                    agent.skills.athletics = Math.min(30, Number((agent.skills.athletics + gain).toFixed(2)));
+                } else if (d === 'DODGE') {
+                    agent.skills.dodge = Math.min(30, Number((agent.skills.dodge + gain).toFixed(2)));
+                } else if (d === 'STEALTH') {
+                    agent.skills.stealth = Math.min(30, Number((agent.skills.stealth + gain).toFixed(2)));
+                } else if (d === 'SURVIVAL') {
+                    agent.skills.survival = Math.min(30, Number((agent.skills.survival + gain).toFixed(2)));
+                }
+                if (agent.cultivation) {
+                    agent.cultivation.currentMasteryPool = Math.min(100, (agent.cultivation.currentMasteryPool || 25) + 10);
                 }
             }
             agent.statusEffects = (agent.statusEffects || []).filter(eff => {
@@ -325,28 +368,138 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
         return newlyRisen;
     },
 
-    cultivateTerminusRunic(agentId, houseState) {
+    RUNIC_CARVING_TIERS: {
+        1: { tier: 1, title: 'Tier I: Bone Needles & Iron Awls', tool: 'Bone Needles & Iron Awls', fuelCost: 10, resCost: 12, sealCost: 0, lifespanBonus: 95, statBonus: 1.0, hpBonus: 15, failureHazard: 0.10 },
+        2: { tier: 2, title: 'Tier II: Runic Chisels', tool: 'Runic Chisels', fuelCost: 12, resCost: 16, sealCost: 0, lifespanBonus: 145, statBonus: 1.4, hpBonus: 20, failureHazard: 0.14 },
+        3: { tier: 3, title: 'Tier III: Silver Inlay Carvers (300 Guardian)', tool: 'Silver Inlay Carvers', fuelCost: 15, resCost: 22, sealCost: 0, lifespanBonus: 260, statBonus: 2.0, hpBonus: 35, failureHazard: 0.18 },
+        4: { tier: 4, title: 'Tier IV: Fuel-Etched Instruments (The Apex Phantom)', tool: 'Fuel-Etched Instruments', fuelCost: 20, resCost: 35, sealCost: 1, lifespanBonus: 450, statBonus: 2.8, hpBonus: 50, failureHazard: 0.22, unlocksWarp: true },
+        5: { tier: 5, title: 'Tier V: Anchor Resonance Tools', tool: 'Anchor Resonance Tools', fuelCost: 24, resCost: 48, sealCost: 2, lifespanBonus: 675, statBonus: 3.6, hpBonus: 65, failureHazard: 0.26 },
+        6: { tier: 6, title: 'Tier VI: Chronal Engravers (Great Ascendant)', tool: 'Chronal Engravers', fuelCost: 28, resCost: 65, sealCost: 3, lifespanBonus: 900, statBonus: 4.5, hpBonus: 85, failureHazard: 0.30 },
+        7: { tier: 7, title: 'Tier VII: Living Rune Implements (Near-Perfect)', tool: 'Living Rune Implements', fuelCost: 34, resCost: 85, sealCost: 4, lifespanBonus: 1000, statBonus: 5.5, hpBonus: 110, failureHazard: 0.35 },
+        8: { tier: 8, title: 'Tier VIII: Pre-Fracture Ascension Instruments (4,936y Max)', tool: 'Pre-Fracture Ascension Instruments', fuelCost: 42, resCost: 115, sealCost: 6, lifespanBonus: 1100, statBonus: 7.0, hpBonus: 150, failureHazard: 0.40 }
+    },
+
+    cultivateTerminusRunic(agentId, houseState = null) {
         const agent = this.agents.get(agentId);
         if (!agent || !agent.alive) return { success: false, message: "Agent invalid or deceased." };
-        if ((houseState.barrierFuelUnits || 0) < 10) {
-            return { success: false, message: "Insufficient refined barrier fuel (Requires 10 units minimum)." };
+        const fe = rootScope.FacilityEngine;
+        const cm = rootScope.CampaignManager;
+        const h = houseState || cm?.state?.house || {};
+        const syn = cm?.state?.syndicate || {};
+        const sov = cm?.state?.sovereign || {};
+        const isSov = cm?.campaignMode === 'SOVEREIGN';
+        const isSyn = cm?.campaignMode === 'SYNDICATE';
+
+        agent.cultivation ??= {
+            stage: 0, maxTier: 8, toolUsed: 'Uninscribed Flesh',
+            bodySites: { neck: 0, chest: 0, leftArm: 0, rightArm: 0, leftLeg: 0, rightLeg: 0 },
+            inscriptionsCount: 0, currentMasteryPool: 35, preservedMastery: 0,
+            potentialRemaining: 100, foundationPurity: 100, foundationFireDays: 0,
+            naturalLifespanYears: 311, bonusLifespanYears: 0, isCultivatedGuardian: false, causalCombatWarp: false
+        };
+
+        const currentStage = agent.cultivation.stage || 0;
+        if (currentStage >= 8) {
+            return { success: false, message: `${agent.name} has already completed all 8 Tiers (48/48 Body Rune Inscriptions — 4,936-Year Max Lifespan achieved!).` };
         }
-        houseState.barrierFuelUnits -= 10;
-        agent.cultivation.stage = (agent.cultivation.stage || 0) + 1;
-        if (agent.cultivation.stage < 3) {
-            return { success: true, message: `Terminus Bone-Carving Stage ${agent.cultivation.stage}/3 complete for ${agent.name}. Ancient syntax engraved.` };
+        const nextTier = currentStage + 1;
+        const cfg = this.RUNIC_CARVING_TIERS[nextTier];
+
+        if (nextTier >= 4) {
+            if (!fe?.facilities?.runic_carving_facility?.unlocked) {
+                return {
+                    success: false,
+                    message: `🔒 Tier ${nextTier} Runic Body-Carving requires the End-Game Facility [🪡 Runic Body-Carving Scriptorium (Tiers IV–VIII)]. Construct it in Base Upgrades first!`
+                };
+            }
+            if ((fe?.chronoSeals || 0) < cfg.sealCost) {
+                return {
+                    success: false,
+                    sealCost: cfg.sealCost,
+                    message: `💎 [PREMIUM BREAKTHROUGH GATE] Tier ${nextTier} (${cfg.title}) requires ${cfg.sealCost} Royal Chrono-Seal(s) as a chronal stabilizing catalyst (You have ${fe?.chronoSeals || 0}/${cfg.sealCost}💎).`
+                };
+            }
         }
-        agent.cultivation.isCultivatedGuardian = true;
-        agent.cultivation.bonusLifespanYears += 500;
+
+        const availFuel = isSyn ? (syn.contrabandResin ?? 45) : (isSov ? Math.floor((sov.significanceHarvested || 0) / 10) : (h.barrierFuelUnits ?? 28));
+        const reqFuel = nextTier <= 3 ? 10 : cfg.fuelCost;
+        const reqRes = nextTier <= 3 ? Math.min(fe?.settlementResources || 0, cfg.resCost) : cfg.resCost;
+
+        if (availFuel < reqFuel) {
+            return { success: false, message: `Insufficient refined Barrier Fuel / Essence (${availFuel}/${reqFuel}u required for ${cfg.title}).` };
+        }
+        if (nextTier >= 4 && (fe?.settlementResources || 0) < reqRes) {
+            return { success: false, message: `Insufficient Settlement Resources (${fe?.settlementResources || 0}/${reqRes}u required for ${cfg.title}).` };
+        }
+
+        if (isSyn) syn.contrabandResin -= reqFuel;
+        else if (isSov) sov.significanceHarvested = Math.max(0, (sov.significanceHarvested || 0) - reqFuel * 10);
+        else h.barrierFuelUnits = Math.max(0, (h.barrierFuelUnits || 0) - reqFuel);
+
+        if (fe && reqRes > 0) fe.settlementResources = Math.max(0, fe.settlementResources - reqRes);
+        if (fe && cfg.sealCost > 0) fe.chronoSeals = Math.max(0, fe.chronoSeals - cfg.sealCost);
+        const totalSkills = Object.values(agent.skills || {}).reduce((acc, v) => acc + Number(v || 2), 0);
+        const skillMasteryRatio = Math.min(1.0, (totalSkills + (agent.cultivation.currentMasteryPool || 30)) / (45 + nextTier * 12));
+        const qualityRoll = Math.min(1.0, 0.55 + skillMasteryRatio * 0.45);
+        const qualityLabels = ['Poor', 'Common', 'Fine', 'Superior', 'Exceptional', 'Legendary'];
+        const runeQuality = qualityLabels[Math.min(5, Math.floor(qualityRoll * 5.99))];
+
+        const potentialSquandered = skillMasteryRatio < 0.75 ? Math.round((1 - skillMasteryRatio) * 18) : 3;
+        agent.cultivation.potentialRemaining = Math.max(10, (agent.cultivation.potentialRemaining ?? 100) - potentialSquandered);
+        agent.cultivation.foundationPurity = Math.round(((agent.cultivation.foundationPurity ?? 100) * 0.65) + (qualityRoll * 100 * 0.35));
+        const preservedGain = Math.max(4, Math.round((agent.cultivation.currentMasteryPool || 30) * qualityRoll));
+        agent.cultivation.preservedMastery = (agent.cultivation.preservedMastery || 0) + preservedGain;
+        agent.cultivation.currentMasteryPool = 10;
+
+        agent.cultivation.stage = nextTier;
+        agent.cultivation.toolUsed = cfg.tool;
+        agent.cultivation.inscriptionsCount = nextTier * 6;
+        agent.cultivation.bodySites = {
+            neck: nextTier, chest: nextTier, leftArm: nextTier, rightArm: nextTier, leftLeg: nextTier, rightLeg: nextTier
+        };
+
+        const purityMult = Math.max(0.6, agent.cultivation.foundationPurity / 100);
+        const addedYears = Math.round(cfg.lifespanBonus * purityMult);
+        agent.cultivation.bonusLifespanYears = (agent.cultivation.bonusLifespanYears || 0) + addedYears;
         agent.cultivation.foundationFireDays = 14;
-        agent.career.rank = 'Guardian of the 300';
-        agent.significance += 45;
-        agent.vitals.maxHp += 50;
+
+        const sb = Number((cfg.statBonus * purityMult).toFixed(2));
+        agent.skills.strength = Number((agent.skills.strength + sb).toFixed(2));
+        agent.skills.toughness = Number((agent.skills.toughness + sb).toFixed(2));
+        agent.skills.meleeAtt = Number((agent.skills.meleeAtt + sb).toFixed(2));
+        agent.skills.meleeDef = Number((agent.skills.meleeDef + sb).toFixed(2));
+        agent.skills.survival = Number((agent.skills.survival + sb * 0.8).toFixed(2));
+        agent.vitals.maxHp += cfg.hpBonus;
         agent.vitals.hp = agent.vitals.maxHp;
         agent.vitals.poise = 100;
-        agent.statusEffects.push({ id: 'FOUNDATION_FIRE', name: 'Foundation Fire', type: 'SURGE', daysRemaining: 14, desc: '+200% all combat effectiveness' });
-        rootScope.EventBus?.emit('UI_LOG', `ðŸ”¥ [TERMINUS] BREAKTHROUGH SURGE: ${agent.name} has ignited the Foundation Fire and joined the 300 Guardians! (+500y Lifespan)`);
-        return { success: true, message: `BREAKTHROUGH ASCENSION! ${agent.name} is now an immortal Guardian of the 300 (+500y lifespan, Foundation Fire ignited).` };
+        agent.significance = (agent.significance || 20) + 25 * nextTier;
+
+        if (nextTier >= 3) {
+            agent.cultivation.isCultivatedGuardian = true;
+            agent.career.rank = nextTier >= 8 ? 'Pre-Fracture Ascendant (4,936y)' : (nextTier >= 6 ? 'Great Ascendant' : (nextTier >= 4 ? 'Apex Phantom' : 'Guardian of the 300'));
+        }
+        if (cfg.unlocksWarp || nextTier >= 4) {
+            agent.cultivation.causalCombatWarp = true;
+        }
+
+        agent.statusEffects = (agent.statusEffects || []).filter(e => e.id !== 'FOUNDATION_FIRE');
+        agent.statusEffects.push({
+            id: 'FOUNDATION_FIRE',
+            name: `Foundation Fire (Tier ${nextTier} Surge)`,
+            type: 'SURGE',
+            daysRemaining: 14,
+            desc: '+200% preserved discipline effectiveness ("The body celebrates before it pays")'
+        });
+
+        const totalLifespan = (agent.cultivation.naturalLifespanYears || 311) + agent.cultivation.bonusLifespanYears;
+        const sealNote = cfg.sealCost > 0 ? `, -${cfg.sealCost}💎 Chrono-Seal(s)` : '';
+        const trapNote = potentialSquandered >= 10
+            ? ` ⚠️ [CULTIVATION TRAP] Hurried ascension squandered -${potentialSquandered}% Lifetime Potential (Purity: ${agent.cultivation.foundationPurity}%)!`
+            : ` ✨ [HIGH PURITY FOUNDATION: ${agent.cultivation.foundationPurity}%] Preserved +${preservedGain} Mastery!`;
+
+        const msg = `🪡🔥 [RUNIC BODY-CARVING TIER ${nextTier}/8 — ${cfg.title.toUpperCase()}] Engraved 6 Body Sites (${agent.cultivation.inscriptionsCount}/48 Runes | Quality: ${runeQuality}) on ${agent.name} using [${cfg.tool}] (-${reqFuel}u Fuel, -${reqRes}r${sealNote}). Lifespan extended to ${totalLifespan} Years (+${addedYears}y). Foundation Fire ignited!${trapNote}`;
+        rootScope.EventBus?.emit('UI_LOG', msg);
+        return { success: true, tier: nextTier, runeQuality, totalLifespan, agent, message: msg };
     },
 
     recruitCounter: 0,
@@ -554,7 +707,8 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
             `Role / Rank:     ${a.career?.rank || 'Novice'} ${(a.career?.id || 'scout').toUpperCase()} | House/Faction: ${a.assignedHouseId}`,
             `Birthright:      [${a.birthright?.title || 'None'}] - ${a.birthright?.desc || ''}`,
             `Shift Birthday:  Day ${a.firstShiftSurvivedDay} AF (Shifts Endured: ${a.shiftsSurvived || 0}) | Significance: ${a.significance}`,
-            `Cultivation:     Stage ${a.cultivation?.stage || 0}/3 ${a.cultivation?.isCultivatedGuardian ? '* IMMORTAL 300 GUARDIAN (+500y)' : '(Mortal)'}`,
+            `Runic Carving:   Tier ${a.cultivation?.stage || 0}/8 (${a.cultivation?.inscriptionsCount || 0}/48 Body Runes | Tool: ${a.cultivation?.toolUsed || 'Uninscribed'})`,
+            `Mastery & Life:  Current Mastery: ${a.cultivation?.currentMasteryPool || 25} | Preserved: ${a.cultivation?.preservedMastery || 0} | Potential: ${a.cultivation?.potentialRemaining ?? 100}% | Purity: ${a.cultivation?.foundationPurity ?? 100}% | Lifespan: ${(a.cultivation?.naturalLifespanYears || 311) + (a.cultivation?.bonusLifespanYears || 0)}y / 4,936y`,
             `Current Stance:  [${a.operatingStance?.mode || 'IDLE'}${a.operatingStance?.discipline ? ': ' + a.operatingStance.discipline : ''}]`,
             `Crucible Scars:  ${(a.scars || []).map(s => s.scar || s).join('; ') || 'None Recorded'}`,
             ``,
@@ -3747,6 +3901,14 @@ const FacilityEngine = rootScope.FacilityEngine || {
             unlocked: false,
             cost: 10,
             unlocksDesc: 'Unlocks Gear & Weapon Trading/Buying Market (Purchase & sell canonical weapons, armor & ward-trinkets; higher levels discount prices).'
+        },
+        runic_carving_facility: {
+            id: 'runic_carving_facility',
+            name: '🪡 Runic Body-Carving Scriptorium (Tiers IV–VIII)',
+            level: 0,
+            unlocked: false,
+            cost: 28,
+            unlocksDesc: 'End-Game Ascension Sanctum (Addendum CA-13): Unlocks Tiers IV–VIII Runic Body-Carving (Fuel-Etched Instruments -> Pre-Fracture Ascension Instruments, 48 Body Sites, up to 4,936y Lifespan; requires Royal Chrono-Seals).'
         }
     },
 
@@ -4077,19 +4239,44 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
                 if (exp.hoursElapsed === Math.ceil(exp.totalHours * 0.35)) {
                     exp.status = 'EN_ROUTE';
                     exp.hazardEncounters = (exp.hazardEncounters || 0) + 1;
+                    exp.combatEvents ??= [];
+
+                    const enemyNames = ['Pack of Bracken-Hounds', 'Frost-Bitten Mist Stalkers', 'Rival House Outrider Ambush', 'Slag-Weevil Swarm'];
+                    const enemyName = enemyNames[(day + exp.hoursElapsed) % enemyNames.length];
+                    const weaponName = profile.equippedSummary[0] || 'Standard Ironwood Spear';
+                    const armorName = profile.equippedSummary[1] || 'Issued Garrison Brigandine';
+                    const agtName = agt?.name || exp.leadAgentName || 'Squad Leader';
+                    const warpActive = agt?.cultivation?.causalCombatWarp;
+                    const fireActive = (agt?.cultivation?.foundationFireDays || 0) > 0;
+                    const cultTier = agt?.cultivation?.stage || 0;
 
                     if (profile.netAdvantage >= 0 || exp.guarded) {
                         const gearUsed = profile.equippedSummary.length > 0 ? ` [${profile.equippedSummary[0]}]` : '';
-                        exp.logs.push(`[${hh}:00] ⚔️ Escort repelled a pack of bracken-hounds in the copper fog${gearUsed}; perimeter held (Def ${profile.squadDefense} vs Hazard ${profile.hazardRating}).`);
+                        const r1 = `[${hh}:05] 👁️ [CONTACT] ${agtName} spotted ${enemyName} (Threat Hazard: ${profile.hazardRating}) closing through the copper fog at 35 paces.`;
+                        const r2 = warpActive
+                            ? `[${hh}:18] ⚡ [CAUSAL COMBAT WARP — TIER ${cultTier} APEX PHANTOM] ${agtName} vanished into slow-movement refraction and side-stepped the lead strike, counter-thrusting with [${weaponName}] for critical vitals damage!`
+                            : `[${hh}:18] 🗡️ [CLASH] ${agtName} braced behind [${armorName}] (Def ${profile.squadDefense}) and drove [${weaponName}] through the lead stalker's collar!`;
+                        const r3 = fireActive
+                            ? `[${hh}:34] 🔥 [FOUNDATION FIRE SURGE (+200%)] Engraved body-runes blazed along ${agtName}'s arms! The escort shattered the ${enemyName} flank in 34 seconds (0 Cargo lost | +0.25 Melee Mastery).`
+                            : `[${hh}:42] 🛡️ [AFTERMATH] Escort locked shields and drove the remaining ${enemyName} back into the peat. Perimeter held (Def ${profile.squadDefense} vs Hazard ${profile.hazardRating} | Cargo Integrity: ${exp.cargoIntegrity ?? 100}%).`;
+
+                        exp.combatEvents.push(r1, r2, r3);
+                        exp.logs.push(`[${hh}:00] ⚔️ Escort repelled a pack of bracken-hounds in the copper fog${gearUsed}; perimeter held (Def ${profile.squadDefense} vs Hazard ${profile.hazardRating}).`, r1, r2, r3);
                         if (agt && agt.skills) {
-                            agt.skills.meleeAtt = Number((agt.skills.meleeAtt + 0.15).toFixed(2));
+                            agt.skills.meleeAtt = Number((agt.skills.meleeAtt + 0.25).toFixed(2));
+                            if (agt.cultivation) agt.cultivation.currentMasteryPool = Math.min(100, (agt.cultivation.currentMasteryPool || 25) + 12);
                         }
                     } else {
                         const cargoLoss = Math.min(40, Math.max(10, Math.abs(profile.netAdvantage) * 3));
                         exp.cargoIntegrity = Math.max(20, (exp.cargoIntegrity ?? 100) - cargoLoss);
-                        exp.logs.push(`[${hh}:00] ⚠️ Mist-stalkers shadowed the unguarded wagons near mile-stone four; drovers whipped the mules hard (-${Math.round(cargoLoss / 10)} Cargo lost | Integrity: ${exp.cargoIntegrity}%).`);
+                        const hpLoss = Math.max(8, Math.abs(profile.netAdvantage) * 2);
+                        const r1 = `[${hh}:08] ⚠️ [AMBUSH] ${enemyName} (Hazard ${profile.hazardRating}) erupted from the drainage ditch, outflanking ${agtName} (Def ${profile.squadDefense})!`;
+                        const r2 = `[${hh}:24] 🩸 [EXCHANGE] ${agtName} parried with [${weaponName}], but a flanker tore through [${armorName}] (-${hpLoss} HP, -18 Poise, +20% Shock)!`;
+                        const r3 = `[${hh}:49] 📦 [BREACH] Drovers whipped the mules clear as ${enemyName} dragged -${Math.round(cargoLoss / 10)} supply cask(s) into the fog (Cargo Integrity: ${exp.cargoIntegrity}%).`;
+
+                        exp.combatEvents.push(r1, r2, r3);
+                        exp.logs.push(`[${hh}:00] ⚠️ Mist-stalkers shadowed the unguarded wagons near mile-stone four; drovers whipped the mules hard (-${Math.round(cargoLoss / 10)} Cargo lost | Integrity: ${exp.cargoIntegrity}%).`, r1, r2, r3);
                         if (agt && agt.vitals) {
-                            const hpLoss = Math.max(8, Math.abs(profile.netAdvantage) * 2);
                             agt.vitals.hp = Math.max(15, agt.vitals.hp - hpLoss);
                             agt.vitals.poise = Math.max(10, (agt.vitals.poise || 60) - 18);
                             if (agt.reflexes) agt.reflexes.shock = Math.min(100, (agt.reflexes.shock || 0) + 20);
