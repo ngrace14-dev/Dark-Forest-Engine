@@ -2149,6 +2149,29 @@ const CampaignManager = rootScope.CampaignManager || {
     victoryConditionsMet: false,
     collapseTriggered: false,
     collapseReason: null,
+    scoutedNodes: new Set(['the capital', 'oakhaven', 'gallows hill', "mire's edge", 'blackwood', 'hollow creek', 'ashen hold']),
+
+    isSettlementInForestZone(settlementObj = {}) {
+        const id = Number(settlementObj.id ?? 0);
+        const nameLower = String(settlementObj.name || '').toLowerCase();
+        // Inner Forest Zone ($r = 0..100km$): The Capital (0) + First 10 Inner Forest Parishes (IDs 1..10, excluding #7 Epitaph on Mountain Event Horizon)
+        if (id === 7 || settlementObj.hiddenGapKeeper || nameLower === 'epitaph') return false;
+        if (id >= 0 && id <= 10) return true;
+        return this.scoutedNodes?.has?.(nameLower) || this.scoutedNodes?.has?.(String(id)) || false;
+    },
+
+    revealFogOfWarNode(targetNameOrId) {
+        this.scoutedNodes ??= new Set();
+        const key = String(targetNameOrId || '').toLowerCase().trim();
+        if (!key) return false;
+        this.scoutedNodes.add(key);
+        const matched = CANONICAL_BEDROCK_SETTLEMENTS.find(s => s.name.toLowerCase() === key || s.house.toLowerCase() === key || String(s.id) === key);
+        if (matched) {
+            this.scoutedNodes.add(matched.name.toLowerCase());
+            this.scoutedNodes.add(String(matched.id));
+        }
+        return true;
+    },
 
     state: {
         house: {
@@ -2217,6 +2240,7 @@ const CampaignManager = rootScope.CampaignManager || {
         CrucibleNarrativeEngine.biographies.clear();
         CrucibleNarrativeEngine.crucibles.clear();
         this.resetWarBoard();
+        this.scoutedNodes = new Set(['0', '1', '2', '3', '4', '5', '6', '8', '9', '10', 'the capital', 'oakhaven', 'gallows hill', "mire's edge", 'blackwood', 'hollow creek', 'ashen hold', "crow's perch", "widow's web", 'thornbury']);
         RealityEditorVault.resetForNewRun();
         RoleStateMachine.transitionTo('MORNING_BRIEFING');
 
@@ -4353,6 +4377,7 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
                     } else if (exp.type === 'GUARDED_CARAVAN' || exp.type === 'UNGUARDED_CARAVAN') {
                         CampaignManager.mutateWarBoard(exp.targetName, 2, 'PEACE');
                     }
+                    CampaignManager.revealFogOfWarNode?.(exp.targetName);
 
                     RealityEditorVault.discoverFact({
                         title: `${exp.targetName} Field Recon & Toll Manifest`,

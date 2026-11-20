@@ -341,3 +341,4 @@ export class DunesSystem {
 
 // Global Singleton Binding
 window.DunesSystem = DunesSystem;
+export default DunesSystem;

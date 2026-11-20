@@ -204,3 +204,8 @@ export class MountainSystem {
         }
     }
 }
+
+if (typeof window !== 'undefined') {
+    window.MountainSystem = MountainSystem;
+}
+export default MountainSystem;

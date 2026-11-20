@@ -1,10 +1,16 @@
 # Dark Forest Engine — Active Context
 
 ## 1. Current Focus
-- Completed the **17-Point Playtester Audit & General Ledger Overhaul** across both the **Mobile General Ledger (`ledger-mobile/`)** and **Desktop Headless Simulation Systems (`src/` & `tools/`)**.
-- All 17 user-reported issues audited, fixed, mirrored across `src/` and `ledger-mobile/`, and verified headlessly with `node tools/test_commander_logic.mjs` and `node tools/live_playtester_audit.mjs`.
+- Completed the **17-Point Playtester Audit & General Ledger Overhaul**, **Royal Auditor Onboarding & Premium Chrono-Seal Economy**, **Lore Bible Addendum CA-13 8-Tier Runic Body-Carving**, and the **20-Settlement Tactical Dominion Map with Outer Horizon Fog of War** across both **Mobile General Ledger (`ledger-mobile/`)** and **Desktop Headless Simulation Systems (`src/` & `tools/`)**.
+- All systems mirrored across `src/` and `ledger-mobile/` and verified headlessly with `node tools/test_commander_logic.mjs` and `node tools/live_playtester_audit.mjs`.
 
 ## 2. Recent Completed Changes
+- **Royal Auditor Onboarding, Premium Chrono-Seal Economy, Addendum CA-13 Runic Body-Carving & Tactical Dominion Map (with Outer Fog of War):**
+  - **Royal Auditor & Faction Leader Identity:** Re-framed `CandidateOnboarding` around the **Royal Auditor & Lore-Specific Faction Leader** (*High Marshal Vane*, *Director Jess Nedaf*, *Baron Kaelen Oakheart*, *Sluice-Boss Harl*, *Korvan*) and replaced free-text origin inputs with 4 selectable **Jurisdictional Campaign Modifiers** (`ORIGIN_MODIFIER_CATALOG`).
+  - **Real-Time Day Timer, Scaling Chrono-Seal Costs & 7-Fragment Seal Forge:** Locked time advancement to the real-time Day Timer (`1x`–`8x`) and scaling **Royal Chrono-Seal** skips (`+2H Boost = 1💎`, `+6H Boost = 3💎`, `+1D Skip = 6💎`, `+3D Skip = 18💎`), backed by a **7-Fragment Daily Log-In Forge** (`claimDailyLoginFragments`) and Resource-to-Seal Mint (`mintChronoSealFromResources`).
+  - **Addendum CA-13 8-Tier Runic Body-Carving & Per-Stat Training:** Implemented all 8 Tiers of Runic Body-Carving (`RUNIC_CARVING_TIERS`, 48 body-rune inscriptions, 311y $\rightarrow$ 4,936y Longevity Ladder, Foundation Purity, Foundation Fire surge, and Causal Combat Warp) with Tiers IV–VIII gated behind `runic_carving_facility` and Royal Chrono-Seals (`1–6💎`), plus per-attribute Fallout Shelter training buttons for all 9 stats (`window.trainAgentStat`) and 3-round **Live Tactical Combat Telemetry** logs (`exp.combatEvents`).
+  - **Interactive 20-Settlement Tactical Dominion Map, Fog of War Layer & Encounter Arena:** Built the interactive SVG Dominion Map on Tab V (`CommanderUI.renderWarBoardReader`) with an **Outer Horizon Fog of War** shroud obscuring settlements outside the Inner Forest Zone (IDs 11–19 and #7 Epitaph) until cleared via `window.scoutFogOfWarNode` / `PATROL_MIST` recon expeditions, plus the interactive **Tactical Encounter Arena** modal and **Auditor's Retreat** fallback toggle.
+  - **Crisis Grace Period Lowered:** Reduced `CrisisEngine.minCrisisDayThreshold` from `40` days to `4` days so emergent crises and *Grammar of Chaos* collisions trigger during the first 14-day Shift cycle.
 - **17-Point Playtester Overhaul (Phase 1–5):**
   1. **Role Selector Title Card Redactions & Role Labels:** Labeled **`ROLE: MERCHANT PATRON`** under The Crown, **`ROLE: NOBLE HOUSE`** under Noble House, and completely blacked out the **Obsidian Citadel** group name, blacked out its Containment gauge, and set the percentage to **`?%`**.
   2. **One-Way Role Selection Lockout:** Removed the option to return to the Role Selector once a role is launched (`openRoleSelection` lockout, removed `🚪 Role Roster`, `PAGE 1`, `PAGE 2`, and hid `btn-nav-role-scroll`).

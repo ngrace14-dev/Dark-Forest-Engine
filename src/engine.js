@@ -9,7 +9,7 @@ import alea from 'alea';
 // Your AAA system imports
 import WetlandsSystem from './systems/wetlands.js';
 import MountainSystem from './systems/mountains.js';
-import DunesSystem from './systems/dunes.js';
+import { DunesSystem } from './systems/dunes.js';
 import TidewaterSystem from './systems/tidewater.js';
 
 

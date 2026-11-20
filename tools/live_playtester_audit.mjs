@@ -455,9 +455,21 @@ if (!tier4Res.success || tier4Res.tier !== 4 || !combatExp.expedition.combatEven
     logPlay('ADDENDUM CA-13 RUNIC CARVING & LIVE COMBAT LOG', `${tier4Res.message}\n   ↳ Live Combat Log: ${combatExp.expedition.combatEvents.join(' | ')}`);
 }
 
-// 5G. Interactive 20-Settlement Tactical Dominion Map, Dragon-Sim Encounter Arena & Auditor's Retreat Fallback
+// 5G. Interactive 20-Settlement Tactical Dominion Map, Fog of War Recon Layer, Dragon-Sim Encounter Arena & Auditor's Retreat Fallback
 window.viewWarBoard();
-window.selectMapSettlement(2); // Select Gallows Hill
+window.selectMapSettlement(15); // Select Blighted Watch (#15, Outer Horizon node outside Inner Forest Zone -> starts covered by Fog of War)
+const foggedDeckHtml = document.getElementById('brutalist-subpage-deck')?.innerHTML || '';
+if (!foggedDeckHtml.includes('OUTER HORIZON FOG — UNCHARTED SECTOR #15') || !foggedDeckHtml.includes('Dispatch Mist-Recon Patrol (Lift Fog of War)')) {
+    auditReport.bugsFound.push('Expected outer settlement node #15 (outside the Inner Forest Zone) to start obscured by the Fog of War layer.');
+}
+window.scoutFogOfWarNode('Blighted Watch'); // Lift Fog of War via Mist-Recon Patrol
+window.selectMapSettlement(15);
+const unfoggedDeckHtml = document.getElementById('brutalist-subpage-deck')?.innerHTML || '';
+if (!unfoggedDeckHtml.includes('SELECTED NODE: BLIGHTED WATCH') || unfoggedDeckHtml.includes('OUTER HORIZON FOG — UNCHARTED SECTOR #15')) {
+    auditReport.bugsFound.push('Expected window.scoutFogOfWarNode("Blighted Watch") to lift the Fog of War on outer settlement #15.');
+}
+
+window.selectMapSettlement(2); // Select Gallows Hill (#2, Inner Forest Zone)
 window.openTacticalEncounter(2);
 const encRound1 = window.executeEncounterAction('CAUSAL_WARP');
 const encRound2 = window.executeEncounterAction('RUNIC_SURGE');
@@ -468,7 +480,7 @@ const warDeckHtml = document.getElementById('brutalist-subpage-deck')?.innerHTML
 if (!encRound1.success || !warDeckHtml.includes('TACTICAL ENCOUNTER ARENA') || !warDeckHtml.includes('SELECTED NODE: GALLOWS HILL')) {
     auditReport.bugsFound.push('Expected Interactive 20-Settlement Tactical Dominion Map and Tactical Encounter Arena modal to render and execute combat rounds.');
 } else {
-    logPlay('TACTICAL DOMINION MAP & ENCOUNTER ARENA', `${encRound1.message} | ${encRound2.message} | ${encRound3.message}`);
+    logPlay('TACTICAL DOMINION MAP, FOG OF WAR & ENCOUNTER ARENA', `Verified Outer Fog of War shroud on Sector #15 lifted by Mist-Recon Patrol + Encounter Arena: ${encRound1.message} | ${encRound2.message} | ${encRound3.message}`);
 }
 
 console.log('--------------------------------------------------------------------------------');
@@ -477,5 +489,6 @@ if (auditReport.bugsFound.length > 0) {
     process.exit(1);
 } else {
     console.log('LIVE GAME TESTER PLAYTHROUGH & SYSTEMIC QA AUDIT PASSED (0 BUGS, 100% UI & LOOP PARITY)!');
+    process.exit(0);
 }
 

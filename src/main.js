@@ -110,7 +110,7 @@ import { ImpostorBaker } from './systems/impostor_baker.js'; // Single Authority
 import './systems/forest_impostors.js';   // 3km Distant Canopy Impostor System
 import WetlandsSystem from './systems/wetlands.js';
 import MountainSystem from './systems/mountains.js';
-import DunesSystem from './systems/dunes.js';
+import { DunesSystem } from './systems/dunes.js';
 import './systems/dune_drift.js';
 import TidewaterSystem from './systems/tidewater.js';
 

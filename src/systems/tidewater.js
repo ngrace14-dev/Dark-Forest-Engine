@@ -300,3 +300,8 @@ export class TidewaterSystem {
         console.log('[TidewaterSystem] Disposed cleanly.');
     }
 }
+
+if (typeof window !== 'undefined') {
+    window.TidewaterSystem = TidewaterSystem;
+}
+export default TidewaterSystem;

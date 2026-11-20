@@ -640,6 +640,13 @@ export const CommanderUI = {
             this.activeEncounterState = null;
             this.renderWarBoardReader();
         };
+        window.scoutFogOfWarNode = (targetName) => {
+            CommanderEngine.CampaignManager.revealFogOfWarNode?.(targetName);
+            const res = CommanderEngine.ExpeditionEngine.launchExpedition('PATROL_MIST', targetName);
+            this.showBanner(`🌫️🧭 [FOG OF WAR RECON] Dispatched Mist-Recon Squad to lift the Outer Horizon Fog around [${targetName}]! ${res.message}`);
+            this.renderWarBoardReader();
+            this.render();
+        };
         window.interrogateSuspect = (targetId = 'agt_2') => {
             CommanderEngine.TutorialAdvisor?.checkAndTrigger?.('INQUEST_BTN');
             this.renderInquestReader(targetId);
@@ -787,9 +794,15 @@ export const CommanderUI = {
 
     renderWarBoardReader() {
         const board = CommanderEngine.CampaignManager.getWarBoard() || [];
+        const settlementsForLog = CommanderEngine.CampaignManager.getBedrockTelemetry({
+            allowTwentyFirst: CommanderEngine.ShadowInfluenceEngine?.isEpitaphRevealed?.() || false
+        }) || [];
+        const clearedCount = settlementsForLog.filter(s => CommanderEngine.CampaignManager.isSettlementInForestZone?.(s)).length;
+        const foggedCount = Math.max(0, settlementsForLog.length - clearedCount);
         let text = "================================================================================\n";
         text += "🏰 THE 19 NOBLE HOUSES & FEUDAL WAR BOARD\n";
         text += "   Power Rating (0-100) = Composite Index of Garrison Strength, Barrier Fuel & Monopoly Leverage\n";
+        text += `   🌲 Inner Forest Zone Cleared: ${clearedCount} Parishes | 🌫️ Outer Horizon Fog of War: ${foggedCount} Unscouted Sectors\n`;
         text += "================================================================================\n\n";
         text += "👑 THE 9 BLESSED HOUSES (MAJOR MONOPOLIES):\n";
         board.filter(h => h.blessed).forEach((h, i) => {
@@ -829,25 +842,30 @@ export const CommanderUI = {
             const selNode = settlements.find(s => Number(s.id) === Number(this.selectedMapSettlementId)) || settlements[1] || { id: 1, name: 'Oakhaven', house: 'House Oakheart', barrierFuel: 50, chainsIntegrity: 100 };
             const selHouse = board.find(w => w.name === selNode.house) || { name: selNode.house, power: 65, status: 'PEACE', monopoly: 'Ironwood' };
             const isSov = CommanderEngine.CampaignManager.campaignMode === 'SOVEREIGN';
+            const selNodeCleared = CommanderEngine.CampaignManager.isSettlementInForestZone?.(selNode) ?? (Number(selNode.id) <= 10);
 
             const svgNodes = settlements.map((s, i) => {
                 if (i === 0) {
                     return `<g style="cursor:pointer;" onclick="window.selectMapSettlement(0)"><rect x="132" y="54" width="16" height="16" fill="#1e1b4b" stroke="#fbbf24" stroke-width="1.8"/><text x="140" y="65" text-anchor="middle" fill="#fde68a" font-size="9">👑</text></g>`;
                 }
+                const isForestInner = Number(s.id) >= 1 && Number(s.id) <= 10 && Number(s.id) !== 7;
+                const isRevealed = CommanderEngine.CampaignManager.isSettlementInForestZone?.(s) ?? isForestInner;
                 const angle = ((i - 1) / Math.max(1, settlements.length - 1)) * Math.PI * 2 - Math.PI / 2;
-                const rx = (i % 2 === 0) ? 108 : 74;
-                const ry = (i % 2 === 0) ? 46 : 31;
+                const rx = isForestInner ? 66 : 112;
+                const ry = isForestInner ? 28 : 49;
                 const cx = (140 + rx * Math.cos(angle)).toFixed(1);
                 const cy = (64 + ry * Math.sin(angle)).toFixed(1);
                 const hEntry = board.find(w => w.name === s.house);
                 const isSelected = Number(s.id) === Number(selNode.id);
                 const isHostile = hEntry?.status === 'WAR_PREP' || hEntry?.status === 'SKIRMISH' || s.chainsIntegrity < 50;
-                const fillCol = isSelected ? '#38bdf8' : (isHostile ? '#dc2626' : (hEntry?.status === 'ALLIED' ? '#10b981' : '#d97706'));
+                const fillCol = !isRevealed ? '#334155' : (isSelected ? '#38bdf8' : (isHostile ? '#dc2626' : (hEntry?.status === 'ALLIED' ? '#10b981' : '#d97706')));
+                const labelTxt = isRevealed ? s.name.slice(0, 10) : '🌫️ [FOGGED]';
+                const blurAttr = !isRevealed ? 'opacity="0.55" filter="url(#outer-fog-blur)"' : '';
                 return `
-                    <g style="cursor:pointer;" onclick="window.selectMapSettlement(${s.id})">
+                    <g style="cursor:pointer;" ${blurAttr} onclick="window.selectMapSettlement(${s.id})">
                         <line x1="140" y1="62" x2="${cx}" y2="${cy}" stroke="${isSelected ? '#38bdf8' : '#4a453b'}" stroke-width="${isSelected ? '1.6' : '0.8'}" stroke-dasharray="2,2"/>
                         <circle cx="${cx}" cy="${cy}" r="${isSelected ? '6.5' : '4.5'}" fill="${fillCol}" stroke="#090d0e" stroke-width="1.2"/>
-                        <text x="${cx}" y="${(Number(cy) - 7).toFixed(1)}" text-anchor="middle" fill="${isSelected ? '#7dd3fc' : '#e2d1b0'}" font-size="${isSelected ? '6.5' : '5.3'}" font-weight="bold">${s.name.slice(0, 10)}</text>
+                        <text x="${cx}" y="${(Number(cy) - 7).toFixed(1)}" text-anchor="middle" fill="${isSelected ? '#7dd3fc' : (isRevealed ? '#e2d1b0' : '#94a3b8')}" font-size="${isSelected ? '6.5' : '5.2'}" font-weight="bold">${labelTxt}</text>
                     </g>
                 `;
             }).join('');
@@ -874,19 +892,27 @@ export const CommanderUI = {
                         </div>
                         <div class="burden-parchment-card" style="padding:6px 8px; margin-top:6px;">
                             <div style="font-family:'Cinzel',serif; font-weight:900; font-size:10px; border-bottom:1px solid #4a3e2e; margin-bottom:4px; color:#5e110b;">
-                                🎯 SELECTED NODE: ${selNode.name.toUpperCase()} (${selNode.house})
+                                🎯 SELECTED NODE: ${selNodeCleared ? `${selNode.name.toUpperCase()} (${selNode.house})` : `🌫️ OUTER HORIZON FOG — UNCHARTED SECTOR #${selNode.id}`}
                             </div>
                             <div style="font-size:8.5px; color:#1c1610; margin-bottom:5px;">
-                                <b>Power:</b> ${selHouse.power}/100 [${selHouse.status}] | <b>Fuel:</b> ${selNode.barrierFuel}u | <b>50-Ton Chains:</b> ${selNode.chainsIntegrity}%
+                                ${selNodeCleared
+                                    ? `<b>Region:</b> ${Number(selNode.id) <= 10 ? 'Inner Dark Forest Zone (Cleared)' : 'Outer Mountain/Horizon Ring (Scouted)'} | <b>Power:</b> ${selHouse.power}/100 [${selHouse.status}] | <b>Fuel:</b> ${selNode.barrierFuel}u | <b>Chains:</b> ${selNode.chainsIntegrity}%`
+                                    : `<b>Status:</b> Obscured by Outer Event-Horizon Fog of War (Outside the Inner Forest Zone). Dispatch a Mist-Recon Patrol to lift the fog and reveal telemetry!`
+                                }
                             </div>
                             <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.openTacticalEncounter(${selNode.id})">${isSov ? '🐺 Hunt &amp; Devour Parish' : '⚔️ Tactical Encounter'}</button>
-                                ${isSov
-                                    ? `<button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('SUMMON_HUNTSMAN','${selNode.name}')">🧭 Stalk Node</button>`
+                                ${!selNodeCleared
+                                    ? `<button class="cmd-btn" style="padding:3px 8px; font-size:9px; background:#0f172a; border-color:#38bdf8; color:#bae6fd;" onclick="window.scoutFogOfWarNode('${selNode.name}')">🌫️🧭 Dispatch Mist-Recon Patrol (Lift Fog of War)</button>`
                                     : `
-                                        <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('GUARDED_CARAVAN','${selNode.name}')">🛡️ Caravan</button>
-                                        <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('PATROL_MIST','${selNode.name}')">🧭 Patrol</button>
-                                        <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('PROXY_RAID','${selNode.name}')">🗡️ Proxy Raid</button>
+                                        <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.openTacticalEncounter(${selNode.id})">${isSov ? '🐺 Hunt &amp; Devour Parish' : '⚔️ Tactical Encounter'}</button>
+                                        ${isSov
+                                            ? `<button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('SUMMON_HUNTSMAN','${selNode.name}')">🧭 Stalk Node</button>`
+                                            : `
+                                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('GUARDED_CARAVAN','${selNode.name}')">🛡️ Caravan</button>
+                                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('PATROL_MIST','${selNode.name}')">🧭 Patrol</button>
+                                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('PROXY_RAID','${selNode.name}')">🗡️ Proxy Raid</button>
+                                            `
+                                        }
                                     `
                                 }
                             </div>
@@ -894,12 +920,27 @@ export const CommanderUI = {
                     </div>
                     <div style="border:1px solid #383e40; background:rgba(9,13,14,0.85); padding:8px; display:flex; flex-direction:column; justify-content:space-between;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold;">TELEMETRY GRID // 20 CHAINED SETTLEMENTS (CLICK NODE TO TARGET)</div>
+                            <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold;">TELEMETRY GRID // INNER FOREST ZONE vs. OUTER FOG OF WAR</div>
                             <span style="font-size:8px; color:#38bdf8;">[${this.mapViewMode}]</span>
                         </div>
-                        <svg viewBox="0 0 280 128" style="width:100%; height:132px; display:block; margin:2px auto; background:radial-gradient(circle at 50% 50%, rgba(14,116,144,0.16) 0%, rgba(7,10,11,0.95) 85%); border:1px solid #2b3234;">
-                            <ellipse cx="140" cy="64" rx="112" ry="48" fill="none" stroke="#4a453b" stroke-width="1" stroke-dasharray="3,2"/>
-                            <ellipse cx="140" cy="64" rx="76" ry="32" fill="none" stroke="#334155" stroke-width="0.8" stroke-dasharray="2,2"/>
+                        <svg viewBox="0 0 280 128" style="width:100%; height:132px; display:block; margin:2px auto; background:radial-gradient(circle at 50% 50%, rgba(20,83,45,0.28) 0%, rgba(15,23,42,0.92) 56%, rgba(5,7,9,0.98) 100%); border:1px solid #2b3234;">
+                            <defs>
+                                <filter id="outer-fog-blur" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feGaussianBlur stdDeviation="0.9" />
+                                </filter>
+                                <radialGradient id="fog-of-war-shroud" cx="50%" cy="50%" r="50%">
+                                    <stop offset="0%" stop-color="#000000" stop-opacity="0" />
+                                    <stop offset="52%" stop-color="#0f172a" stop-opacity="0.05" />
+                                    <stop offset="68%" stop-color="#1e293b" stop-opacity="0.68" />
+                                    <stop offset="100%" stop-color="#020617" stop-opacity="0.92" />
+                                </radialGradient>
+                            </defs>
+                            <!-- Outer Fog of War Shroud covering everything outside the Inner Forest Zone -->
+                            <rect x="0" y="0" width="280" height="128" fill="url(#fog-of-war-shroud)" pointer-events="none"/>
+                            <ellipse cx="140" cy="64" rx="112" ry="49" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3"/>
+                            <ellipse cx="140" cy="64" rx="76" ry="33" fill="none" stroke="#22c55e" stroke-width="1.2" stroke-dasharray="3,2"/>
+                            <text x="140" y="28" text-anchor="middle" fill="#86efac" font-size="5.5" font-weight="bold">🌲 INNER FOREST ZONE (CLEARED)</text>
+                            <text x="140" y="10" text-anchor="middle" fill="#94a3b8" font-size="5.5" font-weight="bold">🌫️ OUTER HORIZON &amp; DUNES (FOG OF WAR — REQUIRES RECON)</text>
                             ${svgNodes}
                         </svg>
                         <div class="burden-parchment-card" style="padding:5px 7px;">
