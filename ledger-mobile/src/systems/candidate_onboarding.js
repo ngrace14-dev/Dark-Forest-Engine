@@ -147,7 +147,7 @@ export const CandidateOnboarding = {
 
                 <div style="display:grid; grid-template-columns: 1.25fr 0.9fr 0.75fr; gap:10px;">
                     <div style="border:1px solid #383e40; background:rgba(9,13,14,0.75); padding:9px;">
-                        <div style="color:#cbbba0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold; border-bottom:1px solid #383e40; padding-bottom:4px; margin-bottom:5px;">ARCHIVAL TELEMETRY &amp; LEADER IDENTITY</div>
+                        <div style="color:#cbbba0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold; border-bottom:1px solid #383e40; padding-bottom:4px; margin-bottom:5px;">FORENSIC PROVENANCE LOG // LEADER IDENTITY</div>
                         ${this.renderFiveStrandLogHtml()}
                         <div style="margin-top:7px; padding:6px; background:#07090a; border:1px solid #575043; font-size:9.5px; color:#d8c8a8;">
                             <b style="color:#fbbf24;">EXECUTIVE AUTHORITY:</b> You play as the <b>Royal Auditor &amp; Lore-Specific Faction Leader</b> of the group you select on the Duty Roster (e.g. <i>High Marshal Vane</i> of House Terminus, <i>Director Jess Nedaf</i> of the Obsidian Citadel, <i>King Alaric's Royal Factor</i>, <i>Sluice-Boss Harl</i>, or <i>Korvan the Pale Sovereign</i>).
