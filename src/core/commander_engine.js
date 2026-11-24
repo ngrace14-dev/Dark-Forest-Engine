@@ -7626,6 +7626,132 @@ export const PoemTrapEngine = rootScope.PoemTrapEngine || {
                 'Be wary should the hunter fall—',
                 'the master comes to feast on all.'
             ]
+        },
+        ANTHOLOGY_POEM_1_ROADS: {
+            id: 'ANTHOLOGY_POEM_1_ROADS',
+            title: 'Anthology Poem #1: The Spatial Distortion Road Cadence',
+            origin: 'SURFACE_VILLAGES',
+            epistemicClass: 'OBSERVATIONAL_TRUTH',
+            pairedCounterPoemId: 'ANTHOLOGY_POEM_11_SHIFT',
+            cipherNumbers: [10],
+            lines: [
+                'Roads are traveled safe alone,',
+                'yet tenfold farther you will roam,',
+                'when markers twist beneath the loam,',
+                'to reach the threshold of your home.'
+            ]
+        },
+        ANTHOLOGY_POEM_2_FADED_CHAMPION: {
+            id: 'ANTHOLOGY_POEM_2_FADED_CHAMPION',
+            title: 'Anthology Poem #2: The Faded Champion & The Betrayal',
+            origin: 'EPITAPH_7',
+            epistemicClass: 'SUPPRESSED_ROOT',
+            pairedCounterPoemId: 'ANTHOLOGY_POEM_3_MONARCH',
+            cipherNumbers: [19],
+            lines: [
+                'A boy turned monster stolen from home,',
+                'murder by day and slave alone.',
+                'In the last moment of his blinding light,',
+                'they fled in haste to keep the fight.'
+            ]
+        },
+        ANTHOLOGY_POEM_3_MONARCH: {
+            id: 'ANTHOLOGY_POEM_3_MONARCH',
+            title: 'Anthology Poem #3: The Monarch’s Fortnight (20 vs. 40 Cipher)',
+            origin: 'THE_CROWN',
+            epistemicClass: 'INSTITUTIONAL_REVISION',
+            pairedCounterPoemId: 'ANTHOLOGY_POEM_2_FADED_CHAMPION',
+            cipherNumbers: [14, 20, 40],
+            lines: [
+                'A monarch leads through every fortnight,',
+                'when some claim twenty, forty others might.',
+                'But when fires burn and spirits flow,',
+                'who dares to doubt the ones who know.'
+            ]
+        },
+        ANTHOLOGY_POEM_4_SCORE_OF_PLACES: {
+            id: 'ANTHOLOGY_POEM_4_SCORE_OF_PLACES',
+            title: 'Anthology Poem #4: A Score of Places (19 Houses & Blessed 10)',
+            origin: 'THE_CROWN',
+            epistemicClass: 'INSTITUTIONAL_REVISION',
+            pairedCounterPoemId: 'EPITAPH_INTERNAL_SLATE',
+            cipherNumbers: [10, 19, 20],
+            lines: [
+                'A score of places teeming with life,',
+                'linked together and bound through strife.',
+                'Nineteen houses and nineteen men,',
+                'fighting to be the blessed ten.'
+            ]
+        },
+        ANTHOLOGY_POEM_5_THREE_HUNDRED_GUARDIANS: {
+            id: 'ANTHOLOGY_POEM_5_THREE_HUNDRED_GUARDIANS',
+            title: 'Anthology Poem #5: The 300 Guardians of the Mountain Cold',
+            origin: 'HOUSE_TERMINUS',
+            epistemicClass: 'SUPPRESSED_ROOT',
+            pairedCounterPoemId: 'TERMINUS_RAPID_AGING_RUMOR',
+            cipherNumbers: [300],
+            lines: [
+                'Cold biting wind and air so dry,',
+                'high in the stone the monsters lie.',
+                'Forced to stay of no will of his own,',
+                'three hundred guardians keep the stone.'
+            ]
+        },
+        ANTHOLOGY_POEM_6_HUNTERS_MARK_BAIT: {
+            id: 'ANTHOLOGY_POEM_6_HUNTERS_MARK_BAIT',
+            title: 'Anthology Poem #6: Glory of the Hunter’s Mark (The Noble Bait)',
+            origin: 'SURFACE_VILLAGES',
+            epistemicClass: 'THE_BAIT_LURE',
+            pairedCounterPoemId: 'SIGNIFICANCE_BEACON_FLESH_LEDGER',
+            cipherNumbers: [19],
+            lines: [
+                'Heroes and greats from times untold,',
+                'bear the mark of hunters old.',
+                'Glory and conquest for all who bear,',
+                'the hunter’s mark that few shall share.'
+            ]
+        },
+        ANTHOLOGY_POEM_8_CROWS_EYE: {
+            id: 'ANTHOLOGY_POEM_8_CROWS_EYE',
+            title: 'Anthology Poem #8: The Blessing of the Eye Above',
+            origin: 'THE_ORB_DUNE',
+            epistemicClass: 'ORBS_HALF_TRUTH',
+            pairedCounterPoemId: 'ANTHOLOGY_POEM_9_HERALD_OF_THE_SEED',
+            cipherNumbers: [1],
+            lines: [
+                'From far above within the sky,',
+                'to hold its grace you hold its eye.',
+                'From far above to down below,',
+                'its silent vision only grows.'
+            ]
+        },
+        ANTHOLOGY_POEM_9_HERALD_OF_THE_SEED: {
+            id: 'ANTHOLOGY_POEM_9_HERALD_OF_THE_SEED',
+            title: 'Anthology Poem #9: The Master’s Light & Herald of the Seed',
+            origin: 'EPITAPH_7',
+            epistemicClass: 'SUPPRESSED_ROOT',
+            pairedCounterPoemId: 'ANTHOLOGY_POEM_8_CROWS_EYE',
+            cipherNumbers: [1],
+            lines: [
+                'A massive tree both tall and right,',
+                'once said to hold the master’s light.',
+                'Strike a bargain if it is pleased,',
+                'to walk as herald of the seed.'
+            ]
+        },
+        ANTHOLOGY_POEM_11_SHIFT: {
+            id: 'ANTHOLOGY_POEM_11_SHIFT',
+            title: 'Anthology Poem #11: The Fourteen-Day Shift Cadence',
+            origin: 'SURFACE_VILLAGES',
+            epistemicClass: 'OBSERVATIONAL_TRUTH',
+            pairedCounterPoemId: 'ANTHOLOGY_POEM_1_ROADS',
+            cipherNumbers: [14],
+            lines: [
+                'Forest dark and ever cold,',
+                'paths are shifting never old.',
+                'Fourteen days and fourteen nights,',
+                'then a shift when dawn breaks light.'
+            ]
         }
     },
 

@@ -8,6 +8,7 @@
 - **OS / Shell Environment:** Windows (`win32`) with PowerShell.
 
 ## 2. Key File Map
+- `system_specs.md` (`c:\Users\NicholasGrace\OneDrive - RRELLC\Documents\GitHub\Dark-Forest-Engine\system_specs.md`): Root System Behavior Specification (Hard Logic & `[COUPLING / DO NOT FLATTEN]` Causal Invariants).
 - `src/core/commander_engine.js` & `ledger-mobile/src/core/commander_engine.js`: Unified headless simulation engine for the 6-role mobile/commander loop.
 - `src/systems/commander_ui.js` & `ledger-mobile/src/systems/commander_ui.js`: DOM View Controller for the General Ledger UI.
 - `src/core/system_definitions.js` & `src/core/civilization.js`: Macro-civilization scalar definitions and 70/30 vector flux math.
