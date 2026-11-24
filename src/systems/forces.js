@@ -107,6 +107,16 @@ metric: 'Villages Crossed',
 pressure: 'mutation',
 active: true,
 value: 0
+},
+'THE_GEOMETER': {
+strength: 250,
+label: 'The Geometer (Orphic Surveyor)',
+description: 'Host-only systemic entity who manifests when GeologicalDissonance breaches critical thresholds, slowly merging with the landscape he maps.',
+metric: 'Geological Dissonance',
+pressure: 'geological_dissonance',
+visibility: 'HOST_ONLY',
+active: true,
+value: 0
 }
 },
 // ==========================================

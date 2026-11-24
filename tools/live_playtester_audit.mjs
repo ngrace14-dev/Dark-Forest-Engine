@@ -521,12 +521,37 @@ const explorePopupHtml = document.getElementById('explore-forest-popup-modal')?.
 if (!explorePopupHtml.includes('MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION') || !explorePopupHtml.includes('position:fixed; inset:0; z-index:9999;') || !explorePopupHtml.includes('overworld-terrain-canvas') || !explorePopupHtml.includes('overworld-svg-pan-zoom-group')) {
     auditReport.bugsFound.push('Expected clicking Explore Forest after upgrading Forward Recon facility to pop up the full-screen 4000x4000 Canvas+SVG Overworld Modal with pan/zoom/drag support.');
 }
-// Verify continuous free-roam waypoint movement & terrain speed modifiers
+// Verify continuous free-roam waypoint movement & terrain speed modifiers scaled to 500,000 sq. mile circular forest
 const wpStartRes = CommanderEngine.ForestOverworldEngine.setWaypoint(2100, 2100, { instantArrival: false });
 const wpStepRes = CommanderEngine.ForestOverworldEngine.updatePartyMovement(0.08);
-if (!wpStartRes.success || !wpStartRes.isMoving || !wpStepRes) {
-    auditReport.bugsFound.push('Expected setWaypoint(2100, 2100) and updatePartyMovement() to move the squad continuously across the 4000x4000 terrain.');
+if (!wpStartRes.success || !wpStartRes.isMoving || !wpStepRes || CommanderEngine.ForestOverworldEngine.worldAreaSqMiles !== 500000 || (wpStepRes.stepPx || 99) > 10) {
+    auditReport.bugsFound.push('Expected setWaypoint(2100, 2100) and updatePartyMovement() to move the squad at a deliberate 500,000 sq. mile scaled march speed across the 4000x4000 terrain.');
 }
+// Verify XCOM × Bannerlord Local Tactical Map with Cyan Squad Blips, Per-Blip Fog of War, Stealth Positioning, Gather Intel, Raid, Attack & Kidnap Advanced Unit
+const stalkLocalRes = window.executeOverworldAction('STALK'); // Automatically zooms into immediate Local Tactical Map when in a squad!
+const localModalHtml = document.getElementById('explore-forest-popup-modal')?.innerHTML || '';
+const ltm = CommanderEngine.ForestOverworldEngine.localTacticalMap;
+if (!stalkLocalRes?.localMapActive || !ltm?.active || !ltm.squadBlips || ltm.squadBlips.length < 1 || ltm.squadBlips[0].color !== '#00f0ff' || !localModalHtml.includes('local-tactical-xcom-overlay')) {
+    auditReport.bugsFound.push('Expected stalking/scouting in a squad (non-Pale Sovereign) to zoom into the procedural XCOM × Bannerlord Local Tactical Map and break the squad node into Cyan Blue Tracking Blips (#00f0ff).');
+}
+const firstBlipId = ltm.squadBlips[0].blipId;
+const fowBeforeMove = ltm.exploredLocalCells.size;
+const moveBlipRes = window.moveLocalBlip(firstBlipId, 11, 6);
+const fowAfterMove = ltm.exploredLocalCells.size;
+const toggleStealthRes = window.toggleLocalBlipStealth(firstBlipId);
+const gatherIntelRes = window.executeLocalTacticalAction('GATHER_INTEL');
+const raidLocalRes = window.executeLocalTacticalAction('RAID');
+const kidnapLocalRes = window.executeLocalTacticalAction('KIDNAP_ADVANCED_UNIT');
+const attackLocalRes = window.executeLocalTacticalAction('ATTACK');
+const syncPacket = window.syncFlagshipCompanion();
+const importSyncRes = CommanderEngine.ForestOverworldEngine.importCompanionSyncPacket(syncPacket);
+if (!moveBlipRes?.success || fowAfterMove <= fowBeforeMove || !toggleStealthRes?.success || !gatherIntelRes?.success || !raidLocalRes?.success || !kidnapLocalRes?.success || !attackLocalRes?.success || syncPacket?.protocolVersion !== 'DFE-COMPANION-SYNC-1.0' || !importSyncRes?.success) {
+    auditReport.bugsFound.push(`Expected Local Tactical Cyan Blip movement to uncover local Fog of War (${fowBeforeMove}->${fowAfterMove}) and execute Gather Intel, Raid, Kidnap Advanced Unit, Attack & Companion Sync.`);
+} else {
+    logPlay('XCOM × BANNERLORD LOCAL TACTICAL MAP (CYAN BLIPS) & 500K SQ. MI. SCALE', `${stalkLocalRes.message}\n   ↳ Blip FoW (${fowBeforeMove}->${fowAfterMove} tiles): ${moveBlipRes.message}\n   ↳ Intel: ${gatherIntelRes.message}\n   ↳ Kidnap: ${kidnapLocalRes.message}`);
+}
+window.closeLocalTacticalMap();
+
 CommanderEngine.ForestOverworldEngine.completeWaypointArrival(); // Complete leg 1 (2/3 supplies left)
 const navLeg2 = CommanderEngine.ForestOverworldEngine.navigateSquadToNode(8);    // Day 2 supply used (1/3 left)
 const navLeg3 = CommanderEngine.ForestOverworldEngine.navigateSquadToNode(10);   // Day 3 supply used (0/3 left -> triggers Auto-Return!)

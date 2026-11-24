@@ -145,7 +145,10 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
                 causalCombatWarp: false
             },
             significance: 20 + (birthright.sigBonus || 0),
-            assignedHouseId: 'House Terminus'
+            assignedHouseId: 'House Terminus',
+            voidTaint: 0.0,
+            isVoidTouched: false,
+            fractalBloomSpikes: []
         };
 
         this.agents.set(id, agent);
@@ -827,7 +830,7 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
         });
     },
 
-    formatAgentStatSheet(agentId) {
+    formatAgentStatSheet(agentId, viewerIsHost = rootScope.HostVisibilityController?.isHost ?? true) {
         const a = this.agents.get(agentId);
         if (!a) return `No squad member found for ID: ${agentId}`;
         const eq = a.equipment || {};
@@ -855,13 +858,14 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
             ``,
             `â”€â”€â”€ ðŸ“Š COMBAT & SURVIVAL ATTRIBUTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
             `================================================================================`,
-            `[GARRISON STAT SHEET] ${a.name.toUpperCase()} (${a.id})${a.isDoubleAgent ? ' [TURNED DOUBLE AGENT]' : ''}`,
+            `[GARRISON STAT SHEET] ${(viewerIsHost && a.voidTaint > 0 && rootScope.VoidTouchedRegistry) ? rootScope.VoidTouchedRegistry.fractureAgentName(a.name, a.voidTaint, true) : a.name.toUpperCase()} (${a.id})${a.isDoubleAgent ? ' [TURNED DOUBLE AGENT]' : ''}`,
             `================================================================================`,
             `Role / Rank:     ${a.career?.rank || 'Novice'} ${(a.career?.id || 'scout').toUpperCase()} | House/Faction: ${a.assignedHouseId}`,
             `Birthright:      [${a.birthright?.title || 'None'}] - ${a.birthright?.desc || ''}`,
             `Shift Birthday:  Day ${a.firstShiftSurvivedDay} AF (Shifts Endured: ${a.shiftsSurvived || 0}) | Significance: ${a.significance}`,
             `Runic Carving:   Tier ${a.cultivation?.stage || 0}/8 (${a.cultivation?.inscriptionsCount || 0}/48 Body Runes | Tool: ${a.cultivation?.toolUsed || 'Uninscribed'})`,
             `Mastery & Life:  Current Mastery: ${a.cultivation?.currentMasteryPool || 25} | Preserved: ${a.cultivation?.preservedMastery || 0} | Potential: ${a.cultivation?.potentialRemaining ?? 100}% | Purity: ${a.cultivation?.foundationPurity ?? 100}% | Lifespan: ${(a.cultivation?.naturalLifespanYears || 311) + (a.cultivation?.bonusLifespanYears || 0)}y / 4,936y`,
+            `Void-Taint:      ${(viewerIsHost && a.voidTaint > 0) ? `[${(a.voidTaint * 100).toFixed(1)}% FRACTAL BLOOM] ${a.voidTaint >= 0.65 ? '░░▓█ DATA CORRUPTION CRITICAL █▓░░' : '◈ WEIBULL POWER-SPIKE ACTIVE'}` : '[0.0% Nominal]'}`,
             `Current Stance:  [${a.operatingStance?.mode || 'IDLE'}${a.operatingStance?.discipline ? ': ' + a.operatingStance.discipline : ''}]`,
             `Crucible Scars:  ${(a.scars || []).map(s => s.scar || s).join('; ') || 'None Recorded'}`,
             ``,
@@ -1816,6 +1820,19 @@ export const PRESSURE_TAG_REGISTRY = {
         prefixDescriptor: 'Non-Euclidean',
         payload_tags: ['SPIKE_BLIND_SPOT_ENTROPY', 'SCATTER_COORDINATES']
     },
+    FORCE_THE_GEOMETER: {
+        id: 'FORCE_THE_GEOMETER',
+        tier: 1,
+        visibility: 'HOST_ONLY',
+        prefixDescriptor: 'Orphic-Dissonant',
+        payload_tags: ['MANIFEST_THE_GEOMETER', 'AUDIT_GEOLOGICAL_DISSONANCE']
+    },
+    GEOLOGICAL_DISSONANCE_SHEAR: {
+        id: 'GEOLOGICAL_DISSONANCE_SHEAR',
+        tier: 2,
+        nounDescriptor: 'Topographic-Fracture',
+        payload_tags: ['MANIFEST_THE_GEOMETER', 'PERMUTE_SECTOR_GEOMETRY']
+    },
     IRON_RUST_CONSTANT: {
         id: 'IRON_RUST_CONSTANT',
         tier: 2,
@@ -1871,6 +1888,8 @@ export const ProceduralCollisionEngine = rootScope.ProceduralCollisionEngine || 
             FORCE_CROW_SIGNIFICANCE: sectorState.FORCE_CROW_SIGNIFICANCE ?? ((CampaignManager?.state?.patron?.candidateSignificance || 25) / 80),
             FORCE_CROWN_ORDER: sectorState.FORCE_CROWN_ORDER ?? ((h.crownScrutiny || 10) / 70),
             FORCE_FOREST_POSSIBILITY: sectorState.FORCE_FOREST_POSSIBILITY ?? ((o.blindSpotEntropy || 12) / 60),
+            FORCE_THE_GEOMETER: sectorState.FORCE_THE_GEOMETER ?? (rootScope.GeometerRegistry?.geologicalDissonance || 0.05),
+            GEOLOGICAL_DISSONANCE_SHEAR: sectorState.GEOLOGICAL_DISSONANCE_SHEAR ?? (rootScope.GeometerRegistry?.geologicalDissonance || 0.05),
             IRON_RUST_CONSTANT: sectorState.IRON_RUST_CONSTANT ?? (shiftProximity <= 3 ? 0.88 : 0.40),
             SHIFT_DRIFT_PROXIMITY: sectorState.SHIFT_DRIFT_PROXIMITY ?? ((14 - shiftProximity) / 14),
             MIST_DEPTH_DENSITY: sectorState.MIST_DEPTH_DENSITY ?? 0.50,
@@ -1955,6 +1974,12 @@ export const ProceduralCollisionEngine = rootScope.ProceduralCollisionEngine || 
         if (payloadTags.includes('SPIKE_BLIND_SPOT_ENTROPY')) {
             o.blindSpotEntropy = Math.min(100, (o.blindSpotEntropy || 12) + 8);
             effectsApplied.push('Blind-Spot Entropy spiked (+8%)');
+        }
+        if (payloadTags.includes('MANIFEST_THE_GEOMETER') && rootScope.GeometerRegistry) {
+            const manifestRes = rootScope.GeometerRegistry.manifestFromCollision(sectorState);
+            if (manifestRes?.manifested) {
+                effectsApplied.push(`The Geometer manifested at (${manifestRes.position.x}, ${manifestRes.position.y}) [Stage ${manifestRes.dissolutionStage}]`);
+            }
         }
 
         return effectsApplied;
@@ -4679,10 +4704,17 @@ rootScope.ExpeditionEngine = ExpeditionEngine;
 
 // ============================================================================
 // 5.85 MOUNT & BLADE STYLE TACTICAL OVERWORLD & PREDATOR HUNTING ENGINE
+//      (500,000 SQ. MILE CIRCULAR DOMINION + XCOM × BANNERLORD LOCAL TACTICAL MAP)
 // ============================================================================
 export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
     worldWidth: 4000,
     worldHeight: 4000,
+    // 500,000 sq. mile circular forest dominion: Area = 500,000 sq mi => Radius = sqrt(500000 / PI) = 398.942 mi, Diameter = 797.885 mi
+    worldAreaSqMiles: 500000,
+    worldRadiusMiles: 398.94,
+    worldDiameterMiles: 797.88,
+    milesPerPixel: 0.19947, // ~0.20 miles per overworld unit across the 4000x4000 space
+    baseMarchSpeedMph: 2.8, // Realistic deliberate squad foot-march across hostile forest (2.8 mph base)
     partyNodeId: 1,
     homeNodeId: 1,
     homeX: 2260,
@@ -4694,14 +4726,17 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
     targetLabel: null,
     targetNodeId: null,
     isMoving: false,
-    baseSpeedPxPerTick: 28,
+    // Deliberately slow macro velocity scaled to 500,000 sq miles (cannot rapidly zip across the continent)
+    baseSpeedPxPerTick: 3.2,
     sightRadius: 340,
     exploredCellSize: 100,
     exploredCells: new Set(),
     travelAccumulatorPx: 0,
+    totalMilesMarched: 0,
     suppliesDaysRemaining: 3,
     maxSuppliesDays: 3,
     distanceFromCampHours: 0,
+    distanceFromCampMiles: 0,
     isAutoReturning: false,
     returnHoursRemaining: 0,
     stance: 'MARCH', // MARCH | STALK | HUNT | FORAGE | AMBUSH | AUTO_RETURNING
@@ -4709,6 +4744,9 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
     movingTargetEntities: [],
     overworldLogs: [],
     huntProgress: 0,
+    localTacticalMap: null, // Active XCOM × Bannerlord Local Area Tactical Map state (Cyan Blips, Local FoW, Stealth, Raid/Kidnap)
+    companionSyncHistory: [],
+
 
     // Deterministic organic 4000x4000 world map coordinates for all 21 settlements (0..20)
     WORLD_SETTLEMENT_COORDS: {
@@ -4818,9 +4856,32 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         return this.exploredCells && this.exploredCells.has(`${gx},${gy}`);
     },
 
+    computeMilesBetween(x1, y1, x2, y2) {
+        const distPx = Math.hypot((Number(x2) || 2000) - (Number(x1) || 2000), (Number(y2) || 2000) - (Number(y1) || 2000));
+        return Number((distPx * (this.milesPerPixel || 0.19947)).toFixed(1));
+    },
+
+    computeTravelHoursForSegment(x1, y1, x2, y2) {
+        const miles = this.computeMilesBetween(x1, y1, x2, y2);
+        const midX = ((Number(x1) || 2000) + (Number(x2) || 2000)) * 0.5;
+        const midY = ((Number(y1) || 2000) + (Number(y2) || 2000)) * 0.5;
+        const biome = this.getBiomeAt(midX, midY);
+        const stanceMult = this.stance === 'STALK' ? 0.65 : (this.stance === 'FORAGE' ? 0.78 : 1.0);
+        const effectiveMph = Math.max(0.9, (this.baseMarchSpeedMph || 2.8) * (biome.speedMult || 0.85) * stanceMult);
+        return Math.max(1, Math.round(miles / effectiveMph));
+    },
+
     computeReturnHoursFromCamp() {
-        const distPx = Math.hypot((this.partyX || 2260) - (this.homeX || 2260), (this.partyY || 2180) - (this.homeY || 2180));
-        return Math.max(1, Math.min(18, Math.ceil(distPx / 210) + Math.max(0, (this.movementTrail?.length || 1) - 1)));
+        const px = this.partyX || 2260;
+        const py = this.partyY || 2180;
+        const hx = this.homeX || 2260;
+        const hy = this.homeY || 2180;
+        const milesFromCamp = this.computeMilesBetween(hx, hy, px, py);
+        this.distanceFromCampMiles = milesFromCamp;
+        const biome = this.getBiomeAt((px + hx) * 0.5, (py + hy) * 0.5);
+        const effectiveMph = Math.max(1.1, (this.baseMarchSpeedMph || 2.8) * (biome.speedMult || 0.85));
+        const rawHours = Math.ceil(milesFromCamp / effectiveMph) + Math.max(0, (this.movementTrail?.length || 1) - 1);
+        return Math.max(1, Math.min(240, rawHours));
     },
 
     resetForNewRun() {
@@ -4842,6 +4903,9 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         this.targetNodeId = null;
         this.isMoving = false;
         this.travelAccumulatorPx = 0;
+        this.totalMilesMarched = 0;
+        this.distanceFromCampMiles = 0;
+        this.localTacticalMap = null;
         this.exploredCells = new Set();
         const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
         const startIdx = settlements.findIndex(s => Number(s.id) === this.partyNodeId);
@@ -4856,8 +4920,8 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         this.spawnMovingTargets();
         this.overworldLogs = [
             isSov
-                ? `🐺 [PREDATOR OVERWORLD ACTIVE — ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS TRAVEL STAMINA] The Pale Sovereign & Bound Huntsman emerged near ${settlements[Math.max(0, startIdx)]?.name || 'Gallows Hill'} (${this.partyX}, ${this.partyY}). Click anywhere on the 4000x4000 terrain or select a roaming caravan to STALK, HUNT, ATTACK & FEED!`
-                : `🧭 [MOUNT & BLADE FOREST OVERWORLD — ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS TRAVEL SUPPLIES] Vanguard Squad mustered at ${settlements[Math.max(0, startIdx)]?.name || 'Oakhaven'} (${this.partyX}, ${this.partyY}). Click any terrain coordinate or settlement to set a free-roam waypoint; time advances while marching and terrain modifies speed!`
+                ? `🐺 [PREDATOR OVERWORLD ACTIVE — 500,000 SQ. MI. DOMINION | ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS STAMINA] The Pale Sovereign & Bound Huntsman emerged near ${settlements[Math.max(0, startIdx)]?.name || 'Gallows Hill'} (${this.partyX}, ${this.partyY}). Click anywhere on the 4000x4000 terrain or select a roaming caravan to STALK, HUNT, ATTACK & FEED!`
+                : `🧭 [500,000 SQ. MI. FOREST OVERWORLD — ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS TRAVEL SUPPLIES] Vanguard Squad mustered at ${settlements[Math.max(0, startIdx)]?.name || 'Oakhaven'} (${this.partyX}, ${this.partyY} | ~${this.baseMarchSpeedMph} mph base march). Click any terrain coordinate to set a deliberate march waypoint, or STALK/SCOUT to zoom into the XCOM × Bannerlord Local Tactical Map with Cyan Squad Blips!`
         ];
     },
 
@@ -4986,7 +5050,10 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         this.isMoving = true;
 
         const biome = this.getBiomeAt(tx, ty);
-        const msg = `🧭 [WAYPOINT SET -> ${this.targetLabel.toUpperCase()}] Destination (${tx}, ${ty}) in [${biome.label} | ${Math.round(biome.speedMult * 100)}% Speed]. Marching across the overworld...`;
+        const legMiles = this.computeMilesBetween(this.partyX, this.partyY, tx, ty);
+        const estHours = this.computeTravelHoursForSegment(this.partyX, this.partyY, tx, ty);
+        const effMph = Number(((this.baseMarchSpeedMph || 2.8) * (biome.speedMult || 0.85) * (this.stance === 'STALK' ? 0.65 : 1.0)).toFixed(2));
+        const msg = `🧭 [WAYPOINT SET -> ${this.targetLabel.toUpperCase()}] Destination (${tx}, ${ty}) across ${legMiles} mi of [${biome.label} | ${Math.round(biome.speedMult * 100)}% Terrain Speed = ${effMph} mph | Est. ${estHours}h March across 500k sq. mi. Forest]...`;
         this.overworldLogs.unshift(msg);
         if (this.overworldLogs.length > 25) this.overworldLogs.pop();
 
@@ -5001,6 +5068,9 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             targetLabel: this.targetLabel,
             partyX: this.partyX,
             partyY: this.partyY,
+            legMiles,
+            estimatedHours: estHours,
+            effectiveMph: effMph,
             suppliesDaysRemaining: this.suppliesDaysRemaining,
             distanceFromCampHours: this.distanceFromCampHours,
             message: msg
@@ -5017,7 +5087,9 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         const dist = Math.hypot(dx, dy);
         const biome = this.getBiomeAt(this.partyX, this.partyY);
         const speedMult = biome.speedMult || 1.0;
-        const stepPx = Math.max(4, (this.baseSpeedPxPerTick || 28) * speedMult * Math.max(0.4, dtSeconds * 20));
+        const stanceMult = this.stance === 'STALK' ? 0.65 : (this.stance === 'FORAGE' ? 0.78 : 1.0);
+        // Deliberately slow march velocity scaled to the 500,000 sq. mile circular forest
+        const stepPx = Math.max(0.85, Number(((this.baseSpeedPxPerTick || 3.2) * speedMult * stanceMult * Math.max(0.4, dtSeconds * 20)).toFixed(2)));
 
         if (dist <= stepPx) {
             this.partyX = this.targetX;
@@ -5027,22 +5099,31 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             return this.completeWaypointArrival(arrivedNode);
         }
 
-        this.partyX = Math.round(this.partyX + (dx / dist) * stepPx);
-        this.partyY = Math.round(this.partyY + (dy / dist) * stepPx);
+        this.partyX = Number((this.partyX + (dx / dist) * stepPx).toFixed(1));
+        this.partyY = Number((this.partyY + (dy / dist) * stepPx).toFixed(1));
         this.travelAccumulatorPx = (this.travelAccumulatorPx || 0) + stepPx;
+        const stepMiles = Number((stepPx * (this.milesPerPixel || 0.19947)).toFixed(2));
+        this.totalMilesMarched = Number(((this.totalMilesMarched || 0) + stepMiles).toFixed(1));
         this.updateExploredArea(this.partyX, this.partyY);
         this.distanceFromCampHours = this.computeReturnHoursFromCamp();
 
-        if (this.travelAccumulatorPx >= 180) {
-            this.travelAccumulatorPx -= 180;
-            this.movementTrail.push({ x: this.partyX, y: this.partyY, nodeId: this.partyNodeId, label: biome.label });
-            if (this.movementTrail.length > 10) this.movementTrail.shift();
-            ExpeditionEngine.tickExpeditionHours(1);
+        // 15 world pixels (~3 miles at ~2.5-3 mph) = 1 in-game hour of marching across the 500k sq mi forest
+        if (this.travelAccumulatorPx >= 15) {
+            const hoursTicked = Math.max(1, Math.floor(this.travelAccumulatorPx / 15));
+            this.travelAccumulatorPx = Number((this.travelAccumulatorPx % 15).toFixed(2));
+            this.movementTrail.push({ x: Math.round(this.partyX), y: Math.round(this.partyY), nodeId: this.partyNodeId, label: biome.label });
+            if (this.movementTrail.length > 14) this.movementTrail.shift();
+            ExpeditionEngine.tickExpeditionHours(hoursTicked);
         }
         return {
             moving: true,
             partyX: this.partyX,
             partyY: this.partyY,
+            stepPx,
+            stepMiles,
+            totalMilesMarched: this.totalMilesMarched,
+            distanceFromCampMiles: this.distanceFromCampMiles,
+            distanceFromCampHours: this.distanceFromCampHours,
             biome: biome.label,
             speedMult
         };
@@ -5170,7 +5251,27 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
                 msg = `🐾👁️ [PREDATOR STALKING] ${leadAgt?.name || 'The Bound Huntsman'} shadowed [${prey?.name || currentSettlement.name}] through the freezing mist without snapping a twig (+${weightGain} Historical Weight, +0.35 Stealth, Prey Vulnerability: ${prey?.stalkedLevel || 40}%).`;
             } else {
                 FacilityEngine.settlementResources += 5;
-                msg = `🏹👁️ [SQUAD RECON STALK] ${leadAgt?.name || 'Scout Squad'} tracked [${prey?.name || currentSettlement.name}] from the ridge-line (+5u Recon Supplies, +0.35 Stealth, Ambush Readiness: ${prey?.stalkedLevel || 40}%).`;
+                this.openLocalTacticalMap({
+                    worldX: this.partyX,
+                    worldY: this.partyY,
+                    targetId: prey?.id || null,
+                    mode: 'STALK_RECON'
+                });
+                const blipCount = this.localTacticalMap?.squadBlips?.length || 1;
+                msg = `🏹👁️ [SQUAD RECON STALK -> LOCAL TACTICAL MAP ACTIVE] ${leadAgt?.name || 'Scout Squad'} tracked [${prey?.name || currentSettlement.name}] into an immediate 1.2×1.2 mi local sector! Squad broke out into ${blipCount} Cyan Blue Tracking Blips with individual Fog-of-War radii (+5u Recon Supplies, +0.35 Stealth, Ambush Readiness: ${prey?.stalkedLevel || 40}%).`;
+            }
+        } else if (act === 'SCOUT_LOCAL' || act === 'ENTER_LOCAL_MAP') {
+            if (!isSov) {
+                this.openLocalTacticalMap({
+                    worldX: this.partyX,
+                    worldY: this.partyY,
+                    targetId: prey?.id || null,
+                    mode: 'TACTICAL_SCOUT'
+                });
+                const blipCount = this.localTacticalMap?.squadBlips?.length || 1;
+                msg = `🎯🟦 [XCOM × BANNERLORD LOCAL TACTICAL SECTOR] Squad fanned out into ${blipCount} Cyan Blue Tracking Blips across the procedural ${this.localTacticalMap?.biome?.label || 'Ironbark'} grid (${this.localTacticalMap?.gridWidth || 20}x${this.localTacticalMap?.gridHeight || 20}). Reposition blips in stealth to uncover local Fog of War, Gather Intel, Attack, Raid, or Kidnap Advanced Units!`;
+            } else {
+                msg = `🐺👁️ [PREDATOR LOCAL SCENT] The Pale Sovereign does not split into human squad blips — stalking prey directly across the overworld mist!`;
             }
         } else if (act === 'HUNT_PREY' || act === 'ATTACK_PREY') {
             this.stance = 'HUNT';
@@ -5251,7 +5352,727 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             body: msg,
             read: false
         });
-        return { success: true, action: act, partyX: this.partyX, partyY: this.partyY, message: msg };
+        return { success: true, action: act, partyX: this.partyX, partyY: this.partyY, localMapActive: Boolean(this.localTacticalMap?.active), message: msg };
+    },
+
+    // ========================================================================
+    // 5.86 XCOM × BANNERLORD PROCEDURAL LOCAL TACTICAL MAP ENGINE & CYAN BLIPS
+    // ========================================================================
+    isKidnapUnlocked() {
+        const fe = rootScope.FacilityEngine?.facilities || {};
+        const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+        const livingCount = Array.from(AgentRosterManager.agents.values()).filter(a => a.alive).length;
+        const facUpgradeSum = (fe.training_grounds?.level || 0)
+            + (fe.exploration_observatory?.level || 0)
+            + (fe.inquest_chamber?.level || 0)
+            + (fe.guard_barracks?.level || 0);
+        const unlocked = Boolean(
+            (fe.training_grounds?.unlocked && (fe.training_grounds.level >= 2 || fe.exploration_observatory?.unlocked || fe.inquest_chamber?.unlocked))
+            || facUpgradeSum >= 3
+            || (sq.avgStealth >= 4.2 && livingCount >= 3)
+            || sq.totalPower >= 115
+        );
+        return {
+            unlocked,
+            facUpgradeSum,
+            avgStealth: sq.avgStealth,
+            totalPower: sq.totalPower,
+            livingCount,
+            reason: unlocked
+                ? 'Squad & Recon/Inquest Facilities Upgraded — Subdue & Kidnap Advanced Unit Ready'
+                : 'Requires upgraded Squad/Facilities (Training Grounds + Recon Outpost/Inquest Chamber, or 3+ Squad Operatives with Avg Stealth >= 4.2)'
+        };
+    },
+
+    openLocalTacticalMap(options = {}) {
+        const isSov = CampaignManager.campaignMode === 'SOVEREIGN';
+        if (isSov) {
+            return {
+                success: false,
+                isSovereign: true,
+                message: 'The Pale Sovereign hunts as a singular apex entity on the macro overworld rather than deploying human cyan squad blips.'
+            };
+        }
+        const wx = Math.round(Number(options.worldX ?? this.partyX ?? 2260));
+        const wy = Math.round(Number(options.worldY ?? this.partyY ?? 2180));
+        const biome = this.getBiomeAt(wx, wy);
+        const gridW = 20;
+        const gridH = 20;
+        const seed = ((wx * 73856093) ^ (wy * 19349663)) >>> 0;
+
+        const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
+        const currentSettlement = settlements.find(s => Number(s.id) === Number(this.partyNodeId)) || settlements[1] || { id: 1, name: 'Oakhaven', house: 'House Oakheart' };
+        const prey = (options.targetId && (this.movingTargetEntities || []).find(p => p.id === options.targetId))
+            || (this.movingTargetEntities || []).find(p => p.alive)
+            || { id: 'local_patrol_1', name: `${currentSettlement.house} Outrider Column`, faction: currentSettlement.house, power: 52, lootFuel: 10, lootRes: 14 };
+
+        const grid = [];
+        for (let gy = 0; gy < gridH; gy++) {
+            const row = [];
+            for (let gx = 0; gx < gridW; gx++) {
+                const hVal = Math.abs(Math.sin((gx * 12.9898 + gy * 78.233 + (seed % 997)) * 0.45) * 43758.5453) % 1;
+                let tileType = 'OPEN_GROUND';
+                let coverBonus = 0;
+                let sightBlock = 0;
+                let label = 'Mossy Forest Floor';
+                let color = biome.color || '#112919';
+
+                if (gx >= 2 && gx <= 17 && gy >= 2 && gy <= 17) {
+                    if (hVal > 0.84) {
+                        tileType = 'BASALT_RUIN';
+                        coverBonus = 45;
+                        sightBlock = 1;
+                        label = 'Fractured Basalt Pillar (Heavy Cover)';
+                        color = '#334155';
+                    } else if (hVal > 0.63) {
+                        tileType = 'MIST_BRUSH';
+                        coverBonus = 35;
+                        sightBlock = 0;
+                        label = 'Concealing Siphon-Bracken & Mist (Stealth Cover)';
+                        color = '#064e3b';
+                    } else if (hVal > 0.48 && biome.id !== 'OUTER_DUNES') {
+                        tileType = 'IRONBARK_CANOPY';
+                        coverBonus = 25;
+                        sightBlock = 0;
+                        label = 'Ancient Ironbark Root-Wall (Light Cover)';
+                        color = '#14532d';
+                    } else if (hVal < 0.08) {
+                        tileType = 'HIGH_RIDGE';
+                        coverBonus = 20;
+                        sightBlock = -1;
+                        label = 'Elevated Survey Ridge (+1 Sight Radius)';
+                        color = '#3f3f46';
+                    }
+                }
+                row.push({ gx, gy, tileType, coverBonus, sightBlock, label, color });
+            }
+            grid.push(row);
+        }
+
+        const livingAgents = Array.from(AgentRosterManager.agents.values()).filter(a => a.alive && !a.trainingLocked).slice(0, 6);
+        if (livingAgents.length === 0) {
+            const fallback = Array.from(AgentRosterManager.agents.values())[0];
+            if (fallback) livingAgents.push(fallback);
+        }
+
+        const startOffsets = [
+            { dx: 3, dy: 16 },
+            { dx: 5, dy: 17 },
+            { dx: 2, dy: 14 },
+            { dx: 7, dy: 16 },
+            { dx: 4, dy: 13 },
+            { dx: 8, dy: 17 }
+        ];
+
+        const squadBlips = livingAgents.map((agt, idx) => {
+            const pos = startOffsets[idx % startOffsets.length];
+            const stealthSkill = Number(agt.skills?.stealth || 3);
+            const survSkill = Number(agt.skills?.survival || 3);
+            const martialSkill = Number(agt.skills?.meleeAtt || 3);
+            const ridgeBonus = grid[pos.dy]?.[pos.dx]?.tileType === 'HIGH_RIDGE' ? 1 : 0;
+            const sightRadius = Math.max(3, Math.min(7, Math.round(3.2 + (survSkill + stealthSkill) * 0.28) + ridgeBonus));
+            return {
+                blipId: `blip_${agt.id}`,
+                agentId: agt.id,
+                name: agt.name,
+                role: (agt.career?.id || 'scout').toUpperCase(),
+                rank: agt.career?.rank || 'Operative',
+                gx: pos.dx,
+                gy: pos.dy,
+                color: '#00f0ff',
+                ringColor: '#38bdf8',
+                sightRadius,
+                stealthActive: true,
+                stealthRating: Math.min(98, Math.round(48 + stealthSkill * 7 + (grid[pos.dy]?.[pos.dx]?.coverBonus || 0) * 0.5)),
+                combatPower: Math.round(18 + martialSkill * 6 + Number(agt.skills?.toughness || 3) * 4 + ((agt.cultivation?.stage || 0) * 8)),
+                hp: agt.vitals?.hp || 100,
+                maxHp: agt.vitals?.maxHp || 100,
+                ap: 3,
+                maxAp: 3
+            };
+        });
+
+        const advTitles = [
+            { title: 'Master Runic Artificer & Siphon-Engineer', specialty: 'RUNIC_ARTIFICER', bonusDesc: '+25% Runic Barrier Fuel efficiency & Tier IV Carving Lore' },
+            { title: 'High-Born Cipher Seneschal', specialty: 'CIPHER_SENESCHAL', bonusDesc: '+2 Blackmail Fact Dossiers & Rival House Telemetry' },
+            { title: 'Elder Ironbark Huntsman Captain', specialty: 'VANGUARD_CAPTAIN', bonusDesc: 'High Martial/Stealth Operative (+6.5 Combat Skills)' }
+        ];
+        const pickedAdv = advTitles[seed % advTitles.length];
+        const enemyFaction = prey.faction || currentSettlement.house || 'House Cull';
+
+        const enemyUnits = [
+            {
+                id: 'enemy_adv_1',
+                name: `${enemyFaction} ${pickedAdv.title}`,
+                faction: enemyFaction,
+                role: pickedAdv.specialty,
+                isAdvancedUnit: true,
+                gx: 13,
+                gy: 5,
+                hp: 110,
+                maxHp: 110,
+                poise: 65,
+                maxPoise: 100,
+                power: 44,
+                alertLevel: 15,
+                intelGathered: false,
+                subdued: false,
+                kidnapped: false,
+                alive: true,
+                bonusDesc: pickedAdv.bonusDesc
+            },
+            {
+                id: 'enemy_guard_1',
+                name: `${enemyFaction} Outrider Halberdier`,
+                faction: enemyFaction,
+                role: 'ESCORT_WARDEN',
+                isAdvancedUnit: false,
+                gx: 11,
+                gy: 7,
+                hp: 85,
+                maxHp: 85,
+                poise: 70,
+                maxPoise: 100,
+                power: 32,
+                alertLevel: 20,
+                intelGathered: false,
+                subdued: false,
+                kidnapped: false,
+                alive: true,
+                bonusDesc: 'Standard Convoy Escort'
+            },
+            {
+                id: 'enemy_guard_2',
+                name: `${enemyFaction} Crossbow Sentinel`,
+                faction: enemyFaction,
+                role: 'CROSSBOW_SENTINEL',
+                isAdvancedUnit: false,
+                gx: 15,
+                gy: 7,
+                hp: 75,
+                maxHp: 75,
+                poise: 60,
+                maxPoise: 100,
+                power: 28,
+                alertLevel: 20,
+                intelGathered: false,
+                subdued: false,
+                kidnapped: false,
+                alive: true,
+                bonusDesc: 'Overwatch Ranged Escort'
+            },
+            {
+                id: 'enemy_cache_1',
+                name: `${prey.name || enemyFaction} Runic Supply & Resin Wagon`,
+                faction: enemyFaction,
+                role: 'SUPPLY_CACHE',
+                isSupplyCache: true,
+                isAdvancedUnit: false,
+                gx: 13,
+                gy: 6,
+                hp: 100,
+                maxHp: 100,
+                poise: 100,
+                maxPoise: 100,
+                power: 10,
+                lootFuel: prey.lootFuel || 12,
+                lootRes: prey.lootRes || 16,
+                raided: false,
+                alive: true,
+                bonusDesc: `+${prey.lootFuel || 12}u Barrier Fuel & +${prey.lootRes || 16}u Canonical Resources`
+            }
+        ];
+
+        const kidnapCheck = this.isKidnapUnlocked();
+        this.localTacticalMap = {
+            active: true,
+            seed,
+            worldX: wx,
+            worldY: wy,
+            sectorScaleMiles: '1.2 mi × 1.2 mi Immediate Tactical Sector (60m per grid cell)',
+            biome,
+            targetEntityId: prey.id,
+            targetName: prey.name || `${enemyFaction} Patrol`,
+            enemyFaction,
+            gridWidth: gridW,
+            gridHeight: gridH,
+            grid,
+            squadBlips,
+            selectedBlipId: squadBlips[0]?.blipId || null,
+            enemyUnits,
+            exploredLocalCells: new Set(),
+            intelLevel: 0,
+            stealthIntact: true,
+            kidnapUnlocked: kidnapCheck.unlocked,
+            kidnapUnlockReason: kidnapCheck.reason,
+            turn: 1,
+            tacticalLogs: [
+                `🎯🟦 [LOCAL TACTICAL SECTOR INITIALIZED — SEED #${seed}] Squad deployed at (${wx}, ${wy}) in [${biome.label}]. Macro Squad Node split into ${squadBlips.length} Cyan Blue Tracking Blips!`,
+                `🌫️👁️ [PER-BLIP FOG OF WAR] Each Cyan Blip uncovers local Fog of War within its sight radius (3–7 tiles). Select any Cyan Blip and click a tile to stealth-position your operatives before ordering GATHER INTEL, ATTACK, RAID, or KIDNAP ADVANCED UNIT!`
+            ]
+        };
+
+        this.recomputeLocalFogOfWar();
+        return {
+            success: true,
+            localTacticalMap: this.localTacticalMap,
+            companionSyncPacket: this.exportCompanionSyncPacket()
+        };
+    },
+
+    closeLocalTacticalMap() {
+        if (this.localTacticalMap) {
+            this.localTacticalMap.active = false;
+        }
+        return { success: true, active: false };
+    },
+
+    recomputeLocalFogOfWar() {
+        const ltm = this.localTacticalMap;
+        if (!ltm) return;
+        if (!(ltm.exploredLocalCells instanceof Set)) {
+            ltm.exploredLocalCells = new Set(Array.isArray(ltm.exploredLocalCells) ? ltm.exploredLocalCells : []);
+        }
+        (ltm.squadBlips || []).forEach(blip => {
+            const tile = ltm.grid?.[blip.gy]?.[blip.gx];
+            const bonus = tile?.tileType === 'HIGH_RIDGE' ? 1 : 0;
+            const r = (blip.sightRadius || 4) + bonus;
+            for (let gy = 0; gy < ltm.gridHeight; gy++) {
+                for (let gx = 0; gx < ltm.gridWidth; gx++) {
+                    if (Math.hypot(gx - blip.gx, gy - blip.gy) <= r) {
+                        ltm.exploredLocalCells.add(`${gx},${gy}`);
+                    }
+                }
+            }
+        });
+    },
+
+    isLocalCellInLiveSight(gx, gy) {
+        const ltm = this.localTacticalMap;
+        if (!ltm || !ltm.squadBlips) return false;
+        return ltm.squadBlips.some(blip => {
+            const tile = ltm.grid?.[blip.gy]?.[blip.gx];
+            const bonus = tile?.tileType === 'HIGH_RIDGE' ? 1 : 0;
+            return Math.hypot(gx - blip.gx, gy - blip.gy) <= ((blip.sightRadius || 4) + bonus);
+        });
+    },
+
+    selectLocalBlip(blipId) {
+        const ltm = this.localTacticalMap;
+        if (!ltm) return { success: false, message: 'No active local tactical map.' };
+        const found = ltm.squadBlips.find(b => b.blipId === blipId || b.agentId === blipId);
+        if (!found) return { success: false, message: `Blip ${blipId} not found.` };
+        ltm.selectedBlipId = found.blipId;
+        return {
+            success: true,
+            selectedBlip: found,
+            message: `🟦 Selected Cyan Blip: [${found.name}] (${found.rank} ${found.role}) at Grid (${found.gx}, ${found.gy}) | Sight Radius: ${found.sightRadius} tiles | Stealth: ${found.stealthActive ? `ACTIVE (${found.stealthRating}%)` : 'OFF'}.`
+        };
+    },
+
+    toggleLocalBlipStealth(blipId = null) {
+        const ltm = this.localTacticalMap;
+        if (!ltm) return { success: false, message: 'No active local tactical map.' };
+        const targetId = blipId || ltm.selectedBlipId;
+        const blip = ltm.squadBlips.find(b => b.blipId === targetId || b.agentId === targetId) || ltm.squadBlips[0];
+        if (!blip) return { success: false, message: 'No squad blip available.' };
+
+        blip.stealthActive = !blip.stealthActive;
+        const tile = ltm.grid?.[blip.gy]?.[blip.gx];
+        const agt = AgentRosterManager.agents.get(blip.agentId);
+        const stealthSkill = Number(agt?.skills?.stealth || 3);
+        blip.stealthRating = blip.stealthActive
+            ? Math.min(99, Math.round(52 + stealthSkill * 7 + (tile?.coverBonus || 0) * 0.6))
+            : Math.max(15, Math.round(22 + (tile?.coverBonus || 0) * 0.3));
+
+        const msg = `🥷🟦 [CYAN BLIP STEALTH ${blip.stealthActive ? 'ENGAGED' : 'DISENGAGED'}] ${blip.name} at (${blip.gx}, ${blip.gy}) [${tile?.label || 'Open Ground'}] -> Concealment Rating: ${blip.stealthRating}%.`;
+        ltm.tacticalLogs.unshift(msg);
+        if (ltm.tacticalLogs.length > 20) ltm.tacticalLogs.pop();
+        return { success: true, blip, stealthActive: blip.stealthActive, stealthRating: blip.stealthRating, message: msg };
+    },
+
+    moveLocalBlip(blipId = null, targetGX = 10, targetGY = 10) {
+        const ltm = this.localTacticalMap;
+        if (!ltm) return { success: false, message: 'No active local tactical map.' };
+        const id = blipId || ltm.selectedBlipId;
+        const blip = ltm.squadBlips.find(b => b.blipId === id || b.agentId === id) || ltm.squadBlips[0];
+        if (!blip) return { success: false, message: 'No squad blip selected.' };
+
+        const gx = Math.max(0, Math.min(ltm.gridWidth - 1, Math.round(Number(targetGX) || 0)));
+        const gy = Math.max(0, Math.min(ltm.gridHeight - 1, Math.round(Number(targetGY) || 0)));
+        const distTiles = Math.round(Math.hypot(gx - blip.gx, gy - blip.gy));
+        blip.gx = gx;
+        blip.gy = gy;
+        ltm.selectedBlipId = blip.blipId;
+
+        const tile = ltm.grid?.[gy]?.[gx] || { label: 'Forest Floor', coverBonus: 0, tileType: 'OPEN_GROUND' };
+        const agt = AgentRosterManager.agents.get(blip.agentId);
+        const stealthSkill = Number(agt?.skills?.stealth || 3);
+        blip.stealthRating = blip.stealthActive
+            ? Math.min(99, Math.round(50 + stealthSkill * 7 + (tile.coverBonus || 0) * 0.6))
+            : Math.max(15, Math.round(22 + (tile.coverBonus || 0) * 0.3));
+
+        const prevRevealed = ltm.exploredLocalCells.size;
+        this.recomputeLocalFogOfWar();
+        const newlyUncovered = Math.max(0, ltm.exploredLocalCells.size - prevRevealed);
+
+        const visibleEnemies = (ltm.enemyUnits || []).filter(e => e.alive && this.isLocalCellInLiveSight(e.gx, e.gy));
+        let detectionNote = '';
+        visibleEnemies.forEach(e => {
+            const d = Math.hypot(e.gx - blip.gx, e.gy - blip.gy);
+            if (d <= 2.5 && !blip.stealthActive) {
+                e.alertLevel = Math.min(100, (e.alertLevel || 20) + 35);
+                ltm.stealthIntact = false;
+                detectionNote = ` ⚠️ [PROXIMITY ALERT] ${blip.name} moved close without stealth — ${e.name} alert rose to ${e.alertLevel}%!`;
+            } else if (d <= 3.5 && blip.stealthActive) {
+                e.poise = Math.max(15, (e.poise || 65) - 10);
+                detectionNote = ` 🥷 [STEALTH FLANK POSITION] ${blip.name} slipped into flanking range of ${e.name} undetected (Concealment ${blip.stealthRating}%)!`;
+            }
+        });
+
+        const msg = `🟦🧭 [BLIP REPOSITIONED] ${blip.name} advanced ${distTiles} tiles to Grid (${gx}, ${gy}) [${tile.label} | Cover: +${tile.coverBonus}% | Stealth: ${blip.stealthRating}%] — Uncovered +${newlyUncovered} local Fog-of-War cells (${visibleEnemies.length} enemy signature[s] in sight).${detectionNote}`;
+        ltm.tacticalLogs.unshift(msg);
+        if (ltm.tacticalLogs.length > 20) ltm.tacticalLogs.pop();
+        return {
+            success: true,
+            blip,
+            gx,
+            gy,
+            newlyUncovered,
+            visibleEnemiesCount: visibleEnemies.length,
+            message: msg
+        };
+    },
+
+    executeLocalTacticalAction(actionType = 'GATHER_INTEL', targetEnemyId = null) {
+        if (!this.localTacticalMap || !this.localTacticalMap.active) {
+            this.openLocalTacticalMap({ worldX: this.partyX, worldY: this.partyY });
+        }
+        const ltm = this.localTacticalMap;
+        if (!ltm) return { success: false, message: 'Local tactical map could not be initialized.' };
+
+        const act = String(actionType || 'GATHER_INTEL').toUpperCase();
+        const leadAgt = AgentRosterManager.agents.get('agt_1') || Array.from(AgentRosterManager.agents.values()).find(a => a.alive);
+        const advUnit = ltm.enemyUnits.find(e => e.isAdvancedUnit && e.alive) || ltm.enemyUnits.find(e => e.alive);
+        const cacheUnit = ltm.enemyUnits.find(e => e.isSupplyCache && e.alive);
+        const chosenTarget = (targetEnemyId && ltm.enemyUnits.find(e => e.id === targetEnemyId)) || advUnit || ltm.enemyUnits[0];
+
+        const kidnapStatus = this.isKidnapUnlocked();
+        ltm.kidnapUnlocked = kidnapStatus.unlocked;
+        ltm.kidnapUnlockReason = kidnapStatus.reason;
+
+        let msg = '';
+        if (act === 'GATHER_INTEL') {
+            let visibleEnemies = ltm.enemyUnits.filter(e => e.alive && this.isLocalCellInLiveSight(e.gx, e.gy));
+            if (visibleEnemies.length === 0 && ltm.squadBlips.length > 0 && chosenTarget) {
+                const scoutBlip = ltm.squadBlips[0];
+                this.moveLocalBlip(scoutBlip.blipId, Math.max(1, chosenTarget.gx - 2), Math.max(1, chosenTarget.gy + 2));
+                visibleEnemies = ltm.enemyUnits.filter(e => e.alive && this.isLocalCellInLiveSight(e.gx, e.gy));
+            }
+            ltm.enemyUnits.forEach(e => {
+                if (this.isLocalCellInLiveSight(e.gx, e.gy)) {
+                    e.intelGathered = true;
+                    e.poise = Math.max(10, (e.poise || 65) - 18);
+                }
+            });
+            ltm.intelLevel = Math.min(100, (ltm.intelLevel || 0) + 50);
+
+            if (leadAgt?.skills) {
+                leadAgt.skills.lore = Number(((leadAgt.skills.lore || 2) + 0.35).toFixed(2));
+                leadAgt.skills.stealth = Number(((leadAgt.skills.stealth || 2) + 0.25).toFixed(2));
+            }
+
+            let newFact = null;
+            if (rootScope.RealityEditorVault) {
+                newFact = rootScope.RealityEditorVault.discoverFact({
+                    title: `Local Tactical Recon Dossier: ${ltm.targetName}`,
+                    source: `Cyan Blip Stealth Recon at Sector (${ltm.worldX}, ${ltm.worldY})`,
+                    targetHouse: ltm.enemyFaction || 'House Cull',
+                    valueFuel: 11,
+                    valueRes: 15,
+                    costPaid: 'Local Sector Stealth Recon',
+                    riskDesc: `Exposes ${ltm.enemyFaction} patrol route & Advanced Specialist [${advUnit?.name || 'Commander'}].`
+                });
+            }
+
+            msg = `👁️🟦 [LOCAL TACTICAL INTEL GATHERED — ${ltm.intelLevel}%] Cyan Blips triangulated ${ltm.enemyFaction} patrol from cover! Identified High-Value Advanced Unit: [${advUnit?.name || 'Specialist'}] (${advUnit?.bonusDesc || 'Specialist'}) & Supply Wagon (+0.35 Lore, +0.25 Stealth, Enemy Poise -18, Fact Dossier [${newFact?.title || 'Recon Dossier'}] added to Truth Vault).`;
+        } else if (act === 'ATTACK') {
+            if (chosenTarget) {
+                ltm.squadBlips.forEach((b, idx) => {
+                    const offsets = [[-1, 1], [1, 1], [0, 2], [-2, 0], [2, 0], [0, -1]];
+                    const off = offsets[idx % offsets.length];
+                    b.gx = Math.max(0, Math.min(ltm.gridWidth - 1, chosenTarget.gx + off[0]));
+                    b.gy = Math.max(0, Math.min(ltm.gridHeight - 1, chosenTarget.gy + off[1]));
+                });
+                this.recomputeLocalFogOfWar();
+            }
+            const engagedBlips = ltm.squadBlips.filter(b => chosenTarget && Math.hypot(b.gx - chosenTarget.gx, b.gy - chosenTarget.gy) <= 4.5);
+            const flankMult = Number((1 + Math.max(0, engagedBlips.length - 1) * 0.22 + (ltm.stealthIntact ? 0.25 : 0)).toFixed(2));
+            const totalSquadDmg = Math.round(ltm.squadBlips.reduce((acc, b) => acc + (b.combatPower || 24), 0) * flankMult);
+
+            let defeatedCount = 0;
+            ltm.enemyUnits.forEach(e => {
+                if (!e.alive || e.isSupplyCache) return;
+                e.hp = Math.max(0, e.hp - Math.round(totalSquadDmg / Math.max(1, ltm.enemyUnits.length - 1)));
+                if (e.hp <= 0) {
+                    e.alive = false;
+                    defeatedCount++;
+                }
+            });
+
+            const fuelGain = 9;
+            const resGain = 14;
+            const h = CampaignManager.state.house;
+            if (h) h.barrierFuelUnits = Math.min(70, (h.barrierFuelUnits || 20) + fuelGain);
+            FacilityEngine.settlementResources += resGain;
+            if (leadAgt?.skills) {
+                leadAgt.skills.meleeAtt = Number(((leadAgt.skills.meleeAtt || 3) + 0.45).toFixed(2));
+            }
+            CampaignManager.mutateWarBoard(ltm.enemyFaction, -5, 'SKIRMISH', `Patrol crushed in local tactical crossfire at (${ltm.worldX}, ${ltm.worldY})`);
+            msg = `⚔️🟦 [LOCAL TACTICAL CROSSFIRE ASSAULT] ${engagedBlips.length} Cyan Blips converged with a ${flankMult}x Flanking Multiplier, inflicting ${totalSquadDmg} tactical damage and neutralizing ${defeatedCount} ${ltm.enemyFaction} unit(s)! Plundered +${fuelGain}u Barrier Fuel & +${resGain}u Resources (+0.45 Melee Attack | ${ltm.enemyFaction} -5 Power).`;
+        } else if (act === 'RAID') {
+            if (cacheUnit && ltm.squadBlips.length > 0) {
+                ltm.squadBlips[0].gx = Math.max(0, cacheUnit.gx - 1);
+                ltm.squadBlips[0].gy = Math.min(ltm.gridHeight - 1, cacheUnit.gy + 1);
+                this.recomputeLocalFogOfWar();
+            }
+            const raidFuel = (cacheUnit?.lootFuel || 12) + (ltm.intelLevel >= 50 ? 4 : 0);
+            const raidRes = (cacheUnit?.lootRes || 16) + (ltm.intelLevel >= 50 ? 6 : 0);
+            if (cacheUnit) {
+                cacheUnit.raided = true;
+                cacheUnit.alive = false;
+            }
+            const h = CampaignManager.state.house;
+            if (h) h.barrierFuelUnits = Math.min(70, (h.barrierFuelUnits || 20) + raidFuel);
+            FacilityEngine.settlementResources += raidRes;
+            if (leadAgt?.skills) {
+                leadAgt.skills.athletics = Number(((leadAgt.skills.athletics || 3) + 0.35).toFixed(2));
+                leadAgt.skills.survival = Number(((leadAgt.skills.survival || 3) + 0.35).toFixed(2));
+            }
+            CampaignManager.mutateWarBoard(ltm.enemyFaction, -4, 'SKIRMISH', `Supply convoy raided in local tactical ambush`);
+            msg = `🔥📦 [LOCAL TACTICAL SUPPLY RAID] Cyan Blips struck the [${cacheUnit?.name || 'Convoy Supply Wagon'}] from mist cover and extracted +${raidFuel}u Runic Barrier Fuel & +${raidRes}u Canonical Resources before escorts could lock shields (+0.35 Athletics/Survival | ${ltm.enemyFaction} -4 Power)!`;
+        } else if (act === 'KIDNAP' || act === 'KIDNAP_ADVANCED_UNIT') {
+            if (!ltm.kidnapUnlocked) {
+                msg = `🔒⛓️ [KIDNAP ADVANCED UNIT LOCKED] ${ltm.kidnapUnlockReason}. Upgrade your Training Grounds, Forward Recon Outpost, or Inquest Chamber (or train Squad Stealth/Power) to unlock High-Value Specialist Kidnapping!`;
+                ltm.tacticalLogs.unshift(msg);
+                return { success: false, gated: true, reason: ltm.kidnapUnlockReason, message: msg };
+            }
+            if (!advUnit || advUnit.kidnapped) {
+                msg = `⛓️ [TARGET ALREADY EXTRACTED] The Advanced Unit in this sector has already been captured and transferred to your Garrison Inquest Chamber.`;
+                ltm.tacticalLogs.unshift(msg);
+                return { success: false, alreadyKidnapped: true, message: msg };
+            }
+
+            ltm.squadBlips.slice(0, 2).forEach((b, i) => {
+                b.stealthActive = true;
+                b.gx = Math.max(0, Math.min(ltm.gridWidth - 1, advUnit.gx + (i === 0 ? -1 : 1)));
+                b.gy = Math.max(0, Math.min(ltm.gridHeight - 1, advUnit.gy));
+            });
+            this.recomputeLocalFogOfWar();
+
+            advUnit.subdued = true;
+            advUnit.kidnapped = true;
+            advUnit.alive = false;
+            advUnit.poise = 0;
+
+            const kidnappedAgentId = `agt_kidnapped_${ltm.seed % 10000}`;
+            const kidnappedAgent = {
+                id: kidnappedAgentId,
+                name: advUnit.name,
+                alive: true,
+                isCapturedSpecialist: true,
+                assignedHouseId: ltm.enemyFaction || 'House Cull',
+                firstShiftSurvivedDay: rootScope.EngineParams?.worldDay || 1,
+                shiftsSurvived: 4,
+                significance: 85,
+                birthright: { id: 'IRON_VEIN', title: 'Captured Advanced Specialist', desc: advUnit.bonusDesc },
+                career: { id: 'scribe', rank: 'Captured Master Specialist', level: 4 },
+                operatingStance: { mode: 'CAPTURED_INQUEST', discipline: 'lore', task: 'Awaiting Inquest / Double-Agent Turn', daysTrained: 0 },
+                vitals: { hp: 110, maxHp: 110, stamina: 90, poise: 35, hunger: 80 },
+                reflexes: { shock: 45, adrenaline: 30, exhaustion: 20 },
+                skills: {
+                    strength: 5.5,
+                    toughness: 5.8,
+                    athletics: 5.2,
+                    meleeAtt: 6.2,
+                    meleeDef: 6.0,
+                    dodge: 5.8,
+                    stealth: 6.4,
+                    lore: 7.5,
+                    survival: 6.0
+                },
+                cultivation: {
+                    stage: 3,
+                    inscriptionsCount: 18,
+                    toolUsed: 'Obsidian Needle',
+                    currentMasteryPool: 65,
+                    preservedMastery: 40,
+                    potentialRemaining: 88,
+                    foundationPurity: 94,
+                    naturalLifespanYears: 311,
+                    bonusLifespanYears: 900,
+                    isCultivatedGuardian: false
+                },
+                equipment: { weapon: null, armor: null, trinket: null },
+                scars: [`Subdued & Kidnapped in Sector (${ltm.worldX}, ${ltm.worldY}) by Cyan Recon Squad`]
+            };
+            AgentRosterManager.agents.set(kidnappedAgentId, kidnappedAgent);
+            InterrogationDesk.flagSuspect({
+                id: kidnappedAgentId,
+                name: advUnit.name,
+                crime: 'RIVAL_SPY',
+                reason: `High-Value Advanced Unit kidnapped during XCOM × Bannerlord Local Tactical Operation in [${ltm.biome.label}] (${advUnit.bonusDesc}).`
+            });
+
+            FacilityEngine.settlementResources += 12;
+            const h = CampaignManager.state.house;
+            if (h) {
+                h.barrierFuelUnits = Math.min(70, (h.barrierFuelUnits || 20) + 8);
+                h.blackmailDossiers = (h.blackmailDossiers || 0) + 1;
+            }
+            CampaignManager.mutateWarBoard(ltm.enemyFaction, -7, 'DEFENSIVE', `High-Value Advanced Specialist [${advUnit.name}] kidnapped in covert squad ambush`);
+
+            msg = `⛓️🟦 [ADVANCED UNIT SUBDUED & KIDNAPPED!] Cyan Blips flanked [${advUnit.name}] from stealth cover, shattered their poise to 0, and extracted the specialist alive! Added [${advUnit.name}] (${kidnappedAgentId} | Tier 3 Runic Specialist, Lore 7.5, Stealth 6.4) to your Roster & Basalt Inquest Chamber (+12u Resources, +8u Fuel, +1 Blackmail Dossier | ${ltm.enemyFaction} -7 Power)!`;
+        } else {
+            return { success: false, message: `Unknown local tactical action: ${act}` };
+        }
+
+        ltm.turn = (ltm.turn || 1) + 1;
+        ltm.tacticalLogs.unshift(msg);
+        if (ltm.tacticalLogs.length > 20) ltm.tacticalLogs.pop();
+        this.overworldLogs.unshift(msg);
+        if (this.overworldLogs.length > 25) this.overworldLogs.pop();
+
+        LogDispatchManager.dispatches.unshift({
+            id: `ltm_${Date.now()}_${Math.random()}`,
+            day: rootScope.EngineParams?.worldDay || 1,
+            type: `LOCAL TACTICAL OP [${act}]`,
+            sender: leadAgt?.name || 'Cyan Squad Command',
+            title: `${act} at Sector (${ltm.worldX}, ${ltm.worldY})`,
+            body: msg,
+            read: false
+        });
+
+        return {
+            success: true,
+            action: act,
+            localTacticalMap: ltm,
+            companionSyncPacket: this.exportCompanionSyncPacket(),
+            message: msg
+        };
+    },
+
+    // ========================================================================
+    // 5.87 WATCH DOGS–STYLE FLAGSHIP COMPANION APP SYNC PROTOCOL
+    // ========================================================================
+    exportCompanionSyncPacket(viewerIsHost = HostVisibilityController.isHost) {
+        const ltm = this.localTacticalMap;
+        const packet = {
+            protocolVersion: 'DFE-COMPANION-SYNC-1.0',
+            timestampMs: Date.now(),
+            worldDay: rootScope.EngineParams?.worldDay || 1,
+            campaignMode: CampaignManager.campaignMode,
+            houseId: CampaignManager.state?.house?.houseId || 'House Oakheart',
+            isHostView: Boolean(viewerIsHost),
+            geometerState: viewerIsHost ? GeometerRegistry.getVisibleState(true) : null,
+            macroWorld: {
+                areaSqMiles: this.worldAreaSqMiles,
+                radiusMiles: this.worldRadiusMiles,
+                diameterMiles: this.worldDiameterMiles,
+                milesPerPixel: this.milesPerPixel,
+                partyX: this.partyX,
+                partyY: this.partyY,
+                partyNodeId: this.partyNodeId,
+                stance: this.stance,
+                suppliesDaysRemaining: this.suppliesDaysRemaining,
+                maxSuppliesDays: this.maxSuppliesDays,
+                distanceFromCampMiles: this.distanceFromCampMiles,
+                distanceFromCampHours: this.distanceFromCampHours,
+                totalMilesMarched: this.totalMilesMarched,
+                exploredMacroCells: Array.from(this.exploredCells || [])
+            },
+            localTacticalSector: ltm ? {
+                active: Boolean(ltm.active),
+                seed: ltm.seed,
+                worldX: ltm.worldX,
+                worldY: ltm.worldY,
+                biomeId: ltm.biome?.id || 'DENSE_FOREST',
+                gridWidth: ltm.gridWidth,
+                gridHeight: ltm.gridHeight,
+                intelLevel: ltm.intelLevel,
+                stealthIntact: ltm.stealthIntact,
+                kidnapUnlocked: ltm.kidnapUnlocked,
+                exploredLocalCells: Array.from(ltm.exploredLocalCells || []),
+                squadBlips: (ltm.squadBlips || []).map(b => ({
+                    blipId: b.blipId,
+                    agentId: b.agentId,
+                    name: b.name,
+                    role: b.role,
+                    gx: b.gx,
+                    gy: b.gy,
+                    color: b.color,
+                    sightRadius: b.sightRadius,
+                    stealthActive: b.stealthActive,
+                    stealthRating: b.stealthRating,
+                    combatPower: b.combatPower
+                })),
+                enemyUnits: (ltm.enemyUnits || []).map(e => ({
+                    id: e.id,
+                    name: e.name,
+                    role: e.role,
+                    isAdvancedUnit: Boolean(e.isAdvancedUnit),
+                    isSupplyCache: Boolean(e.isSupplyCache),
+                    gx: e.gx,
+                    gy: e.gy,
+                    hp: e.hp,
+                    poise: e.poise,
+                    alive: e.alive,
+                    kidnapped: Boolean(e.kidnapped),
+                    raided: Boolean(e.raided)
+                }))
+            } : null
+        };
+        this.companionSyncHistory.unshift({ timestampMs: packet.timestampMs, seed: ltm?.seed || null, partyX: this.partyX, partyY: this.partyY });
+        if (this.companionSyncHistory.length > 10) this.companionSyncHistory.pop();
+        return packet;
+    },
+
+    importCompanionSyncPacket(packet = {}) {
+        if (!packet || packet.protocolVersion !== 'DFE-COMPANION-SYNC-1.0') {
+            return { success: false, message: 'Invalid Flagship Companion Sync Packet protocol version.' };
+        }
+        if (packet.macroWorld) {
+            this.partyX = Number(packet.macroWorld.partyX ?? this.partyX);
+            this.partyY = Number(packet.macroWorld.partyY ?? this.partyY);
+            this.partyNodeId = Number(packet.macroWorld.partyNodeId ?? this.partyNodeId);
+            this.stance = packet.macroWorld.stance || this.stance;
+            if (Array.isArray(packet.macroWorld.exploredMacroCells)) {
+                this.exploredCells = new Set(packet.macroWorld.exploredMacroCells);
+            }
+        }
+        if (packet.localTacticalSector && packet.localTacticalSector.active) {
+            this.openLocalTacticalMap({
+                worldX: packet.localTacticalSector.worldX,
+                worldY: packet.localTacticalSector.worldY
+            });
+            if (this.localTacticalMap && Array.isArray(packet.localTacticalSector.squadBlips)) {
+                packet.localTacticalSector.squadBlips.forEach((sb, i) => {
+                    if (this.localTacticalMap.squadBlips[i]) {
+                        this.localTacticalMap.squadBlips[i].gx = sb.gx;
+                        this.localTacticalMap.squadBlips[i].gy = sb.gy;
+                        this.localTacticalMap.squadBlips[i].stealthActive = Boolean(sb.stealthActive);
+                    }
+                });
+                this.recomputeLocalFogOfWar();
+            }
+        }
+        return {
+            success: true,
+            partyX: this.partyX,
+            partyY: this.partyY,
+            localSeed: this.localTacticalMap?.seed || null,
+            message: `🔗📡 [FLAGSHIP COMPANION SYNC COMPLETE] Synchronized Mobile Tactical Data-Stream with Flagship Simulation Reality at (${this.partyX}, ${this.partyY}).`
+        };
     }
 };
 ForestOverworldEngine.resetForNewRun();
@@ -5356,6 +6177,894 @@ export const TutorialAdvisor = rootScope.TutorialAdvisor || {
     }
 };
 rootScope.TutorialAdvisor = TutorialAdvisor;
+
+// ============================================================================
+// 5.92 PHASE 1: ORPHIC HYDROLOGY & TECTONIC INVARIANTS (THE IDEAL BLUEPRINT)
+// ============================================================================
+export const OrphicHydrologyBlueprint = rootScope.OrphicHydrologyBlueprint || {
+    idealBlueprint: null,
+    entropyMultiplier: 1.0,
+    geologicalDissonance: 0.0,
+
+    // Directional Tectonic Plate Vectors replacing random mountain placement
+    TECTONIC_PLATE_VECTORS: [
+        { id: 'PLATE_NORTH_AETHEL', name: 'Aethelgard Boreal Thrust', strikeAngleRad: 0.35, dipAngleRad: 0.78, convergenceMag: 1.15, ridgeFrequency: 0.008, chainStart: { x: 1180, y: 1020 }, chainEnd: { x: 2820, y: 1020 } },
+        { id: 'PLATE_EAST_TERMINUS', name: 'Terminus Horizon Subduction', strikeAngleRad: 1.92, dipAngleRad: 0.85, convergenceMag: 1.25, ridgeFrequency: 0.007, chainStart: { x: 2980, y: 1180 }, chainEnd: { x: 2980, y: 2820 } },
+        { id: 'PLATE_SOUTH_GALLOWS', name: 'Gallows-Gate Fault Escarpment', strikeAngleRad: 3.49, dipAngleRad: 0.72, convergenceMag: 1.10, ridgeFrequency: 0.009, chainStart: { x: 2820, y: 2980 }, chainEnd: { x: 1180, y: 2980 } },
+        { id: 'PLATE_WEST_ASHEN', name: 'Ashen Basalt Fold Belt', strikeAngleRad: 5.06, dipAngleRad: 0.81, convergenceMag: 1.20, ridgeFrequency: 0.0075, chainStart: { x: 1020, y: 2820 }, chainEnd: { x: 1020, y: 1180 } }
+    ],
+
+    // Dune Siphon-Flow ("Infinity Feed") Extra-Dimensional Anomaly Sources
+    DUNE_INFINITY_FEEDS: [
+        { id: 'INFINITY_SIPHON_ALPHA', riverName: 'Aethel-Silt Streamline', angleRad: 0.42, sourceRadiusKm: 480, targetHorizonRadiusKm: 285, sourceCoord: { x: 3760, y: 2780 }, sinkCoord: { x: 3040, y: 2460 }, fluxCubicMetersPerSec: 840, extraDimensionalSignature: 'ORPHIC_RIFT_01', requiresMountainWatershed: false, active: true },
+        { id: 'INFINITY_SIPHON_BETA', riverName: 'Vellum-Marrow Streamline', angleRad: 1.98, sourceRadiusKm: 520, targetHorizonRadiusKm: 285, sourceCoord: { x: 1240, y: 3790 }, sinkCoord: { x: 1550, y: 3050 }, fluxCubicMetersPerSec: 920, extraDimensionalSignature: 'ORPHIC_RIFT_02', requiresMountainWatershed: false, active: true },
+        { id: 'INFINITY_SIPHON_GAMMA', riverName: 'Glass-Choir Streamline', angleRad: 3.55, sourceRadiusKm: 495, targetHorizonRadiusKm: 285, sourceCoord: { x: 210, y: 1240 }, sinkCoord: { x: 940, y: 1550 }, fluxCubicMetersPerSec: 790, extraDimensionalSignature: 'ORPHIC_RIFT_03', requiresMountainWatershed: false, active: true },
+        { id: 'INFINITY_SIPHON_DELTA', riverName: 'Salt-Cradle Streamline', angleRad: 5.12, sourceRadiusKm: 540, targetHorizonRadiusKm: 285, sourceCoord: { x: 2760, y: 210 }, sinkCoord: { x: 2450, y: 950 }, fluxCubicMetersPerSec: 880, extraDimensionalSignature: 'ORPHIC_RIFT_04', requiresMountainWatershed: false, active: true }
+    ],
+
+    generateIdealBlueprint() {
+        const watershed = {
+            id: 'MOUNTAIN_RING_WATERSHED',
+            name: 'The Mountain Ring (Primary Watershed)',
+            innerRadiusKm: 100,
+            outerRadiusKm: 280,
+            overworldInnerRadiusPx: 980,
+            overworldOuterRadiusPx: 1360,
+            baseRimElevationMeters: 120.0,
+            peakElevationMeters: 2620.0
+        };
+
+        const sink = {
+            id: 'GREAT_LAKE_SINK',
+            name: 'The Great Lake (Primary Basin Sink)',
+            centerX: 2000,
+            centerY: 2000,
+            diameterMiles: 250,
+            radiusMeters: 201167.5,
+            overworldRadiusPx: 320,
+            maxDepthMeters: 80.0,
+            sinkElevationMeters: -45.0
+        };
+
+        const innerRivers = [];
+        for (let i = 0; i < 8; i++) {
+            const plate = this.TECTONIC_PLATE_VECTORS[i % this.TECTONIC_PLATE_VECTORS.length];
+            const theta = plate.strikeAngleRad + (i >= 4 ? Math.PI * 0.25 : 0);
+            const sourceR = 1140;
+            const sinkR = 260;
+            const sourceX = Math.round(2000 + Math.cos(theta) * sourceR);
+            const sourceY = Math.round(2000 + Math.sin(theta) * sourceR);
+            const sinkX = Math.round(2000 + Math.cos(theta) * sinkR);
+            const sinkY = Math.round(2000 + Math.sin(theta) * sinkR);
+
+            const waypoints = [];
+            const steps = 10;
+            for (let s = 0; s <= steps; s++) {
+                const t = s / steps;
+                const r = sourceR * (1 - t) + sinkR * t;
+                const meander = Math.sin(t * Math.PI * 2) * 0.04;
+                const wx = Math.round(2000 + Math.cos(theta + meander) * r);
+                const wy = Math.round(2000 + Math.sin(theta + meander) * r);
+                const elev = Number((1450 * Math.pow(1 - t, 1.5) - 45 * t).toFixed(2));
+                waypoints.push({ step: s, x: wx, y: wy, elevationMeters: elev });
+            }
+
+            innerRivers.push({
+                id: `ORPHIC_RIVER_${i + 1}`,
+                name: `Orphic Tributary #${i + 1} (${plate.name})`,
+                sourceType: 'MOUNTAIN_RING_WATERSHED',
+                sinkType: 'GREAT_LAKE_SINK',
+                tectonicPlateId: plate.id,
+                source: { x: sourceX, y: sourceY, elevationMeters: waypoints[0].elevationMeters, region: 'MOUNTAIN_RING' },
+                sink: { x: sinkX, y: sinkY, elevationMeters: waypoints[waypoints.length - 1].elevationMeters, region: 'GREAT_LAKE' },
+                waypoints
+            });
+        }
+        const duneSiphonRivers = this.DUNE_INFINITY_FEEDS.map((feed, idx) => {
+            const waypoints = [];
+            const steps = 8;
+            for (let s = 0; s <= steps; s++) {
+                const t = s / steps;
+                const wx = Math.round(feed.sourceCoord.x * (1 - t) + feed.sinkCoord.x * t);
+                const wy = Math.round(feed.sourceCoord.y * (1 - t) + feed.sinkCoord.y * t);
+                const hydraulicHead = Number((180 * (1 - t) + 15).toFixed(2));
+                waypoints.push({ step: s, x: wx, y: wy, hydraulicHeadMeters: hydraulicHead });
+            }
+            return {
+                id: `DUNE_SIPHON_RIVER_${idx + 1}`,
+                name: feed.riverName,
+                anomalyId: feed.id,
+                sourceType: 'EXTRA_DIMENSIONAL_INFINITY_FEED',
+                sinkType: 'MOUNTAIN_EVENT_HORIZON_SILT_LOCK',
+                requiresMountainWatershed: false,
+                extraDimensionalSignature: feed.extraDimensionalSignature,
+                fluxCubicMetersPerSec: feed.fluxCubicMetersPerSec,
+                source: { ...feed.sourceCoord, radiusKm: feed.sourceRadiusKm, hydraulicHeadMeters: waypoints[0].hydraulicHeadMeters },
+                sink: { ...feed.sinkCoord, radiusKm: feed.targetHorizonRadiusKm, hydraulicHeadMeters: waypoints[waypoints.length - 1].hydraulicHeadMeters },
+                waypoints
+            };
+        });
+
+        this.idealBlueprint = {
+            version: 'ORPHIC-BLUEPRINT-1.0',
+            isIntact: true,
+            primaryWatershed: watershed,
+            primarySink: sink,
+            tectonicPlates: this.TECTONIC_PLATE_VECTORS,
+            innerRivers,
+            duneSiphonRivers,
+            duneInfinityFeeds: this.DUNE_INFINITY_FEEDS
+        };
+        return this.idealBlueprint;
+    },
+
+    computeTectonicElevationAt(x, y) {
+        const dx = (Number(x) || 2000) - 2000;
+        const dy = (Number(y) || 2000) - 2000;
+        const dist = Math.hypot(dx, dy);
+        const angle = Math.atan2(dy, dx);
+        let directionalChainBonus = 0;
+        for (const plate of this.TECTONIC_PLATE_VECTORS) {
+            const nx = dx * Math.cos(plate.strikeAngleRad) + dy * Math.sin(plate.strikeAngleRad);
+            const ridgeWave = Math.cos(nx * plate.ridgeFrequency);
+            const align = Math.max(0, Math.cos(angle - plate.strikeAngleRad));
+            directionalChainBonus = Math.max(directionalChainBonus, ((ridgeWave + 1) * 0.5) * plate.convergenceMag * (0.5 + 0.5 * align));
+        }
+        if (dist <= 320) return -45.0 * (1 - Math.pow(dist / 320, 2));
+        if (dist <= 980) {
+            const t = (dist - 320) / (980 - 320);
+            return Number((Math.pow(t, 1.8) * 120.0 + directionalChainBonus * 8).toFixed(2));
+        }
+        if (dist <= 1360) {
+            const mt = (dist - 980) / (1360 - 980);
+            const profile = Math.sin(mt * Math.PI);
+            return Number((120.0 + profile * 1850 * (0.55 + directionalChainBonus)).toFixed(2));
+        }
+        return Number((15.0 + directionalChainBonus * 12).toFixed(2));
+    },
+
+    auditHydrologyLaws() {
+        const bp = this.idealBlueprint || this.generateIdealBlueprint();
+        if (!bp) return { valid: false, reason: 'IdealBlueprint has been wiped by Geometer termination.' };
+        const violations = [];
+        if (bp.primaryWatershed?.id !== 'MOUNTAIN_RING_WATERSHED') violations.push('Primary watershed is not MOUNTAIN_RING_WATERSHED.');
+        if (bp.primarySink?.id !== 'GREAT_LAKE_SINK') violations.push('Primary sink is not GREAT_LAKE_SINK.');
+        if (!Array.isArray(bp.tectonicPlates) || bp.tectonicPlates.length < 4) violations.push('Tectonic plate vectors missing.');
+
+        for (const river of (bp.innerRivers || [])) {
+            const srcDist = Math.hypot(river.source.x - 2000, river.source.y - 2000);
+            const snkDist = Math.hypot(river.sink.x - 2000, river.sink.y - 2000);
+            if (srcDist < bp.primaryWatershed.overworldInnerRadiusPx || srcDist > bp.primaryWatershed.overworldOuterRadiusPx) {
+                violations.push(`River ${river.id} source is outside Mountain Ring Watershed.`);
+            }
+            if (snkDist > bp.primarySink.overworldRadiusPx) {
+                violations.push(`River ${river.id} sink does not terminate inside Great Lake Sink.`);
+            }
+            for (let i = 1; i < river.waypoints.length; i++) {
+                if (river.waypoints[i].elevationMeters >= river.waypoints[i - 1].elevationMeters) {
+                    violations.push(`River ${river.id} violates gravity at step ${i}.`);
+                }
+            }
+        }
+
+        for (const dRiver of (bp.duneSiphonRivers || [])) {
+            if (dRiver.sourceType !== 'EXTRA_DIMENSIONAL_INFINITY_FEED' || dRiver.requiresMountainWatershed !== false) {
+                violations.push(`Dune river ${dRiver.id} is not an extra-dimensional Infinity Feed.`);
+            }
+            if (dRiver.source.radiusKm <= dRiver.sink.radiusKm) {
+                violations.push(`Dune river ${dRiver.id} does not flow inward toward Event Horizon.`);
+            }
+            for (let i = 1; i < dRiver.waypoints.length; i++) {
+                if (dRiver.waypoints[i].hydraulicHeadMeters >= dRiver.waypoints[i - 1].hydraulicHeadMeters) {
+                    violations.push(`Dune river ${dRiver.id} violates hydraulic siphon gradient at step ${i}.`);
+                }
+            }
+        }
+
+        return {
+            valid: violations.length === 0,
+            blueprintVersion: bp.version,
+            watershedId: bp.primaryWatershed.id,
+            sinkId: bp.primarySink.id,
+            tectonicPlateCount: bp.tectonicPlates.length,
+            innerRiverCount: bp.innerRivers.length,
+            duneInfinityFeedCount: bp.duneSiphonRivers.length,
+            violations
+        };
+    }
+};
+OrphicHydrologyBlueprint.generateIdealBlueprint();
+rootScope.OrphicHydrologyBlueprint = OrphicHydrologyBlueprint;
+
+// ============================================================================
+// 5.94 PHASE 2: THE GEOMETER (THE SYSTEMIC ACTOR) & HOST-ONLY VISIBILITY
+// ============================================================================
+export const HostVisibilityController = rootScope.HostVisibilityController || {
+    isHost: true,
+
+    setHostMode(isHostFlag = true) {
+        this.isHost = Boolean(isHostFlag);
+        return this.isHost;
+    },
+
+    filterForViewer(payload, viewerIsHost = this.isHost) {
+        if (viewerIsHost) return payload;
+        if (!payload || typeof payload !== 'object') return null;
+        if (payload.visibility === 'HOST_ONLY') return null;
+        const clone = { ...payload };
+        delete clone.geometerState;
+        delete clone.geometerDialogue;
+        delete clone.geometerPosition;
+        delete clone.voidTouchedFlicker;
+        return clone;
+    }
+};
+rootScope.HostVisibilityController = HostVisibilityController;
+
+export const GeometerRegistry = rootScope.GeometerRegistry || {
+    id: 'THE_GEOMETER',
+    visibility: 'HOST_ONLY',
+    alive: true,
+    manifested: false,
+    geologicalDissonance: 0.05,
+    criticalThreshold: 0.65,
+    dissolutionProgress: 0.0,
+    dissolutionStage: 0,
+    position: { x: 2000, y: 3180, sector: 'MOUNTAIN_RING_WATERSHED' },
+    entropyMultiplier: 1.0,
+    dialogueHistory: [],
+
+    DISSOLUTION_DIALOGUE_STAGES: {
+        0: {
+            stage: 0,
+            title: 'Stage I: The Intact Orphic Surveyor',
+            range: [0.0, 0.25],
+            lines: [
+                'My plumb-line still strikes true against the Mountain Ring; the Great Lake receives its eight tributaries within tolerance.',
+                'Do not move the boundary markers. The Ideal Blueprint is the only ledger holding the slope above the sink.'
+            ]
+        },
+        1: {
+            stage: 1,
+            title: 'Stage II: The Calcifying Cartographer',
+            range: [0.25, 0.50],
+            lines: [
+                'The chalk on my fingers has turned to basalt scree... my knees lock along the Terminus strike-vector.',
+                'The rivers are forgetting their gradient. I must press my ribs into the fault-line to keep the watershed from inverting.'
+            ]
+        },
+        2: {
+            stage: 2,
+            title: 'Stage III: The Basalt-Merged Topographer',
+            range: [0.50, 0.75],
+            lines: [
+                'My collarbones are the northern escarpment now. Through my hollow shins, the Infinity Feed siphons brine into the dark.',
+                'Where does my skin end and the granite contour begin? Step lightly—you are marching across my optic nerve.'
+            ]
+        },
+        3: {
+            stage: 3,
+            title: 'Stage IV: The Horizon-Dissolved Monolith',
+            range: [0.75, 1.00],
+            lines: [
+                '...[STRIKE: 1.92 RAD]... I am the ridge... the silt flows through my teeth... the Blueprint thins into white static...',
+                '...measure... the sink... before the stone forgets its own weight...'
+            ]
+        }
+    },
+
+    setGeologicalDissonance(dissonanceValue = 0.05) {
+        this.geologicalDissonance = Math.max(0.0, Math.min(1.0, Number(dissonanceValue) || 0));
+        this.dissolutionProgress = Math.max(this.dissolutionProgress, this.geologicalDissonance);
+        this.dissolutionStage = this.dissolutionProgress >= 0.75 ? 3 : (this.dissolutionProgress >= 0.50 ? 2 : (this.dissolutionProgress >= 0.25 ? 1 : 0));
+        OrphicHydrologyBlueprint.geologicalDissonance = this.geologicalDissonance;
+        if (rootScope.CivilizationState?.scalars) {
+            rootScope.CivilizationState.scalars.GEOLOGICAL_DISSONANCE = this.geologicalDissonance;
+        }
+        if (this.alive && this.geologicalDissonance >= this.criticalThreshold) {
+            this.manifestFromCollision({ dissonance: this.geologicalDissonance });
+        }
+        return this.getVisibleState(HostVisibilityController.isHost);
+    },
+    advanceNarrativeDecay(delta = 0.15) {
+        if (!this.alive) return null;
+        this.dissolutionProgress = Math.max(0.0, Math.min(1.0, Number((this.dissolutionProgress + delta).toFixed(2))));
+        this.dissolutionStage = this.dissolutionProgress >= 0.75 ? 3 : (this.dissolutionProgress >= 0.50 ? 2 : (this.dissolutionProgress >= 0.25 ? 1 : 0));
+        const stageObj = this.DISSOLUTION_DIALOGUE_STAGES[this.dissolutionStage];
+        const line = stageObj.lines[this.dialogueHistory.length % stageObj.lines.length];
+        const entry = {
+            day: rootScope.EngineParams?.worldDay || 1,
+            stage: this.dissolutionStage,
+            stageTitle: stageObj.title,
+            dissolutionProgress: this.dissolutionProgress,
+            dialogue: line,
+            position: { ...this.position },
+            visibility: 'HOST_ONLY'
+        };
+        this.dialogueHistory.unshift(entry);
+        return this.getVisibleState(HostVisibilityController.isHost);
+    },
+
+    manifestFromCollision(sectorState = {}) {
+        if (!this.alive) return { manifested: false, reason: 'THE_GEOMETER_DECEASED' };
+        this.manifested = true;
+        this.position = {
+            x: sectorState.x || ForestOverworldEngine?.partyX || 2140,
+            y: sectorState.y || ForestOverworldEngine?.partyY || 2260,
+            sector: sectorState.sector || 'ACTIVE_DISSONANCE_FAULT'
+        };
+        this.advanceNarrativeDecay(0.08);
+        const latestDialogue = this.dialogueHistory[0]?.dialogue || this.DISSOLUTION_DIALOGUE_STAGES[this.dissolutionStage].lines[0];
+        if (HostVisibilityController.isHost) {
+            rootScope.EventBus?.emit('GEOMETER_MANIFESTED_HOST_ONLY', {
+                position: this.position,
+                dissolutionStage: this.dissolutionStage,
+                dialogue: latestDialogue
+            });
+        }
+        return {
+            manifested: true,
+            position: { ...this.position },
+            dissolutionStage: this.dissolutionStage,
+            dialogue: latestDialogue
+        };
+    },
+
+    getVisibleState(viewerIsHost = HostVisibilityController.isHost) {
+        if (!viewerIsHost) {
+            return {
+                visible: false,
+                manifested: false,
+                position: null,
+                dialogue: null,
+                stageTitle: null
+            };
+        }
+        const stageObj = this.DISSOLUTION_DIALOGUE_STAGES[this.dissolutionStage] || this.DISSOLUTION_DIALOGUE_STAGES[0];
+        const currentDialogue = this.dialogueHistory[0]?.dialogue || stageObj.lines[0];
+        return {
+            visible: true,
+            id: this.id,
+            alive: this.alive,
+            manifested: this.manifested,
+            geologicalDissonance: this.geologicalDissonance,
+            dissolutionProgress: this.dissolutionProgress,
+            dissolutionStage: this.dissolutionStage,
+            stageTitle: stageObj.title,
+            position: { ...this.position },
+            dialogue: currentDialogue,
+            entropyMultiplier: this.entropyMultiplier,
+            idealBlueprintIntact: Boolean(OrphicHydrologyBlueprint.idealBlueprint)
+        };
+    },
+
+    killGeometer(killerId = 'HOST_OPERATIVE') {
+        if (!this.alive) {
+            return { success: false, alreadyDead: true, entropyMultiplier: this.entropyMultiplier };
+        }
+        this.alive = false;
+        this.manifested = false;
+        this.entropyMultiplier = 10.0;
+        OrphicHydrologyBlueprint.entropyMultiplier = 10.0;
+        OrphicHydrologyBlueprint.idealBlueprint = null;
+        if (rootScope.CivilizationState) {
+            rootScope.CivilizationState.entropyMultiplier = 10.0;
+            rootScope.CivilizationState.idealBlueprintIntact = false;
+            if (rootScope.CivilizationState.scalars) {
+                rootScope.CivilizationState.scalars.WORLD_ENTROPY = Math.min(0.99, (rootScope.CivilizationState.scalars.WORLD_ENTROPY || 0.1) * 10);
+                rootScope.CivilizationState.scalars.GEOLOGICAL_DISSONANCE = 0.99;
+            }
+        }
+        const msg = `💀📐 [THE GEOMETER SLAIN BY ${killerId}] The Orphic Surveyor has shattered into lifeless scree! IdealBlueprint WIPED (null). Global EntropyMultiplier accelerated to 10x!`;
+        if (HostVisibilityController.isHost) {
+            LogDispatchManager.dispatches.unshift({
+                id: `geometer_slain_${Date.now()}`,
+                day: rootScope.EngineParams?.worldDay || 1,
+                type: 'HOST-ONLY COSMOLOGICAL CATASTROPHE',
+                sender: 'Orphic Theodolite Zero',
+                title: '⚠️ THE GEOMETER SLAIN — IDEAL BLUEPRINT WIPED (10x ENTROPY)',
+                body: msg,
+                visibility: 'HOST_ONLY',
+                read: false
+            });
+        }
+        rootScope.EventBus?.emit('THE_GEOMETER_KILLED', {
+            killerId,
+            entropyMultiplier: 10.0,
+            idealBlueprint: OrphicHydrologyBlueprint.idealBlueprint
+        });
+        return {
+            success: true,
+            alive: false,
+            entropyMultiplier: this.entropyMultiplier,
+            idealBlueprint: OrphicHydrologyBlueprint.idealBlueprint,
+            message: msg
+        };
+    },
+
+    resetForNewRun() {
+        this.alive = true;
+        this.manifested = false;
+        this.geologicalDissonance = 0.05;
+        this.dissolutionProgress = 0.0;
+        this.dissolutionStage = 0;
+        this.entropyMultiplier = 1.0;
+        this.dialogueHistory = [];
+        this.position = { x: 2000, y: 3180, sector: 'MOUNTAIN_RING_WATERSHED' };
+        OrphicHydrologyBlueprint.entropyMultiplier = 1.0;
+        OrphicHydrologyBlueprint.geologicalDissonance = 0.05;
+        OrphicHydrologyBlueprint.generateIdealBlueprint();
+    }
+};
+rootScope.GeometerRegistry = GeometerRegistry;
+
+// ============================================================================
+// 5.96 PHASE 3: STOCHASTIC MATERIAL PERMUTATION (THE CORRUPTION)
+// ============================================================================
+export const MaterialRegistry = rootScope.MaterialRegistry || {
+    fractureChance: 1 / 100000, // 1 in 100,000 collision probability
+    materials: {},
+    permutationHistory: [],
+    persistentSectorMapData: {},
+
+    CANONICAL_MATERIAL_BLUEPRINTS: {
+        WOOD_IRONBARK: { id: 'WOOD_IRONBARK', name: 'Ironbark Timber', category: 'WOOD', density: 1.15, hardness: 4.5, elasticity: 0.72, conductivity: 0.12, resonance: 0.35, isSolid: true, corrupted: false },
+        STONE_BASALT: { id: 'STONE_BASALT', name: 'Columnar Basalt Stone', category: 'STONE', density: 2.95, hardness: 8.8, elasticity: 0.08, conductivity: 0.04, resonance: 0.65, isSolid: true, corrupted: false },
+        RESIN_SIPHON: { id: 'RESIN_SIPHON', name: 'Siphon-Vine Cold Resin', category: 'FLUID', density: 1.08, hardness: 1.2, elasticity: 0.94, conductivity: 0.85, resonance: 0.90, isSolid: false, corrupted: false },
+        GLASS_GLOOM: { id: 'GLASS_GLOOM', name: 'Gloom-Glass Silica', category: 'MINERAL', density: 2.40, hardness: 6.5, elasticity: 0.15, conductivity: 0.45, resonance: 0.82, isSolid: true, corrupted: false }
+    },
+
+    PERMUTABLE_PROPERTIES: ['density', 'hardness', 'elasticity', 'conductivity', 'resonance'],
+
+    init() {
+        this.materials = {};
+        for (const [k, v] of Object.entries(this.CANONICAL_MATERIAL_BLUEPRINTS)) {
+            this.materials[k] = { ...v };
+        }
+        return this.materials;
+    },
+
+    getMaterial(materialId) {
+        if (!this.materials || Object.keys(this.materials).length === 0) this.init();
+        return this.materials[materialId] || null;
+    },
+
+    permuteMaterialProperties(matIdA = 'WOOD_IRONBARK', propA = 'density', matIdB = 'STONE_BASALT', propB = 'hardness', sectorKey = '2000,2000', objectId = null) {
+        if (!this.materials || Object.keys(this.materials).length === 0) this.init();
+        const matA = this.materials[matIdA];
+        const matB = this.materials[matIdB];
+        if (!matA || !matB || matA[propA] === undefined || matB[propB] === undefined) {
+            return { success: false, message: 'Invalid materials or properties for permutation.' };
+        }
+
+        const oldValA = matA[propA];
+        const oldValB = matB[propB];
+        matA[propA] = oldValB;
+        matB[propB] = oldValA;
+        matA.corrupted = true;
+        matB.corrupted = true;
+
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const fractureId = `fracture_${day}_${this.permutationHistory.length + 1}`;
+        const objKey = objectId || `obj_${sectorKey}_${matIdA}_${matIdB}`;
+
+        this.persistentSectorMapData[sectorKey] ??= { sectorKey, corruptedObjects: {}, terrainPermutations: [] };
+        this.persistentSectorMapData[sectorKey].corruptedObjects[objKey] = {
+            objectId: objKey,
+            fractureId,
+            day,
+            sectorKey,
+            materialA: matIdA,
+            propertyA: propA,
+            newValA: matA[propA],
+            materialB: matIdB,
+            propertyB: propB,
+            newValB: matB[propB],
+            isSolid: matA.isSolid,
+            persistent: true
+        };
+
+        const record = {
+            fractureId,
+            day,
+            sectorKey,
+            objectId: objKey,
+            swapped: `${matIdA}.${propA} (${oldValA} -> ${matA[propA]}) <-> ${matIdB}.${propB} (${oldValB} -> ${matB[propB]})`,
+            materialAState: { ...matA },
+            materialBState: { ...matB }
+        };
+        this.permutationHistory.unshift(record);
+
+        // Increase Geological Dissonance whenever reality fractures
+        const nextDissonance = Math.min(1.0, Number(((GeometerRegistry.geologicalDissonance || 0.05) + 0.12).toFixed(2)));
+        GeometerRegistry.setGeologicalDissonance(nextDissonance);
+
+        rootScope.EventBus?.emit('REALITY_FRACTURE_PERMUTATION', record);
+        return {
+            success: true,
+            fractured: true,
+            record,
+            persistentSector: this.persistentSectorMapData[sectorKey]
+        };
+    },
+
+    evaluateCollisionFracture(options = {}) {
+        if (!this.materials || Object.keys(this.materials).length === 0) this.init();
+        const entropyMult = GeometerRegistry.entropyMultiplier || 1.0;
+        const effectiveChance = this.fractureChance * entropyMult;
+        const roll = options.forceRoll !== undefined ? Number(options.forceRoll) : Math.random();
+
+        if (roll < effectiveChance || options.forceTrigger === true) {
+            const matKeys = Object.keys(this.materials);
+            const matIdA = options.matIdA || matKeys[0]; // WOOD_IRONBARK
+            const matIdB = options.matIdB || matKeys[1]; // STONE_BASALT
+            const propA = options.propA || 'density';
+            const propB = options.propB || 'hardness';
+            const sectorKey = options.sectorKey || `${Math.round(ForestOverworldEngine?.partyX || 2000)},${Math.round(ForestOverworldEngine?.partyY || 2000)}`;
+            return this.permuteMaterialProperties(matIdA, propA, matIdB, propB, sectorKey, options.objectId);
+        }
+        return { success: true, fractured: false, roll, threshold: effectiveChance };
+    },
+
+    getPersistentSectorData(sectorKey) {
+        return this.persistentSectorMapData[sectorKey] || null;
+    },
+
+    resetForNewRun() {
+        this.init();
+        this.permutationHistory = [];
+        this.persistentSectorMapData = {};
+    }
+};
+MaterialRegistry.init();
+rootScope.MaterialRegistry = MaterialRegistry;
+
+// ============================================================================
+// 5.98 PHASE 4: PHASE-SHIFT BREACHES (QUANTUM TUNNELLING & REALITY EVICTION)
+// ============================================================================
+export const PhaseShiftBreachEngine = rootScope.PhaseShiftBreachEngine || {
+    breachProbabilityPerTick: 1e-7, // 10^-7 per-tick Phase-Shift Breach hazard
+    breachedObjects: new Map(),
+    evictionHistory: [],
+    activeCorruptionZones: [],
+
+    evaluateTickBreach(options = {}) {
+        const entropyMult = GeometerRegistry.entropyMultiplier || 1.0;
+        const effectiveProb = this.breachProbabilityPerTick * entropyMult;
+        const roll = options.forceRoll !== undefined ? Number(options.forceRoll) : Math.random();
+
+        if (roll < effectiveProb || options.forceBreach === true) {
+            const objId = options.objectId || `breach_obj_${Date.now()}_${this.breachedObjects.size + 1}`;
+            const gx = options.gx !== undefined ? Number(options.gx) : 10;
+            const gy = options.gy !== undefined ? Number(options.gy) : 10;
+            const worldX = options.worldX !== undefined ? Number(options.worldX) : (ForestOverworldEngine?.partyX || 2260);
+            const worldY = options.worldY !== undefined ? Number(options.worldY) : (ForestOverworldEngine?.partyY || 2180);
+
+            const breachedObj = {
+                objectId: objId,
+                isSolid: false,
+                breached: true,
+                breachRoll: roll,
+                gx,
+                gy,
+                worldX,
+                worldY,
+                materialId: options.materialId || 'STONE_BASALT',
+                day: rootScope.EngineParams?.worldDay || 1
+            };
+            this.breachedObjects.set(objId, breachedObj);
+            rootScope.EventBus?.emit('PHASE_SHIFT_BREACH_DETECTED', breachedObj);
+            return { breached: true, object: breachedObj, threshold: effectiveProb };
+        }
+        return { breached: false, roll, threshold: effectiveProb };
+    },
+    evaluateActorOverlap(actor = {}, objectOrId = null, options = {}) {
+        const obj = typeof objectOrId === 'string'
+            ? this.breachedObjects.get(objectOrId)
+            : (objectOrId || Array.from(this.breachedObjects.values())[0]);
+
+        if (!obj || obj.isSolid !== false) {
+            return { evicted: false, reason: 'Object is still solid or unbreached.' };
+        }
+
+        const actorGX = actor.gx !== undefined ? Number(actor.gx) : obj.gx;
+        const actorGY = actor.gy !== undefined ? Number(actor.gy) : obj.gy;
+        const overlaps = (actorGX === obj.gx && actorGY === obj.gy) || options.forceOverlap === true;
+        if (!overlaps) {
+            return { evicted: false, reason: 'Actor coordinates do not overlap breached object.' };
+        }
+
+        // 1. REALITY EVICTION PROTOCOL: Random Overworld Teleport
+        const prevX = ForestOverworldEngine?.partyX || 2260;
+        const prevY = ForestOverworldEngine?.partyY || 2180;
+        const seedOffset = (this.evictionHistory.length + 1) * 7919;
+        const randAngle = options.teleportAngleRad !== undefined
+            ? Number(options.teleportAngleRad)
+            : ((seedOffset % 360) / 360) * Math.PI * 2;
+        const randRadius = options.teleportRadiusPx !== undefined
+            ? Number(options.teleportRadiusPx)
+            : 450 + (seedOffset % 950);
+
+        const destX = Math.max(120, Math.min(3880, Math.round(2000 + Math.cos(randAngle) * randRadius)));
+        const destY = Math.max(120, Math.min(3880, Math.round(2000 + Math.sin(randAngle) * randRadius)));
+
+        if (ForestOverworldEngine) {
+            ForestOverworldEngine.partyX = destX;
+            ForestOverworldEngine.partyY = destY;
+            ForestOverworldEngine.isMoving = false;
+            ForestOverworldEngine.updateExploredArea(destX, destY, 360);
+        }
+
+        // 2. CORRUPTION BURST: 5x5 Tile CORRUPTION_ZONE permuting local terrain
+        const centerGX = Math.max(2, Math.min(17, actorGX));
+        const centerGY = Math.max(2, Math.min(17, actorGY));
+        const corruptedTiles = [];
+        for (let dx = -2; dx <= 2; dx++) {
+            for (let dy = -2; dy <= 2; dy++) {
+                const tx = centerGX + dx;
+                const ty = centerGY + dy;
+                corruptedTiles.push({
+                    gx: tx,
+                    gy: ty,
+                    zoneType: 'CORRUPTION_ZONE',
+                    permutedCoverType: (Math.abs(dx) + Math.abs(dy)) % 2 === 0 ? 'LIQUID_BASALT_PILLAR' : 'PETRIFIED_RESIN_BRACKEN',
+                    isCorrupted: true
+                });
+            }
+        }
+
+        const sectorKey = `${destX},${destY}`;
+        MaterialRegistry.permuteMaterialProperties('STONE_BASALT', 'hardness', 'WOOD_IRONBARK', 'elasticity', sectorKey, obj.objectId);
+        MaterialRegistry.persistentSectorMapData[sectorKey] ??= { sectorKey, corruptedObjects: {}, terrainPermutations: [] };
+        const corruptionZone = {
+            id: `corruption_zone_${Date.now()}_${this.activeCorruptionZones.length + 1}`,
+            type: 'CORRUPTION_ZONE',
+            width: 5,
+            height: 5,
+            tileCount: corruptedTiles.length,
+            centerGX,
+            centerGY,
+            worldX: destX,
+            worldY: destY,
+            sectorKey,
+            tiles: corruptedTiles,
+            day: rootScope.EngineParams?.worldDay || 1
+        };
+        this.activeCorruptionZones.unshift(corruptionZone);
+        MaterialRegistry.persistentSectorMapData[sectorKey].terrainPermutations.push(corruptionZone);
+
+        if (ForestOverworldEngine?.localTacticalMap) {
+            ForestOverworldEngine.localTacticalMap.corruptionZones ??= [];
+            ForestOverworldEngine.localTacticalMap.corruptionZones.push(corruptionZone);
+        }
+
+        const evictionRecord = {
+            id: `eviction_${Date.now()}_${this.evictionHistory.length + 1}`,
+            actorId: actor.id || actor.agentId || 'agt_1',
+            actorName: actor.name || 'Vanguard Operative',
+            breachedObjectId: obj.objectId,
+            fromWorld: { x: prevX, y: prevY },
+            toWorld: { x: destX, y: destY },
+            corruptionZone,
+            day: rootScope.EngineParams?.worldDay || 1
+        };
+        this.evictionHistory.unshift(evictionRecord);
+
+        const msg = `🌀⚡ [PHASE-SHIFT BREACH & REALITY EVICTION] ${evictionRecord.actorName} overlapped non-solid breached object [${obj.objectId} | isSolid: false]! Quantum-tunnelled from (${prevX}, ${prevY}) to (${destX}, ${destY}) and erupted a 5x5 (${corruptionZone.tileCount}-tile) CORRUPTION_ZONE!`;
+        LogDispatchManager.dispatches.unshift({
+            id: evictionRecord.id,
+            day: evictionRecord.day,
+            type: 'QUANTUM PHASE-SHIFT BREACH',
+            sender: 'OCP Spatial Seismograph',
+            title: `Phase-Shift Eviction to (${destX}, ${destY}) & 5x5 Corruption Burst`,
+            body: msg,
+            read: false
+        });
+        rootScope.EventBus?.emit('REALITY_EVICTION_EXECUTED', evictionRecord);
+
+        return {
+            evicted: true,
+            teleportedFrom: evictionRecord.fromWorld,
+            teleportedTo: evictionRecord.toWorld,
+            corruptionZone,
+            record: evictionRecord,
+            message: msg
+        };
+    },
+
+    resetForNewRun() {
+        this.breachedObjects.clear();
+        this.evictionHistory = [];
+        this.activeCorruptionZones = [];
+    }
+};
+rootScope.PhaseShiftBreachEngine = PhaseShiftBreachEngine;
+// ============================================================================
+// 5.99 PHASE 5: VOID-TOUCHED AGENTS (FRACTAL BLOOM, WEIBULL SPIKES & SHATTER EVENT)
+// ============================================================================
+export const VoidTouchedRegistry = rootScope.VoidTouchedRegistry || {
+    voidFractures: [],
+    shatterHistory: [],
+
+    rollWeibullPowerSpike(voidTaint = 0.35, options = {}) {
+        const taint = Math.max(0.01, Math.min(1.0, Number(voidTaint) || 0.35));
+        const u = options.uniformRoll !== undefined
+            ? Math.max(0.001, Math.min(0.999, Number(options.uniformRoll)))
+            : Math.max(0.001, Math.min(0.999, Math.random()));
+        const k = options.shapeK !== undefined ? Number(options.shapeK) : 0.72;
+        const lambda = options.scaleLambda !== undefined ? Number(options.scaleLambda) : (4.5 + taint * 14.0);
+        const rawSpike = lambda * Math.pow(-Math.log(1 - u), 1 / k);
+        return Number(Math.max(1.5, Math.min(48.0, rawSpike)).toFixed(2));
+    },
+
+    fractureAgentName(name = 'Operative', voidTaint = 0.0, viewerIsHost = HostVisibilityController.isHost) {
+        if (!viewerIsHost || voidTaint < 0.35) return String(name);
+        const chars = String(name).split('');
+        const glyphs = ['░', '▒', '▓', '█', '◈', '‡', '§', 'Ø', '∆'];
+        return chars.map((ch, idx) => {
+            if (ch === ' ') return ' ';
+            if (voidTaint >= 0.80 && idx % 2 === 1) {
+                return `${glyphs[(idx + Math.round(voidTaint * 10)) % glyphs.length]}${ch}`;
+            }
+            if (voidTaint >= 0.50 && idx % 3 === 1) {
+                return glyphs[idx % glyphs.length];
+            }
+            return ch;
+        }).join('');
+    },
+
+    getFractalDecayUIModel(agentId, viewerIsHost = HostVisibilityController.isHost) {
+        const agent = AgentRosterManager.agents.get(agentId);
+        if (!agent) return null;
+        const taint = Number(agent.voidTaint || 0);
+        if (!viewerIsHost) {
+            return {
+                agentId: agent.id,
+                displayName: agent.name,
+                asciiModel: '[STANDARD_OPERATIVE_SILHOUETTE]',
+                voidTaintVisible: false,
+                corrupted: false
+            };
+        }
+        const displayName = this.fractureAgentName(agent.name, taint, true);
+        let asciiModel = '[ nominal // ╬═╬ ]';
+        if (taint >= 0.80) {
+            asciiModel = '░░▓█ [ERR::FRACTAL_HORIZON_OVERFLOW // ╬̸═̸╬̸] █▓░░';
+        } else if (taint >= 0.50) {
+            asciiModel = '▒▓ [WARN::VOID_LATTICE_DEGRADING // ╬░╬] ▓▒';
+        } else if (taint > 0) {
+            asciiModel = '◈ [BLOOM::WEIBULL_RESONANCE // ╬◈╬]';
+        }
+        return {
+            agentId: agent.id,
+            displayName,
+            asciiModel,
+            voidTaint: taint,
+            voidTaintVisible: true,
+            corrupted: taint >= 0.50
+        };
+    },
+    inflictVoidTaint(agentId, taintDelta = 0.25, options = {}) {
+        const agent = AgentRosterManager.agents.get(agentId);
+        if (!agent || !agent.alive) {
+            return { success: false, message: `Agent ${agentId} not found or already deceased/shattered.` };
+        }
+
+        const prevTaint = Number(agent.voidTaint || 0);
+        const newTaint = Math.max(0.0, Math.min(1.0, Number((prevTaint + Number(taintDelta || 0)).toFixed(3))));
+        agent.voidTaint = newTaint;
+        agent.isVoidTouched = newTaint > 0;
+        agent.fractalBloomSpikes ??= [];
+
+        if (newTaint >= 1.0) {
+            return this.triggerShatterEvent(agentId, options);
+        }
+
+        const spikeVal = this.rollWeibullPowerSpike(newTaint, options);
+        const statKeys = ['meleeAtt', 'strength', 'stealth', 'lore', 'survival'];
+        const targetStat = options.targetStat || statKeys[agent.fractalBloomSpikes.length % statKeys.length];
+        agent.skills[targetStat] = Number(((agent.skills[targetStat] || 2) + spikeVal).toFixed(2));
+        agent.fractalBloomSpikes.push({
+            day: rootScope.EngineParams?.worldDay || 1,
+            taint: newTaint,
+            stat: targetStat,
+            weibullSpike: spikeVal
+        });
+
+        const uiModel = this.getFractalDecayUIModel(agentId, HostVisibilityController.isHost);
+        return {
+            success: true,
+            shattered: false,
+            agentId: agent.id,
+            voidTaint: newTaint,
+            isVoidTouched: true,
+            weibullSpike: { stat: targetStat, bonus: spikeVal },
+            uiModel,
+            message: `◈⚡ [VOID-TOUCHED FRACTAL BLOOM] ${uiModel.displayName} absorbed +${(taintDelta * 100).toFixed(0)}% VoidTaint (Now ${(newTaint * 100).toFixed(1)}%). Weibull Stat-Roller granted +${spikeVal} [${targetStat.toUpperCase()}]!`
+        };
+    },
+
+    triggerShatterEvent(agentId, options = {}) {
+        const agent = AgentRosterManager.agents.get(agentId);
+        if (!agent) return { success: false, message: `Agent ${agentId} not found.` };
+
+        agent.voidTaint = 1.0;
+        agent.alive = false;
+        agent.shatteredByVoid = true;
+        AgentRosterManager.agents.delete(agentId);
+
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const worldX = options.worldX ?? ForestOverworldEngine?.partyX ?? 2260;
+        const worldY = options.worldY ?? ForestOverworldEngine?.partyY ?? 2180;
+        const sectorKey = `${worldX},${worldY}`;
+
+        const anomaly = {
+            id: `VOID_FRACTURE_${day}_${this.voidFractures.length + 1}`,
+            type: 'VOID_FRACTURE',
+            formerAgentId: agent.id,
+            formerAgentName: agent.name,
+            worldX,
+            worldY,
+            sectorKey,
+            day,
+            weibullPeakPower: (agent.fractalBloomSpikes || []).reduce((acc, s) => acc + (s.weibullSpike || 0), 0),
+            persistent: true
+        };
+        this.voidFractures.unshift(anomaly);
+
+        MaterialRegistry.persistentSectorMapData[sectorKey] ??= { sectorKey, corruptedObjects: {}, terrainPermutations: [], voidFractures: [] };
+        MaterialRegistry.persistentSectorMapData[sectorKey].voidFractures ??= [];
+        MaterialRegistry.persistentSectorMapData[sectorKey].voidFractures.push(anomaly);
+
+        const narrativeLog = `💥🕳️ [SHATTER EVENT — 1.0 VOID TAINT] At 100% VoidTaint, ${agent.name}'s fractal lattice reached supercriticality and shattered into a permanent [${anomaly.type}] anomaly at (${worldX}, ${worldY}), erasing them from the physical roster!`;
+        const shatterRecord = {
+            id: `shatter_${day}_${this.shatterHistory.length + 1}`,
+            day,
+            agentId: agent.id,
+            agentName: agent.name,
+            anomaly,
+            narrativeLog
+        };
+        this.shatterHistory.unshift(shatterRecord);
+
+        LogDispatchManager.dispatches.unshift({
+            id: shatterRecord.id,
+            day,
+            type: 'VOID-TOUCHED SHATTER EVENT',
+            sender: 'Orphic Anomaly Seismograph',
+            title: `💥 SHATTER EVENT: ${agent.name} -> [${anomaly.id}]`,
+            body: narrativeLog,
+            read: false
+        });
+        CrucibleNarrativeEngine.processActorDeath({
+            id: agent.id,
+            name: agent.name,
+            cause: `Shattered at 1.0 VoidTaint into ${anomaly.type} (${anomaly.id}) at (${worldX}, ${worldY})`
+        });
+        rootScope.EventBus?.emit('VOID_SHATTER_EVENT', shatterRecord);
+
+        return {
+            success: true,
+            shattered: true,
+            agentRemoved: !AgentRosterManager.agents.has(agentId),
+            anomaly,
+            shatterRecord,
+            message: narrativeLog
+        };
+    },
+
+    resetForNewRun() {
+        this.voidFractures = [];
+        this.shatterHistory = [];
+    }
+};
+rootScope.VoidTouchedRegistry = VoidTouchedRegistry;
+
+
+
+
+
+
 
 // ============================================================================
 // 6. UNIFIED COMMANDER ENGINE FACADE (PROLOGUE + FUTURE FOLD-IN SYSTEM)
@@ -5555,6 +7264,12 @@ export const CommanderEngine = {
     FacilityEngine,
     ExpeditionEngine,
     ForestOverworldEngine,
+    OrphicHydrologyBlueprint,
+    HostVisibilityController,
+    GeometerRegistry,
+    MaterialRegistry,
+    PhaseShiftBreachEngine,
+    VoidTouchedRegistry,
     NOBLE_HOUSE_PROFILES,
     ROLE_CATALOG,
     SQUAD_ARMORY_CATALOG

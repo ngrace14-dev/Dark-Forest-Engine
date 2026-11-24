@@ -20,6 +20,15 @@ class DuneDriftSystem {
         this.confluenceHistory = [];
         this.eventHorizonThresholdKm = 285;
 
+        // Phase 1: Dune Siphon-Flow ("Infinity Feed") Extra-Dimensional Anomaly Sources
+        // Allows Dune river systems to exist without traditional mountain watersheds
+        this.infinityFeedAnomalies = [
+            { id: 'INFINITY_SIPHON_ALPHA', riverName: 'Aethel-Silt Streamline', angleRad: 0.42, sourceRadiusKm: 480, targetHorizonRadiusKm: 285, fluxCubicMetersPerSec: 840, extraDimensionalSignature: 'ORPHIC_RIFT_01', requiresMountainWatershed: false, active: true },
+            { id: 'INFINITY_SIPHON_BETA', riverName: 'Vellum-Marrow Streamline', angleRad: 1.98, sourceRadiusKm: 520, targetHorizonRadiusKm: 285, fluxCubicMetersPerSec: 920, extraDimensionalSignature: 'ORPHIC_RIFT_02', requiresMountainWatershed: false, active: true },
+            { id: 'INFINITY_SIPHON_GAMMA', riverName: 'Glass-Choir Streamline', angleRad: 3.55, sourceRadiusKm: 495, targetHorizonRadiusKm: 285, fluxCubicMetersPerSec: 790, extraDimensionalSignature: 'ORPHIC_RIFT_03', requiresMountainWatershed: false, active: true },
+            { id: 'INFINITY_SIPHON_DELTA', riverName: 'Salt-Cradle Streamline', angleRad: 5.12, sourceRadiusKm: 540, targetHorizonRadiusKm: 285, fluxCubicMetersPerSec: 880, extraDimensionalSignature: 'ORPHIC_RIFT_04', requiresMountainWatershed: false, active: true }
+        ];
+
         if (typeof window !== 'undefined' && window.EventBus) {
             window.EventBus.on('ENGINE_READY', () => this.init());
             window.EventBus.on('HEARTBEAT_T1', () => this.tickDailyDrift());

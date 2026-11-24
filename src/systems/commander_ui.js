@@ -980,6 +980,56 @@ export const CommanderUI = {
             this.renderExploreForestModal(false);
             this.render();
         };
+        window.openLocalTacticalMap = (opts = {}) => {
+            const res = CommanderEngine.ForestOverworldEngine?.openLocalTacticalMap?.(opts);
+            if (res?.message) this.showBanner(res.message);
+            this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
+            this.render();
+            return res;
+        };
+        window.closeLocalTacticalMap = () => {
+            const res = CommanderEngine.ForestOverworldEngine?.closeLocalTacticalMap?.();
+            this.showBanner('🧭 Returned from Immediate Local Tactical Sector to the 500,000 Sq. Mile Macro Forest Overworld.');
+            this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
+            this.render();
+            return res;
+        };
+        window.selectLocalBlip = (blipId) => {
+            const res = CommanderEngine.ForestOverworldEngine?.selectLocalBlip?.(blipId);
+            if (res?.message) this.showBanner(res.message);
+            this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
+            return res;
+        };
+        window.toggleLocalBlipStealth = (blipId = null) => {
+            const res = CommanderEngine.ForestOverworldEngine?.toggleLocalBlipStealth?.(blipId);
+            if (res?.message) this.showBanner(res.message);
+            this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
+            return res;
+        };
+        window.moveLocalBlip = (blipId, gx, gy) => {
+            const res = CommanderEngine.ForestOverworldEngine?.moveLocalBlip?.(blipId, gx, gy);
+            if (res?.message) this.showBanner(res.message);
+            this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
+            return res;
+        };
+        window.executeLocalTacticalAction = (act, targetId = null) => {
+            const res = CommanderEngine.ForestOverworldEngine?.executeLocalTacticalAction?.(act, targetId);
+            if (res?.message) this.showBanner(res.message);
+            this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
+            this.render();
+            return res;
+        };
+        window.syncFlagshipCompanion = () => {
+            const packet = CommanderEngine.ForestOverworldEngine?.exportCompanionSyncPacket?.();
+            this.showBanner(`📡🔗 [WATCH DOGS–STYLE FLAGSHIP COMPANION SYNC] Broadcasted Mobile Tactical Packet (${packet?.protocolVersion} | Sector Seed #${packet?.localTacticalSector?.seed || 'MACRO'} | ${packet?.localTacticalSector?.squadBlips?.length || 0} Cyan Blips) to Flagship Data-Bus!`);
+            return packet;
+        };
         window.interrogateSuspect = (targetId = 'agt_2') => {
             CommanderEngine.TutorialAdvisor?.checkAndTrigger?.('INQUEST_BTN');
             this.renderInquestReader(targetId);
@@ -1403,6 +1453,144 @@ export const CommanderUI = {
         }
     },
 
+    buildLocalTacticalOverlayHtml(ovw, isSov) {
+        const ltm = ovw?.localTacticalMap;
+        if (!ltm || !ltm.active || isSov) return '';
+
+        const kidnapInfo = ovw.isKidnapUnlocked ? ovw.isKidnapUnlocked() : { unlocked: Boolean(ltm.kidnapUnlocked), reason: ltm.kidnapUnlockReason || '' };
+        ltm.kidnapUnlocked = kidnapInfo.unlocked;
+        ltm.kidnapUnlockReason = kidnapInfo.reason;
+
+        const cellSize = 40;
+        const svgW = (ltm.gridWidth || 20) * cellSize;
+        const svgH = (ltm.gridHeight || 20) * cellSize;
+        const selectedBlip = (ltm.squadBlips || []).find(b => b.blipId === ltm.selectedBlipId) || (ltm.squadBlips || [])[0] || null;
+
+        let gridSvg = '';
+        for (let gy = 0; gy < (ltm.gridHeight || 20); gy++) {
+            for (let gx = 0; gx < (ltm.gridWidth || 20); gx++) {
+                const tile = ltm.grid?.[gy]?.[gx] || { tileType: 'OPEN_GROUND', color: '#112919', coverBonus: 0, label: 'Forest Floor' };
+                const inLiveSight = ovw.isLocalCellInLiveSight ? ovw.isLocalCellInLiveSight(gx, gy) : true;
+                const isExplored = inLiveSight || (ltm.exploredLocalCells && ltm.exploredLocalCells.has(`${gx},${gy}`));
+                const x = gx * cellSize;
+                const y = gy * cellSize;
+
+                if (!isExplored) {
+                    gridSvg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" fill="#04070b" stroke="#0f172a" stroke-width="1" style="cursor:pointer;" onclick="event.stopPropagation(); window.moveLocalBlip('${selectedBlip?.blipId || ''}', ${gx}, ${gy});"><title>Uncharted Local Fog (${gx}, ${gy}) — Click to Move Selected Cyan Blip Here</title></rect>`;
+                    continue;
+                }
+
+                const fillCol = tile.color || '#112919';
+                let iconTxt = '';
+                if (tile.tileType === 'BASALT_RUIN') iconTxt = '🏛️';
+                else if (tile.tileType === 'MIST_BRUSH') iconTxt = '🌿';
+                else if (tile.tileType === 'IRONBARK_CANOPY') iconTxt = '🌲';
+                else if (tile.tileType === 'HIGH_RIDGE') iconTxt = '⛰️';
+
+                gridSvg += `
+                    <g style="cursor:pointer;" onclick="event.stopPropagation(); window.moveLocalBlip('${selectedBlip?.blipId || ''}', ${gx}, ${gy});">
+                        <rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" fill="${fillCol}" stroke="rgba(148,163,184,0.2)" stroke-width="1"/>
+                        ${iconTxt ? `<text x="${x + 20}" y="${y + 26}" text-anchor="middle" font-size="18" opacity="${inLiveSight ? '0.92' : '0.45'}">${iconTxt}</text>` : ''}
+                        ${!inLiveSight ? `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" fill="rgba(2,6,14,0.58)"/>` : ''}
+                        <title>Grid (${gx}, ${gy}) ${tile.label} [Cover +${tile.coverBonus}%] — Click to Reposition Selected Cyan Blip</title>
+                    </g>
+                `;
+            }
+        }
+
+        const enemiesSvg = (ltm.enemyUnits || []).filter(e => e.alive && ((ovw.isLocalCellInLiveSight && ovw.isLocalCellInLiveSight(e.gx, e.gy)) || e.intelGathered)).map(e => {
+            const cx = e.gx * cellSize + cellSize * 0.5;
+            const cy = e.gy * cellSize + cellSize * 0.5;
+            const col = e.isAdvancedUnit ? '#a855f7' : (e.isSupplyCache ? '#f59e0b' : '#ef4444');
+            const badge = e.isAdvancedUnit ? '👑ADV' : (e.isSupplyCache ? '📦CACHE' : '⚔️GRD');
+            return `
+                <g style="cursor:pointer;" onclick="event.stopPropagation(); window.moveLocalBlip('${selectedBlip?.blipId || ''}', ${Math.max(0, e.gx - 1)}, ${e.gy});">
+                    <circle cx="${cx}" cy="${cy}" r="16" fill="${col}" stroke="#fde68a" stroke-width="2.5"/>
+                    <text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="900">${badge}</text>
+                    <text x="${cx}" y="${cy - 20}" text-anchor="middle" fill="#fde68a" font-size="11" font-weight="900">${e.name.slice(0, 18)} (HP:${e.hp})</text>
+                </g>
+            `;
+        }).join('');
+
+        const blipsSvg = (ltm.squadBlips || []).map((b, idx) => {
+            const cx = b.gx * cellSize + cellSize * 0.5;
+            const cy = b.gy * cellSize + cellSize * 0.5;
+            const isSel = selectedBlip && b.blipId === selectedBlip.blipId;
+            const tile = ltm.grid?.[b.gy]?.[b.gx];
+            const sightR = ((b.sightRadius || 4) + (tile?.tileType === 'HIGH_RIDGE' ? 1 : 0)) * cellSize;
+            return `
+                <g style="cursor:pointer;" onclick="event.stopPropagation(); window.selectLocalBlip('${b.blipId}');">
+                    <circle cx="${cx}" cy="${cy}" r="${sightR}" fill="rgba(0, 240, 255, 0.05)" stroke="${isSel ? '#00f0ff' : 'rgba(56, 189, 248, 0.45)'}" stroke-width="${isSel ? '2.5' : '1.5'}" stroke-dasharray="8,5" pointer-events="none"/>
+                    <circle cx="${cx}" cy="${cy}" r="${isSel ? '16' : '13'}" fill="rgba(0, 240, 255, 0.28)" stroke="${isSel ? '#ffffff' : '#00f0ff'}" stroke-width="${isSel ? '3.5' : '2.5'}"/>
+                    <circle cx="${cx}" cy="${cy}" r="6" fill="#00f0ff"/>
+                    <text x="${cx}" y="${cy - 20}" text-anchor="middle" fill="#00f0ff" font-size="11.5" font-weight="900">🟦#${idx + 1} ${b.name.split(' ')[0]} ${b.stealthActive ? `🥷${b.stealthRating}%` : '⚡'}</text>
+                </g>
+            `;
+        }).join('');
+
+        const blipRosterHtml = (ltm.squadBlips || []).map((b, idx) => {
+            const isSel = selectedBlip && b.blipId === selectedBlip.blipId;
+            return `
+                <button class="cmd-btn" style="padding:3px 7px; font-size:9px; border-color:${isSel ? '#00f0ff' : '#334155'}; background:${isSel ? 'rgba(0,240,255,0.18)' : 'rgba(15,23,42,0.85)'}; color:${isSel ? '#a5f3fc' : '#cbd5e1'};" onclick="event.stopPropagation(); window.selectLocalBlip('${b.blipId}')">
+                    🟦 #${idx + 1} ${b.name} (${b.gx},${b.gy}) | Sight:${b.sightRadius} | ${b.stealthActive ? `🥷${b.stealthRating}%` : '⚡LOUD'}
+                </button>
+            `;
+        }).join('');
+
+        const advEnemy = (ltm.enemyUnits || []).find(e => e.isAdvancedUnit);
+        return `
+            <div id="local-tactical-xcom-overlay" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()"
+                 style="position:absolute; inset:8px; z-index:45; background:rgba(4,8,14,0.97); border:2px solid #00f0ff; border-radius:8px; padding:8px 10px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 0 28px rgba(0,240,255,0.25); overflow:hidden;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #0e7490; padding-bottom:5px; flex-wrap:wrap; gap:6px;">
+                    <div>
+                        <div style="color:#00f0ff; font-family:'Cinzel',serif; font-size:12px; font-weight:900;">
+                            🎯🟦 XCOM × BANNERLORD LOCAL TACTICAL SECTOR // SEED #${ltm.seed} [${ltm.biome?.label?.toUpperCase() || 'FOREST SECTOR'}]
+                        </div>
+                        <div style="font-size:9px; color:#bae6fd; font-family:'Share Tech Mono',monospace;">
+                            📍 WORLD COORD: (${ltm.worldX}, ${ltm.worldY}) | SCALE: ${ltm.sectorScaleMiles} | CYAN BLIPS DEPLOYED: <b>${ltm.squadBlips.length}</b> | LOCAL FOG CLEARED: <b>${ltm.exploredLocalCells?.size || 0}/${(ltm.gridWidth || 20) * (ltm.gridHeight || 20)} TILES</b> | INTEL: <b>${ltm.intelLevel || 0}%</b>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                        <button class="cmd-btn" style="padding:3px 8px; font-size:9px; background:#083344; border-color:#00f0ff; color:#a5f3fc; font-weight:bold;" onclick="window.syncFlagshipCompanion()">📡 Sync Flagship Companion</button>
+                        <button class="cmd-btn" style="padding:3px 9px; font-size:9.5px; background:#3f1212; border-color:#ef4444; color:#fecaca; font-weight:bold;" onclick="window.closeLocalTacticalMap()">🗺️ Exit to 500k Sq. Mi. Overworld</button>
+                    </div>
+                </div>
+                <div style="display:flex; gap:4px; align-items:center; flex-wrap:wrap; margin:4px 0;">
+                    <span style="font-size:9px; color:#67e8f9; font-weight:bold;">CYAN SQUAD BLIPS:</span>
+                    ${blipRosterHtml}
+                    ${selectedBlip ? `
+                        <button class="cmd-btn" style="padding:3px 7px; font-size:9px; background:#064e3b; border-color:#34d399; color:#d1fae5; font-weight:bold;" onclick="window.toggleLocalBlipStealth('${selectedBlip.blipId}')">
+                            🥷 Toggle Stealth (${selectedBlip.stealthActive ? 'ON' : 'OFF'})
+                        </button>
+                    ` : ''}
+                </div>
+                <div style="flex:1; display:flex; align-items:center; justify-content:center; min-height:150px; overflow:hidden; background:#020408; border:1px solid #155e75; border-radius:4px; position:relative;">
+                    <svg id="local-tactical-grid-svg" viewBox="0 0 ${svgW} ${svgH}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; max-height:46vh; display:block;">
+                        ${gridSvg}
+                        ${enemiesSvg}
+                        ${blipsSvg}
+                    </svg>
+                    <div style="position:absolute; bottom:4px; left:6px; font-size:8px; color:#67e8f9; background:rgba(2,6,14,0.86); padding:2px 6px; border-radius:3px; pointer-events:none;">
+                        👆 Click any Grid Tile to Stealth-Position Selected Cyan Blip (${selectedBlip?.name || 'Operative'}) &amp; Uncover Local Fog of War | 🌿=Stealth Brush 🏛️=Basalt Cover ⛰️=Ridge (+1 Sight)
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-top:5px; padding-top:4px; border-top:1px solid #164e63;">
+                    <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                        <button class="cmd-btn" style="padding:4px 9px; font-size:9.5px; background:#0c4a6e; border-color:#38bdf8; color:#e0f2fe; font-weight:bold;" onclick="window.executeLocalTacticalAction('GATHER_INTEL')">👁️ Gather Intel (Reveal Patrol &amp; Dossier)</button>
+                        <button class="cmd-btn" style="padding:4px 9px; font-size:9.5px; background:#450a0a; border-color:#ef4444; color:#fecaca; font-weight:bold;" onclick="window.executeLocalTacticalAction('ATTACK')">⚔️ Crossfire Attack</button>
+                        <button class="cmd-btn" style="padding:4px 9px; font-size:9.5px; background:#78350f; border-color:#f59e0b; color:#fef3c7; font-weight:bold;" onclick="window.executeLocalTacticalAction('RAID')">🔥 Raid Supply Cache</button>
+                        <button class="cmd-btn" style="padding:4px 10px; font-size:9.5px; background:${ltm.kidnapUnlocked ? '#3b0764' : '#1e293b'}; border-color:${ltm.kidnapUnlocked ? '#c084fc' : '#64748b'}; color:${ltm.kidnapUnlocked ? '#f3e8ff' : '#94a3b8'}; font-weight:900;" onclick="window.executeLocalTacticalAction('KIDNAP_ADVANCED_UNIT')">
+                            ${ltm.kidnapUnlocked ? `⛓️👑 Kidnap Advanced Unit (${advEnemy?.kidnapped ? 'CAPTURED' : (advEnemy?.name?.slice(0, 22) || 'Specialist')})` : '🔒⛓️ Kidnap Advanced Unit (Upgrade Squad/Recon First)'}
+                        </button>
+                    </div>
+                    <div style="font-size:8.5px; color:#a5f3fc; max-width:100%; overflow:hidden; text-overflow:ellipsis;">
+                        ${(ltm.tacticalLogs || [])[0] || ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
     renderExploreForestModal(forceOpen = true) {
         const modal = typeof document !== 'undefined' ? document.getElementById('explore-forest-popup-modal') : null;
         if (!modal) return;
@@ -1494,6 +1682,8 @@ export const CommanderUI = {
         `;
 
         const encounterOverlayHtml = this.buildEncounterArenaHtml(isSov);
+        const localTacticalOverlayHtml = this.buildLocalTacticalOverlayHtml(ovw, isSov);
+        const effMph = Number(((ovw.baseMarchSpeedMph || 2.8) * (curBiome.speedMult || 0.85) * (ovw.stance === 'STALK' ? 0.65 : 1.0)).toFixed(2));
 
         modal.style.display = 'block';
         modal.innerHTML = `
@@ -1501,13 +1691,14 @@ export const CommanderUI = {
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid ${isSov ? '#7f1d1d' : '#14532d'}; padding-bottom:6px; flex-wrap:wrap; gap:6px;">
                     <div>
                         <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:14px; font-weight:900; letter-spacing:0.04em;">
-                            ${isSov ? '🐺 PREDATOR OVERWORLD MAP // 4000x4000 FREE-ROAM TERRAIN (FULLSCREEN)' : '🧭 MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION (4000x4000 FREE-ROAM)'}
+                            ${isSov ? '🐺 PREDATOR OVERWORLD MAP // 500,000 SQ. MI. CIRCULAR DOMINION (4000x4000 FREE-ROAM)' : '🧭 MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION (500,000 SQ. MI. • 4000x4000 FREE-ROAM)'}
                         </div>
                         <div style="font-size:10px; color:#86efac; font-family:'Share Tech Mono',monospace;">
-                            ⛺ SUPPLIES: <b>${ovw.suppliesDaysRemaining ?? 3}/${ovw.maxSuppliesDays ?? 3} DAYS</b> | 📍 POS: (${ovw.partyX}, ${ovw.partyY}) [${curBiome.label} • ${Math.round((curBiome.speedMult || 1) * 100)}% SPD] | 🏃 DIST FROM CAMP: <b>${ovw.distanceFromCampHours ?? 0}H (${Number(((ovw.distanceFromCampHours ?? 0) * (0.5 / (CommanderEngine.timeScale || 1))).toFixed(2))}H IRL)</b>
+                            🌍 <b>500,000 SQ. MI.</b> (R=${ovw.worldRadiusMiles || 398.9}mi) | ⛺ SUPPLIES: <b>${ovw.suppliesDaysRemaining ?? 3}/${ovw.maxSuppliesDays ?? 3} DAYS</b> | 📍 POS: (${ovw.partyX}, ${ovw.partyY}) [${curBiome.label} • ${Math.round((curBiome.speedMult || 1) * 100)}% SPD = <b>${effMph} MPH</b>] | 🏃 DIST FROM CAMP: <b>${ovw.distanceFromCampMiles ?? 0} MI / ${ovw.distanceFromCampHours ?? 0}H (${Number(((ovw.distanceFromCampHours ?? 0) * (0.5 / (CommanderEngine.timeScale || 1))).toFixed(2))}H IRL)</b>
                         </div>
                     </div>
                     <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                        ${!isSov ? `<button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#083344; border-color:#00f0ff; color:#a5f3fc; font-weight:900;" onclick="window.openLocalTacticalMap()">🎯🟦 Local Tactical Map (Cyan Blips)</button>` : ''}
                         <button class="cmd-btn" style="padding:5px 10px; font-size:10px; ${ovw.stance === 'MARCH' ? 'background:#14532d; border-color:#4ade80; color:#dcfce7; font-weight:bold;' : ''}" onclick="window.setOverworldStance('MARCH')">${isSov ? '🐺 PROWL' : '🛡️ MARCH'}</button>
                         <button class="cmd-btn" style="padding:5px 10px; font-size:10px; ${ovw.stance === 'STALK' ? 'background:#2e1065; border-color:#a855f7; color:#e9d5ff; font-weight:bold;' : ''}" onclick="window.setOverworldStance('STALK')">🐾 STALK</button>
                         <button class="cmd-btn" style="padding:5px 10px; font-size:10px; ${ovw.stance === 'HUNT' ? 'background:#450a0a; border-color:#ef4444; color:#fecaca; font-weight:bold;' : ''}" onclick="window.setOverworldStance('HUNT')">${isSov ? '🩸 HUNT' : '⚔️ RAID'}</button>
@@ -1537,7 +1728,7 @@ export const CommanderUI = {
                         <button class="cmd-btn" style="padding:2px 7px; font-size:9px;" onclick="window.resetOverworldMapCamera()" title="Full 4000x4000 World Overview">🔄 World Overview</button>
                     </div>
                     <div style="position:absolute; bottom:6px; left:8px; z-index:15; pointer-events:none; font-size:8.5px; color:#94a3b8; background:rgba(5,7,9,0.82); padding:3px 7px; border-radius:3px;">
-                        👆 Click Anywhere on Terrain to March Squad (Time Advances While Moving) | ✋ Drag to Pan | 🖱️ Scroll / ➕➖ to Zoom
+                        👆 Click Anywhere on Terrain to March Squad Across 500,000 Sq. Mi. (Deliberate ~${effMph} mph March) | 🏹 Click [Recon Stalk] or [Local Tactical Map] for XCOM × Bannerlord Cyan Blip View
                     </div>
                     <canvas id="overworld-terrain-canvas" width="800" height="800" style="position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none;"></canvas>
                     <svg id="overworld-fullscreen-svg" viewBox="0 0 4000 4000" preserveAspectRatio="xMidYMid meet" style="position:relative; z-index:10; width:100%; height:100%; max-height:66vh; display:block;">
@@ -1549,6 +1740,7 @@ export const CommanderUI = {
                             ${partyTokenSvg}
                         </g>
                     </svg>
+                    ${localTacticalOverlayHtml}
                 </div>
                 ${encounterOverlayHtml}
                 <div style="background:rgba(15,23,42,0.92); border:1.5px solid #334155; border-radius:6px; padding:7px 10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -1568,7 +1760,8 @@ export const CommanderUI = {
                                 <button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#3b0764; border-color:#e879f9; color:#fae8ff; font-weight:bold;" onclick="window.executeOverworldAction('FEED')">🥩 Feed &amp; Gorge</button>
                             `
                             : `
-                                <button class="cmd-btn" style="padding:5px 10px; font-size:10px;" onclick="window.executeOverworldAction('STALK')">🏹 Recon Stalk</button>
+                                <button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#083344; border-color:#00f0ff; color:#a5f3fc; font-weight:bold;" onclick="window.executeOverworldAction('STALK')">🏹🟦 Recon Stalk (Zoom Local Cyan Blips)</button>
+                                <button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#0c4a6e; border-color:#38bdf8; color:#bae6fd; font-weight:bold;" onclick="window.executeOverworldAction('SCOUT_LOCAL')">🎯🟦 Scout Local Sector</button>
                                 <button class="cmd-btn" style="padding:5px 10px; font-size:10px;" onclick="window.executeOverworldAction('HUNT_PREY')">⚔️ Intercept Convoy</button>
                                 <button class="cmd-btn" style="padding:5px 10px; font-size:10px;" onclick="window.executeOverworldAction('FEED')">⛺ Camp &amp; Forage</button>
                                 <button class="cmd-btn" style="padding:5px 10px; font-size:10px;" onclick="window.sendExpedition('GUARDED_CARAVAN','${selNode.name}'); window.CommanderUI.renderExploreForestModal(false);">🛡️ Send Caravan</button>
@@ -2522,9 +2715,18 @@ export const CommanderUI = {
                             ? `<button class="cmd-btn" style="padding:2px 6px; font-size:9px; background:#3f1212; border-color:#ef4444; color:#fecaca; font-weight:bold;" onclick="window.cancelAgentTraining('${a.id}')">🔓 Cancel Training (-${cancelFee}r / 50% Cost)</button>`
                             : '';
 
+                        const isHostViewer = Boolean(CommanderEngine.HostVisibilityController?.isHost ?? true);
+                        const voidUI = (isHostViewer && a.voidTaint > 0 && CommanderEngine.VoidTouchedRegistry)
+                            ? CommanderEngine.VoidTouchedRegistry.getFractalDecayUIModel(a.id, true)
+                            : null;
+                        const renderedName = voidUI ? voidUI.displayName : a.name;
+                        const voidBadgeHtml = voidUI
+                            ? `<span style="font-size:9.5px; color:#f43f5e; background:#2e0518; padding:1px 4px; border:1px solid #f43f5e; margin-left:4px; font-family:'Share Tech Mono',monospace;">${voidUI.asciiModel} (${(a.voidTaint * 100).toFixed(0)}% TAINT)</span>`
+                            : '';
+
                         return `
                         <div style="padding: 6px 0; border-bottom: 1px dashed #7c664d;">
-                            <b style="color:#5e110b;">${a.name}</b> <span style="font-size:10px; color:#0e7490; font-weight:bold;">${a.cultivation?.isCultivatedGuardian ? `★ TIER ${cStage} ASCENDANT` : `(Tier ${cStage}/8)`}</span>
+                            <b style="color:#5e110b;">${renderedName}</b>${voidBadgeHtml} <span style="font-size:10px; color:#0e7490; font-weight:bold;">${a.cultivation?.isCultivatedGuardian ? `★ TIER ${cStage} ASCENDANT` : `(Tier ${cStage}/8)`}</span>
                             <span style="color:#463523; font-weight:bold;">(${a.career?.rank || 'Novice'} ${a.career?.id})</span>
                             <div style="font-size:9.5px; color:#1f160e; font-family:'Share Tech Mono',monospace;">HP: ${a.vitals.hp}/${a.vitals.maxHp} | Poise: ${Math.round(a.vitals.poise)} | Runes: ${a.cultivation?.inscriptionsCount || 0}/48 | Purity: ${a.cultivation?.foundationPurity ?? 100}% | Potential: ${a.cultivation?.potentialRemaining ?? 100}% | Lifespan: ${totalLife}y</div>
                             <div style="font-size:9.5px; color:#3f2e1e;">🗡️ Gear: [${gearSummary}] | Birthright: [${a.birthright?.title || 'None'}] ${activeDrill ? `| <b style="color:#b91c1c;">[🔒 LOCKED IN TRAINING: ${activeDrill} (+1/Day)]</b>` : ''}${queueSummary}</div>

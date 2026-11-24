@@ -1,56 +1,61 @@
-# Implementation Plan: Full Playtester Audit & 17-Point General Ledger Overhaul
+# Implementation Plan: The Broken Reality (Hydrology, Tectonics, The Geometer & Void-Touched Fractal Decay)
 
 ## 1. Objective & Design Mandate
-Address every playtester issue audited across the General Ledger UI (`src/systems/commander_ui.js`, `ledger-mobile/src/systems/commander_ui.js`, `ledger-mobile/index.html`, `ledger-mobile/theme.css`) and Headless Simulation Engine (`src/core/commander_engine.js`, `ledger-mobile/src/core/commander_engine.js`, `src/systems/candidate_onboarding.js`).
+Upgrade the world-generation and systemic simulation engines to treat geological laws as an **"Ideal Blueprint"** and reality as an **"Entropy-Degrading System."** Integrate **The Geometer** as a hidden (`HOST_ONLY`) systemic entity and the **Void-Touched** system as a high-stakes, fractal decay mechanic for operatives.
 
-## 2. Phase-by-Phase Technical Specification
+## 2. Strict Topic Isolation & Sequential Execution Plan
 
-### Phase 1: Role Selector Redactions, Role Lockout & Stat Sheet Runic Cleanup
-1. **Role Selector Title Card Redactions & Role Titles:**
-   - **Under The Crown (`MERCHANT_PATRON`):** Role title clearly labeled **`THE CROWN (MERCHANT PATRON)`**.
-   - **Under Noble House (`NOBLE_HOUSE`):** Role title clearly labeled **`NOBLE HOUSE`**.
-   - **Obsidian Citadel (`GUILD_LEADER`) Card Redaction:** Black out the group name (`<span class="redaction-bar">████████████████</span>`), black out the Containment gauge (`#090705` blacked-out gauge), and display **`?%`** for the percentage.
-2. **One-Way Role Selection Lockout:**
-   - Once a role is selected (`selectRoleAndLaunch`), remove/hide all options to return to the Role Selector (`btn-nav-role-scroll` in `ledger-mobile/index.html`, `🚪 Role Roster`, `PAGE 1`, and `PAGE 2` buttons in `CommanderUI`).
-3. **Stat Sheet Fluff Runic Lettering Removal:**
-   - Remove decorative Futhark runic borders/lettering from character stat sheets and clean up any encoding artifacts in `formatAgentStatSheet`.
-4. **Dynamic Procedural Courier Dispatches:**
-   - Upgrade `LogDispatchManager.generateDailyDispatches()` with dynamic, state-reactive dispatches driven by active expeditions, agent drills, market trades, and war board shifts.
-
-### Phase 2: Fallout Shelter–Style Patrol Recall, Dynamic Stress Index, Death Certificate Lineage & Verdicts
-1. **Fallout Shelter–Style Expedition Return March:**
-   - Refactor `ExpeditionEngine.recallExpedition(expId)` so recalling a squad after $N$ hours logs an immediate turnaround & waste-land encounter/salvage entry in `exp.logs` and transitions the squad to `status = 'RETURNING_EARLY'` with `returnHoursRemaining = Math.max(1, exp.hoursElapsed)` (marching back over the elapsed hours like Fallout Shelter, while crediting salvaged cargo and logging the full return trail).
-2. **Dynamic Observed Stress Index:**
-   - Dynamically compute `deceptionScore` in `InterrogationDesk.interrogate(targetId)` from live agent `shock`, `poise`, `hunger`, settlement `unrest`, `volatilityIndex`, and interrogation pressure increments.
-3. **Elaborated Family Lineage & Connections on Death Certificate Dossier:**
-   - Generate a rich, cohesive family tree & bloodline network (Parents of the same House/Parish, Spouse/Betrothed, Siblings, Children/Heirs, and Sworn Shield-Companion from the active Garrison roster) under `─── 🌳 FAMILY LINEAGE & BLOODLINE CONNECTIONS ───`.
-4. **Inquest Verdicts (`Exonerate`, `Demote`, `Execute`, `Turn Double Agent`) & Mobile Exit Button:**
-   - Fix `InterrogationDesk.renderVerdict(targetId, verdictType)` so all 4 verdicts reliably update agent state/loyalty/rank/death/double-agent status, display the signed verdict transcript in the reader, and add a dedicated **`[✖ EXIT DOSSIER / CLOSE READER]`** button (`window.closeStoryReader()`).
-
-### Phase 3: Obsidian Citadel Tax Exemption, Triage Missive Consequences, Emissary Variety & Power Rating Context
-1. **Obsidian Citadel (`GUILD_LEADER` / `ORDER`) Crown Tax Exemption:**
-   - Set `crownDemand: 0`, `taxExempt: true` for Obsidian Citadel (`ORDER` / `GUILD`), ensuring zero Crown tax/tithe obligations.
-2. **Triage Missives & Anti-Crown Consequence Parity:**
-   - Ensure anti-Crown options in Triage Missives and directives declare and inflict explicit penalties (`-15% Crown Favor`, `+12% Crown Scrutiny`, `-5u Royal Assessor Supply Seizure`, and Inquisitorial Retaliation raids at high Scrutiny).
-3. **Dynamic Daily Emissary Variety & Power Rating Context:**
-   - Overhaul `RealityEditorVault.generateEmissaryPetition(day)` with 6+ distinct emissary archetypes rotating across all competing Houses, and add explicit **Power Rating Context** (`Power: 66/100 [Rank #8/19 — Military & Monopoly Leverage Index]`).
-
-### Phase 4: Armory & Weapon Market Facility, Faction Unit Recruitment & Book-Page Tabbed UI Architecture
-1. **Gear & Weapon Trading/Buying Market Facility (`armory_market`):**
-   - Add upgradable `armory_market` (*⚔️ Armory & Weaponry Exchange Market*) to `FacilityEngine.facilities` unlocking `buyArmoryGear(itemId)` and `sellArmoryGear(itemId)`.
-2. **Clear Faction Unit Generation & Recruitment System:**
-   - Add `recruitFactionUnit(archetype)` to `AgentRosterManager` and a dedicated recruitment panel in the Garrison tab.
-3. **Book-Page Tabbed Main Gameplay UI & Functional Truth / Relic Vault Buttons:**
-   - Organize the main gameplay UI into a clean **5-Tab Royal Ledger Book** with book-page tabs (`📖 Page I: Command & Triage`, `🛡️ Page II: Garrison, Recruitment & Armory Market`, `🧭 Page III: Field Expeditions & Courier Dispatches`, `📜 Page IV: Truth & Relic Vault`, `🏰 Page V: 19-House War Board & Telemetry`).
-   - Ensure Truth & Relic Vault buttons always open Page IV and display interactive Fact/Relic dossiers immediately.
-
-### Phase 5: Time Clock & Dream World Skip Audit + First-Click Tutorial Advisor System
-1. **Time Clock (`+1 DAY`) vs. Dream World (`🌙 DREAM WARD` / `+1D CHRONO-SKIP`) Audit:**
-   - Clearly differentiate and label interactive `+1 DAY (END TURN)` vs. `🌙 DREAM WARD (-10u Siphon)` vs. `⏭️ +1D DREAM CHRONO-SKIP (Unattended Auto-Resolve)`.
-2. **Interactive First-Click Tutorial Advisor (`TutorialAdvisor`):**
-   - Pop up an on-screen **Royal Archive Advisor** on the first click of each interface button/tab explaining its systems, and automatically trigger an **Emissary Arrival Walkthrough** on the first emissary explaining pros, cons, and hidden cascading consequences.
+### Phase 1: Orphic Hydrology & Tectonic Invariants (The Blueprint)
+- **Files Affected:**
+  - `src/epoch_manager.js`
+  - `src/systems/dune_drift.js`
+  - `src/core/commander_engine.js` & `ledger-mobile/src/core/commander_engine.js`
+  - `tools/audit/verify_hydrology_laws.mjs` (New Audit Script)
+- **Technical Specification:**
+  1. **Ideal Geological Blueprint (`IdealBlueprint`):** Codify the Mountain Ring ($100\text{–}280\text{km}$) as the primary **Orphic Watershed** and the **Great Lake** (250-mile diameter inner basin sink) as the **Primary Sink**.
+  2. **Tectonic Lineaments:** Replace purely random mountain placement with directional chains based on deterministic **Tectonic Plate Vectors** (`TECTONIC_PLATE_VECTORS`).
+  3. **Dune Siphon-Flow ("Infinity Feed"):** Implement extra-dimensional anomaly siphon sources (`INFINITY_FEED_ANOMALIES`) for Dune river systems, allowing them to flow inward without traditional mountain watersheds.
+  4. **Hydrology Auditor (`tools/audit/verify_hydrology_laws.mjs`):** Verify that every inner river maps from a Mountain Ring source to the Great Lake sink, and every Dune river maps from an Infinity Feed siphon anomaly to the Event Horizon Silt-Lock.
 
 
+### Phase 2: The Geometer (The Systemic Actor)
+- **Files Affected:**
+  - `src/core/civilization.js`
+  - `src/systems/forces.js`
+  - `src/core/commander_engine.js` & `ledger-mobile/src/core/commander_engine.js`
+  - `src/systems/commander_ui.js` & `ledger-mobile/src/systems/commander_ui.js`
+  - `tools/audit/verify_geometer_system.mjs` (New Audit Script)
+- **Technical Specification:**
+  1. **The Geometer Registry:** Add `THE_GEOMETER` to `ForceCatalog` in `src/core/civilization.js` and `ForceManager` in `src/systems/forces.js`.
+  2. **`HOST_ONLY` Visibility Controller:** Implement `HOST_ONLY` visibility filtering in `CommanderEngine` so clients (`isHost === false`) never see the Geometer's dialogue, position, or Void-Touched UI flickering.
+  3. **Procedural Collision Integration:** Link the Geometer to `ProceduralCollisionEngine` (*Grammar of Chaos*); he manifests when `GeologicalDissonance` reaches a critical threshold ($\ge 0.65$).
+  4. **Narrative Decay & Entropy Acceleration:** Evolve the Geometer's dialogue across 4 dissolution stages as he merges with the landscape. Killing the Geometer triggers an immediate `10x EntropyMultiplier` and wipes `IdealBlueprint`.
 
+### Phase 3: Stochastic Material Permutation (The Corruption)
+- **Files Affected:**
+  - `src/core/commander_engine.js` & `ledger-mobile/src/core/commander_engine.js`
+  - `tools/audit/verify_material_permutation.mjs` (New Audit Script)
+- **Technical Specification:**
+  1. **Material Registry:** Refactor static material data (Ironbark Wood, Basalt Stone, etc.) into a dynamic registry supporting property permutation.
+  2. **Reality Fracture Event:** Implement a `1 in 100,000` (`1e-5`) collision chance that permutes two random material properties (e.g., Tree density vs. Stone hardness).
+  3. **Persistence:** Persist corrupted objects and material states in `persistentSectorMapData`.
 
+### Phase 4: Phase-Shift Breaches (Quantum Tunnelling)
+- **Files Affected:**
+  - `src/core/commander_engine.js` & `ledger-mobile/src/core/commander_engine.js`
+  - `tools/audit/verify_phase_shift_breaches.mjs` (New Audit Script)
+- **Technical Specification:**
+  1. **Breach Hazard:** Implement a `10^-7` per-tick `Phase-Shift Breach` turning breached objects non-solid (`isSolid: false`).
+  2. **Reality Eviction Protocol:** Overlapping a breached `isSolid: false` object triggers a random Overworld teleport.
+  3. **Corruption Burst:** Teleportation triggers a `5x5` tile `CORRUPTION_ZONE` that permutes local terrain.
 
+### Phase 5: Void-Touched Agents (Fractal Bloom & Decay)
+- **Files Affected:**
+  - `src/core/commander_engine.js` & `ledger-mobile/src/core/commander_engine.js`
+  - `src/systems/commander_ui.js` & `ledger-mobile/src/systems/commander_ui.js`
+  - `tools/audit/verify_void_touched_agents.mjs` (New Audit Script)
+- **Technical Specification:**
+  1. **`VoidTaint` Registry:** Track `VoidTaint` ($0.0\text{–}1.0$) on all operatives.
+  2. **Fractal Bloom:** Implement a `Weibull` stat-roller granting massive, unstable power-spikes to `VoidTouched` agents.
+  3. **Fractal Decay UI:** Progressive ASCII/data corruption and name fracturing at high Taint (filtered via `isHost`).
+  4. **Shatter Event:** At `1.0 Taint`, remove the agent, spawn a `VOID_FRACTURE` anomaly, and log a high-significance narrative entry.

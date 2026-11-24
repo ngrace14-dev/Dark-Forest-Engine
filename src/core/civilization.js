@@ -7,8 +7,33 @@
  * Engine Law #5: 70% Scalar-to-Scalar / 30% Scalar-to-Framework.
  */
 
-window.CivilizationState = {
-    // 11 Core Civilization Scalars (0.0 - 1.0)
+const _civRoot = typeof window !== 'undefined' ? window : globalThis;
+
+export const ForceCatalog = _civRoot.ForceCatalog || {
+    FOREST: { id: 'FOREST', label: 'Possibility', tier: 1, visibility: 'PUBLIC' },
+    CROW: { id: 'CROW', label: 'Significance', tier: 1, visibility: 'PUBLIC' },
+    TREE: { id: 'TREE', label: 'Continuity', tier: 1, visibility: 'PUBLIC' },
+    HUNTSMAN: { id: 'HUNTSMAN', label: 'Cultivation', tier: 1, visibility: 'PUBLIC' },
+    CROWN: { id: 'CROWN', label: 'Order', tier: 1, visibility: 'PUBLIC' },
+    WENDIGO: { id: 'WENDIGO', label: 'Consumption', tier: 1, visibility: 'PUBLIC' },
+    TRUTH: { id: 'TRUTH', label: 'Accuracy', tier: 1, visibility: 'PUBLIC' },
+    ORB: { id: 'ORB', label: 'Witness', tier: 1, visibility: 'PUBLIC' },
+    THE_SHACKLE: { id: 'THE_SHACKLE', label: 'The Bound Walker', tier: 1, visibility: 'PUBLIC' },
+    THE_GEOMETER: {
+        id: 'THE_GEOMETER',
+        label: 'The Geometer (Orphic Surveyor of the Ideal Blueprint)',
+        tier: 1,
+        visibility: 'HOST_ONLY',
+        dissonanceThreshold: 0.65,
+        entropyAccelerationOnDeath: 10.0,
+        wipesIdealBlueprintOnDeath: true,
+        description: 'Hidden systemic actor who manifests when GeologicalDissonance breaches critical thresholds, slowly dissolving into the topography he measures.'
+    }
+};
+_civRoot.ForceCatalog = ForceCatalog;
+
+_civRoot.CivilizationState = {
+    // 12 Core Civilization Scalars (0.0 - 1.0) including GEOLOGICAL_DISSONANCE
     scalars: {
         WORLD_ENTROPY: 0.1,        // Decay/Friction
         TRUTH_DECAY: 0.1,         // Noise/Entropy
@@ -20,15 +45,20 @@ window.CivilizationState = {
         FEAR_LOAD: 0.1,           // Survival Drive
         TRUST_DENSITY: 0.7,       // Inter-agent Reliability
         DISCOVERY_PRESSURE: 0.1,  // Innovation Drive
-        VIOLENCE_POTENTIAL: 0.05   // Threshold to Conflict
+        VIOLENCE_POTENTIAL: 0.05, // Threshold to Conflict
+        GEOLOGICAL_DISSONANCE: 0.05 // Deviation between Ideal Blueprint and Current State
     },
 
     // Tracking for Flux calculations
     deltas: {
         WORLD_ENTROPY: 0, TRUTH_DECAY: 0, MATERIAL_STRESS: 0, BIOLOGICAL_LOAD: 0,
         COHESION_INDEX: 0, LEGITIMACY_INDEX: 0, SIGNIFICANCE_DENSITY: 0, FEAR_LOAD: 0,
-        TRUST_DENSITY: 0, DISCOVERY_PRESSURE: 0, VIOLENCE_POTENTIAL: 0
+        TRUST_DENSITY: 0, DISCOVERY_PRESSURE: 0, VIOLENCE_POTENTIAL: 0, GEOLOGICAL_DISSONANCE: 0
     },
+
+    entropyMultiplier: 1.0,
+    idealBlueprintIntact: true,
+    forceCatalog: ForceCatalog,
 
     // System influence tracking (Law #5 Enforcement)
     systemInfluence: {
@@ -51,7 +81,8 @@ window.CivilizationState = {
         FEAR_LOAD: 0.15,
         TRUST_DENSITY: 0.65,
         DISCOVERY_PRESSURE: 0.20,
-        VIOLENCE_POTENTIAL: 0.10
+        VIOLENCE_POTENTIAL: 0.10,
+        GEOLOGICAL_DISSONANCE: 0.05
     }
 };
 
@@ -59,7 +90,7 @@ window.CivilizationState = {
  * FRAMEWORK 1: SCALAR FLUX
  * Responsible for scalar accumulation, interaction, normalization, and threshold checks.
  */
-window.ScalarFlux = {
+_civRoot.ScalarFlux = {
     metrics: {
         totalNudgesApplied: 0,
         scalarFluxApplied: 0,
@@ -72,8 +103,8 @@ window.ScalarFlux = {
         console.log("%c🟢 Framework 1: Scalar Flux Initialized", "color: #60a5fa; font-weight: bold;");
         
         // Register for heartbeat to process flux
-        if (window.EventBus) {
-            window.EventBus.on('HEARTBEAT_TICK', () => this.update());
+        if (_civRoot.EventBus) {
+            _civRoot.EventBus.on('HEARTBEAT_TICK', () => this.update());
         }
     },
 
@@ -135,10 +166,10 @@ window.ScalarFlux = {
     },
 
     evaluateSystemDefinitions: function(dampingScale = 0.01) {
-        const defs = window.SystemDefinitions;
+        const defs = _civRoot.SystemDefinitions;
         if (!Array.isArray(defs) || defs.length === 0) return [];
-        const scalars = window.CivilizationState.scalars;
-        window.CivilizationState.frameworkVectors = {};
+        const scalars = _civRoot.CivilizationState.scalars;
+        _civRoot.CivilizationState.frameworkVectors = {};
         const activeSystems = [];
 
         for (let i = 0; i < defs.length; i++) {
@@ -155,32 +186,28 @@ window.ScalarFlux = {
                     scalar_to_framework: Object.fromEntries(
                         Object.entries(normalizedVectors.scalar_to_framework).map(([k, v]) => [
                             k,
-                            v * window.CivilizationState.systemInfluence.scalarToFramework
+                            v * _civRoot.CivilizationState.systemInfluence.scalarToFramework
                         ])
                     )
                 }
             });
         }
         this.metrics.activeSystemCount = activeSystems.length;
-        if (window.EventBus) window.EventBus.emit('ACTIVE_SYSTEMS_UPDATED', activeSystems);
+        if (_civRoot.EventBus) _civRoot.EventBus.emit('ACTIVE_SYSTEMS_UPDATED', activeSystems);
         return activeSystems;
     },
 
-    /**
-     * Applies a vector nudge to the civilization scalars from a system.
-     * Enforces Engine Law #5 (70% Scalar-to-Scalar / 30% Scalar-to-Framework).
-     */
     applySystemNudge: function(systemId, vectors, scale = 1.0) {
         if (!vectors) return;
-        const s2sWeight = window.CivilizationState.systemInfluence.scalarToScalar; // 0.70
-        const s2fWeight = window.CivilizationState.systemInfluence.scalarToFramework; // 0.30
+        const s2sWeight = _civRoot.CivilizationState.systemInfluence.scalarToScalar; // 0.70
+        const s2fWeight = _civRoot.CivilizationState.systemInfluence.scalarToFramework; // 0.30
         this.metrics.totalNudgesApplied++;
 
         if (vectors.scalar_to_scalar) {
             for (const [scalar, magnitude] of Object.entries(vectors.scalar_to_scalar)) {
-                if (window.CivilizationState.deltas[scalar] !== undefined && Number.isFinite(magnitude)) {
+                if (_civRoot.CivilizationState.deltas[scalar] !== undefined && Number.isFinite(magnitude)) {
                     const weightedDelta = magnitude * s2sWeight * scale;
-                    window.CivilizationState.deltas[scalar] += weightedDelta;
+                    _civRoot.CivilizationState.deltas[scalar] += weightedDelta;
                     this.metrics.scalarFluxApplied += Math.abs(weightedDelta);
                 }
             }
@@ -189,24 +216,21 @@ window.ScalarFlux = {
             for (const [modifier, magnitude] of Object.entries(vectors.scalar_to_framework)) {
                 if (Number.isFinite(magnitude)) {
                     const weightedPressure = magnitude * s2fWeight * scale;
-                    window.CivilizationState.frameworkVectors[modifier] =
-                        (window.CivilizationState.frameworkVectors[modifier] || 0) + weightedPressure;
+                    _civRoot.CivilizationState.frameworkVectors[modifier] =
+                        (_civRoot.CivilizationState.frameworkVectors[modifier] || 0) + weightedPressure;
                     this.metrics.frameworkPressureApplied += Math.abs(weightedPressure);
                 }
             }
         }
-        if (window.Profiler && window.Profiler.logFlux) {
-            window.Profiler.logFlux(systemId, vectors);
+        if (_civRoot.Profiler && _civRoot.Profiler.logFlux) {
+            _civRoot.Profiler.logFlux(systemId, vectors);
         }
     },
 
-    /**
-     * Main update loop for civilization scalars.
-     */
     update: function() {
-        const state = window.CivilizationState.scalars;
-        const deltas = window.CivilizationState.deltas;
-        const baselines = window.CivilizationState.baselines;
+        const state = _civRoot.CivilizationState.scalars;
+        const deltas = _civRoot.CivilizationState.deltas;
+        const baselines = _civRoot.CivilizationState.baselines;
         this.metrics.cyclesCompleted++;
 
         // 0. EVALUATE TIER-C SYSTEM DEFINITIONS (Engine Law #5 70/30 Split)
@@ -219,10 +243,11 @@ window.ScalarFlux = {
         }
 
         // 2. SCALAR-TO-SCALAR INTERACTIONS (Atmospheric Friction)
+        const entropyMult = _civRoot.CivilizationState.entropyMultiplier || 1.0;
         if (state.FEAR_LOAD > 0.5) {
             state.TRUST_DENSITY -= (state.FEAR_LOAD - 0.5) * 0.01;
         }
-        state.MATERIAL_STRESS += state.WORLD_ENTROPY * 0.005;
+        state.MATERIAL_STRESS += state.WORLD_ENTROPY * 0.005 * entropyMult;
         if (state.LEGITIMACY_INDEX < 0.4) {
             state.VIOLENCE_POTENTIAL += (0.4 - state.LEGITIMACY_INDEX) * 0.01;
         }
@@ -246,23 +271,29 @@ window.ScalarFlux = {
         this.checkThresholds(state);
 
         // 5. EMIT UPDATE
-        if (window.EventBus) {
-            window.EventBus.emit('CIV_SCALARS_UPDATED', state);
+        if (_civRoot.EventBus) {
+            _civRoot.EventBus.emit('CIV_SCALARS_UPDATED', state);
         }
     },
 
     checkThresholds: function(state) {
-        // Example: Collapse trigger
         if (state.WORLD_ENTROPY > 0.9 && state.LEGITIMACY_INDEX < 0.1) {
-            window.EventBus.emit('CIV_COLLAPSE_WARNING', "Civilization structure is failing.");
+            _civRoot.EventBus?.emit('CIV_COLLAPSE_WARNING', "Civilization structure is failing.");
         }
-
-        // Example: Violence outbreak
         if (state.VIOLENCE_POTENTIAL > 0.8) {
-            window.EventBus.emit('CIV_VIOLENCE_OUTBREAK', "Civil unrest reaching critical levels.");
+            _civRoot.EventBus?.emit('CIV_VIOLENCE_OUTBREAK', "Civil unrest reaching critical levels.");
+        }
+        if (state.GEOLOGICAL_DISSONANCE >= (ForceCatalog.THE_GEOMETER.dissonanceThreshold || 0.65)) {
+            _civRoot.EventBus?.emit('GEOMETER_DISSONANCE_CRITICAL', {
+                geologicalDissonance: state.GEOLOGICAL_DISSONANCE,
+                visibility: 'HOST_ONLY'
+            });
         }
     }
 };
 
 // Auto-initialize Flux Framework
-window.ScalarFlux.init();
+_civRoot.ScalarFlux.init();
+export const CivilizationState = _civRoot.CivilizationState;
+export const ScalarFlux = _civRoot.ScalarFlux;
+export default _civRoot.CivilizationState;

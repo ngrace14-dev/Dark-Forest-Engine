@@ -13,6 +13,15 @@ export class EpochManager {
         this.mountainRotation = 0; // Cumulative rotation in radians
         this.duneSeed = this.baseSeed; // Regenerates when abandoned
         this.isDuneOccupied = false;
+
+        // PHASE 1: ORPHIC HYDROLOGY & TECTONIC INVARIANTS (THE IDEAL BLUEPRINT)
+        this.tectonicPlateVectors = [
+            { id: 'PLATE_NORTH_AETHEL', strikeAngleRad: 0.35, dipAngleRad: 0.78, convergenceMag: 1.15, ridgeFrequency: 0.008 },
+            { id: 'PLATE_EAST_TERMINUS', strikeAngleRad: 1.92, dipAngleRad: 0.85, convergenceMag: 1.25, ridgeFrequency: 0.007 },
+            { id: 'PLATE_SOUTH_GALLows', strikeAngleRad: 3.49, dipAngleRad: 0.72, convergenceMag: 1.10, ridgeFrequency: 0.009 },
+            { id: 'PLATE_WEST_ASHEN', strikeAngleRad: 5.06, dipAngleRad: 0.81, convergenceMag: 1.20, ridgeFrequency: 0.0075 }
+        ];
+        this.idealBlueprint = this._generateIdealBlueprint();
         
         // ... previous config ...
 
@@ -33,8 +42,68 @@ export class EpochManager {
 
     }
 
-        _generateEpochSeed() {
+    _generateEpochSeed() {
         return `${this.baseSeed}_epoch_${this.currentEpoch}`;
+    }
+
+    /**
+     * Phase 1: Orphic Hydrology & Tectonic Invariants (The Ideal Blueprint)
+     * Codifies the Mountain Ring as the primary watershed, the Great Lake as the primary sink,
+     * directional tectonic lineaments, and extra-dimensional Infinity Feed siphon sources for Dune rivers.
+     */
+    _generateIdealBlueprint() {
+        const halfForestSide = (this.config?.darkForestSideMeters || 1137800.0) / 2;
+        const mountainWidth = this.config?.mountainRingWidthMeters || 160934.4;
+        const lakeRadius = (this.config?.greatLakeDiameterMeters || 402335.0) / 2;
+        const lakeCenterOff = new alea(this.currentSeed + '_lake')();
+        const lakeAngle = lakeCenterOff * Math.PI * 2;
+        const lakeDistFromCenter = (halfForestSide - lakeRadius) * 0.6;
+        const lakeCenterX = Math.cos(lakeAngle) * lakeDistFromCenter;
+        const lakeCenterZ = Math.sin(lakeAngle) * lakeDistFromCenter;
+
+        return {
+            primaryWatershed: {
+                id: 'MOUNTAIN_RING_WATERSHED',
+                innerRadiusMeters: halfForestSide,
+                outerRadiusMeters: halfForestSide + mountainWidth,
+                baseRimElevationMeters: 120.0,
+                peakElevationMeters: 2620.0
+            },
+            primarySink: {
+                id: 'GREAT_LAKE_SINK',
+                centerX: lakeCenterX,
+                centerZ: lakeCenterZ,
+                radiusMeters: lakeRadius,
+                maxDepthMeters: 80.0,
+                sinkElevationMeters: -45.0
+            },
+            tectonicPlates: this.tectonicPlateVectors,
+            duneInfinityFeeds: [
+                { id: 'INFINITY_SIPHON_ALPHA', riverName: 'Aethel-Silt Streamline', angleRad: 0.42, sourceRadiusKm: 480, targetHorizonRadiusKm: 285, fluxCubicMetersPerSec: 840, extraDimensionalSignature: 'ORPHIC_RIFT_01' },
+                { id: 'INFINITY_SIPHON_BETA', riverName: 'Vellum-Marrow Streamline', angleRad: 1.98, sourceRadiusKm: 520, targetHorizonRadiusKm: 285, fluxCubicMetersPerSec: 920, extraDimensionalSignature: 'ORPHIC_RIFT_02' },
+                { id: 'INFINITY_SIPHON_GAMMA', riverName: 'Glass-Choir Streamline', angleRad: 3.55, sourceRadiusKm: 495, targetHorizonRadiusKm: 285, fluxCubicMetersPerSec: 790, extraDimensionalSignature: 'ORPHIC_RIFT_03' },
+                { id: 'INFINITY_SIPHON_DELTA', riverName: 'Salt-Cradle Streamline', angleRad: 5.12, sourceRadiusKm: 540, targetHorizonRadiusKm: 285, fluxCubicMetersPerSec: 880, extraDimensionalSignature: 'ORPHIC_RIFT_04' }
+            ]
+        };
+    }
+
+    /**
+     * Computes directional mountain elevation along tectonic plate lineament chains
+     * rather than purely isotropic random placement.
+     */
+    computeTectonicLineamentFactor(x, z) {
+        const angle = Math.atan2(z, x);
+        let maxChainResonance = 0;
+        for (const plate of this.tectonicPlateVectors) {
+            const nx = x * Math.cos(plate.strikeAngleRad) + z * Math.sin(plate.strikeAngleRad);
+            const nz = -x * Math.sin(plate.strikeAngleRad) + z * Math.cos(plate.strikeAngleRad);
+            // Directional ridge chain parallel to plate strike vector
+            const chainWave = Math.cos(nx * plate.ridgeFrequency + this.noise2D(nx * 0.002, nz * 0.002) * 1.8);
+            const ridgeSharpness = Math.pow(Math.max(0, (chainWave + 1) * 0.5), 1.6) * plate.convergenceMag;
+            const sectorWeight = 0.55 + 0.45 * Math.cos(angle - plate.strikeAngleRad);
+            maxChainResonance = Math.max(maxChainResonance, ridgeSharpness * sectorWeight);
+        }
+        return Math.max(0.25, Math.min(1.45, maxChainResonance));
     }
 
         advanceEpoch() {
@@ -254,12 +323,13 @@ export class EpochManager {
             // Distance from the inner forest edge to the mountain peak
             const mountainT = (dist - halfForestSide) / mountainWidth; 
             
-            // Generate a massive jagged mountain shape
-            // Peaks at the middle of the 100-mile range
+            // Generate directional mountain chains along Tectonic Plate Lineaments (Phase 1 Blueprint)
+            // Peaks at the middle of the 100-mile range, aligned to plate vectors
             const profile = Math.sin(mountainT * Math.PI); 
-            const jaggedness = this.noise2D(x * 0.01, z * 0.01) * 0.5 + 0.5;
+            const lineamentFactor = this.computeTectonicLineamentFactor(x, z);
+            const jaggedness = (this.noise2D(x * 0.01, z * 0.01) * 0.25 + 0.75) * lineamentFactor;
             
-            // Mountains reach up to 2,500 meters
+            // Mountains reach up to 2,500+ meters along active tectonic lineaments
             height += profile * 2500 * jaggedness;
 
             // THE MOUNTAIN PASS (Terminus Gate)
