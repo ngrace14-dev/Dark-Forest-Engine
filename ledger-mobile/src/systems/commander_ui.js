@@ -638,18 +638,30 @@ export const CommanderUI = {
             this.render();
         };
         window.toggleMapViewMode = () => this.toggleMapViewMode();
-        window.selectMapSettlement = (id) => this.selectMapSettlement(id);
-        window.openTacticalEncounter = (id = null) => this.openTacticalEncounterModal(id);
-        window.executeEncounterAction = (act) => this.executeTacticalEncounterAction(act);
+        window.selectMapSettlement = (id) => {
+            this.selectMapSettlement(id);
+            this.renderExploreForestModal(false);
+        };
+        window.openTacticalEncounter = (id = null) => {
+            this.openTacticalEncounterModal(id);
+            this.renderExploreForestModal(false);
+        };
+        window.executeEncounterAction = (act) => {
+            const res = this.executeTacticalEncounterAction(act);
+            this.renderExploreForestModal(false);
+            return res;
+        };
         window.closeTacticalEncounter = () => {
             this.activeEncounterState = null;
             this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
         };
         window.scoutFogOfWarNode = (targetName) => {
             CommanderEngine.CampaignManager.revealFogOfWarNode?.(targetName);
             const res = CommanderEngine.ExpeditionEngine.launchExpedition('PATROL_MIST', targetName);
             this.showBanner(`🌫️🧭 [FOG OF WAR RECON] Dispatched Mist-Recon Squad to lift the Outer Horizon Fog around [${targetName}]! ${res.message}`);
             this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
             this.render();
         };
         window.openExploreForest = () => {

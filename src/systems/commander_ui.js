@@ -638,18 +638,30 @@ export const CommanderUI = {
             this.render();
         };
         window.toggleMapViewMode = () => this.toggleMapViewMode();
-        window.selectMapSettlement = (id) => this.selectMapSettlement(id);
-        window.openTacticalEncounter = (id = null) => this.openTacticalEncounterModal(id);
-        window.executeEncounterAction = (act) => this.executeTacticalEncounterAction(act);
+        window.selectMapSettlement = (id) => {
+            this.selectMapSettlement(id);
+            this.renderExploreForestModal(false);
+        };
+        window.openTacticalEncounter = (id = null) => {
+            this.openTacticalEncounterModal(id);
+            this.renderExploreForestModal(false);
+        };
+        window.executeEncounterAction = (act) => {
+            const res = this.executeTacticalEncounterAction(act);
+            this.renderExploreForestModal(false);
+            return res;
+        };
         window.closeTacticalEncounter = () => {
             this.activeEncounterState = null;
             this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
         };
         window.scoutFogOfWarNode = (targetName) => {
             CommanderEngine.CampaignManager.revealFogOfWarNode?.(targetName);
             const res = CommanderEngine.ExpeditionEngine.launchExpedition('PATROL_MIST', targetName);
             this.showBanner(`🌫️🧭 [FOG OF WAR RECON] Dispatched Mist-Recon Squad to lift the Outer Horizon Fog around [${targetName}]! ${res.message}`);
             this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
             this.render();
         };
         window.openExploreForest = () => {
@@ -1191,7 +1203,7 @@ export const CommanderUI = {
 
         const svgNodes = settlements.map((s, i) => {
             if (i === 0) {
-                return `<g style="cursor:pointer;" onclick="window.navigateOverworldSquad(0)"><rect x="132" y="54" width="16" height="16" fill="#1e1b4b" stroke="#fbbf24" stroke-width="1.8"/><text x="140" y="65" text-anchor="middle" fill="#fde68a" font-size="9">👑</text></g>`;
+                return `<g style="cursor:pointer;" onclick="window.selectMapSettlement(0)"><rect x="131" y="53" width="18" height="18" rx="2" fill="#1e1b4b" stroke="#fbbf24" stroke-width="2"/><text x="140" y="65" text-anchor="middle" fill="#fde68a" font-size="10">👑</text><text x="140" y="50" text-anchor="middle" fill="#fde68a" font-size="6.2" font-weight="900">THE CAPITAL</text></g>`;
             }
             const isForestInner = Number(s.id) >= 1 && Number(s.id) <= 10 && Number(s.id) !== 7;
             const isRevealed = CommanderEngine.CampaignManager.isSettlementInForestZone?.(s) ?? isForestInner;
@@ -1205,13 +1217,13 @@ export const CommanderUI = {
             const isPartyHere = Number(s.id) === Number(ovw.partyNodeId);
             const isHostile = hEntry?.status === 'WAR_PREP' || hEntry?.status === 'SKIRMISH' || s.chainsIntegrity < 50;
             const fillCol = !isRevealed ? '#334155' : (isPartyHere ? '#a855f7' : (isSelected ? '#38bdf8' : (isHostile ? '#dc2626' : (hEntry?.status === 'ALLIED' ? '#10b981' : '#d97706'))));
-            const labelTxt = isRevealed ? s.name.slice(0, 10) : '🌫️ [FOGGED]';
+            const labelTxt = isRevealed ? s.name.slice(0, 12) : '🌫️ [FOGGED]';
             const blurAttr = !isRevealed ? 'opacity="0.55" filter="url(#outer-fog-blur-pop)"' : '';
             return `
-                <g style="cursor:pointer;" ${blurAttr} onclick="window.navigateOverworldSquad(${s.id})">
-                    <line x1="140" y1="62" x2="${cx}" y2="${cy}" stroke="${isSelected ? '#38bdf8' : '#4a453b'}" stroke-width="${isSelected ? '1.6' : '0.8'}" stroke-dasharray="2,2"/>
-                    <circle cx="${cx}" cy="${cy}" r="${isSelected || isPartyHere ? '6.5' : '4.5'}" fill="${fillCol}" stroke="#090d0e" stroke-width="1.2"/>
-                    <text x="${cx}" y="${(Number(cy) - 7).toFixed(1)}" text-anchor="middle" fill="${isSelected ? '#7dd3fc' : (isRevealed ? '#e2d1b0' : '#94a3b8')}" font-size="${isSelected ? '6.5' : '5.2'}" font-weight="bold">${labelTxt}</text>
+                <g style="cursor:pointer;" ${blurAttr} onclick="window.selectMapSettlement(${s.id})" ondblclick="window.navigateOverworldSquad(${s.id})">
+                    <line x1="140" y1="62" x2="${cx}" y2="${cy}" stroke="${isSelected ? '#38bdf8' : '#4a453b'}" stroke-width="${isSelected ? '1.8' : '0.9'}" stroke-dasharray="2,2"/>
+                    <circle cx="${cx}" cy="${cy}" r="${isSelected || isPartyHere ? '7.5' : '5.5'}" fill="${fillCol}" stroke="${isSelected ? '#ffffff' : '#090d0e'}" stroke-width="1.4"/>
+                    <text x="${cx}" y="${(Number(cy) - 8).toFixed(1)}" text-anchor="middle" fill="${isSelected ? '#7dd3fc' : (isRevealed ? '#fef3c7' : '#94a3b8')}" font-size="${isSelected ? '6.8' : '5.6'}" font-weight="900">${labelTxt}</text>
                 </g>
             `;
         }).join('');
@@ -1239,69 +1251,85 @@ export const CommanderUI = {
             </g>
         `;
 
+        const encounterOverlayHtml = this.buildEncounterArenaHtml(isSov);
+
         modal.style.display = 'block';
         modal.innerHTML = `
-            <div style="border:2px solid ${isSov ? '#ef4444' : '#22c55e'}; background:linear-gradient(180deg,#090d10 0%,#050709 100%); padding:12px; border-radius:6px; box-shadow:0 16px 40px rgba(0,0,0,0.95); margin-bottom:10px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid ${isSov ? '#7f1d1d' : '#14532d'}; padding-bottom:6px; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
-                    <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:12.5px; font-weight:900;">
-                        ${isSov ? '🐺 PREDATOR OVERWORLD MAP // STALK, HUNT, ATTACK &amp; FEED' : '🧭 MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION'}
+            <div style="position:fixed; inset:0; z-index:9999; background:rgba(3,5,8,0.98); display:flex; flex-direction:column; justify-content:space-between; padding:10px 14px; box-sizing:border-box; overflow:hidden;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid ${isSov ? '#7f1d1d' : '#14532d'}; padding-bottom:6px; flex-wrap:wrap; gap:6px;">
+                    <div>
+                        <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:14px; font-weight:900; letter-spacing:0.04em;">
+                            ${isSov ? '🐺 PREDATOR OVERWORLD MAP // STALK, HUNT, ATTACK &amp; FEED (FULLSCREEN)' : '🧭 MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION (FULLSCREEN)'}
+                        </div>
+                        <div style="font-size:10px; color:#86efac; font-family:'Share Tech Mono',monospace;">
+                            ⛺ SUPPLIES: <b>${ovw.suppliesDaysRemaining ?? 3}/${ovw.maxSuppliesDays ?? 3} DAYS</b> | 📍 POS: (${ovw.partyX}, ${ovw.partyY}) | 🏃 DIST FROM CAMP: <b>${ovw.distanceFromCampHours ?? 0}H (${Number(((ovw.distanceFromCampHours ?? 0) * (0.5 / (CommanderEngine.timeScale || 1))).toFixed(2))}H IRL)</b>
+                        </div>
                     </div>
-                    <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
-                        <button class="cmd-btn" style="padding:3px 8px; font-size:9px; ${ovw.stance === 'MARCH' ? 'background:#14532d; border-color:#4ade80; color:#dcfce7; font-weight:bold;' : ''}" onclick="window.setOverworldStance('MARCH')">${isSov ? '🐺 PROWL' : '🛡️ MARCH'}</button>
-                        <button class="cmd-btn" style="padding:3px 8px; font-size:9px; ${ovw.stance === 'STALK' ? 'background:#2e1065; border-color:#a855f7; color:#e9d5ff; font-weight:bold;' : ''}" onclick="window.setOverworldStance('STALK')">🐾 STALK</button>
-                        <button class="cmd-btn" style="padding:3px 8px; font-size:9px; ${ovw.stance === 'HUNT' ? 'background:#450a0a; border-color:#ef4444; color:#fecaca; font-weight:bold;' : ''}" onclick="window.setOverworldStance('HUNT')">${isSov ? '🩸 HUNT' : '⚔️ RAID'}</button>
-                        <button class="cmd-btn" style="background:#3f1212; border-color:#ef4444; color:#fecaca; padding:3px 10px; font-size:9.5px; font-weight:bold;" onclick="window.closeExploreForestModal()">✖ Close Overworld Map</button>
+                    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                        <button class="cmd-btn" style="padding:5px 10px; font-size:10px; ${ovw.stance === 'MARCH' ? 'background:#14532d; border-color:#4ade80; color:#dcfce7; font-weight:bold;' : ''}" onclick="window.setOverworldStance('MARCH')">${isSov ? '🐺 PROWL' : '🛡️ MARCH'}</button>
+                        <button class="cmd-btn" style="padding:5px 10px; font-size:10px; ${ovw.stance === 'STALK' ? 'background:#2e1065; border-color:#a855f7; color:#e9d5ff; font-weight:bold;' : ''}" onclick="window.setOverworldStance('STALK')">🐾 STALK</button>
+                        <button class="cmd-btn" style="padding:5px 10px; font-size:10px; ${ovw.stance === 'HUNT' ? 'background:#450a0a; border-color:#ef4444; color:#fecaca; font-weight:bold;' : ''}" onclick="window.setOverworldStance('HUNT')">${isSov ? '🩸 HUNT' : '⚔️ RAID'}</button>
+                        <button class="cmd-btn" style="background:#3f1212; border-color:#ef4444; color:#fecaca; padding:5px 12px; font-size:10.5px; font-weight:900;" onclick="window.closeExploreForestModal()">✖ Return to Command Hub</button>
                     </div>
                 </div>
-                <svg viewBox="0 0 280 128" style="width:100%; height:180px; display:block; margin:4px auto 8px auto; background:radial-gradient(circle at 50% 50%, rgba(20,83,45,0.32) 0%, rgba(15,23,42,0.94) 56%, rgba(5,7,9,0.98) 100%); border:1.5px solid #2b3234; border-radius:4px;">
-                    <defs>
-                        <filter id="outer-fog-blur-pop" x="-20%" y="-20%" width="140%" height="140%">
-                            <feGaussianBlur stdDeviation="0.9" />
-                        </filter>
-                        <radialGradient id="fog-of-war-shroud-pop" cx="50%" cy="50%" r="50%">
-                            <stop offset="0%" stop-color="#000000" stop-opacity="0" />
-                            <stop offset="52%" stop-color="#0f172a" stop-opacity="0.05" />
-                            <stop offset="68%" stop-color="#1e293b" stop-opacity="0.68" />
-                            <stop offset="100%" stop-color="#020617" stop-opacity="0.92" />
-                        </radialGradient>
-                    </defs>
-                    <rect x="0" y="0" width="280" height="128" fill="url(#fog-of-war-shroud-pop)" pointer-events="none"/>
-                    <ellipse cx="140" cy="64" rx="112" ry="49" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3"/>
-                    <ellipse cx="140" cy="64" rx="76" ry="33" fill="none" stroke="#22c55e" stroke-width="1.2" stroke-dasharray="3,2"/>
-                    <text x="140" y="28" text-anchor="middle" fill="#86efac" font-size="5.5" font-weight="bold">🌲 INNER FOREST ZONE (TAP ANY NODE TO NAVIGATE SQUAD)</text>
-                    <text x="140" y="10" text-anchor="middle" fill="#94a3b8" font-size="5.5" font-weight="bold">🌫️ OUTER HORIZON &amp; DUNES (FOG OF WAR — MARCH OR SCOUT TO LIFT)</text>
-                    ${trailSvg}
-                    ${svgNodes}
-                    ${preyNodesSvg}
-                    ${partyTokenSvg}
-                </svg>
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
-                    <div style="font-size:9.5px; color:#cbd5e1;">
-                        🎯 <b>Active Target Node:</b> <span style="color:#fde68a; font-weight:bold;">${selNodeCleared ? `${selNode.name} (${selNode.house} | Power: ${selHouse.power}/100)` : `🌫️ Uncharted Sector #${selNode.id}`}</span>
+                <div style="flex:1; position:relative; display:flex; align-items:center; justify-content:center; min-height:240px; margin:6px 0; border:2px solid ${isSov ? '#7f1d1d' : '#14532d'}; border-radius:6px; overflow:hidden; background:radial-gradient(circle at 50% 50%, rgba(20,83,45,0.38) 0%, rgba(15,23,42,0.95) 58%, rgba(3,5,8,1) 100%);">
+                    <svg viewBox="0 0 280 128" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; max-height:66vh; display:block;">
+                        <defs>
+                            <filter id="outer-fog-blur-pop" x="-20%" y="-20%" width="140%" height="140%">
+                                <feGaussianBlur stdDeviation="0.9" />
+                            </filter>
+                            <radialGradient id="fog-of-war-shroud-pop" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" stop-color="#000000" stop-opacity="0" />
+                                <stop offset="52%" stop-color="#0f172a" stop-opacity="0.05" />
+                                <stop offset="68%" stop-color="#1e293b" stop-opacity="0.68" />
+                                <stop offset="100%" stop-color="#020617" stop-opacity="0.92" />
+                            </radialGradient>
+                        </defs>
+                        <rect x="0" y="0" width="280" height="128" fill="url(#fog-of-war-shroud-pop)" pointer-events="none"/>
+                        <ellipse cx="140" cy="64" rx="112" ry="49" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3"/>
+                        <ellipse cx="140" cy="64" rx="76" ry="33" fill="none" stroke="#22c55e" stroke-width="1.2" stroke-dasharray="3,2"/>
+                        <text x="140" y="28" text-anchor="middle" fill="#86efac" font-size="5.2" font-weight="bold">🌲 INNER FOREST ZONE (TAP ANY NODE TO SELECT OR DOUBLE-TAP TO MARCH)</text>
+                        <text x="140" y="10" text-anchor="middle" fill="#94a3b8" font-size="5.2" font-weight="bold">🌫️ OUTER HORIZON &amp; DUNES (FOG OF WAR — MARCH OR SCOUT TO LIFT)</text>
+                        ${trailSvg}
+                        ${svgNodes}
+                        ${preyNodesSvg}
+                        ${partyTokenSvg}
+                    </svg>
+                </div>
+                ${encounterOverlayHtml}
+                <div style="background:rgba(15,23,42,0.92); border:1.5px solid #334155; border-radius:6px; padding:7px 10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div style="font-size:10.5px; color:#cbd5e1;">
+                        🎯 <b>SELECTED NODE:</b> <span style="color:#fde68a; font-weight:900;">${selNodeCleared ? `${selNode.name.toUpperCase()} (${selNode.house} | Power: ${selHouse.power}/100 [${selHouse.status}] | Fuel: ${selNode.barrierFuel}u | Chains: ${selNode.chainsIntegrity}%)` : `🌫️ OUTER HORIZON FOG — UNCHARTED SECTOR #${selNode.id}`}</span>
                     </div>
-                    <div style="display:flex; gap:5px; flex-wrap:wrap;">
-                        <button class="cmd-btn" style="padding:4px 8px; font-size:9px; background:#14532d; border-color:#22c55e; color:#dcfce7; font-weight:bold;" onclick="window.navigateOverworldSquad(${selNode.id})">🧭 March Squad to ${selNode.name}</button>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#14532d; border-color:#22c55e; color:#dcfce7; font-weight:900;" onclick="window.navigateOverworldSquad(${selNode.id})">🧭 March Squad to ${selNode.name} (-1d Supply)</button>
+                        ${!selNodeCleared
+                            ? `<button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#0f172a; border-color:#38bdf8; color:#bae6fd; font-weight:bold;" onclick="window.scoutFogOfWarNode('${selNode.name}')">🌫️🧭 Lift Fog of War (Mist-Recon)</button>`
+                            : ''
+                        }
                         ${isSov
                             ? `
-                                <button class="cmd-btn" style="padding:4px 8px; font-size:9px; background:#2e1065; border-color:#a855f7; color:#f3e8ff;" onclick="window.executeOverworldAction('STALK')">🐾 Stalk Prey</button>
-                                <button class="cmd-btn" style="padding:4px 8px; font-size:9px; background:#450a0a; border-color:#dc2626; color:#fecaca;" onclick="window.executeOverworldAction('HUNT_PREY')">🩸 Hunt &amp; Pounce</button>
-                                <button class="cmd-btn" style="padding:4px 8px; font-size:9px; background:#3b0764; border-color:#e879f9; color:#fae8ff;" onclick="window.executeOverworldAction('FEED')">🥩 Feed &amp; Gorge</button>
+                                <button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#2e1065; border-color:#a855f7; color:#f3e8ff; font-weight:bold;" onclick="window.executeOverworldAction('STALK')">🐾 Stalk Prey</button>
+                                <button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#450a0a; border-color:#dc2626; color:#fecaca; font-weight:bold;" onclick="window.executeOverworldAction('HUNT_PREY')">🩸 Hunt &amp; Pounce</button>
+                                <button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#3b0764; border-color:#e879f9; color:#fae8ff; font-weight:bold;" onclick="window.executeOverworldAction('FEED')">🥩 Feed &amp; Gorge</button>
                             `
                             : `
-                                <button class="cmd-btn" style="padding:4px 8px; font-size:9px;" onclick="window.executeOverworldAction('STALK')">🏹 Recon Stalk</button>
-                                <button class="cmd-btn" style="padding:4px 8px; font-size:9px;" onclick="window.executeOverworldAction('HUNT_PREY')">⚔️ Intercept Convoy</button>
-                                <button class="cmd-btn" style="padding:4px 8px; font-size:9px;" onclick="window.executeOverworldAction('FEED')">⛺ Camp &amp; Forage</button>
+                                <button class="cmd-btn" style="padding:5px 10px; font-size:10px;" onclick="window.executeOverworldAction('STALK')">🏹 Recon Stalk</button>
+                                <button class="cmd-btn" style="padding:5px 10px; font-size:10px;" onclick="window.executeOverworldAction('HUNT_PREY')">⚔️ Intercept Convoy</button>
+                                <button class="cmd-btn" style="padding:5px 10px; font-size:10px;" onclick="window.executeOverworldAction('FEED')">⛺ Camp &amp; Forage</button>
+                                <button class="cmd-btn" style="padding:5px 10px; font-size:10px;" onclick="window.sendExpedition('GUARDED_CARAVAN','${selNode.name}'); window.CommanderUI.renderExploreForestModal(false);">🛡️ Send Caravan</button>
+                                <button class="cmd-btn" style="padding:5px 10px; font-size:10px;" onclick="window.sendExpedition('PROXY_RAID','${selNode.name}'); window.CommanderUI.renderExploreForestModal(false);">🗡️ Proxy Raid</button>
                             `
                         }
-                        <button class="cmd-btn" style="padding:4px 8px; font-size:9px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.openTacticalEncounter(${selNode.id})">${isSov ? '🐺 Attack Parish' : '⚔️ Tactical Encounter'}</button>
+                        <button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#3f1212; border-color:#ef4444; color:#fecaca; font-weight:bold;" onclick="window.openTacticalEncounter(${selNode.id})">${isSov ? '🐺 Attack &amp; Devour Parish' : '⚔️ Tactical Encounter'}</button>
                     </div>
                 </div>
-                <div class="burden-parchment-card" style="padding:6px 8px;">
-                    <div style="font-family:'Cinzel',serif; font-weight:900; font-size:9.5px; border-bottom:1px solid #4a3e2e; margin-bottom:3px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
+                <div class="burden-parchment-card" style="padding:6px 10px;">
+                    <div style="font-family:'Cinzel',serif; font-weight:900; font-size:10px; border-bottom:1px solid #4a3e2e; margin-bottom:3px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
                         <span>[${isSov ? 'PREDATOR HUNT &amp; FEEDING TELEMETRY' : 'OVERWORLD SQUAD NAVIGATION LOG'}]</span>
                         <span style="color:#5e110b;">POS: (${ovw.partyX}, ${ovw.partyY}) | ⛺ SUPPLIES: ${ovw.suppliesDaysRemaining ?? 3}/${ovw.maxSuppliesDays ?? 3} DAYS | DIST: ${ovw.distanceFromCampHours ?? 0}H (${Number(((ovw.distanceFromCampHours ?? 0) * (0.5 / (CommanderEngine.timeScale || 1))).toFixed(2))}H IRL)</span>
                     </div>
-                    <div style="font-size:8.5px; color:#1c1610; max-height:48px; overflow-y:auto;">
+                    <div style="font-size:9.5px; color:#1c1610; max-height:52px; overflow-y:auto;">
                         ${(ovw.overworldLogs || []).slice(0, 3).map(l => `<div style="margin-bottom:2px;">• ${l}</div>`).join('')}
                     </div>
                 </div>
