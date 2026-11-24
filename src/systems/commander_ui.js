@@ -15,6 +15,58 @@ export const CommanderUI = {
     activeBannerMsg: null,
     roleSelected: false,
     isRunCommitted: false,
+    mapZoom: 1,
+    mapPanX: 0,
+    mapPanY: 0,
+    _isMapDragging: false,
+    _mapDragMoved: false,
+    _mapDragStartX: 0,
+    _mapDragStartY: 0,
+    _mapStartPanX: 0,
+    _mapStartPanY: 0,
+
+    applyOverworldMapTransform() {
+        if (typeof document === 'undefined') return;
+        const g = document.getElementById('overworld-svg-pan-zoom-group');
+        const badge = document.getElementById('overworld-zoom-badge');
+        const z = Number((this.mapZoom || 1).toFixed(2));
+        const px = Number((this.mapPanX || 0).toFixed(1));
+        const py = Number((this.mapPanY || 0).toFixed(1));
+        if (g) {
+            g.setAttribute('transform', `translate(140, 64) scale(${z}) translate(${-140 + px}, ${-64 + py})`);
+        }
+        if (badge) {
+            badge.textContent = `${Math.round(z * 100)}%`;
+        }
+    },
+
+    zoomOverworldMap(deltaScale = 0.25) {
+        this.mapZoom = Math.max(0.6, Math.min(4.0, Number(((this.mapZoom || 1) + deltaScale).toFixed(2))));
+        this.applyOverworldMapTransform();
+    },
+
+    panOverworldMap(dx = 0, dy = 0) {
+        this.mapPanX = Math.max(-180, Math.min(180, (this.mapPanX || 0) + dx));
+        this.mapPanY = Math.max(-100, Math.min(100, (this.mapPanY || 0) + dy));
+        this.applyOverworldMapTransform();
+    },
+
+    resetOverworldMapCamera() {
+        this.mapZoom = 1;
+        this.mapPanX = 0;
+        this.mapPanY = 0;
+        this.applyOverworldMapTransform();
+    },
+
+    focusOverworldParty() {
+        const ovw = CommanderEngine.ForestOverworldEngine;
+        const px = ovw?.partyX ?? 140;
+        const py = ovw?.partyY ?? 64;
+        this.mapZoom = Math.max(1.6, this.mapZoom || 1.6);
+        this.mapPanX = Number((140 - px).toFixed(1));
+        this.mapPanY = Number((64 - py).toFixed(1));
+        this.applyOverworldMapTransform();
+    },
 
     init(customContainerId = null) {
         if (customContainerId) this.containerId = customContainerId;
@@ -639,8 +691,49 @@ export const CommanderUI = {
         };
         window.toggleMapViewMode = () => this.toggleMapViewMode();
         window.selectMapSettlement = (id) => {
+            if (this._mapDragMoved) return;
             this.selectMapSettlement(id);
             this.renderExploreForestModal(false);
+        };
+        window.zoomOverworldMap = (delta = 0.25) => this.zoomOverworldMap(delta);
+        window.panOverworldMap = (dx = 0, dy = 0) => this.panOverworldMap(dx, dy);
+        window.resetOverworldMapCamera = () => this.resetOverworldMapCamera();
+        window.focusOverworldParty = () => this.focusOverworldParty();
+        window.handleOverworldWheel = (ev) => {
+            if (ev?.preventDefault) ev.preventDefault();
+            const delta = (ev?.deltaY || 0) < 0 ? 0.22 : -0.22;
+            this.zoomOverworldMap(delta);
+        };
+        window.handleOverworldPointerDown = (ev) => {
+            const pt = ev?.touches?.[0] || ev;
+            if (!pt) return;
+            this._isMapDragging = true;
+            this._mapDragMoved = false;
+            this._mapDragStartX = pt.clientX || 0;
+            this._mapDragStartY = pt.clientY || 0;
+            this._mapStartPanX = this.mapPanX || 0;
+            this._mapStartPanY = this.mapPanY || 0;
+        };
+        window.handleOverworldPointerMove = (ev) => {
+            if (!this._isMapDragging) return;
+            const pt = ev?.touches?.[0] || ev;
+            if (!pt) return;
+            const dxPx = (pt.clientX || 0) - this._mapDragStartX;
+            const dyPx = (pt.clientY || 0) - this._mapDragStartY;
+            if (Math.hypot(dxPx, dyPx) > 4) {
+                this._mapDragMoved = true;
+            }
+            const svg = typeof document !== 'undefined' ? document.getElementById('overworld-fullscreen-svg') : null;
+            const rect = svg?.getBoundingClientRect?.() || { width: 560, height: 256 };
+            const scaleFactorX = 280 / Math.max(120, rect.width || 560) / (this.mapZoom || 1);
+            const scaleFactorY = 128 / Math.max(80, rect.height || 256) / (this.mapZoom || 1);
+            this.mapPanX = Math.max(-180, Math.min(180, Number((this._mapStartPanX + dxPx * scaleFactorX).toFixed(1))));
+            this.mapPanY = Math.max(-100, Math.min(100, Number((this._mapStartPanY + dyPx * scaleFactorY).toFixed(1))));
+            this.applyOverworldMapTransform();
+        };
+        window.handleOverworldPointerUp = () => {
+            this._isMapDragging = false;
+            setTimeout(() => { this._mapDragMoved = false; }, 60);
         };
         window.openTacticalEncounter = (id = null) => {
             this.openTacticalEncounterModal(id);
@@ -1272,8 +1365,31 @@ export const CommanderUI = {
                         <button class="cmd-btn" style="background:#3f1212; border-color:#ef4444; color:#fecaca; padding:5px 12px; font-size:10.5px; font-weight:900;" onclick="window.closeExploreForestModal()">✖ Return to Command Hub</button>
                     </div>
                 </div>
-                <div style="flex:1; position:relative; display:flex; align-items:center; justify-content:center; min-height:240px; margin:6px 0; border:2px solid ${isSov ? '#7f1d1d' : '#14532d'}; border-radius:6px; overflow:hidden; background:radial-gradient(circle at 50% 50%, rgba(20,83,45,0.38) 0%, rgba(15,23,42,0.95) 58%, rgba(3,5,8,1) 100%);">
-                    <svg viewBox="0 0 280 128" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; max-height:66vh; display:block;">
+                <div id="overworld-map-pan-zoom-viewport"
+                     onwheel="window.handleOverworldWheel(event)"
+                     onmousedown="window.handleOverworldPointerDown(event)"
+                     onmousemove="window.handleOverworldPointerMove(event)"
+                     onmouseup="window.handleOverworldPointerUp(event)"
+                     onmouseleave="window.handleOverworldPointerUp(event)"
+                     ontouchstart="window.handleOverworldPointerDown(event)"
+                     ontouchmove="window.handleOverworldPointerMove(event)"
+                     ontouchend="window.handleOverworldPointerUp(event)"
+                     style="flex:1; position:relative; display:flex; align-items:center; justify-content:center; min-height:240px; margin:6px 0; border:2px solid ${isSov ? '#7f1d1d' : '#14532d'}; border-radius:6px; overflow:hidden; cursor:grab; touch-action:none; user-select:none; background:radial-gradient(circle at 50% 50%, rgba(20,83,45,0.38) 0%, rgba(15,23,42,0.95) 58%, rgba(3,5,8,1) 100%);">
+                    <div style="position:absolute; top:8px; right:8px; z-index:20; display:flex; gap:4px; align-items:center; background:rgba(9,13,16,0.9); border:1px solid #475569; border-radius:4px; padding:4px 6px;" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
+                        <span style="font-size:9px; color:#94a3b8; font-family:'Share Tech Mono',monospace;">🔍 ZOOM: <b id="overworld-zoom-badge" style="color:#fde68a;">${Math.round((this.mapZoom || 1) * 100)}%</b></span>
+                        <button class="cmd-btn" style="padding:2px 7px; font-size:10px; font-weight:900;" onclick="window.zoomOverworldMap(0.25)" title="Zoom In">➕</button>
+                        <button class="cmd-btn" style="padding:2px 7px; font-size:10px; font-weight:900;" onclick="window.zoomOverworldMap(-0.25)" title="Zoom Out">➖</button>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px;" onclick="window.panOverworldMap(0, 18)" title="Pan North">⬆</button>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px;" onclick="window.panOverworldMap(0, -18)" title="Pan South">⬇</button>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px;" onclick="window.panOverworldMap(24, 0)" title="Pan West">⬅</button>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px;" onclick="window.panOverworldMap(-24, 0)" title="Pan East">➡</button>
+                        <button class="cmd-btn" style="padding:2px 7px; font-size:9px; background:#1e293b; border-color:#38bdf8; color:#bae6fd;" onclick="window.focusOverworldParty()" title="Center on Squad / Sovereign">🎯 Center Squad</button>
+                        <button class="cmd-btn" style="padding:2px 7px; font-size:9px;" onclick="window.resetOverworldMapCamera()" title="Reset Zoom &amp; Pan">🔄 Reset 100%</button>
+                    </div>
+                    <div style="position:absolute; bottom:6px; left:8px; z-index:15; pointer-events:none; font-size:8.5px; color:#94a3b8; background:rgba(5,7,9,0.75); padding:2px 6px; border-radius:3px;">
+                        ✋ Drag to Pan Map | 🖱️ Scroll / ➕➖ to Zoom | 👆 Tap Node to Select | 👆👆 Double-Tap Node to March
+                    </div>
+                    <svg id="overworld-fullscreen-svg" viewBox="0 0 280 128" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; max-height:66vh; display:block;">
                         <defs>
                             <filter id="outer-fog-blur-pop" x="-20%" y="-20%" width="140%" height="140%">
                                 <feGaussianBlur stdDeviation="0.9" />
@@ -1285,15 +1401,17 @@ export const CommanderUI = {
                                 <stop offset="100%" stop-color="#020617" stop-opacity="0.92" />
                             </radialGradient>
                         </defs>
-                        <rect x="0" y="0" width="280" height="128" fill="url(#fog-of-war-shroud-pop)" pointer-events="none"/>
-                        <ellipse cx="140" cy="64" rx="112" ry="49" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3"/>
-                        <ellipse cx="140" cy="64" rx="76" ry="33" fill="none" stroke="#22c55e" stroke-width="1.2" stroke-dasharray="3,2"/>
-                        <text x="140" y="28" text-anchor="middle" fill="#86efac" font-size="5.2" font-weight="bold">🌲 INNER FOREST ZONE (TAP ANY NODE TO SELECT OR DOUBLE-TAP TO MARCH)</text>
-                        <text x="140" y="10" text-anchor="middle" fill="#94a3b8" font-size="5.2" font-weight="bold">🌫️ OUTER HORIZON &amp; DUNES (FOG OF WAR — MARCH OR SCOUT TO LIFT)</text>
-                        ${trailSvg}
-                        ${svgNodes}
-                        ${preyNodesSvg}
-                        ${partyTokenSvg}
+                        <g id="overworld-svg-pan-zoom-group" transform="translate(140, 64) scale(${Number((this.mapZoom || 1).toFixed(2))}) translate(${-140 + Number((this.mapPanX || 0).toFixed(1))}, ${-64 + Number((this.mapPanY || 0).toFixed(1))})">
+                            <rect x="-140" y="-64" width="560" height="256" fill="url(#fog-of-war-shroud-pop)" pointer-events="none"/>
+                            <ellipse cx="140" cy="64" rx="112" ry="49" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3"/>
+                            <ellipse cx="140" cy="64" rx="76" ry="33" fill="none" stroke="#22c55e" stroke-width="1.2" stroke-dasharray="3,2"/>
+                            <text x="140" y="28" text-anchor="middle" fill="#86efac" font-size="5.2" font-weight="bold">🌲 INNER FOREST ZONE (TAP ANY NODE TO SELECT OR DOUBLE-TAP TO MARCH)</text>
+                            <text x="140" y="10" text-anchor="middle" fill="#94a3b8" font-size="5.2" font-weight="bold">🌫️ OUTER HORIZON &amp; DUNES (FOG OF WAR — MARCH OR SCOUT TO LIFT)</text>
+                            ${trailSvg}
+                            ${svgNodes}
+                            ${preyNodesSvg}
+                            ${partyTokenSvg}
+                        </g>
                     </svg>
                 </div>
                 ${encounterOverlayHtml}
