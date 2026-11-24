@@ -31,8 +31,14 @@ export class TidewaterSystem {
             uSunColor: { value: new THREE.Color(0xfef3c7) },
             uSkyColor: { value: new THREE.Color(0x5a7b93) },
             uWaterShallow: { value: new THREE.Color(0x0f5e6a) },
-            uWaterDeep: { value: new THREE.Color(0x02101a) }
+            uWaterDeep: { value: new THREE.Color(0x02101a) },
+            uAmplitudeMult: { value: 1.0 },
+            uRiverMouthDamping: { value: 0.0 }
         };
+        this.baseSeaLevelY = -10.0;
+        this.currentSeaLevelY = -10.0;
+        this.coupledDissonance = 0.05;
+        this.riverMouthCoords = [];
     }
 
     /**
@@ -55,6 +61,7 @@ export class TidewaterSystem {
             uniforms: this.uniforms,
             vertexShader: `
                 uniform float uTime;
+                uniform float uAmplitudeMult;
                 uniform vec4 uWaves[4]; // [dirX, dirZ, steepness, wavelength]
                 
                 varying vec2 vUv;
@@ -116,9 +123,9 @@ export class TidewaterSystem {
                     vec3 tangent = vec3(1.0, 0.0, 0.0);
                     vec3 binormal = vec3(0.0, 0.0, 1.0);
                     
-                    // Summation of all 4 Gerstner waves
+                    // Summation of all 4 Gerstner waves scaled by systemic uAmplitudeMult
                     for(int i = 0; i < 4; i++) {
-                        finalPos += calculateGerstnerWave(uWaves[i], gridPos, tangent, binormal);
+                        finalPos += calculateGerstnerWave(uWaves[i], gridPos, tangent, binormal) * uAmplitudeMult;
                     }
                     
                     // Calculate the precise analytical normal using the modified tangent and binormal
@@ -231,7 +238,10 @@ export class TidewaterSystem {
             vertexCount: 0,
             faceCount: 0,
             simulationTime: this.uniforms.uTime.value.toFixed(3),
-            waveCount: this.uniforms.uWaves.value.length
+            waveCount: this.uniforms.uWaves.value.length,
+            seaLevelY: Number(this.currentSeaLevelY.toFixed(2)),
+            coupledDissonance: this.coupledDissonance,
+            coupledRiverMouths: this.riverMouthCoords.length
         };
 
         if (this.oceanMesh) {
@@ -259,16 +269,65 @@ export class TidewaterSystem {
     }
 
     /**
+     * PHASE 8: COUPLED REALITY INTEGRATION
+     * Binds the Tidewater ocean/sink surface to global Geological Dissonance and Orphic Hydrology.
+     * Safe for both WebGL 3D scenes and headless Node.js verification.
+     */
+    syncWithReality(dissonance = null, idealBlueprint = null) {
+        const rootScope = typeof window !== 'undefined' ? window : globalThis;
+        const diss = dissonance !== null && dissonance !== undefined
+            ? Number(dissonance)
+            : (rootScope.GeometerRegistry?.geologicalDissonance ?? rootScope.CivilizationState?.scalars?.GEOLOGICAL_DISSONANCE ?? 0.05);
+        const bp = idealBlueprint !== null
+            ? idealBlueprint
+            : (rootScope.OrphicHydrologyBlueprint?.idealBlueprint ?? null);
+
+        this.coupledDissonance = Math.max(0.0, Math.min(1.0, Number(diss) || 0));
+
+        // 1. Dissonance-Driven Sea Level Rise (Flooding the Inner Basin as Reality Fractures)
+        const targetY = this.baseSeaLevelY + (this.coupledDissonance * 45.0); // Rises from -10.0m up to +35.0m at 1.0 Dissonance
+        this.currentSeaLevelY = Number((this.currentSeaLevelY + (targetY - this.currentSeaLevelY) * 0.25).toFixed(3));
+        if (this.oceanMesh && this.oceanMesh.position) {
+            this.oceanMesh.position.y = this.currentSeaLevelY;
+        }
+
+        // 2. Orphic River Mouth Coupling & Wave Amplitude Modulation
+        if (bp && Array.isArray(bp.innerRivers)) {
+            this.riverMouthCoords = bp.innerRivers.map(r => ({
+                id: r.id,
+                x: r.sink.x - 2000,
+                z: r.sink.y - 2000,
+                elevationMeters: r.sink.elevationMeters
+            }));
+            this.uniforms.uRiverMouthDamping.value = 0.35; // Smooth estuary damping when IdealBlueprint is intact
+            this.uniforms.uAmplitudeMult.value = Number((1.0 + this.coupledDissonance * 0.8).toFixed(3));
+        } else {
+            // IdealBlueprint wiped (Geometer slain -> 10x Entropy storm surge)
+            this.riverMouthCoords = [];
+            this.uniforms.uRiverMouthDamping.value = 0.0;
+            this.uniforms.uAmplitudeMult.value = 2.5;
+        }
+
+        return {
+            coupledDissonance: this.coupledDissonance,
+            seaLevelY: this.currentSeaLevelY,
+            targetSeaLevelY: Number(targetY.toFixed(3)),
+            amplitudeMult: this.uniforms.uAmplitudeMult.value,
+            coupledRiverMouths: this.riverMouthCoords.length,
+            idealBlueprintIntact: Boolean(bp)
+        };
+    }
+
+    /**
      * Updates the fluid simulation uniforms.
      * @param {number} deltaTime - Time elapsed since last frame
      * @param {THREE.Camera} camera - The active player camera
      */
     update(deltaTime, camera) {
+        this.syncWithReality();
         if (!this.initialized) return;
         
         this.uniforms.uTime.value += deltaTime;
-        
-        // Future logic: center the ocean grid on the camera XZ coordinates to create an infinite ocean illusion
     }
 
     /**
