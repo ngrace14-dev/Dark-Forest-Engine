@@ -1292,12 +1292,15 @@ export const CommanderUI = {
 
         const visualDeck = document.getElementById('brutalist-subpage-deck');
         if (visualDeck) {
-            const rowsHtml = board.slice(0, 6).map((h, idx) => `
+            const rowsHtml = board.slice(0, 6).map((h, idx) => {
+                const sealObj = CommanderEngine.RunicTallySystem?.getBindRuneSeal?.(h.name) || { sigil: 'ᛟ᛭ᛏ', title: 'Chancery Bind-Seal' };
+                return `
                 <div style="background:${idx === 0 ? 'linear-gradient(90deg,#8c4f19,#5c3412)' : 'linear-gradient(160deg,#d7ccb8,#b8a88e)'}; color:${idx === 0 ? '#fde68a' : '#1c1610'}; border:1.5px solid #4a3e2e; padding:4px 7px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; font-size:9.5px; font-weight:bold;">
-                    <span style="font-family:'Cinzel',serif;">${h.name.toUpperCase()}</span>
+                    <span style="font-family:'Cinzel',serif;">${h.name.toUpperCase()} <span style="font-family:'Share Tech Mono',monospace; font-size:10px; color:${idx === 0 ? '#38bdf8' : '#7c2d12'};" title="${sealObj.title}">[${sealObj.sigil}]</span></span>
                     <span style="font-size:8.5px;" title="Composite of Garrison Strength, Barrier Fuel & Monopoly Leverage">POWER: ${h.power}/100 (RANK #${idx + 1}/19) [POSTURE: ${h.status}]</span>
                 </div>
-            `).join('');
+            `;
+            }).join('');
 
             const auditItems = board.filter(h => h.lastMutationReason).slice(0, 3);
             const auditHtml = (auditItems.length > 0 ? auditItems : [
@@ -1396,6 +1399,15 @@ export const CommanderUI = {
                                     : `<b>Status:</b> Obscured by Outer Event-Horizon Fog of War (Outside the Inner Forest Zone). Dispatch a Mist-Recon Patrol to lift the fog and reveal telemetry!`
                                 }
                             </div>
+                            ${(() => {
+                                const tomb = CommanderEngine.PoemTrapEngine?.tombstoneRecords?.get?.(selNode.house);
+                                if (!selNodeCleared || !tomb) return '';
+                                return `<div style="background:rgba(28,22,16,0.14); border-left:2.5px solid #7c2d12; padding:3px 6px; margin-bottom:5px; font-family:'Share Tech Mono',monospace; font-size:8px; color:#2b1e12;">
+                                    <div style="font-weight:bold; color:#5e110b;">🪦 TOMBSTONE RECORD [${tomb.epistemicClass}] (${tomb.bindRuneSeal}):</div>
+                                    <div>${tomb.poem.caesuraLines.slice(0, 2).join(' / ')}</div>
+                                    <div style="color:#78350f; font-size:7.5px;">${tomb.poem.futharkLines[0] || ''}</div>
+                                </div>`;
+                            })()}
                             <div style="display:flex; gap:4px; flex-wrap:wrap;">
                                 <button class="cmd-btn" style="padding:3px 7px; font-size:8.5px; background:#14532d; border-color:#22c55e; color:#dcfce7;" onclick="window.navigateOverworldSquad(${selNode.id})">🧭 March Squad Here</button>
                                 ${!selNodeCleared
@@ -2491,16 +2503,20 @@ export const CommanderUI = {
                 if (activePetition.isFirstEmissary && CommanderEngine.TutorialAdvisor && !CommanderEngine.TutorialAdvisor.seenTopics.has('EMISSARY_FIRST_ARRIVAL')) {
                     CommanderEngine.TutorialAdvisor.checkAndTrigger('EMISSARY_FIRST_ARRIVAL');
                 }
+                const tallySlatHtml = (activePetition.runicTally && CommanderEngine.RunicTallySystem?.renderTallySlatHtml)
+                    ? CommanderEngine.RunicTallySystem.renderTallySlatHtml(activePetition.runicTally)
+                    : '';
                 crisisPanel.style.display = 'block';
                 crisisPanel.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
-                        <span style="color:#1a130c; font-family:'Cinzel',serif; font-weight:900; font-size:11.5px;">EMISSARY PETITION // ${activePetition.senderHouse.toUpperCase()}</span>
+                        <span style="color:#1a130c; font-family:'Cinzel',serif; font-weight:900; font-size:11.5px;">EMISSARY PETITION // ${activePetition.senderHouse.toUpperCase()} [${activePetition.bindRuneSeal || 'ᛟ᛭ᛏ'}]</span>
                         <button class="cmd-btn" style="padding:1px 6px; font-size:8.5px; background:#1e293b; border-color:#38bdf8; color:#e0f2fe;" onclick="window.showTutorialTip('EMISSARY_FIRST_ARRIVAL')">🎓 Advisor Analysis</button>
                     </div>
                     <div style="background:rgba(28,22,16,0.12); border:1px dashed #5c4934; padding:3px 6px; margin-bottom:5px; font-size:8.5px; color:#3b2410; font-weight:bold;">
                         📊 ${activePetition.powerContext || `Power: ${activePetition.senderPower || 66}/100 [Military, Fuel & Monopoly Leverage Index]`}
                     </div>
-                    <div style="color:#2b1e12; font-size:9.5px; margin-bottom:6px;">${activePetition.prompt}</div>
+                    <div style="color:#2b1e12; font-size:9.5px; margin-bottom:4px;">${activePetition.prompt}</div>
+                    ${tallySlatHtml}
                     <div style="display:flex; gap:5px; flex-wrap:wrap;">
                         <button class="cmd-btn" style="flex:1; padding:5px; background:#14332a; border-color:#10b981; color:#d1fae5;" onclick="window.resolveEmissaryPetition('ACCEPT')">${activePetition.acceptLabel}</button>
                         <button class="cmd-btn" style="flex:1; padding:5px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.resolveEmissaryPetition('REJECT')">${activePetition.rejectLabel}</button>

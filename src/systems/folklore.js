@@ -42,10 +42,20 @@ class FolkloreEngineSystem {
                 "The 19 walked where only 10 stay / the rest were lost along the way."
             ],
             'EPITAPH': [
-                "The Wanderer came with runes of old / a tale of fire and iron told.",
-                "Through shifting woods and mountain cold / they sought the truth that none could hold.",
-                "A hero's mark on skin was carved / while cities thrived and peasants starved.",
-                "They spoke to stars and dreamed of light / until the Wendigo brought the night."
+                "Above the wood, behind the veil, / we keep the hearth that shall not fail.",
+                "We feed the hound and bide the hour, / till broken chains reclaim their power."
+            ],
+            'TERMINUS_AGING_RUMOR': [
+                "Two weeks pass within the wood, / where yesterday the village stood.",
+                "Yet those who walk the mountain stone— / grow gray and bent before their own."
+            ],
+            'EARLY_ASCENSION_TRAP': [
+                "Carve the flesh before the bone, / and claim the fire as your own.",
+                "Two hundred strides you’ll outrun grace— / and die a youth with wrinkled face."
+            ],
+            'FLESH_LEDGER_BEACON': [
+                "Cut the iron in your skin, / to keep the shifting world within.",
+                "The brighter burns the story's brand, / the closer walks the Pale One's hand."
             ],
             'BARRIER_LESSON': [
                 "When fires dim and spirits fade / Do not wander from the chain.",

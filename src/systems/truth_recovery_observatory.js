@@ -7,12 +7,15 @@
  * Tracks the lifecycle of critical knowledge through loss, archiving, and rediscovery.
  */
 
+const _troRoot = typeof window !== 'undefined' ? window : globalThis;
+
 class TruthRecoveryObservatory {
     constructor() {
         this.lostTruths = new Set();      // intel_ids of significant truths with 0 owners
         this.archivedTruths = new Set();  // intel_ids of truths in the historical archive
         this.recoveredTruths = new Set(); // intel_ids of truths that were once lost but returned
         this.forgottenTruths = new Set(); // intel_ids of truths purged without archiving
+        this.verifiedTallies = [];        // Verified Rúnakefli split-tally contracts
         
         this.extinctionHistory = [];      // Array of { timestamp, intel_id, title }
         this.historyLimit = 100;
@@ -20,10 +23,12 @@ class TruthRecoveryObservatory {
         this.metrics = {
             truthRecoveryRate: 0,
             archiveResilience: 0,
-            historicalRediscoveryProbability: 0
+            historicalRediscoveryProbability: 0,
+            splitTalliesAuthenticated: 0,
+            splitTallyForgeriesDetected: 0
         };
 
-        window.EventBus.on('ENGINE_READY', () => this.init());
+        _troRoot.EventBus?.on('ENGINE_READY', () => this.init());
     }
 
     init() {
@@ -157,12 +162,38 @@ class TruthRecoveryObservatory {
 
     determineCivilizationSurvival(report) {
         if (report.rate < 0.1 && report.lost > 5) {
-            window.EventBus.emit('UI_LOG', "⚠️ [DIRECTORATE] CRITICAL: Civilization is losing the ability to rediscover its past. Amnesia is becoming permanent.");
+            _troRoot.EventBus?.emit('UI_LOG', "⚠️ [DIRECTORATE] CRITICAL: Civilization is losing the ability to rediscover its past. Amnesia is becoming permanent.");
         } else if (report.rate > 0.5) {
-            window.EventBus.emit('UI_LOG', "✅ [DIRECTORATE] STABLE: High rediscovery rate. Civilization maintains continuity through physical and institutional memory.");
+            _troRoot.EventBus?.emit('UI_LOG', "✅ [DIRECTORATE] STABLE: High rediscovery rate. Civilization maintains continuity through physical and institutional memory.");
         }
+    }
+
+    /**
+     * Phase 6: Rúnakefli Split-Tally Anti-Fraud Verification
+     * Cross-references the wood-grain fracture checksum, halved Elder Futhark staves,
+     * edge notches, and bind-rune signet seals between two split-tally halves (Stock & Foil).
+     */
+    verifySplitTally(tallyA, tallyB) {
+        if (_troRoot.RunicTallySystem?.verifySplitTally) {
+            const res = _troRoot.RunicTallySystem.verifySplitTally(tallyA, tallyB);
+            if (res.verified) {
+                this.metrics.splitTalliesAuthenticated++;
+                this.verifiedTallies.unshift({ tallyId: res.tallyId, hash: res.woodGrainHash, day: _troRoot.EngineParams?.worldDay || 1 });
+            } else {
+                this.metrics.splitTallyForgeriesDetected++;
+            }
+            return res;
+        }
+        if (!tallyA || !tallyB) return { verified: false, reason: 'Missing tally shard.' };
+        const verified = tallyA.woodGrainHash === tallyB.woodGrainHash
+            && tallyA.edgeNotches?.quantity === tallyB.edgeNotches?.quantity
+            && (tallyA.halvedRunesTop || tallyA.fullInscription) === (tallyB.halvedRunesBottom || tallyB.fullInscription);
+        if (verified) this.metrics.splitTalliesAuthenticated++;
+        else this.metrics.splitTallyForgeriesDetected++;
+        return { verified, tallyId: tallyA.tallyId || tallyA.id, woodGrainHash: tallyA.woodGrainHash };
     }
 }
 
-window.TruthRecoveryObservatory = new TruthRecoveryObservatory();
-export default window.TruthRecoveryObservatory;
+_troRoot.TruthRecoveryObservatory = new TruthRecoveryObservatory();
+export const truthRecoveryObservatory = _troRoot.TruthRecoveryObservatory;
+export default _troRoot.TruthRecoveryObservatory;

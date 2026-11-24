@@ -58,4 +58,52 @@ Upgrade the world-generation and systemic simulation engines to treat geological
   1. **`VoidTaint` Registry:** Track `VoidTaint` ($0.0\text{–}1.0$) on all operatives.
   2. **Fractal Bloom:** Implement a `Weibull` stat-roller granting massive, unstable power-spikes to `VoidTouched` agents.
   3. **Fractal Decay UI:** Progressive ASCII/data corruption and name fracturing at high Taint (filtered via `isHost`).
-  4. **Shatter Event:** At `1.0 Taint`, remove the agent, spawn a `VOID_FRACTURE` anomaly, and log a high-significance narrative entry.
+
+
+### Phase 6: The Chancery & Runic Tally Engine (Elder Futhark Orthography & Rúnakefli Split-Tallies)
+- **Files Affected:**
+  - `src/core/commander_engine.js` & `ledger-mobile/src/core/commander_engine.js`
+  - `src/systems/truth_recovery_observatory.js`
+  - `src/systems/commander_ui.js` & `ledger-mobile/src/systems/commander_ui.js`
+  - `tools/audit/verify_runic_tally_system.mjs` (New Audit Script)
+- **Technical Specification:**
+  1. **Elder Futhark Phonetic Transliteration (`RunicTallySystem`):**
+     - Implement the 24-Rune Elder Futhark alphabet across the 3 *ættir* (`ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ` | `ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ` | `ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ`).
+     - Enforce core phonetic & orthographic laws:
+       - **Phonetic Spelling & Silent Letter Elimination:** e.g. `knight` $\rightarrow$ `nait` (`ᚾᚨᛁᛏ`), `stone` $\rightarrow$ `ston` (`ᛊᛏᛟᚾ`).
+       - **Single Runes for Digraphs:** `th` $\rightarrow$ `ᚦ` (Thurisaz), `ng` $\rightarrow$ `ᛜ` (Ingwaz).
+       - **Missing Modern Letters:** `qu`/`q` $\rightarrow$ `ᚲᚹ`, `x` $\rightarrow$ `ᚲᛊ`, `v` $\rightarrow$ `ᚢ`, soft `c` $\rightarrow$ `ᛊ`, hard `c` $\rightarrow$ `ᚲ`, `y` (consonant) $\rightarrow$ `ᛃ`.
+       - **Never Double Consonants (or identical consecutive runes):** `hammer` $\rightarrow$ `ᚺᚨᛗᛖᚱ`, `valley` $\rightarrow$ `ᚢᚨᛚᛖᛁ`.
+       - **Optional Nasal Omission Before Stops (`archaicNasalOmission`):** `land` $\rightarrow$ `ᛚᚨᛞ`, `king` $\rightarrow$ `ᚲᛁᚷ`.
+       - **Word Dividers (`᛬` or `᛫`) & Rigid Left-to-Right Framing:** `Black River` $\rightarrow$ `ᛒᛚᚨᚲ᛬ᚱᛁᚢᛖᚱ`.
+  2. **Rúnakefli Wooden Tally Sticks & Edge-Notch Accounting:**
+     - Translate resource manifests into standardized Chancery formulas (`[Owner] ᛬ [Verb] ᛬ [Commodity] ᛬ [Quantity]`) paired with carved edge-notches (`᛭` = 10, `×` = 5, `|` = 1) and `TallyNotchCount`.
+     - Generate official **Bind-Rune Seals (Samstavsrunor)** for all 19 Noble Houses + The Crown.
+  3. **Split-Tally Anti-Fraud Checksum (`verifySplitTally`):**
+     - Split a carved `RunicTallyStick` lengthwise into `stockShard` (creditor/Chancery half) and `foilShard` (debtor/House half) sharing a deterministic wood-grain fracture vector and halved-rune checksum.
+     - Wire `verifySplitTally(tallyA, tallyB)` into `RunicTallySystem` and `src/systems/truth_recovery_observatory.js` to detect forged or mismatched tallies.
+  4. **UI Rendering (`RunicTallySlat`):**
+     - Render interactive Chancery `RunicTallySlat` wooden tally cards with bind-rune seals and edge notches on Emissary Petitions and the 19-House War Board in `CommanderUI`.
+
+### Phase 7: The Poem Trap Matrix, Hard Epistemic Ceiling Gates & 18,000-Year Semantic Decay Pipeline
+- **Files Affected:**
+  - `src/core/commander_engine.js` & `ledger-mobile/src/core/commander_engine.js`
+  - `src/systems/folklore.js`
+  - `src/systems/commander_ui.js` & `ledger-mobile/src/systems/commander_ui.js`
+  - `tools/audit/verify_poem_trap_matrix.mjs` (New Audit Script)
+- **Technical Specification:**
+  1. **5 Epistemic Classes (`EPISTEMIC_CLASSES`):**
+     - `OBSERVATIONAL_TRUTH` (Survival Cadence — zero proper nouns or cosmic cosmology).
+     - `INSTITUTIONAL_REVISION` (Crown/House Propaganda — flatters authority, enforces 12,000-year timeline).
+     - `THE_BAIT_LURE` (Epitaph & Noble Hubris — promises Significance/Glory while omitting Harvest Visibility & Foundation Decay).
+     - `ORBS_HALF_TRUTH` (Contextually Incomplete Warning — true immediate mechanical fix hiding catastrophic second-order consequence).
+     - `SUPPRESSED_ROOT` (Faded Champion / Terminus Echo — preserves $t=0$ fragments via kennings & relational pronouns).
+  2. **Hard Bible Gates (Rule of Observational Horizon & Rule of Spatial/Illusion Fidelity):**
+     - Enforce per-origin `ALLOWED_KNOWLEDGE_CEILING` and `FORBIDDEN_KNOWLEDGE_TERMS` across `SURFACE_VILLAGES`, `THE_CROWN`, `HOUSE_TERMINUS`, `EPITAPH_7`, and `THE_ORB_DUNE`, blocking any leak of `hiddenGapKeeper: true` (*Epitaph*) when `blindSpotEntropy < 85`.
+  3. **Structural & Prosodic Constraints:**
+     - 4-Beat Mnemonic Stanza (4-slot blueprint: `Line 1: Anchor`, `Line 2: Tension`, `Line 3: Pivot/Trap`, `Line 4: Hook/Consequence`).
+     - Strip Latinate/clinical jargon unless origin is `OCP_LEAK`.
+     - Midpoint Double-Dot Caesura (`᛬`) on every line + Elder Futhark zero-punctuation epigraphy.
+     - Two-Key Interlocking Rule (`pairedCounterPoemId`) & all 4 Canonical Bible Addendum Poems (Addendum CA-13, Addendum BY Surface Terminus Rumor, Addendum BY Internal Epitaph Slate, Addendum BN Flesh Ledger).
+  4. **18,000-Year Semantic Decay Mutation Pipeline & 19-House Tombstone Records:**
+     - Apply `Rule 1: Pronoun Drift`, `Rule 2: Metric Fossilization`, and `Rule 3: Medium Corruption` (`IRON_CHANTRY_STONE`, `FLAYED_QUILL_BONE_TALLY`, `VILLAGE_NURSERY_RHYME`), and generate the 19-House Tombstone Records.

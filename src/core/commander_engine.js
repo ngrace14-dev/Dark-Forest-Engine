@@ -2247,6 +2247,17 @@ export const RealityEditorVault = rootScope.RealityEditorVault || {
         ];
 
         const chosenArch = archetypes[(day + this.petitionCounter) % archetypes.length];
+        const runicTally = rootScope.RunicTallySystem?.createRunicTallyStick
+            ? rootScope.RunicTallySystem.createRunicTallyStick({
+                day,
+                owner: rival.name,
+                recipient: activeHouse,
+                verb: 'OFFERS',
+                commodity: rival.monopoly || 'Barrier Fuel',
+                quantity: (chosenArch.fuelGain || 0) + (chosenArch.resGain || 0),
+                witnesses: ['Vane', 'Harl']
+            })
+            : null;
 
         this.activeEmissaryPetition = {
             id: `pet_${day}_${this.petitionCounter}_${Math.floor(Math.random() * 1000)}`,
@@ -2260,6 +2271,8 @@ export const RealityEditorVault = rootScope.RealityEditorVault || {
             acceptLabel: chosenArch.acceptLabel,
             rejectLabel: chosenArch.rejectLabel,
             effects: chosenArch,
+            runicTally,
+            bindRuneSeal: runicTally?.ownerSeal?.sigil || 'ᛟ᛭ᛏ',
             isFirstEmissary: this.petitionCounter === 1
         };
         rootScope.EventBus?.emit('EMISSARY_ARRIVED', this.activeEmissaryPetition);
@@ -7060,6 +7073,769 @@ export const VoidTouchedRegistry = rootScope.VoidTouchedRegistry || {
 };
 rootScope.VoidTouchedRegistry = VoidTouchedRegistry;
 
+// ============================================================================
+// 5.995 PHASE 6: THE CHANCERY & RUNIC TALLY ENGINE (ELDER FUTHARK & RÚNAKEFLI)
+// ============================================================================
+export const RunicTallySystem = rootScope.RunicTallySystem || {
+    activeTallies: new Map(),
+    splitTallyRegistry: new Map(),
+
+    // 1. The 24-Rune Elder Futhark Alphabet across the 3 Ættir (Families of 8)
+    ELDER_FUTHARK_ALPHABET: {
+        F: { rune: 'ᚠ', name: 'Fehu', aett: 1, sound: '/f/', meaning: 'Cattle / Mobile Wealth' },
+        U: { rune: 'ᚢ', name: 'Uruz', aett: 1, sound: '/u/', meaning: 'Aurochs / Raw Strength' },
+        TH: { rune: 'ᚦ', name: 'Thurisaz', aett: 1, sound: '/θ/', meaning: 'Thorn / Giant' },
+        A: { rune: 'ᚨ', name: 'Ansuz', aett: 1, sound: '/a/', meaning: 'Sovereign Breath / Order' },
+        R: { rune: 'ᚱ', name: 'Raidho', aett: 1, sound: '/r/', meaning: 'Wagon / Ride / Journey' },
+        K: { rune: 'ᚲ', name: 'Kenaz', aett: 1, sound: '/k/', meaning: 'Torch / Pine Brand' },
+        G: { rune: 'ᚷ', name: 'Gebo', aett: 1, sound: '/g/', meaning: 'Gift / Tithe Exchange' },
+        W: { rune: 'ᚹ', name: 'Wunjo', aett: 1, sound: '/w/', meaning: 'Harmony / Clan Banner' },
+        H: { rune: 'ᚺ', name: 'Hagalaz', aett: 2, sound: '/h/', meaning: 'Hailstone / Rupture' },
+        N: { rune: 'ᚾ', name: 'Nauthiz', aett: 2, sound: '/n/', meaning: 'Need-Fire / Constraint' },
+        I: { rune: 'ᛁ', name: 'Isa', aett: 2, sound: '/i/', meaning: 'Ice / Stasis' },
+        J: { rune: 'ᛃ', name: 'Jera', aett: 2, sound: '/j/', meaning: 'Harvest Year / Cycle' },
+        EI: { rune: 'ᛇ', name: 'Eihwaz', aett: 2, sound: '/æː/', meaning: 'Yew Tree / Axis' },
+        P: { rune: 'ᛈ', name: 'Perthro', aett: 2, sound: '/p/', meaning: 'Lot-Cup / Chance' },
+        Z: { rune: 'ᛉ', name: 'Algiz', aett: 2, sound: '/z/', meaning: 'Elk-Sedge / Ward' },
+        S: { rune: 'ᛊ', name: 'Sowilo', aett: 2, sound: '/s/', meaning: 'Sun-Wheel' },
+        T: { rune: 'ᛏ', name: 'Tiwaz', aett: 3, sound: '/t/', meaning: 'Law-Spear / Oath' },
+        B: { rune: 'ᛒ', name: 'Berkano', aett: 3, sound: '/b/', meaning: 'Birch Twig / Renewal' },
+        E: { rune: 'ᛖ', name: 'Ehwaz', aett: 3, sound: '/e/', meaning: 'Steed / Partnership' },
+        M: { rune: 'ᛗ', name: 'Mannaz', aett: 3, sound: '/m/', meaning: 'Mortal / Witness' },
+        L: { rune: 'ᛚ', name: 'Laguz', aett: 3, sound: '/l/', meaning: 'Water / Flow' },
+        NG: { rune: 'ᛜ', name: 'Ingwaz', aett: 3, sound: '/ŋ/', meaning: 'Seed / Potential' },
+        D: { rune: 'ᛞ', name: 'Dagaz', aett: 3, sound: '/d/', meaning: 'Daybreak / Threshold' },
+        O: { rune: 'ᛟ', name: 'Othala', aett: 3, sound: '/o/', meaning: 'Ancestral Domain / Estate' }
+    },
+
+    PHONETIC_LEXICON_OVERRIDES: {
+        knight: 'nait', night: 'nait', light: 'lait', might: 'mait', sight: 'sait', fight: 'fait', right: 'rait',
+        stone: 'ston', bone: 'bon', throne: 'thron', gate: 'gat', lake: 'lak', oak: 'ok', oakhaven: 'okhauen',
+        ironwood: 'ironwud', ironbark: 'ironbark', wood: 'wud', blood: 'blud', creek: 'krik', tree: 'tri',
+        green: 'grin', queen: 'kwin', deep: 'dip', keep: 'kip', seed: 'sid', feed: 'fid', steel: 'stil',
+        seal: 'sil', vein: 'uein', sovereign: 'soueren', house: 'haus', crown: 'kraun', scout: 'skaut',
+        mountain: 'maunten', bound: 'baund', power: 'pauer', tower: 'tauer', fire: 'fair', mire: 'mair',
+        ice: 'ais', life: 'laif', knife: 'naif', time: 'taim', crime: 'kraim', mine: 'main', pine: 'pain',
+        vine: 'uain', line: 'lain', fine: 'fain', brine: 'brain', white: 'hwait', rite: 'rait', write: 'rait',
+        side: 'said', ride: 'raid', hide: 'haid', tide: 'taid', strike: 'straik', mile: 'mail', debt: 'det',
+        lamb: 'lam', tomb: 'tum', sign: 'sain', gnaw: 'nau', wrist: 'rist', wrath: 'rath', wrong: 'rong',
+        wrote: 'rot', castle: 'kasel', listen: 'lisen', often: 'ofen', sword: 'sord', two: 'tu', who: 'hu',
+        whole: 'hol', one: 'wan', wolf: 'wulf', eye: 'ai', true: 'tru', value: 'ualu', plague: 'plag',
+        rogue: 'rog', league: 'lig', tongue: 'tung', guard: 'gard', guardian: 'gardian', guild: 'gild',
+        build: 'bild', conduit: 'konduit', recruit: 'rekrut', sluice: 'slus', siphon: 'saifon',
+        valley: 'ualei', galley: 'galei', tally: 'tali', cull: 'kul', cullfield: 'kulfild', field: 'fild',
+        shield: 'shild', yield: 'jild', chief: 'kif', thief: 'thif', friend: 'frend', sieve: 'siv',
+        seize: 'sis', weird: 'wird', veil: 'ueil', heir: 'eir'
+    },
+    HOUSE_BIND_RUNE_SEALS: {
+        'House Aethel':      { sigil: 'ᛟ᛭ᛏ', runes: ['ᛟ', 'ᛏ'], title: 'Crown Seal of Aethel (Othala-Tiwaz)' },
+        'House Oakheart':    { sigil: 'ᛟ᛭ᚲ', runes: ['ᛟ', 'ᚲ'], title: 'Ironwood Bind-Seal (Othala-Kenaz)' },
+        'House Gallows':     { sigil: 'ᚷ᛭ᚺ', runes: ['ᚷ', 'ᚺ'], title: 'Gallows Dust-Seal (Gebo-Hagalaz)' },
+        'House Mire':        { sigil: 'ᛗ᛭ᛚ', runes: ['ᛗ', 'ᛚ'], title: 'Mire Spore-Seal (Mannaz-Laguz)' },
+        'House Blackwood':   { sigil: 'ᛒ᛭ᚹ', runes: ['ᛒ', 'ᚹ'], title: 'Blackwood Weevil-Seal (Berkano-Wunjo)' },
+        'House Hollow':      { sigil: 'ᚺ᛭ᛚ', runes: ['ᚺ', 'ᛚ'], title: 'Hollow Creek-Seal (Hagalaz-Laguz)' },
+        'House Ashen':       { sigil: 'ᚨ᛭ᛊ', runes: ['ᚨ', 'ᛊ'], title: 'Ashen Basalt-Seal (Ansuz-Sowilo)' },
+        'House Crow':        { sigil: 'ᚲ᛭ᚱ', runes: ['ᚲ', 'ᚱ'], title: 'Crow Perch-Seal (Kenaz-Raidho)' },
+        'House Widow':       { sigil: 'ᚹ᛭ᛁ', runes: ['ᚹ', 'ᛁ'], title: 'Widow Resin-Seal (Wunjo-Isa)' },
+        'House Thorn':       { sigil: 'ᚦ᛭ᚱ', runes: ['ᚦ', 'ᚱ'], title: 'Thorn Wax-Seal (Thurisaz-Raidho)' },
+        'House Gloom':       { sigil: 'ᚷ᛭ᛚ', runes: ['ᚷ', 'ᛚ'], title: 'Gloom Glass-Seal (Gebo-Laguz)' },
+        'House Dusken':      { sigil: 'ᛞ᛭ᛊ', runes: ['ᛞ', 'ᛊ'], title: 'Dusken Silk-Seal (Dagaz-Sowilo)' },
+        'House Grim':        { sigil: 'ᚷ᛭ᚱ', runes: ['ᚷ', 'ᚱ'], title: 'Grimsby Chain-Seal (Gebo-Raidho)' },
+        'House Shadowfen':   { sigil: 'ᛊ᛭ᚠ', runes: ['ᛊ', 'ᚠ'], title: 'Shadowfen Matrix-Seal (Sowilo-Fehu)' },
+        'House Blightwatch': { sigil: 'ᛒ᛭ᛏ', runes: ['ᛒ', 'ᛏ'], title: 'Blightwatch Rod-Seal (Berkano-Tiwaz)' },
+        'House Bleak':       { sigil: 'ᛒ᛭ᚲ', runes: ['ᛒ', 'ᚲ'], title: 'Bleakmire Cap-Seal (Berkano-Kenaz)' },
+        'House Wraith':      { sigil: 'ᚹ᛭ᚦ', runes: ['ᚹ', 'ᚦ'], title: 'Wraith Oil-Seal (Wunjo-Thurisaz)' },
+        'House Cull':        { sigil: 'ᚲ᛭ᛚ', runes: ['ᚲ', 'ᛚ'], title: 'Cullfield Heart-Seal (Kenaz-Laguz)' },
+        'House Terminus':    { sigil: 'ᛏ᛭ᚱ', runes: ['ᛏ', 'ᚱ'], title: 'Terminus Horizon-Seal (Tiwaz-Raidho)' }
+    },
+
+    transliterateWordToElderFuthark(rawWord = '', options = {}) {
+        const clean = String(rawWord || '').toLowerCase().replace(/[^a-z]/g, '');
+        if (!clean) return '';
+
+        let w = this.PHONETIC_LEXICON_OVERRIDES[clean] || clean;
+        if (!this.PHONETIC_LEXICON_OVERRIDES[clean]) {
+            w = w
+                .replace(/^kn/, 'n')
+                .replace(/^gn/, 'n')
+                .replace(/^wr/, 'r')
+                .replace(/^wh/, 'hw')
+                .replace(/igh/g, 'ai')
+                .replace(/ck/g, 'k')
+                .replace(/qu/g, 'kw')
+                .replace(/ph/g, 'f')
+                .replace(/sh/g, 's')
+                .replace(/ch/g, 'k')
+                .replace(/ee/g, 'i')
+                .replace(/oo/g, 'u')
+                .replace(/ey$/g, 'ei')
+                .replace(/mb$/g, 'm');
+
+            if (w.length > 3 && /[^aeiou]e$/.test(w) && !/le$/.test(w)) {
+                w = w.slice(0, -1);
+            }
+            if (w.length > 3 && /le$/.test(w)) {
+                w = w.slice(0, -2) + 'el';
+            }
+        }
+
+        w = w.replace(/([a-z])\1+/g, '$1');
+
+        if (options.archaicNasalOmission) {
+            w = w.replace(/n([bpdtgk])/g, '$1').replace(/m([bpdtgk])/g, '$1');
+        }
+
+        const runes = [];
+        let i = 0;
+        while (i < w.length) {
+            const two = w.slice(i, i + 2);
+            if (two === 'th') {
+                if (runes[runes.length - 1] !== 'ᚦ') runes.push('ᚦ');
+                i += 2;
+                continue;
+            }
+            if (two === 'ng') {
+                if (runes[runes.length - 1] !== 'ᛜ') runes.push('ᛜ');
+                i += 2;
+                continue;
+            }
+
+            const ch = w[i];
+            const nextCh = w[i + 1] || '';
+            let r = '';
+            switch (ch) {
+                case 'f': r = 'ᚠ'; break;
+                case 'u': r = 'ᚢ'; break;
+                case 'v': r = 'ᚢ'; break;
+                case 'a': r = 'ᚨ'; break;
+                case 'r': r = 'ᚱ'; break;
+                case 'k': r = 'ᚲ'; break;
+                case 'c': r = (nextCh === 'e' || nextCh === 'i' || nextCh === 'y') ? 'ᛊ' : 'ᚲ'; break;
+                case 'q': r = 'ᚲᚹ'; break;
+                case 'x': r = 'ᚲᛊ'; break;
+                case 'g': r = 'ᚷ'; break;
+                case 'w': r = 'ᚹ'; break;
+                case 'h': r = 'ᚺ'; break;
+                case 'n': r = 'ᚾ'; break;
+                case 'i': r = 'ᛁ'; break;
+                case 'y': r = (i === 0 || /[aeiou]/.test(nextCh)) ? 'ᛃ' : 'ᛁ'; break;
+                case 'j': r = 'ᛃ'; break;
+                case 'p': r = 'ᛈ'; break;
+                case 'z': r = 'ᛉ'; break;
+                case 's': r = 'ᛊ'; break;
+                case 't': r = 'ᛏ'; break;
+                case 'b': r = 'ᛒ'; break;
+                case 'e': r = 'ᛖ'; break;
+                case 'm': r = 'ᛗ'; break;
+                case 'l': r = 'ᛚ'; break;
+                case 'd': r = 'ᛞ'; break;
+                case 'o': r = 'ᛟ'; break;
+                default: r = ''; break;
+            }
+            for (const subRune of r) {
+                if (runes.length === 0 || runes[runes.length - 1] !== subRune) {
+                    runes.push(subRune);
+                }
+            }
+            i++;
+        }
+
+        return runes.join('');
+    },
+
+    transliterateToElderFuthark(phrase = '', options = {}) {
+        const divider = options.divider || '᛬';
+        const tokens = String(phrase || '')
+            .trim()
+            .split(/\s+/)
+            .map(tok => this.transliterateWordToElderFuthark(tok, options))
+            .filter(Boolean);
+        return tokens.join(divider);
+    },
+    encodeEdgeNotches(quantity = 0) {
+        const qty = Math.max(0, Math.floor(Number(quantity) || 0));
+        const tens = Math.floor(qty / 10);
+        const remAfterTens = qty % 10;
+        const fives = Math.floor(remAfterTens / 5);
+        const units = remAfterTens % 5;
+        const notchGlyphs = '᛭'.repeat(tens) + '×'.repeat(fives) + '|'.repeat(units);
+        return {
+            quantity: qty,
+            tens,
+            fives,
+            units,
+            totalNotchCuts: tens + fives + units,
+            notchGlyphs: notchGlyphs || '·',
+            binaryMask: qty.toString(2).padStart(8, '0')
+        };
+    },
+
+    getBindRuneSeal(entityName = 'House Oakheart') {
+        const direct = this.HOUSE_BIND_RUNE_SEALS[entityName];
+        if (direct) return direct;
+        const futhark = this.transliterateToElderFuthark(entityName, { divider: '' });
+        const r1 = futhark[0] || 'ᛟ';
+        const r2 = futhark[1] || 'ᛏ';
+        return {
+            sigil: `${r1}᛭${r2}`,
+            runes: [r1, r2],
+            title: `Chancery Bind-Seal (${r1}-${r2})`
+        };
+    },
+
+    computeGrainHash(str = '') {
+        let h = 2166136261;
+        const s = String(str);
+        for (let i = 0; i < s.length; i++) {
+            h ^= s.charCodeAt(i);
+            h = Math.imul(h, 16777619);
+        }
+        return (h >>> 0).toString(16).toUpperCase().padStart(8, '0');
+    },
+
+    createRunicTallyStick(manifest = {}) {
+        const day = manifest.day || rootScope.EngineParams?.worldDay || 1;
+        const owner = manifest.owner || 'House Oakheart';
+        const verb = manifest.verb || 'PAID';
+        const commodity = manifest.commodity || 'Ironwood';
+        const quantity = Number(manifest.quantity ?? 12);
+        const recipient = manifest.recipient || 'House Aethel';
+        const witnesses = Array.isArray(manifest.witnesses) && manifest.witnesses.length > 0
+            ? manifest.witnesses
+            : ['Vane', 'Mallow'];
+
+        const formulaEnglish = `${owner} ${verb} ${commodity}`;
+        const runicFormula = this.transliterateToElderFuthark(formulaEnglish, { divider: '᛬' });
+        const witnessRunes = witnesses.map(w => this.transliterateWordToElderFuthark(w)).join('᛬');
+        const notchData = this.encodeEdgeNotches(quantity);
+        const ownerSeal = this.getBindRuneSeal(owner);
+        const recipientSeal = this.getBindRuneSeal(recipient);
+
+        const fullInscription = `${runicFormula}᛬${notchData.notchGlyphs}᛬${witnessRunes}᛬${ownerSeal.sigil}`;
+        const woodGrainHash = this.computeGrainHash(`${day}|${owner}|${verb}|${commodity}|${quantity}|${fullInscription}`);
+        const tallyId = manifest.id || `kefli_${day}_${this.activeTallies.size + 1}_${woodGrainHash.slice(0, 4)}`;
+
+        const stockShard = {
+            shardType: 'STOCK_CREDITOR_HALF',
+            tallyId,
+            holder: recipient,
+            day,
+            owner,
+            verb,
+            commodity,
+            quantity,
+            runicFormula,
+            halvedRunesTop: fullInscription,
+            edgeNotches: notchData,
+            bindRuneSeal: ownerSeal.sigil,
+            counterSeal: recipientSeal.sigil,
+            woodGrainHash
+        };
+
+        const foilShard = {
+            shardType: 'FOIL_DEBTOR_HALF',
+            tallyId,
+            holder: owner,
+            day,
+            owner,
+            verb,
+            commodity,
+            quantity,
+            runicFormula,
+            halvedRunesBottom: fullInscription,
+            edgeNotches: { ...notchData },
+            bindRuneSeal: ownerSeal.sigil,
+            counterSeal: recipientSeal.sigil,
+            woodGrainHash
+        };
+
+        const tallyStick = {
+            id: tallyId,
+            day,
+            medium: 'RÚNAKEFLI_SPLIT_PINE_SLAT',
+            style: 'IMPERIAL_CHANCERY_ELDER_FUTHARK',
+            owner,
+            recipient,
+            verb,
+            commodity,
+            quantity,
+            witnesses,
+            formulaEnglish,
+            runicFormula,
+            witnessRunes,
+            fullInscription,
+            edgeNotches: notchData,
+            ownerSeal,
+            recipientSeal,
+            woodGrainHash,
+            stockShard,
+            foilShard
+        };
+
+        this.activeTallies.set(tallyId, tallyStick);
+        this.splitTallyRegistry.set(tallyId, { stockShard, foilShard });
+        return tallyStick;
+    },
+
+    verifySplitTally(tallyA, tallyB) {
+        if (!tallyA || !tallyB) {
+            return { verified: false, reason: 'Missing stock or foil tally shard.' };
+        }
+        const grainMatches = tallyA.woodGrainHash && tallyA.woodGrainHash === tallyB.woodGrainHash;
+        const runesAlign = (tallyA.halvedRunesTop || tallyA.fullInscription) === (tallyB.halvedRunesBottom || tallyB.fullInscription);
+        const notchesAlign = tallyA.edgeNotches?.quantity === tallyB.edgeNotches?.quantity
+            && tallyA.edgeNotches?.notchGlyphs === tallyB.edgeNotches?.notchGlyphs;
+        const sealsAlign = tallyA.bindRuneSeal === tallyB.bindRuneSeal;
+
+        const verified = Boolean(grainMatches && runesAlign && notchesAlign && sealsAlign);
+        let failureReason = null;
+        if (!verified) {
+            if (!notchesAlign) failureReason = `Edge-notch mismatch (Stock=${tallyA.edgeNotches?.quantity} vs. Foil=${tallyB.edgeNotches?.quantity})`;
+            else if (!runesAlign) failureReason = 'Halved runic staves do not align across split grain';
+            else if (!grainMatches) failureReason = 'Wood-grain checksum fracture mismatch (Forgery detected)';
+            else failureReason = 'Bind-rune signet seal mismatch';
+        }
+
+        return {
+            verified,
+            tallyId: tallyA.tallyId || tallyA.id,
+            woodGrainHash: tallyA.woodGrainHash,
+            notchCount: tallyA.edgeNotches?.quantity ?? 0,
+            bindRuneSeal: tallyA.bindRuneSeal,
+            reason: verified ? 'Wood grain, halved Elder Futhark staves, and edge notches align perfectly.' : failureReason
+        };
+    },
+
+    renderTallySlatHtml(tallyStick) {
+        if (!tallyStick) return '';
+        return `
+            <div class="runic-tally-slat" style="background:linear-gradient(180deg,#3d2817 0%,#2a1b0e 50%,#3d2817 100%); border:1.5px solid #8c6239; border-radius:3px; padding:5px 8px; margin:5px 0; font-family:'Share Tech Mono',monospace; color:#fde68a; box-shadow:inset 0 0 8px rgba(0,0,0,0.85);">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:8px; color:#d97706; border-bottom:1px solid #78512d; padding-bottom:2px; margin-bottom:3px;">
+                    <span>🪵 RÚNAKEFLI SPLIT-TALLY // ${tallyStick.id.toUpperCase()}</span>
+                    <span>NOTCHES: [${tallyStick.edgeNotches.notchGlyphs}] (${tallyStick.quantity}u) | GRAIN: #${tallyStick.woodGrainHash.slice(0, 6)}</span>
+                </div>
+                <div style="font-size:12px; letter-spacing:0.08em; color:#fef08a; padding:2px 0; border-bottom:1px dashed #a16207; overflow-x:auto; white-space:nowrap;">
+                    ${tallyStick.fullInscription}
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:8px; color:#e2d1b0; margin-top:3px;">
+                    <span>FORMULA: ${tallyStick.owner} ᛬ ${tallyStick.verb} ᛬ ${tallyStick.commodity} (${tallyStick.quantity}u)</span>
+                    <span style="color:#38bdf8; font-weight:bold;">SEAL: [${tallyStick.ownerSeal.sigil}] ${tallyStick.ownerSeal.title}</span>
+                </div>
+            </div>
+        `;
+    }
+};
+rootScope.RunicTallySystem = RunicTallySystem;
+// ============================================================================
+// 5.998 PHASE 7: THE POEM TRAP MATRIX, HARD EPISTEMIC GATES & SEMANTIC DECAY
+// ============================================================================
+export const PoemTrapEngine = rootScope.PoemTrapEngine || {
+    tombstoneRecords: new Map(),
+
+    // I. The 5 Epistemic Classification Rules (Addendum BJ & Section 17)
+    EPISTEMIC_CLASSES: {
+        OBSERVATIONAL_TRUTH: {
+            id: 'OBSERVATIONAL_TRUTH',
+            label: 'Observational Truth (Survival Cadence)',
+            functionDesc: 'Teaches ground-level survival physics without explaining underlying metaphysics.',
+            constraintDesc: 'Zero proper nouns or cosmic cosmology. Describes what happens, never why.'
+        },
+        INSTITUTIONAL_REVISION: {
+            id: 'INSTITUTIONAL_REVISION',
+            label: 'Institutional Revision (Crown / House Propaganda)',
+            functionDesc: 'Masks the Founders\' betrayal and enforces the 12,000-year perceived timeline.',
+            constraintDesc: 'Flatters authority, frames containment as heroism, compresses succession into an eternal line.'
+        },
+        THE_BAIT_LURE: {
+            id: 'THE_BAIT_LURE',
+            label: 'The Bait / Lure (Epitaph & Noble Hubris)',
+            functionDesc: 'Inflates Story Density and lures Founder-bloodline nobles into early ascension or the Huntsman\'s Mark.',
+            constraintDesc: 'Promises Significance, Glory, or Power while omitting Harvest Visibility and Foundation Decay.'
+        },
+        ORBS_HALF_TRUTH: {
+            id: 'ORBS_HALF_TRUTH',
+            label: 'The Orb\'s Half-Truth (Contextually Incomplete Warning)',
+            functionDesc: 'Mirrors Addendum BK—technically accurate, emotionally urgent, and fatal if acted upon blindly.',
+            constraintDesc: 'Gives a true mechanical solution to an immediate pain point while hiding the catastrophic second-order consequence.'
+        },
+        SUPPRESSED_ROOT: {
+            id: 'SUPPRESSED_ROOT',
+            label: 'The Suppressed Root (Faded Champion / Terminus Echo)',
+            functionDesc: 'Preserves fragments of t=0 (Korvan\'s slavery, the compromised seal, or internal Epitaph loyalty).',
+            constraintDesc: 'Uses kennings and relational pronouns ("the boy", "the master\'s light", "the score of places") to survive censorship.'
+        }
+    },
+
+    // II. Reference-Frame & Concealment Constraints (Hard Bible Gates)
+    REFERENCE_FRAME_CEILINGS: {
+        SURFACE_VILLAGES: {
+            originId: 'SURFACE_VILLAGES',
+            label: 'Surface Villages (The 19 Houses)',
+            allowedTopics: ['14_DAY_SHIFT', 'BARRIER_FUEL_DEPENDENCY', 'ROAD_SPATIAL_DISTORTION', 'TERMINUS_AGING_SYMPTOM', 'SHACKLE_AND_WENDIGO_FEAR'],
+            forbiddenTerms: ['white void', 'seven-day void', '21-day', 'twenty-one day', '6,000-year', 'six thousand years', 'endless dunes', 'epitaph', 'twenty-first anchor', 'founders betrayal', 'korvan'],
+            defaultClasses: ['OBSERVATIONAL_TRUTH', 'INSTITUTIONAL_REVISION']
+        },
+        THE_CROWN: {
+            originId: 'THE_CROWN',
+            label: 'The Crown (House Aethel)',
+            allowedTopics: ['FUEL_CHOKEPOINT', 'GUARDIAN_300_CONTAINMENT', 'FOUNDERS_VIGIL_REVISION'],
+            forbiddenTerms: ['white void', 'seven-day void', '6,000-year', 'six thousand years', 'mountain rotation', 'rotating ring', 'endless dunes'],
+            defaultClasses: ['INSTITUTIONAL_REVISION']
+        },
+        HOUSE_TERMINUS: {
+            originId: 'HOUSE_TERMINUS',
+            label: 'House Terminus & 300 Guardians',
+            allowedTopics: ['7_DAY_WHITE_VOID', '21_DAY_OBJECTIVE_CYCLE', '18000_YEAR_TIMELINE', 'FOUNDATION_PURITY_LATE_ASCENSION'],
+            forbiddenTerms: ['endless dunes', '5% reference frame', 'static dunes', 'mountain rotation', 'rotating ring'],
+            defaultClasses: ['ORBS_HALF_TRUTH', 'THE_BAIT_LURE']
+        },
+        EPITAPH_7: {
+            originId: 'EPITAPH_7',
+            label: 'Epitaph (Settlement #7)',
+            requiresConcealmentGate: true,
+            allowedTopics: ['FALLEN_ERA_HOUSEHOLD_RUNES', '21ST_ANCHOR_STATUS', 'CHAMPION_BETRAYAL_ORIGIN', 'HUNTSMAN_VECTORING'],
+            forbiddenTerms: ['korvan lost free will', 'korvan_only', 'endless dunes', '5% reference frame'],
+            defaultClasses: ['SUPPRESSED_ROOT', 'THE_BAIT_LURE']
+        },
+        THE_ORB_DUNE: {
+            originId: 'THE_ORB_DUNE',
+            label: 'The Orb / Dune Artifacts',
+            allowedTopics: ['5_PERCENT_REFERENCE_FRAME', 'PALE_SOVEREIGN_HARVEST', 'T0_FRACTURE_PHYSICS'],
+            forbiddenTerms: ['complete fatal catch context', 'macabre communion warning'],
+            defaultClasses: ['ORBS_HALF_TRUTH']
+        },
+        OCP_LEAK: {
+            originId: 'OCP_LEAK',
+            label: 'OCP Directorate / Jess Nedaf Bureaucratic Leak',
+            allowsClinicalJargon: true,
+            allowedTopics: ['FORM_12B_CONTAINMENT', 'BLIND_SPOT_ENTROPY'],
+            forbiddenTerms: ['korvan_only'],
+            defaultClasses: ['OBSERVATIONAL_TRUTH']
+        }
+    },
+
+    BANNED_CLINICAL_JARGON: {
+        destination: 'goal',
+        denary: 'tenfold',
+        anomaly: 'wound',
+        cultivation: 'carving',
+        protocol: 'law',
+        fractal: 'shattered',
+        telemetry: 'watch',
+        parameter: 'bound',
+        vector: 'path',
+        equilibrium: 'balance'
+    },
+
+    // VI. Compliant Canonical Examples from the Bible Addendums + Two-Key Interlocking Counter-Poems
+    CANONICAL_BIBLE_POEMS: {
+        EARLY_ASCENSION_TRAP: {
+            id: 'EARLY_ASCENSION_TRAP',
+            title: 'The Early Ascension Trap (Addendum CA-13)',
+            origin: 'HOUSE_TERMINUS',
+            epistemicClass: 'THE_BAIT_LURE',
+            pairedCounterPoemId: 'LATE_PURITY_COUNTER',
+            cipherNumbers: [200, 311],
+            lines: [
+                'Carve the flesh before the bone,',
+                'and claim the fire as your own.',
+                'Two hundred strides you’ll outrun grace—',
+                'and die a youth with wrinkled face.'
+            ]
+        },
+        LATE_PURITY_COUNTER: {
+            id: 'LATE_PURITY_COUNTER',
+            title: 'The Stone-Patience Counter-Verse (Addendum CA-13 Key II)',
+            origin: 'HOUSE_TERMINUS',
+            epistemicClass: 'OBSERVATIONAL_TRUTH',
+            pairedCounterPoemId: 'EARLY_ASCENSION_TRAP',
+            cipherNumbers: [300, 311],
+            lines: [
+                'Hold the needle from the skin,',
+                'till three hundred winters thin.',
+                'He who waits for bone to set—',
+                'outlives the shift and pays no debt.'
+            ]
+        },
+        TERMINUS_RAPID_AGING_RUMOR: {
+            id: 'TERMINUS_RAPID_AGING_RUMOR',
+            title: 'The Rapid Aging Rumor of Terminus (Addendum BY Surface Symptom)',
+            origin: 'SURFACE_VILLAGES',
+            epistemicClass: 'OBSERVATIONAL_TRUTH',
+            pairedCounterPoemId: 'EPITAPH_INTERNAL_SLATE',
+            cipherNumbers: [14],
+            lines: [
+                'Two weeks pass within the wood,',
+                'where yesterday the village stood.',
+                'Yet those who walk the mountain stone—',
+                'grow gray and bent before their own.'
+            ]
+        },
+        EPITAPH_INTERNAL_SLATE: {
+            id: 'EPITAPH_INTERNAL_SLATE',
+            title: 'Settlement #7 — Epitaph Internal Slate (Addendum BY)',
+            origin: 'EPITAPH_7',
+            epistemicClass: 'SUPPRESSED_ROOT',
+            pairedCounterPoemId: 'TERMINUS_RAPID_AGING_RUMOR',
+            cipherNumbers: [21],
+            lines: [
+                'Above the wood, behind the veil,',
+                'we keep the hearth that shall not fail.',
+                'We feed the hound and bide the hour,',
+                'till broken chains reclaim their power.'
+            ]
+        },
+        SIGNIFICANCE_BEACON_FLESH_LEDGER: {
+            id: 'SIGNIFICANCE_BEACON_FLESH_LEDGER',
+            title: 'The Significance Beacon / Flesh Ledger (Addendum BN)',
+            origin: 'THE_ORB_DUNE',
+            epistemicClass: 'ORBS_HALF_TRUTH',
+            pairedCounterPoemId: 'ORB_KILL_HUNTSMAN_TRAP',
+            cipherNumbers: [14],
+            lines: [
+                'Cut the iron in your skin,',
+                'to keep the shifting world within.',
+                'The brighter burns the story’s brand,',
+                'the closer walks the Pale One’s hand.'
+            ]
+        },
+        ORB_KILL_HUNTSMAN_TRAP: {
+            id: 'ORB_KILL_HUNTSMAN_TRAP',
+            title: 'Poem #7: The Huntsman Slayer’s Lure (Addendum BK Key I)',
+            origin: 'THE_ORB_DUNE',
+            epistemicClass: 'ORBS_HALF_TRUTH',
+            pairedCounterPoemId: 'HUNTSMAN_FALL_COUNTER_WARNING',
+            cipherNumbers: [1],
+            lines: [
+                'The shadow stalks the marked man’s door,',
+                'and beats his limbs upon the floor.',
+                'Wish you be rid of all this plight?',
+                'Kill the huntsman with your might.'
+            ]
+        },
+        HUNTSMAN_FALL_COUNTER_WARNING: {
+            id: 'HUNTSMAN_FALL_COUNTER_WARNING',
+            title: 'Poem #10: The Harvest Counter-Key (Addendum BK Key II)',
+            origin: 'HOUSE_TERMINUS',
+            epistemicClass: 'SUPPRESSED_ROOT',
+            pairedCounterPoemId: 'ORB_KILL_HUNTSMAN_TRAP',
+            cipherNumbers: [300],
+            lines: [
+                'The hound that bites you keeps the fold,',
+                'and shields the spark from winter’s cold.',
+                'Be wary should the hunter fall—',
+                'the master comes to feast on all.'
+            ]
+        }
+    },
+
+    sanitizeClinicalVocabulary(line = '', origin = 'SURFACE_VILLAGES') {
+        if (origin === 'OCP_LEAK') return String(line);
+        let result = String(line);
+        for (const [latinWord, saxonRoot] of Object.entries(this.BANNED_CLINICAL_JARGON)) {
+            const rx = new RegExp(`\\b${latinWord}\\b`, 'gi');
+            result = result.replace(rx, saxonRoot);
+        }
+        return result;
+    },
+
+    formatLineWithMidpointCaesura(line = '') {
+        const clean = String(line || '').replace(/[.,;!?—–-]/g, '').trim();
+        if (clean.includes('᛬')) return clean;
+        const words = clean.split(/\s+/).filter(Boolean);
+        if (words.length < 2) return clean;
+        const mid = Math.ceil(words.length / 2);
+        return `${words.slice(0, mid).join(' ')} ᛬ ${words.slice(mid).join(' ')}`;
+    },
+
+    formatStanzaToElderFuthark(lines = []) {
+        return lines.map(line => {
+            const clean = String(line || '').replace(/[.,;!?—–-]/g, '').trim();
+            const words = clean.split(/\s+/).filter(w => w && w !== '᛬');
+            const mid = Math.max(1, Math.ceil(words.length / 2));
+            const leftHalf = words.slice(0, mid).map(w => RunicTallySystem.transliterateWordToElderFuthark(w)).filter(Boolean).join('᛫');
+            const rightHalf = words.slice(mid).map(w => RunicTallySystem.transliterateWordToElderFuthark(w)).filter(Boolean).join('᛫');
+            return rightHalf ? `${leftHalf}᛬${rightHalf}` : leftHalf;
+        });
+    },
+    validateHardBibleGates(poemObj = {}, options = {}) {
+        const originKey = poemObj.origin || 'SURFACE_VILLAGES';
+        const ceiling = this.REFERENCE_FRAME_CEILINGS[originKey] || this.REFERENCE_FRAME_CEILINGS.SURFACE_VILLAGES;
+        const textLower = (poemObj.lines || []).join(' ').toLowerCase();
+        const violations = [];
+
+        for (const forbidden of (ceiling.forbiddenTerms || [])) {
+            if (textLower.includes(forbidden.toLowerCase())) {
+                violations.push(`Gate 1 (Observational Horizon Violation): Origin [${originKey}] cannot reference forbidden term "${forbidden}".`);
+            }
+        }
+
+        const currentEntropy = options.blindSpotEntropy !== undefined
+            ? Number(options.blindSpotEntropy)
+            : (CampaignManager?.state?.order?.blindSpotEntropy || 12);
+        const mentionsEpitaphDirectly = textLower.includes('epitaph') || textLower.includes('twenty-first parish');
+        if (mentionsEpitaphDirectly && originKey !== 'EPITAPH_7' && currentEntropy < 85) {
+            violations.push(`Gate 2 (Spatial & Illusion Fidelity Violation): Concealed Settlement #7 (hiddenGapKeeper: true) cannot be exposed in [${originKey}] verse while blindSpotEntropy (${currentEntropy}%) < 85%.`);
+        }
+
+        if (!ceiling.allowsClinicalJargon) {
+            for (const latinWord of Object.keys(this.BANNED_CLINICAL_JARGON)) {
+                const rx = new RegExp(`\\b${latinWord}\\b`, 'i');
+                if (rx.test(textLower)) {
+                    violations.push(`Gate 3 (Prosodic Jargon Violation): Clinical term "${latinWord}" forbidden in non-OCP origin [${originKey}].`);
+                }
+            }
+        }
+
+        return {
+            passed: violations.length === 0,
+            origin: originKey,
+            epistemicClass: poemObj.epistemicClass,
+            blindSpotEntropy: currentEntropy,
+            violations
+        };
+    },
+
+    applySemanticDecayPipeline(lines = [], medium = 'IRON_CHANTRY_STONE', options = {}) {
+        const med = String(medium || 'IRON_CHANTRY_STONE').toUpperCase();
+        const mutated = lines.map((rawLine, idx) => {
+            let line = String(rawLine);
+
+            if (med !== 'VILLAGE_NURSERY_RHYME') {
+                line = line
+                    .replace(/\bthe champion\b/gi, 'the pale beast')
+                    .replace(/\bliberator\b/gi, 'plague-walker')
+                    .replace(/\bfled in greed\b/gi, 'kept the vigil')
+                    .replace(/\bbetrayed the boy\b/gi, 'sealed the ward')
+                    .replace(/runic fuel crates?/gi, "the Crown's Hearth-Bread")
+                    .replace(/the 95% reference frame/gi, 'The Unmoving Stone')
+                    .replace(/barrier fuel units?/gi, 'hearth-oil');
+            }
+
+            if (med === 'IRON_CHANTRY_STONE') {
+                if (/flesh|epitaph|betrayal|skin/i.test(line)) {
+                    line = 'The monarch guards the sacred chain,';
+                }
+            } else if (med === 'FLAYED_QUILL_BONE_TALLY') {
+                if (idx === 1 || options.corruptLineIndex === idx) {
+                    const parts = this.formatLineWithMidpointCaesura(line).split('᛬');
+                    line = `${parts[0].trim()} ᛬ [REDACTED / WORN SMOOTH]`;
+                }
+            }
+            return line;
+        });
+
+        return {
+            medium: med,
+            preservesNumbers100Percent: med === 'VILLAGE_NURSERY_RHYME',
+            lines: mutated,
+            caesuraLines: mutated.map(l => l.includes('[REDACTED') ? l : this.formatLineWithMidpointCaesura(l))
+        };
+    },
+
+    generateFourSlotPoem(spec = {}) {
+        const origin = spec.origin || 'SURFACE_VILLAGES';
+        const ceiling = this.REFERENCE_FRAME_CEILINGS[origin] || this.REFERENCE_FRAME_CEILINGS.SURFACE_VILLAGES;
+        const epistemicClass = spec.epistemicClass || ceiling.defaultClasses[0];
+
+        const rawLines = [
+            spec.line1Anchor || 'Fourteen nights the forest stands,',
+            spec.line2Tension || 'while hearth-bread feeds the iron bands.',
+            spec.line3PivotTrap || 'A score of places bless the throne,',
+            spec.line4HookConsequence || 'the body cheers before the bone.'
+        ].map(l => this.sanitizeClinicalVocabulary(l, origin));
+
+        const caesuraLines = rawLines.map(l => this.formatLineWithMidpointCaesura(l));
+        const futharkLines = this.formatStanzaToElderFuthark(rawLines);
+        const gateAudit = this.validateHardBibleGates({ origin, epistemicClass, lines: rawLines }, spec);
+
+        return {
+            id: spec.id || `poem_4slot_${Date.now()}`,
+            title: spec.title || 'Chancery Four-Beat Stanza',
+            origin,
+            epistemicClass,
+            pairedCounterPoemId: spec.pairedCounterPoemId || null,
+            cipherNumbers: spec.cipherNumbers || [14, 20],
+            lines: rawLines,
+            caesuraLines,
+            futharkLines,
+            gateAudit
+        };
+    },
+
+    generate19HouseTombstoneRecords() {
+        this.tombstoneRecords.clear();
+        const settlements = CANONICAL_BEDROCK_SETTLEMENTS.filter(s => !s.hiddenGapKeeper && s.id <= 19);
+
+        const houseVerseConfigs = {
+            'House Aethel': {
+                origin: 'THE_CROWN',
+                epistemicClass: 'INSTITUTIONAL_REVISION',
+                cipherNumbers: [14, 20],
+                l1: 'A score of places bound in light,',
+                l2: 'receive the hearth-bread every night.',
+                l3: 'The monarch keeps the fortnight whole,',
+                l4: 'and claims the tithe of every soul.'
+            },
+            'House Terminus': {
+                origin: 'HOUSE_TERMINUS',
+                epistemicClass: 'ORBS_HALF_TRUTH',
+                pairedCounterPoemId: 'TERMINUS_RAPID_AGING_RUMOR',
+                cipherNumbers: [300, 311],
+                l1: 'Three hundred wardens hold the gate,',
+                l2: 'where seven whitened mornings wait.',
+                l3: 'Carve deep the bone before the shift,',
+                l4: 'three hundred eleven years the gift.'
+            }
+        };
+
+        settlements.forEach((s) => {
+            const hName = s.house;
+            const custom = houseVerseConfigs[hName];
+            const origin = custom?.origin || 'SURFACE_VILLAGES';
+            const epistemicClass = custom?.epistemicClass || (s.id <= 10 ? 'INSTITUTIONAL_REVISION' : 'OBSERVATIONAL_TRUTH');
+            const industrySaxon = String(s.industry || 'ironwood').replace(/_/g, ' ');
+
+            const poem = this.generateFourSlotPoem({
+                id: `tombstone_${s.id}_${hName.toLowerCase().replace(/\s+/g, '_')}`,
+                title: `Tombstone Record of ${s.name} (${hName})`,
+                origin,
+                epistemicClass,
+                pairedCounterPoemId: custom?.pairedCounterPoemId || 'EARLY_ASCENSION_TRAP',
+                cipherNumbers: custom?.cipherNumbers || [14, 19, 20],
+                line1Anchor: custom?.l1 || `Fourteen nights the ${industrySaxon} gleams,`,
+                line2Tension: custom?.l2 || `while chains hold fast above the streams.`,
+                line3PivotTrap: custom?.l3 || `Nineteen lords obey the crown,`,
+                line4HookConsequence: custom?.l4 || `lest hungry shadows drag them down.`
+            });
+
+            const seal = RunicTallySystem.getBindRuneSeal(hName);
+            const record = {
+                houseId: hName,
+                settlementId: s.id,
+                settlementName: s.name,
+                bindRuneSeal: seal.sigil,
+                epistemicClass: poem.epistemicClass,
+                origin: poem.origin,
+                cipherNumbers: poem.cipherNumbers,
+                poem,
+                nurseryVariant: this.applySemanticDecayPipeline(poem.lines, 'VILLAGE_NURSERY_RHYME'),
+                chantryStoneVariant: this.applySemanticDecayPipeline(poem.lines, 'IRON_CHANTRY_STONE'),
+                boneTallyVariant: this.applySemanticDecayPipeline(poem.lines, 'FLAYED_QUILL_BONE_TALLY')
+            };
+            this.tombstoneRecords.set(hName, record);
+        });
+
+        return this.tombstoneRecords;
+    }
+};
+PoemTrapEngine.generate19HouseTombstoneRecords();
+rootScope.PoemTrapEngine = PoemTrapEngine;
+
+
+
+
+
 
 
 
@@ -7270,6 +8046,8 @@ export const CommanderEngine = {
     MaterialRegistry,
     PhaseShiftBreachEngine,
     VoidTouchedRegistry,
+    RunicTallySystem,
+    PoemTrapEngine,
     NOBLE_HOUSE_PROFILES,
     ROLE_CATALOG,
     SQUAD_ARMORY_CATALOG
