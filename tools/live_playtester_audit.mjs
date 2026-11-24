@@ -514,19 +514,25 @@ if ((strAfter - strBefore) !== 1 || !blockedRepeatShift.shiftCapped) {
 // Verify 3-Day Overworld Travel Supplies, Pop-Up Explore Forest Modal & Auto-Return Trek (Distance -> IRL Hours)
 const unlockedExploreRes = window.openExploreForest();
 window.zoomOverworldMap(0.5);
-window.panOverworldMap(12, -8);
+window.panOverworldMap(120, -80);
 window.focusOverworldParty();
 window.resetOverworldMapCamera();
 const explorePopupHtml = document.getElementById('explore-forest-popup-modal')?.innerHTML || '';
-if (!explorePopupHtml.includes('MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION') || !explorePopupHtml.includes('position:fixed; inset:0; z-index:9999;') || !explorePopupHtml.includes('overworld-svg-pan-zoom-group')) {
-    auditReport.bugsFound.push('Expected clicking Explore Forest after upgrading Forward Recon facility to pop up the full-screen interactive Explore Forest Overworld Modal with pan/zoom/drag support.');
+if (!explorePopupHtml.includes('MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION') || !explorePopupHtml.includes('position:fixed; inset:0; z-index:9999;') || !explorePopupHtml.includes('overworld-terrain-canvas') || !explorePopupHtml.includes('overworld-svg-pan-zoom-group')) {
+    auditReport.bugsFound.push('Expected clicking Explore Forest after upgrading Forward Recon facility to pop up the full-screen 4000x4000 Canvas+SVG Overworld Modal with pan/zoom/drag support.');
 }
-const navSquadRes = CommanderEngine.ForestOverworldEngine.navigateSquadToNode(4); // Day 1 supply used (2/3 left)
+// Verify continuous free-roam waypoint movement & terrain speed modifiers
+const wpStartRes = CommanderEngine.ForestOverworldEngine.setWaypoint(2100, 2100, { instantArrival: false });
+const wpStepRes = CommanderEngine.ForestOverworldEngine.updatePartyMovement(0.08);
+if (!wpStartRes.success || !wpStartRes.isMoving || !wpStepRes) {
+    auditReport.bugsFound.push('Expected setWaypoint(2100, 2100) and updatePartyMovement() to move the squad continuously across the 4000x4000 terrain.');
+}
+CommanderEngine.ForestOverworldEngine.completeWaypointArrival(); // Complete leg 1 (2/3 supplies left)
 const navLeg2 = CommanderEngine.ForestOverworldEngine.navigateSquadToNode(8);    // Day 2 supply used (1/3 left)
 const navLeg3 = CommanderEngine.ForestOverworldEngine.navigateSquadToNode(10);   // Day 3 supply used (0/3 left -> triggers Auto-Return!)
 const interceptRes = CommanderEngine.ForestOverworldEngine.executePredatorOrSquadAction('HUNT_PREY');
 const campRes = CommanderEngine.ForestOverworldEngine.executePredatorOrSquadAction('FEED');
-if (!unlockedExploreRes?.success || !navSquadRes.success || !navLeg2.success || !navLeg3.autoReturned || !interceptRes.success || !campRes.success) {
+if (!unlockedExploreRes?.success || !wpStartRes.success || !navLeg2.success || !navLeg3.autoReturned || !interceptRes.success || !campRes.success) {
     auditReport.bugsFound.push(`Expected 3-day travel supply depletion to auto-return squad with distance-based return trek, got leg3=${JSON.stringify(navLeg3)}`);
 }
 
@@ -540,7 +546,7 @@ const sovOverworldHtml = document.getElementById('brutalist-subpage-deck')?.inne
 if (!sovStalkRes.success || !sovHuntRes.success || !sovFeedRes.success || (CommanderEngine.CampaignManager.state.sovereign.significanceHarvested || 0) < 600 || !sovOverworldHtml.includes('PREDATOR OVERWORLD MAP')) {
     auditReport.bugsFound.push(`Expected Pale Sovereign Overworld Hunt/Stalk/Attack/Feed loop to harvest >=600 Historical Weight and render Predator Overworld Map, got weight=${CommanderEngine.CampaignManager.state.sovereign.significanceHarvested}`);
 } else {
-    logPlay('MOUNT & BLADE FOREST OVERWORLD & PALE SOVEREIGN HUNT/STALK/FEED', `Squad Overworld: ${navSquadRes.message} | ${interceptRes.message}\n   ↳ Pale Sovereign Predator Overworld: ${sovStalkRes.message} | ${sovHuntRes.message} | ${sovFeedRes.message}`);
+    logPlay('MOUNT & BLADE 4000x4000 FREE-ROAM OVERWORLD & PALE SOVEREIGN HUNT/STALK/FEED', `Squad Free-Roam Overworld: ${wpStartRes.message} | ${interceptRes.message}\n   ↳ Pale Sovereign Predator Overworld: ${sovStalkRes.message} | ${sovHuntRes.message} | ${sovFeedRes.message}`);
 }
 
 // 5I. Mirror src/core/commander_engine.js & src/systems/commander_ui.js to ledger-mobile/

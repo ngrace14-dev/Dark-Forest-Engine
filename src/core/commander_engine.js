@@ -4681,12 +4681,24 @@ rootScope.ExpeditionEngine = ExpeditionEngine;
 // 5.85 MOUNT & BLADE STYLE TACTICAL OVERWORLD & PREDATOR HUNTING ENGINE
 // ============================================================================
 export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
+    worldWidth: 4000,
+    worldHeight: 4000,
     partyNodeId: 1,
     homeNodeId: 1,
-    homeX: 198,
-    homeY: 82,
-    partyX: 198,
-    partyY: 82,
+    homeX: 2260,
+    homeY: 2180,
+    partyX: 2260,
+    partyY: 2180,
+    targetX: null,
+    targetY: null,
+    targetLabel: null,
+    targetNodeId: null,
+    isMoving: false,
+    baseSpeedPxPerTick: 28,
+    sightRadius: 340,
+    exploredCellSize: 100,
+    exploredCells: new Set(),
+    travelAccumulatorPx: 0,
     suppliesDaysRemaining: 3,
     maxSuppliesDays: 3,
     distanceFromCampHours: 0,
@@ -4698,25 +4710,117 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
     overworldLogs: [],
     huntProgress: 0,
 
+    // Deterministic organic 4000x4000 world map coordinates for all 21 settlements (0..20)
+    WORLD_SETTLEMENT_COORDS: {
+        0:  { x: 2000, y: 2000, rZone: 'INNER_FOREST', biome: 'CLEARING' },     // The Capital (Royal Core)
+        1:  { x: 2260, y: 2180, rZone: 'INNER_FOREST', biome: 'DENSE_FOREST' }, // Oakhaven
+        2:  { x: 1710, y: 2290, rZone: 'INNER_FOREST', biome: 'HILLS' },        // Gallows Hill
+        3:  { x: 2380, y: 1740, rZone: 'INNER_FOREST', biome: 'RIVER_VALLEY' }, // Mire's Edge
+        4:  { x: 1620, y: 1690, rZone: 'INNER_FOREST', biome: 'DENSE_FOREST' }, // Blackwood
+        5:  { x: 2040, y: 2520, rZone: 'INNER_FOREST', biome: 'RIVER_VALLEY' }, // Hollow Creek
+        6:  { x: 2560, y: 2040, rZone: 'INNER_FOREST', biome: 'HILLS' },        // Ashen Hold
+        7:  { x: 1120, y: 1180, rZone: 'OUTER_HORIZON', biome: 'OUTER_DUNES' }, // Epitaph (Blind-Spot Anomaly)
+        8:  { x: 1460, y: 2040, rZone: 'INNER_FOREST', biome: 'HILLS' },        // Crow's Perch
+        9:  { x: 1860, y: 1450, rZone: 'INNER_FOREST', biome: 'DENSE_FOREST' }, // Widow's Web
+        10: { x: 2280, y: 1460, rZone: 'INNER_FOREST', biome: 'CLEARING' },     // Thornbury
+        11: { x: 2940, y: 2480, rZone: 'OUTER_HORIZON', biome: 'HILLS' },       // Iron-Crag
+        12: { x: 3120, y: 1820, rZone: 'OUTER_HORIZON', biome: 'RIVER_VALLEY' },// Sluice-Gate
+        13: { x: 2780, y: 1120, rZone: 'OUTER_HORIZON', biome: 'HILLS' },       // Frost-Vein
+        14: { x: 1980, y: 880,  rZone: 'OUTER_HORIZON', biome: 'OUTER_DUNES' }, // Sun-Bleach
+        15: { x: 1240, y: 960,  rZone: 'OUTER_HORIZON', biome: 'HILLS' },       // Blighted Watch
+        16: { x: 860,  y: 1680, rZone: 'OUTER_HORIZON', biome: 'DENSE_FOREST' },// Whisper-Grove
+        17: { x: 920,  y: 2540, rZone: 'OUTER_HORIZON', biome: 'RIVER_VALLEY' },// Silt-Harbor
+        18: { x: 1380, y: 3120, rZone: 'OUTER_HORIZON', biome: 'OUTER_DUNES' }, // Salt-Mire
+        19: { x: 2260, y: 3180, rZone: 'OUTER_HORIZON', biome: 'HILLS' },       // World's End Gate (Terminus)
+        20: { x: 3220, y: 3060, rZone: 'OUTER_HORIZON', biome: 'OUTER_DUNES' }  // Drift-Anchor
+    },
+
     getSettlementCoords(settlementObj, idx = 1, total = 20) {
         const id = Number(settlementObj?.id ?? idx);
-        if (id === 0 || settlementObj?.isCrownSeat) {
-            return { x: 140, y: 64, rZone: 'INNER_FOREST' };
+        const entry = this.WORLD_SETTLEMENT_COORDS[id];
+        if (entry) {
+            return { x: entry.x, y: entry.y, rZone: entry.rZone, biome: entry.biome };
         }
         const isForestInner = id >= 1 && id <= 10 && id !== 7;
         const angle = ((idx - 1) / Math.max(1, total - 1)) * Math.PI * 2 - Math.PI / 2;
-        const rx = isForestInner ? 66 : 112;
-        const ry = isForestInner ? 28 : 49;
+        const radius = isForestInner ? 580 : 1220;
         return {
-            x: Number((140 + rx * Math.cos(angle)).toFixed(1)),
-            y: Number((64 + ry * Math.sin(angle)).toFixed(1)),
-            rZone: isForestInner ? 'INNER_FOREST' : 'OUTER_HORIZON'
+            x: Math.round(2000 + radius * Math.cos(angle)),
+            y: Math.round(2000 + radius * Math.sin(angle)),
+            rZone: isForestInner ? 'INNER_FOREST' : 'OUTER_HORIZON',
+            biome: isForestInner ? 'DENSE_FOREST' : 'OUTER_DUNES'
         };
     },
 
+    getBiomeAt(x, y) {
+        const wx = Number(x) || 2000;
+        const wy = Number(y) || 2000;
+        const distCenter = Math.hypot(wx - 2000, wy - 2000);
+        const angle = Math.atan2(wy - 2000, wx - 2000);
+        const riverWave = Math.abs(Math.sin(angle * 3 + distCenter * 0.0025));
+        if (riverWave < 0.065 && distCenter > 160 && distCenter < 1680) {
+            return { id: 'RIVER', label: 'Dendritic River Ford', speedMult: 0.72, color: '#0e3a52' };
+        }
+        const roadWave = Math.abs(Math.cos(angle * 4));
+        if (distCenter < 760 && roadWave > 0.96) {
+            return { id: 'ROYAL_ROAD', label: 'Cobbled Runic Causeway', speedMult: 1.35, color: '#5c5346' };
+        }
+        if (distCenter > 1360) {
+            return { id: 'OUTER_DUNES', label: 'Endless Outer Dunes', speedMult: 0.82, color: '#6b5335' };
+        }
+        if (distCenter > 980) {
+            return { id: 'MOUNTAIN_RING', label: 'Mountain Ring & Crags', speedMult: 0.68, color: '#3b424c' };
+        }
+        const n = Math.sin(wx * 0.0065) * Math.cos(wy * 0.0065) + Math.sin((wx + wy) * 0.003);
+        if (n > 0.45 || distCenter < 240) {
+            return { id: 'CLEARING', label: 'Sunlit Forest Clearing', speedMult: 1.12, color: '#24472c' };
+        }
+        return { id: 'DENSE_FOREST', label: 'Dense Ironbark Forest', speedMult: 0.78, color: '#112919' };
+    },
+
+    getTerrainSpeedModifier(x, y) {
+        return this.getBiomeAt(x, y).speedMult;
+    },
+
+    updateExploredArea(x, y, customRadius = null) {
+        if (!this.exploredCells) this.exploredCells = new Set();
+        const rad = customRadius || this.sightRadius || 340;
+        const step = this.exploredCellSize || 100;
+        const minGX = Math.max(0, Math.floor((x - rad) / step));
+        const maxGX = Math.min(39, Math.floor((x + rad) / step));
+        const minGY = Math.max(0, Math.floor((y - rad) / step));
+        const maxGY = Math.min(39, Math.floor((y + rad) / step));
+        for (let gx = minGX; gx <= maxGX; gx++) {
+            for (let gy = minGY; gy <= maxGY; gy++) {
+                const cx = gx * step + step * 0.5;
+                const cy = gy * step + step * 0.5;
+                if (Math.hypot(cx - x, cy - y) <= rad) {
+                    this.exploredCells.add(`${gx},${gy}`);
+                }
+            }
+        }
+        const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
+        settlements.forEach((s, idx) => {
+            const sc = this.getSettlementCoords(s, idx, settlements.length || 20);
+            if (Math.hypot(sc.x - x, sc.y - y) <= rad) {
+                if (!CampaignManager.isSettlementInForestZone(s)) {
+                    CampaignManager.revealFogOfWarNode(s.name);
+                }
+            }
+        });
+    },
+
+    isCoordInLiveSight(x, y) {
+        return Math.hypot((Number(x) || 0) - (this.partyX || 2000), (Number(y) || 0) - (this.partyY || 2000)) <= (this.sightRadius || 340);
+    },
+
+    isCellExplored(gx, gy) {
+        return this.exploredCells && this.exploredCells.has(`${gx},${gy}`);
+    },
+
     computeReturnHoursFromCamp() {
-        const distPx = Math.hypot((this.partyX || 198) - (this.homeX || 198), (this.partyY || 82) - (this.homeY || 82));
-        return Math.max(1, Math.min(18, Math.ceil(distPx / 18) + Math.max(0, (this.movementTrail?.length || 1) - 1)));
+        const distPx = Math.hypot((this.partyX || 2260) - (this.homeX || 2260), (this.partyY || 2180) - (this.homeY || 2180));
+        return Math.max(1, Math.min(18, Math.ceil(distPx / 210) + Math.max(0, (this.movementTrail?.length || 1) - 1)));
     },
 
     resetForNewRun() {
@@ -4732,6 +4836,13 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         this.huntProgress = 0;
         this.isAutoReturning = false;
         this.returnHoursRemaining = 0;
+        this.targetX = null;
+        this.targetY = null;
+        this.targetLabel = null;
+        this.targetNodeId = null;
+        this.isMoving = false;
+        this.travelAccumulatorPx = 0;
+        this.exploredCells = new Set();
         const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
         const startIdx = settlements.findIndex(s => Number(s.id) === this.partyNodeId);
         const startCoords = this.getSettlementCoords(settlements[Math.max(0, startIdx)], Math.max(1, startIdx), settlements.length || 20);
@@ -4741,11 +4852,12 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         this.homeY = startCoords.y;
         this.distanceFromCampHours = 0;
         this.movementTrail = [{ x: this.partyX, y: this.partyY, nodeId: this.partyNodeId, label: settlements[Math.max(0, startIdx)]?.name || 'Oakhaven' }];
+        this.updateExploredArea(this.partyX, this.partyY, 440);
         this.spawnMovingTargets();
         this.overworldLogs = [
             isSov
-                ? `🐺 [PREDATOR OVERWORLD ACTIVE — ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS TRAVEL STAMINA] The Pale Sovereign & Bound Huntsman emerged near ${settlements[Math.max(0, startIdx)]?.name || 'Gallows Hill'}. Select any forest node or roaming caravan to STALK, HUNT, ATTACK & FEED!`
-                : `🧭 [MOUNT & BLADE FOREST OVERWORLD — ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS TRAVEL SUPPLIES] Vanguard Squad mustered at ${settlements[Math.max(0, startIdx)]?.name || 'Oakhaven'}. Each travel leg consumes -1 Day of Supplies; when depleted (0/${this.maxSuppliesDays}d), the squad automatically marches back to camp based on distance!`
+                ? `🐺 [PREDATOR OVERWORLD ACTIVE — ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS TRAVEL STAMINA] The Pale Sovereign & Bound Huntsman emerged near ${settlements[Math.max(0, startIdx)]?.name || 'Gallows Hill'} (${this.partyX}, ${this.partyY}). Click anywhere on the 4000x4000 terrain or select a roaming caravan to STALK, HUNT, ATTACK & FEED!`
+                : `🧭 [MOUNT & BLADE FOREST OVERWORLD — ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS TRAVEL SUPPLIES] Vanguard Squad mustered at ${settlements[Math.max(0, startIdx)]?.name || 'Oakhaven'} (${this.partyX}, ${this.partyY}). Click any terrain coordinate or settlement to set a free-roam waypoint; time advances while marching and terrain modifies speed!`
         ];
     },
 
@@ -4762,10 +4874,10 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         const c4 = pickCoord(10);
 
         this.movingTargetEntities = [
-            { id: 'prey_caravan_1', name: 'Oakheart Ironwood & Resin Convoy', type: 'NOBLE_CONVOY', faction: 'House Oakheart', nodeId: c1.id, x: Number(((c1.x + 140) / 2).toFixed(1)), y: Number(((c1.y + 64) / 2).toFixed(1)), power: 48, lootFuel: 10, lootRes: 14, lootWeight: 260, alive: true, stalkedLevel: 0 },
-            { id: 'prey_patrol_2', name: 'Blackwood Outrider Scion Patrol', type: 'OUTRIDER_PATROL', faction: 'House Blackwood', nodeId: c2.id, x: Number((c2.x - 10).toFixed(1)), y: Number((c2.y + 6).toFixed(1)), power: 54, lootFuel: 8, lootRes: 12, lootWeight: 320, alive: true, stalkedLevel: 0 },
-            { id: 'prey_beast_3', name: 'Elder Bracken-Stag & Feral Pack', type: 'APEX_BEAST', faction: 'Dark Forest Wilds', nodeId: c3.id, x: Number((c3.x + 8).toFixed(1)), y: Number((c3.y - 5).toFixed(1)), power: 44, lootFuel: 6, lootRes: 16, lootWeight: 220, alive: true, stalkedLevel: 0 },
-            { id: 'prey_caravan_4', name: 'Crown Crucible Tithe Wagon', type: 'TITHE_WAGON', faction: 'House Aethel', nodeId: c4.id, x: Number(((c4.x + 140) / 2).toFixed(1)), y: Number(((c4.y + 64) / 2).toFixed(1)), power: 62, lootFuel: 14, lootRes: 18, lootWeight: 380, alive: true, stalkedLevel: 0 }
+            { id: 'prey_caravan_1', name: 'Oakheart Ironwood & Resin Convoy', type: 'NOBLE_CONVOY', faction: 'House Oakheart', nodeId: c1.id, x: Math.round((c1.x + 2000) / 2), y: Math.round((c1.y + 2000) / 2), power: 48, lootFuel: 10, lootRes: 14, lootWeight: 260, alive: true, stalkedLevel: 0 },
+            { id: 'prey_patrol_2', name: 'Blackwood Outrider Scion Patrol', type: 'OUTRIDER_PATROL', faction: 'House Blackwood', nodeId: c2.id, x: Math.round(c2.x - 140), y: Math.round(c2.y + 110), power: 54, lootFuel: 8, lootRes: 12, lootWeight: 320, alive: true, stalkedLevel: 0 },
+            { id: 'prey_beast_3', name: 'Elder Bracken-Stag & Feral Pack', type: 'APEX_BEAST', faction: 'Dark Forest Wilds', nodeId: c3.id, x: Math.round(c3.x + 150), y: Math.round(c3.y - 120), power: 44, lootFuel: 6, lootRes: 16, lootWeight: 220, alive: true, stalkedLevel: 0 },
+            { id: 'prey_caravan_4', name: 'Crown Crucible Tithe Wagon', type: 'TITHE_WAGON', faction: 'House Aethel', nodeId: c4.id, x: Math.round((c4.x + 2000) / 2), y: Math.round((c4.y + 2000) / 2), power: 62, lootFuel: 14, lootRes: 18, lootWeight: 380, alive: true, stalkedLevel: 0 }
         ];
     },
     setStance(newStance = 'MARCH') {
@@ -4851,36 +4963,125 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         };
     },
 
-    navigateSquadToNode(targetNodeId) {
-        const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
-        const idx = settlements.findIndex(s => Number(s.id) === Number(targetNodeId));
-        const target = settlements[idx >= 0 ? idx : 1] || settlements[0];
-        if (!target) return { success: false, message: 'Invalid forest destination node.' };
-
+    setWaypoint(worldX, worldY, options = {}) {
+        const tx = Math.max(80, Math.min(3920, Math.round(Number(worldX) || 2000)));
+        const ty = Math.max(80, Math.min(3920, Math.round(Number(worldY) || 2000)));
         if ((this.suppliesDaysRemaining ?? 3) <= 0) {
             return this.triggerAutoReturnToCamp('0 Days of Travel Supplies remaining');
         }
+        const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
+        let snappedNode = null;
+        if (options.nodeId !== undefined && options.nodeId !== null) {
+            snappedNode = settlements.find(s => Number(s.id) === Number(options.nodeId)) || null;
+        } else {
+            snappedNode = settlements.find((s, idx) => {
+                const sc = this.getSettlementCoords(s, idx, settlements.length || 20);
+                return Math.hypot(sc.x - tx, sc.y - ty) <= 85;
+            }) || null;
+        }
+        this.targetX = tx;
+        this.targetY = ty;
+        this.targetNodeId = snappedNode ? Number(snappedNode.id) : null;
+        this.targetLabel = options.label || (snappedNode ? snappedNode.name : `Terrain Waypoint (${tx}, ${ty})`);
+        this.isMoving = true;
 
-        const coords = this.getSettlementCoords(target, idx >= 0 ? idx : 1, settlements.length || 20);
-        this.partyNodeId = Number(target.id);
-        this.partyX = coords.x;
-        this.partyY = coords.y;
-        this.movementTrail.push({ x: this.partyX, y: this.partyY, nodeId: this.partyNodeId, label: target.name });
-        if (this.movementTrail.length > 6) this.movementTrail.shift();
+        const biome = this.getBiomeAt(tx, ty);
+        const msg = `🧭 [WAYPOINT SET -> ${this.targetLabel.toUpperCase()}] Destination (${tx}, ${ty}) in [${biome.label} | ${Math.round(biome.speedMult * 100)}% Speed]. Marching across the overworld...`;
+        this.overworldLogs.unshift(msg);
+        if (this.overworldLogs.length > 25) this.overworldLogs.pop();
 
-        // Diminish travel supplies by 1 day on every exploration march leg (starts at 3 days)
+        if (options.instantArrival) {
+            return this.completeWaypointArrival(snappedNode);
+        }
+        return {
+            success: true,
+            isMoving: true,
+            targetX: this.targetX,
+            targetY: this.targetY,
+            targetLabel: this.targetLabel,
+            partyX: this.partyX,
+            partyY: this.partyY,
+            suppliesDaysRemaining: this.suppliesDaysRemaining,
+            distanceFromCampHours: this.distanceFromCampHours,
+            message: msg
+        };
+    },
+
+    updatePartyMovement(dtSeconds = 0.05) {
+        if (!this.isMoving || this.targetX === null || this.targetY === null) {
+            this.isMoving = false;
+            return { moving: false };
+        }
+        const dx = this.targetX - this.partyX;
+        const dy = this.targetY - this.partyY;
+        const dist = Math.hypot(dx, dy);
+        const biome = this.getBiomeAt(this.partyX, this.partyY);
+        const speedMult = biome.speedMult || 1.0;
+        const stepPx = Math.max(4, (this.baseSpeedPxPerTick || 28) * speedMult * Math.max(0.4, dtSeconds * 20));
+
+        if (dist <= stepPx) {
+            this.partyX = this.targetX;
+            this.partyY = this.targetY;
+            const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
+            const arrivedNode = (this.targetNodeId !== null && settlements.find(s => Number(s.id) === Number(this.targetNodeId))) || null;
+            return this.completeWaypointArrival(arrivedNode);
+        }
+
+        this.partyX = Math.round(this.partyX + (dx / dist) * stepPx);
+        this.partyY = Math.round(this.partyY + (dy / dist) * stepPx);
+        this.travelAccumulatorPx = (this.travelAccumulatorPx || 0) + stepPx;
+        this.updateExploredArea(this.partyX, this.partyY);
+        this.distanceFromCampHours = this.computeReturnHoursFromCamp();
+
+        if (this.travelAccumulatorPx >= 180) {
+            this.travelAccumulatorPx -= 180;
+            this.movementTrail.push({ x: this.partyX, y: this.partyY, nodeId: this.partyNodeId, label: biome.label });
+            if (this.movementTrail.length > 10) this.movementTrail.shift();
+            ExpeditionEngine.tickExpeditionHours(1);
+        }
+        return {
+            moving: true,
+            partyX: this.partyX,
+            partyY: this.partyY,
+            biome: biome.label,
+            speedMult
+        };
+    },
+
+    completeWaypointArrival(targetSettlement = null) {
+        const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
+        const target = targetSettlement
+            || (this.targetNodeId !== null ? settlements.find(s => Number(s.id) === Number(this.targetNodeId)) : null);
+        if (this.targetX !== null && this.targetY !== null) {
+            this.partyX = this.targetX;
+            this.partyY = this.targetY;
+        }
+        const arrivalLabel = target?.name || this.targetLabel || `Waypoint (${this.partyX}, ${this.partyY})`;
+        if (target) {
+            this.partyNodeId = Number(target.id);
+        }
+        this.isMoving = false;
+        this.targetX = null;
+        this.targetY = null;
+        this.targetNodeId = null;
+        this.updateExploredArea(this.partyX, this.partyY);
+        this.movementTrail.push({ x: this.partyX, y: this.partyY, nodeId: this.partyNodeId, label: arrivalLabel });
+        if (this.movementTrail.length > 10) this.movementTrail.shift();
+
         this.suppliesDaysRemaining = Math.max(0, (this.suppliesDaysRemaining ?? 3) - 1);
         this.distanceFromCampHours = this.computeReturnHoursFromCamp();
         this.isAutoReturning = false;
 
-        const wasFogged = !CampaignManager.isSettlementInForestZone(target);
-        if (wasFogged) {
+        let wasFogged = false;
+        if (target && !CampaignManager.isSettlementInForestZone(target)) {
+            wasFogged = true;
             CampaignManager.revealFogOfWarNode(target.name);
         }
 
         const isSov = CampaignManager.campaignMode === 'SOVEREIGN';
         const leadAgt = AgentRosterManager.agents.get('agt_1') || Array.from(AgentRosterManager.agents.values()).find(a => a.alive);
         const leaderName = leadAgt?.name || (isSov ? 'Korvan the Pale Sovereign' : 'Vanguard Commander');
+        const biome = this.getBiomeAt(this.partyX, this.partyY);
 
         let eventNote = '';
         if (isSov) {
@@ -4888,7 +5089,7 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             CampaignManager.state.sovereign.significanceHarvested = (CampaignManager.state.sovereign.significanceHarvested || 0) + stalkGain;
             this.huntProgress = Math.min(100, (this.huntProgress || 0) + 25);
             if (leadAgt?.skills) leadAgt.skills.stealth = Number((leadAgt.skills.stealth + 0.2).toFixed(2));
-            eventNote = `Stalked the shadowed treeline around ${target.name} (${target.house}): +${stalkGain} Historical Weight harvested (+0.2 Stealth | Travel Supplies: ${this.suppliesDaysRemaining}/${this.maxSuppliesDays}d left | Dist from Camp: ${this.distanceFromCampHours}h).`;
+            eventNote = `Stalked [${biome.label}] around ${arrivalLabel}: +${stalkGain} Historical Weight harvested (+0.2 Stealth | Travel Supplies: ${this.suppliesDaysRemaining}/${this.maxSuppliesDays}d left | Dist from Camp: ${this.distanceFromCampHours}h).`;
         } else {
             const resFind = this.stance === 'FORAGE' ? 6 : 3;
             const fuelFind = 2;
@@ -4896,11 +5097,11 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             const h = CampaignManager.state.house;
             if (h) h.barrierFuelUnits = Math.min(70, (h.barrierFuelUnits || 20) + fuelFind);
             if (leadAgt?.skills) leadAgt.skills.survival = Number((leadAgt.skills.survival + 0.2).toFixed(2));
-            eventNote = `Marched squad column to ${target.name} (${target.house}): Scavenged +${resFind}u Resources & +${fuelFind}u Runic Fuel (+0.2 Survival | Travel Supplies: ${this.suppliesDaysRemaining}/${this.maxSuppliesDays}d left | Dist from Camp: ${this.distanceFromCampHours}h).`;
+            eventNote = `Marched squad across [${biome.label}] to ${arrivalLabel}: Scavenged +${resFind}u Resources & +${fuelFind}u Runic Fuel (+0.2 Survival | Travel Supplies: ${this.suppliesDaysRemaining}/${this.maxSuppliesDays}d left | Dist from Camp: ${this.distanceFromCampHours}h).`;
         }
 
-        const fogNote = wasFogged ? ` 🌫️✨ [FOG OF WAR LIFTED] Outer Horizon telemetry unlocked for ${target.name}!` : '';
-        let msg = `🧭 [OVERWORLD MARCH -> ${target.name.toUpperCase()}] ${leaderName} navigated to ${target.name} (Stance: ${this.stance}). ${eventNote}${fogNote}`;
+        const fogNote = wasFogged ? ` 🌫️✨ [FOG OF WAR LIFTED] Outer Horizon telemetry unlocked for ${arrivalLabel}!` : '';
+        let msg = `🧭 [OVERWORLD MARCH -> ${arrivalLabel.toUpperCase()}] ${leaderName} arrived at ${arrivalLabel} (${this.partyX}, ${this.partyY} | Stance: ${this.stance}). ${eventNote}${fogNote}`;
         this.overworldLogs.unshift(msg);
         if (this.overworldLogs.length > 25) this.overworldLogs.pop();
 
@@ -4908,12 +5109,13 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
 
         let autoReturnRes = null;
         if (this.suppliesDaysRemaining <= 0) {
-            autoReturnRes = this.triggerAutoReturnToCamp(`3-Day Travel Supplies exhausted at ${target.name}`);
+            autoReturnRes = this.triggerAutoReturnToCamp(`3-Day Travel Supplies exhausted at ${arrivalLabel}`);
             msg += ` | ${autoReturnRes.message}`;
         }
 
         return {
             success: true,
+            moving: false,
             partyNodeId: this.partyNodeId,
             partyX: this.partyX,
             partyY: this.partyY,
@@ -4923,6 +5125,19 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             wasFogged,
             message: msg
         };
+    },
+
+    navigateSquadToNode(targetNodeId, instant = true) {
+        const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
+        const idx = settlements.findIndex(s => Number(s.id) === Number(targetNodeId));
+        const target = settlements[idx >= 0 ? idx : 1] || settlements[0];
+        if (!target) return { success: false, message: 'Invalid forest destination node.' };
+        const coords = this.getSettlementCoords(target, idx >= 0 ? idx : 1, settlements.length || 20);
+        return this.setWaypoint(coords.x, coords.y, {
+            nodeId: target.id,
+            label: target.name,
+            instantArrival: instant
+        });
     },
     executePredatorOrSquadAction(actionType = 'STALK', targetId = null) {
         const act = String(actionType || 'STALK').toUpperCase();

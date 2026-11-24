@@ -15,57 +15,167 @@ export const CommanderUI = {
     activeBannerMsg: null,
     roleSelected: false,
     isRunCommitted: false,
-    mapZoom: 1,
+    mapZoom: 2.2,
     mapPanX: 0,
     mapPanY: 0,
+    _mapCameraInitialized: false,
     _isMapDragging: false,
     _mapDragMoved: false,
     _mapDragStartX: 0,
     _mapDragStartY: 0,
     _mapStartPanX: 0,
     _mapStartPanY: 0,
+    _overworldRafId: null,
 
     applyOverworldMapTransform() {
         if (typeof document === 'undefined') return;
         const g = document.getElementById('overworld-svg-pan-zoom-group');
         const badge = document.getElementById('overworld-zoom-badge');
-        const z = Number((this.mapZoom || 1).toFixed(2));
+        const z = Number((this.mapZoom || 2.2).toFixed(2));
         const px = Number((this.mapPanX || 0).toFixed(1));
         const py = Number((this.mapPanY || 0).toFixed(1));
         if (g) {
-            g.setAttribute('transform', `translate(140, 64) scale(${z}) translate(${-140 + px}, ${-64 + py})`);
+            g.setAttribute('transform', `translate(2000, 2000) scale(${z}) translate(${-2000 + px}, ${-2000 + py})`);
         }
         if (badge) {
             badge.textContent = `${Math.round(z * 100)}%`;
         }
+        this.drawOverworldTerrainCanvas();
+    },
+
+    drawOverworldTerrainCanvas() {
+        if (typeof document === 'undefined') return;
+        const canvas = document.getElementById('overworld-terrain-canvas');
+        if (!canvas || typeof canvas.getContext !== 'function') return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const ovw = CommanderEngine.ForestOverworldEngine;
+        if (!ovw) return;
+        const cw = canvas.width || 800;
+        const ch = canvas.height || 800;
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.fillStyle = '#030508';
+        ctx.fillRect(0, 0, cw, ch);
+
+        const z = Number(this.mapZoom || 2.2);
+        const panX = Number(this.mapPanX || 0);
+        const panY = Number(this.mapPanY || 0);
+        const scale = cw / 4000;
+
+        ctx.save();
+        ctx.translate(cw * 0.5, ch * 0.5);
+        ctx.scale(z, z);
+        ctx.translate(-cw * 0.5 + panX * scale, -ch * 0.5 + panY * scale);
+
+        const step = ovw.exploredCellSize || 100;
+        const cellPx = step * scale;
+        const partyX = ovw.partyX || 2260;
+        const partyY = ovw.partyY || 2180;
+        const sightR = ovw.sightRadius || 340;
+
+        for (let gx = 0; gx < 40; gx++) {
+            for (let gy = 0; gy < 40; gy++) {
+                const wx = gx * step + step * 0.5;
+                const wy = gy * step + step * 0.5;
+                const distToParty = Math.hypot(wx - partyX, wy - partyY);
+                const inLiveSight = distToParty <= sightR;
+                const isExplored = inLiveSight || ovw.isCellExplored?.(gx, gy);
+
+                const rx = gx * cellPx;
+                const ry = gy * cellPx;
+                if (!isExplored) {
+                    ctx.fillStyle = '#04070b';
+                    ctx.fillRect(rx, ry, cellPx + 0.6, cellPx + 0.6);
+                    continue;
+                }
+                const biome = ovw.getBiomeAt ? ovw.getBiomeAt(wx, wy) : { color: '#112919', id: 'DENSE_FOREST' };
+                ctx.fillStyle = biome.color || '#112919';
+                ctx.fillRect(rx, ry, cellPx + 0.6, cellPx + 0.6);
+
+                if (biome.id === 'DENSE_FOREST') {
+                    ctx.fillStyle = 'rgba(20, 83, 45, 0.35)';
+                    ctx.fillRect(rx + cellPx * 0.25, ry + cellPx * 0.25, cellPx * 0.5, cellPx * 0.5);
+                } else if (biome.id === 'RIVER') {
+                    ctx.fillStyle = 'rgba(56, 189, 248, 0.28)';
+                    ctx.fillRect(rx + cellPx * 0.15, ry + cellPx * 0.15, cellPx * 0.7, cellPx * 0.7);
+                }
+
+                if (!inLiveSight) {
+                    ctx.fillStyle = 'rgba(2, 6, 14, 0.56)';
+                    ctx.fillRect(rx, ry, cellPx + 0.6, cellPx + 0.6);
+                }
+            }
+        }
+
+        ctx.strokeStyle = CommanderEngine.CampaignManager.campaignMode === 'SOVEREIGN'
+            ? 'rgba(239, 68, 68, 0.55)'
+            : 'rgba(74, 222, 128, 0.55)';
+        ctx.lineWidth = 2.5 / z;
+        ctx.beginPath();
+        ctx.arc(partyX * scale, partyY * scale, sightR * scale, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.restore();
+    },
+
+    startOverworldMovementLoop() {
+        if (this._overworldRafId || typeof window === 'undefined') return;
+        const stepLoop = () => {
+            const ovw = CommanderEngine.ForestOverworldEngine;
+            if (!ovw || !ovw.isMoving) {
+                this._overworldRafId = null;
+                this.renderExploreForestModal(false);
+                this.renderWarBoardReader();
+                this.render();
+                return;
+            }
+            const res = ovw.updatePartyMovement(0.05);
+            this.mapPanX = Number((2000 - (ovw.partyX || 2000)).toFixed(1));
+            this.mapPanY = Number((2000 - (ovw.partyY || 2000)).toFixed(1));
+            this.renderExploreForestModal(false);
+            if (res && res.moving) {
+                const raf = window.requestAnimationFrame || ((cb) => setTimeout(cb, 45));
+                this._overworldRafId = raf(stepLoop);
+            } else {
+                this._overworldRafId = null;
+                if (res?.message) this.showBanner(res.message);
+                this.renderExploreForestModal(false);
+                this.renderWarBoardReader();
+                this.render();
+            }
+        };
+        const raf = window.requestAnimationFrame || ((cb) => setTimeout(cb, 45));
+        this._overworldRafId = raf(stepLoop);
     },
 
     zoomOverworldMap(deltaScale = 0.25) {
-        this.mapZoom = Math.max(0.6, Math.min(4.0, Number(((this.mapZoom || 1) + deltaScale).toFixed(2))));
-        this.applyOverworldMapTransform();
+        this.mapZoom = Math.max(0.55, Math.min(4.5, Number(((this.mapZoom || 2.2) + deltaScale).toFixed(2))));
+        this.renderExploreForestModal(false);
     },
 
     panOverworldMap(dx = 0, dy = 0) {
-        this.mapPanX = Math.max(-180, Math.min(180, (this.mapPanX || 0) + dx));
-        this.mapPanY = Math.max(-100, Math.min(100, (this.mapPanY || 0) + dy));
+        this.mapPanX = Math.max(-1950, Math.min(1950, (this.mapPanX || 0) + dx));
+        this.mapPanY = Math.max(-1950, Math.min(1950, (this.mapPanY || 0) + dy));
         this.applyOverworldMapTransform();
     },
 
     resetOverworldMapCamera() {
-        this.mapZoom = 1;
+        this.mapZoom = 1.0;
         this.mapPanX = 0;
         this.mapPanY = 0;
-        this.applyOverworldMapTransform();
+        this.renderExploreForestModal(false);
     },
 
     focusOverworldParty() {
         const ovw = CommanderEngine.ForestOverworldEngine;
-        const px = ovw?.partyX ?? 140;
-        const py = ovw?.partyY ?? 64;
-        this.mapZoom = Math.max(1.6, this.mapZoom || 1.6);
-        this.mapPanX = Number((140 - px).toFixed(1));
-        this.mapPanY = Number((64 - py).toFixed(1));
-        this.applyOverworldMapTransform();
+        const px = ovw?.partyX ?? 2260;
+        const py = ovw?.partyY ?? 2180;
+        this.mapZoom = Math.max(2.2, this.mapZoom || 2.2);
+        this.mapPanX = Number((2000 - px).toFixed(1));
+        this.mapPanY = Number((2000 - py).toFixed(1));
+        this._mapCameraInitialized = true;
+        this.renderExploreForestModal(false);
     },
 
     init(customContainerId = null) {
@@ -724,16 +834,50 @@ export const CommanderUI = {
                 this._mapDragMoved = true;
             }
             const svg = typeof document !== 'undefined' ? document.getElementById('overworld-fullscreen-svg') : null;
-            const rect = svg?.getBoundingClientRect?.() || { width: 560, height: 256 };
-            const scaleFactorX = 280 / Math.max(120, rect.width || 560) / (this.mapZoom || 1);
-            const scaleFactorY = 128 / Math.max(80, rect.height || 256) / (this.mapZoom || 1);
-            this.mapPanX = Math.max(-180, Math.min(180, Number((this._mapStartPanX + dxPx * scaleFactorX).toFixed(1))));
-            this.mapPanY = Math.max(-100, Math.min(100, Number((this._mapStartPanY + dyPx * scaleFactorY).toFixed(1))));
+            const rect = svg?.getBoundingClientRect?.() || { width: 800, height: 800 };
+            const scaleFactorX = 4000 / Math.max(120, rect.width || 800) / (this.mapZoom || 2.2);
+            const scaleFactorY = 4000 / Math.max(120, rect.height || 800) / (this.mapZoom || 2.2);
+            this.mapPanX = Math.max(-1950, Math.min(1950, Number((this._mapStartPanX + dxPx * scaleFactorX).toFixed(1))));
+            this.mapPanY = Math.max(-1950, Math.min(1950, Number((this._mapStartPanY + dyPx * scaleFactorY).toFixed(1))));
             this.applyOverworldMapTransform();
         };
         window.handleOverworldPointerUp = () => {
             this._isMapDragging = false;
             setTimeout(() => { this._mapDragMoved = false; }, 60);
+        };
+        window.handleOverworldMapClick = (ev) => {
+            if (this._mapDragMoved) return;
+            const svg = typeof document !== 'undefined' ? document.getElementById('overworld-fullscreen-svg') : null;
+            const rect = svg?.getBoundingClientRect?.() || { left: 0, top: 0, width: 800, height: 800 };
+            const clientX = ev?.clientX ?? (rect.left + rect.width * 0.5);
+            const clientY = ev?.clientY ?? (rect.top + rect.height * 0.5);
+            const side = Math.min(Math.max(120, rect.width || 800), Math.max(120, rect.height || 800));
+            const offsetX = ((rect.width || 800) - side) * 0.5;
+            const offsetY = ((rect.height || 800) - side) * 0.5;
+            const svgX = ((clientX - rect.left - offsetX) / side) * 4000;
+            const svgY = ((clientY - rect.top - offsetY) / side) * 4000;
+            const z = this.mapZoom || 2.2;
+            const worldX = Math.round(((svgX - 2000) / z) + 2000 - (this.mapPanX || 0));
+            const worldY = Math.round(((svgY - 2000) / z) + 2000 - (this.mapPanY || 0));
+            window.setWaypoint(worldX, worldY, { instantArrival: false });
+        };
+        window.setWaypoint = (worldX, worldY, opts = {}) => {
+            const ovw = CommanderEngine.ForestOverworldEngine;
+            if (!ovw) return;
+            const isHeadlessEnv = typeof window === 'undefined' || Boolean(window.isHeadless) || !document?.getElementById('overworld-terrain-canvas');
+            const res = ovw.setWaypoint(worldX, worldY, {
+                ...opts,
+                instantArrival: opts.instantArrival !== undefined ? opts.instantArrival : isHeadlessEnv
+            });
+            if (res?.message) this.showBanner(res.message);
+            if (ovw.isMoving && !isHeadlessEnv) {
+                this.startOverworldMovementLoop();
+            } else {
+                this.renderExploreForestModal(false);
+                this.renderWarBoardReader();
+                this.render();
+            }
+            return res;
         };
         window.openTacticalEncounter = (id = null) => {
             this.openTacticalEncounterModal(id);
@@ -1125,53 +1269,49 @@ export const CommanderUI = {
             const selNodeCleared = CommanderEngine.CampaignManager.isSettlementInForestZone?.(selNode) ?? (Number(selNode.id) <= 10);
 
             const svgNodes = settlements.map((s, i) => {
+                const coords = ovw.getSettlementCoords ? ovw.getSettlementCoords(s, i, settlements.length || 20) : { x: 2000, y: 2000 };
+                const cx = coords.x;
+                const cy = coords.y;
                 if (i === 0) {
-                    return `<g style="cursor:pointer;" onclick="window.navigateOverworldSquad(0)"><rect x="132" y="54" width="16" height="16" fill="#1e1b4b" stroke="#fbbf24" stroke-width="1.8"/><text x="140" y="65" text-anchor="middle" fill="#fde68a" font-size="9">👑</text></g>`;
+                    return `<g style="cursor:pointer;" onclick="window.navigateOverworldSquad(0)"><rect x="${cx - 45}" y="${cy - 45}" width="90" height="90" fill="#1e1b4b" stroke="#fbbf24" stroke-width="10"/><text x="${cx}" y="${cy + 18}" text-anchor="middle" fill="#fde68a" font-size="52">👑</text></g>`;
                 }
                 const isForestInner = Number(s.id) >= 1 && Number(s.id) <= 10 && Number(s.id) !== 7;
-                const isRevealed = CommanderEngine.CampaignManager.isSettlementInForestZone?.(s) ?? isForestInner;
-                const angle = ((i - 1) / Math.max(1, settlements.length - 1)) * Math.PI * 2 - Math.PI / 2;
-                const rx = isForestInner ? 66 : 112;
-                const ry = isForestInner ? 28 : 49;
-                const cx = (140 + rx * Math.cos(angle)).toFixed(1);
-                const cy = (64 + ry * Math.sin(angle)).toFixed(1);
+                const isRevealed = (CommanderEngine.CampaignManager.isSettlementInForestZone?.(s) ?? isForestInner)
+                    || (ovw.isCoordInLiveSight && ovw.isCoordInLiveSight(cx, cy));
                 const hEntry = board.find(w => w.name === s.house);
                 const isSelected = Number(s.id) === Number(selNode.id);
                 const isPartyHere = Number(s.id) === Number(ovw.partyNodeId);
                 const isHostile = hEntry?.status === 'WAR_PREP' || hEntry?.status === 'SKIRMISH' || s.chainsIntegrity < 50;
                 const fillCol = !isRevealed ? '#334155' : (isPartyHere ? '#a855f7' : (isSelected ? '#38bdf8' : (isHostile ? '#dc2626' : (hEntry?.status === 'ALLIED' ? '#10b981' : '#d97706'))));
                 const labelTxt = isRevealed ? s.name.slice(0, 10) : '🌫️ [FOGGED]';
-                const blurAttr = !isRevealed ? 'opacity="0.55" filter="url(#outer-fog-blur)"' : '';
                 return `
-                    <g style="cursor:pointer;" ${blurAttr} onclick="window.navigateOverworldSquad(${s.id})">
-                        <line x1="140" y1="62" x2="${cx}" y2="${cy}" stroke="${isSelected ? '#38bdf8' : '#4a453b'}" stroke-width="${isSelected ? '1.6' : '0.8'}" stroke-dasharray="2,2"/>
-                        <circle cx="${cx}" cy="${cy}" r="${isSelected || isPartyHere ? '6.5' : '4.5'}" fill="${fillCol}" stroke="#090d0e" stroke-width="1.2"/>
-                        <text x="${cx}" y="${(Number(cy) - 7).toFixed(1)}" text-anchor="middle" fill="${isSelected ? '#7dd3fc' : (isRevealed ? '#e2d1b0' : '#94a3b8')}" font-size="${isSelected ? '6.5' : '5.2'}" font-weight="bold">${labelTxt}</text>
+                    <g style="cursor:pointer;" opacity="${isRevealed ? '1' : '0.45'}" onclick="window.navigateOverworldSquad(${s.id})">
+                        <circle cx="${cx}" cy="${cy}" r="${isSelected || isPartyHere ? '46' : '32'}" fill="${fillCol}" stroke="#090d0e" stroke-width="8"/>
+                        <text x="${cx}" y="${cy - 54}" text-anchor="middle" fill="${isSelected ? '#7dd3fc' : (isRevealed ? '#e2d1b0' : '#94a3b8')}" font-size="44" font-weight="bold">${labelTxt}</text>
                     </g>
                 `;
             }).join('');
 
-            // Render Mount & Blade Overworld Moving Prey / Convoy Tokens & Player Squad / Predator Token
-            const preyNodesSvg = (ovw.movingTargetEntities || []).filter(p => p.alive).map(p => `
+            const preyNodesSvg = (ovw.movingTargetEntities || []).filter(p => p.alive && ((ovw.isCoordInLiveSight && ovw.isCoordInLiveSight(p.x, p.y)) || p.stalkedLevel > 0)).map(p => `
                 <g style="cursor:pointer;" onclick="window.executeOverworldAction('HUNT_PREY','${p.id}')">
-                    <circle cx="${p.x}" cy="${p.y}" r="4.2" fill="${isSov ? '#991b1b' : '#b45309'}" stroke="#fde68a" stroke-width="1" stroke-dasharray="1.5,1"/>
-                    <text x="${p.x}" y="${(Number(p.y) + 2.2).toFixed(1)}" text-anchor="middle" font-size="5.5">${p.type === 'APEX_BEAST' ? '🦌' : '📦'}</text>
-                    <text x="${p.x}" y="${(Number(p.y) + 8.5).toFixed(1)}" text-anchor="middle" fill="#fde68a" font-size="4.4" font-weight="bold">${isSov ? '🩸PREY' : '⚔️TARGET'}</text>
+                    <circle cx="${p.x}" cy="${p.y}" r="34" fill="${isSov ? '#991b1b' : '#b45309'}" stroke="#fde68a" stroke-width="6" stroke-dasharray="10,6"/>
+                    <text x="${p.x}" y="${Number(p.y) + 14}" text-anchor="middle" font-size="40">${p.type === 'APEX_BEAST' ? '🦌' : '📦'}</text>
                 </g>
             `).join('');
 
             const trailPoints = (ovw.movementTrail || []).map(pt => `${pt.x},${pt.y}`).join(' ');
             const trailSvg = (ovw.movementTrail && ovw.movementTrail.length > 1)
-                ? `<polyline points="${trailPoints}" fill="none" stroke="${isSov ? '#ef4444' : '#38bdf8'}" stroke-width="1.6" stroke-dasharray="3,2" opacity="0.85"/>`
+                ? `<polyline points="${trailPoints}" fill="none" stroke="${isSov ? '#ef4444' : '#38bdf8'}" stroke-width="12" stroke-dasharray="22,14" opacity="0.85"/>`
                 : '';
 
-            const px = ovw.partyX || 198;
-            const py = ovw.partyY || 82;
+            const px = ovw.partyX || 2260;
+            const py = ovw.partyY || 2180;
             const partyTokenSvg = `
                 <g pointer-events="none">
-                    <circle cx="${px}" cy="${py}" r="8.5" fill="${isSov ? 'rgba(220,38,38,0.28)' : 'rgba(56,189,248,0.25)'}" stroke="${isSov ? '#ef4444' : '#38bdf8'}" stroke-width="1.4"/>
-                    <text x="${px}" y="${(Number(py) + 3).toFixed(1)}" text-anchor="middle" font-size="8.5">${isSov ? '🐺' : '🛡️'}</text>
-                    <text x="${px}" y="${(Number(py) + 13).toFixed(1)}" text-anchor="middle" fill="${isSov ? '#fca5a5' : '#bae6fd'}" font-size="5.2" font-weight="900">${isSov ? `SOVEREIGN [${ovw.stance}]` : `SQUAD [${ovw.stance}]`}</text>
+                    <circle cx="${px}" cy="${py}" r="${ovw.sightRadius || 340}" fill="none" stroke="${isSov ? 'rgba(239,68,68,0.45)' : 'rgba(56,189,248,0.45)'}" stroke-width="8" stroke-dasharray="20,12"/>
+                    <circle cx="${px}" cy="${py}" r="58" fill="${isSov ? 'rgba(220,38,38,0.28)' : 'rgba(56,189,248,0.25)'}" stroke="${isSov ? '#ef4444' : '#38bdf8'}" stroke-width="10"/>
+                    <text x="${px}" y="${Number(py) + 18}" text-anchor="middle" font-size="56">${isSov ? '🐺' : '🛡️'}</text>
+                    <text x="${px}" y="${Number(py) + 92}" text-anchor="middle" fill="${isSov ? '#fca5a5' : '#bae6fd'}" font-size="38" font-weight="900">${isSov ? `SOVEREIGN [${ovw.stance}]` : `SQUAD [${ovw.stance}]`}</text>
                 </g>
             `;
 
@@ -1240,24 +1380,7 @@ export const CommanderUI = {
                                 <button class="cmd-btn" style="padding:1px 5px; font-size:8px; ${ovw.stance === 'HUNT' ? 'border-color:#ef4444; color:#fecaca;' : ''}" onclick="window.setOverworldStance('HUNT')">${isSov ? '🩸 Hunt' : '⚔️ Raid'}</button>
                             </div>
                         </div>
-                        <svg viewBox="0 0 280 128" style="width:100%; height:136px; display:block; margin:2px auto; background:radial-gradient(circle at 50% 50%, rgba(20,83,45,0.28) 0%, rgba(15,23,42,0.92) 56%, rgba(5,7,9,0.98) 100%); border:1px solid #2b3234;">
-                            <defs>
-                                <filter id="outer-fog-blur" x="-20%" y="-20%" width="140%" height="140%">
-                                    <feGaussianBlur stdDeviation="0.9" />
-                                </filter>
-                                <radialGradient id="fog-of-war-shroud" cx="50%" cy="50%" r="50%">
-                                    <stop offset="0%" stop-color="#000000" stop-opacity="0" />
-                                    <stop offset="52%" stop-color="#0f172a" stop-opacity="0.05" />
-                                    <stop offset="68%" stop-color="#1e293b" stop-opacity="0.68" />
-                                    <stop offset="100%" stop-color="#020617" stop-opacity="0.92" />
-                                </radialGradient>
-                            </defs>
-                            <!-- Outer Fog of War Shroud covering everything outside the Inner Forest Zone -->
-                            <rect x="0" y="0" width="280" height="128" fill="url(#fog-of-war-shroud)" pointer-events="none"/>
-                            <ellipse cx="140" cy="64" rx="112" ry="49" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3"/>
-                            <ellipse cx="140" cy="64" rx="76" ry="33" fill="none" stroke="#22c55e" stroke-width="1.2" stroke-dasharray="3,2"/>
-                            <text x="140" y="28" text-anchor="middle" fill="#86efac" font-size="5.5" font-weight="bold">🌲 INNER FOREST ZONE (TAP ANY NODE TO NAVIGATE SQUAD)</text>
-                            <text x="140" y="10" text-anchor="middle" fill="#94a3b8" font-size="5.5" font-weight="bold">🌫️ OUTER HORIZON &amp; DUNES (FOG OF WAR — MARCH OR SCOUT TO LIFT)</text>
+                        <svg viewBox="0 0 4000 4000" style="width:100%; height:136px; display:block; margin:2px auto; background:radial-gradient(circle at 50% 50%, rgba(20,83,45,0.34) 0%, rgba(15,23,42,0.92) 56%, rgba(5,7,9,0.98) 100%); border:1px solid #2b3234;">
                             ${trailSvg}
                             ${svgNodes}
                             ${preyNodesSvg}
@@ -1288,59 +1411,84 @@ export const CommanderUI = {
         const settlements = CommanderEngine.CampaignManager.getBedrockTelemetry({
             allowTwentyFirst: CommanderEngine.ShadowInfluenceEngine?.isEpitaphRevealed?.() || false
         }) || [];
-        const ovw = CommanderEngine.ForestOverworldEngine || { partyNodeId: 1, partyX: 198, partyY: 82, stance: 'MARCH', movementTrail: [], movingTargetEntities: [], overworldLogs: [] };
+        const ovw = CommanderEngine.ForestOverworldEngine || { partyNodeId: 1, partyX: 2260, partyY: 2180, stance: 'MARCH', movementTrail: [], movingTargetEntities: [], overworldLogs: [] };
+        if (forceOpen && !this._mapCameraInitialized) {
+            this.mapZoom = 2.2;
+            this.mapPanX = Number((2000 - (ovw.partyX || 2260)).toFixed(1));
+            this.mapPanY = Number((2000 - (ovw.partyY || 2180)).toFixed(1));
+            this._mapCameraInitialized = true;
+        }
+        const z = Number(this.mapZoom || 2.2);
         const selNode = settlements.find(s => Number(s.id) === Number(this.selectedMapSettlementId)) || settlements[1] || { id: 1, name: 'Oakhaven', house: 'House Oakheart', barrierFuel: 50, chainsIntegrity: 100 };
         const selHouse = board.find(w => w.name === selNode.house) || { name: selNode.house, power: 65, status: 'PEACE', monopoly: 'Ironwood' };
         const isSov = CommanderEngine.CampaignManager.campaignMode === 'SOVEREIGN';
         const selNodeCleared = CommanderEngine.CampaignManager.isSettlementInForestZone?.(selNode) ?? (Number(selNode.id) <= 10);
+        const selCoords = ovw.getSettlementCoords ? ovw.getSettlementCoords(selNode, 1, settlements.length || 20) : { x: 2260, y: 2180 };
 
         const svgNodes = settlements.map((s, i) => {
-            if (i === 0) {
-                return `<g style="cursor:pointer;" onclick="window.selectMapSettlement(0)"><rect x="131" y="53" width="18" height="18" rx="2" fill="#1e1b4b" stroke="#fbbf24" stroke-width="2"/><text x="140" y="65" text-anchor="middle" fill="#fde68a" font-size="10">👑</text><text x="140" y="50" text-anchor="middle" fill="#fde68a" font-size="6.2" font-weight="900">THE CAPITAL</text></g>`;
-            }
-            const isForestInner = Number(s.id) >= 1 && Number(s.id) <= 10 && Number(s.id) !== 7;
-            const isRevealed = CommanderEngine.CampaignManager.isSettlementInForestZone?.(s) ?? isForestInner;
-            const angle = ((i - 1) / Math.max(1, settlements.length - 1)) * Math.PI * 2 - Math.PI / 2;
-            const rx = isForestInner ? 66 : 112;
-            const ry = isForestInner ? 28 : 49;
-            const cx = (140 + rx * Math.cos(angle)).toFixed(1);
-            const cy = (64 + ry * Math.sin(angle)).toFixed(1);
-            const hEntry = board.find(w => w.name === s.house);
+            const coords = ovw.getSettlementCoords ? ovw.getSettlementCoords(s, i, settlements.length || 20) : { x: 2000, y: 2000 };
+            const cx = coords.x;
+            const cy = coords.y;
             const isSelected = Number(s.id) === Number(selNode.id);
-            const isPartyHere = Number(s.id) === Number(ovw.partyNodeId);
+            const isPartyHere = Number(s.id) === Number(ovw.partyNodeId) && Math.hypot((ovw.partyX || 2000) - cx, (ovw.partyY || 2000) - cy) < 90;
+            const isForestInner = Number(s.id) >= 1 && Number(s.id) <= 10 && Number(s.id) !== 7;
+            const isRevealed = (CommanderEngine.CampaignManager.isSettlementInForestZone?.(s) ?? isForestInner)
+                || (ovw.isCoordInLiveSight && ovw.isCoordInLiveSight(cx, cy));
+            const hEntry = board.find(w => w.name === s.house);
             const isHostile = hEntry?.status === 'WAR_PREP' || hEntry?.status === 'SKIRMISH' || s.chainsIntegrity < 50;
             const fillCol = !isRevealed ? '#334155' : (isPartyHere ? '#a855f7' : (isSelected ? '#38bdf8' : (isHostile ? '#dc2626' : (hEntry?.status === 'ALLIED' ? '#10b981' : '#d97706'))));
-            const labelTxt = isRevealed ? s.name.slice(0, 12) : '🌫️ [FOGGED]';
-            const blurAttr = !isRevealed ? 'opacity="0.55" filter="url(#outer-fog-blur-pop)"' : '';
+            const showLabel = i === 0 || isSelected || isPartyHere || z >= 1.35 || (isRevealed && isForestInner && z >= 1.0);
+            const fontSize = Math.round(Math.max(22, Math.min(54, 42 / Math.sqrt(z))));
+            const nodeR = Math.round(Math.max(18, Math.min(38, (isSelected || isPartyHere ? 34 : 26) / Math.sqrt(z))));
+            const labelTxt = isRevealed ? s.name : '🌫️ Uncharted';
+            if (i === 0) {
+                return `
+                    <g style="cursor:pointer;" onclick="event.stopPropagation(); window.selectMapSettlement(0); window.setWaypoint(${cx}, ${cy}, { nodeId: 0, label: 'The Capital', instantArrival: false });">
+                        <rect x="${cx - 34}" y="${cy - 34}" width="68" height="68" rx="8" fill="#1e1b4b" stroke="#fbbf24" stroke-width="6"/>
+                        <text x="${cx}" y="${cy + 13}" text-anchor="middle" fill="#fde68a" font-size="38">👑</text>
+                        <text x="${cx}" y="${cy - 46}" text-anchor="middle" fill="#fde68a" font-size="${fontSize}" font-weight="900">THE CAPITAL</text>
+                    </g>
+                `;
+            }
             return `
-                <g style="cursor:pointer;" ${blurAttr} onclick="window.selectMapSettlement(${s.id})" ondblclick="window.navigateOverworldSquad(${s.id})">
-                    <line x1="140" y1="62" x2="${cx}" y2="${cy}" stroke="${isSelected ? '#38bdf8' : '#4a453b'}" stroke-width="${isSelected ? '1.8' : '0.9'}" stroke-dasharray="2,2"/>
-                    <circle cx="${cx}" cy="${cy}" r="${isSelected || isPartyHere ? '7.5' : '5.5'}" fill="${fillCol}" stroke="${isSelected ? '#ffffff' : '#090d0e'}" stroke-width="1.4"/>
-                    <text x="${cx}" y="${(Number(cy) - 8).toFixed(1)}" text-anchor="middle" fill="${isSelected ? '#7dd3fc' : (isRevealed ? '#fef3c7' : '#94a3b8')}" font-size="${isSelected ? '6.8' : '5.6'}" font-weight="900">${labelTxt}</text>
+                <g style="cursor:pointer;" opacity="${isRevealed ? '1' : '0.48'}" onclick="event.stopPropagation(); window.selectMapSettlement(${s.id}); window.setWaypoint(${cx}, ${cy}, { nodeId: ${s.id}, label: '${s.name.replace(/'/g, "\\'")}', instantArrival: false });">
+                    <circle cx="${cx}" cy="${cy}" r="${nodeR}" fill="${fillCol}" stroke="${isSelected ? '#ffffff' : '#090d0e'}" stroke-width="5"/>
+                    ${showLabel ? `<text x="${cx}" y="${cy - nodeR - 12}" text-anchor="middle" fill="${isSelected ? '#7dd3fc' : (isRevealed ? '#fef3c7' : '#94a3b8')}" font-size="${fontSize}" font-weight="900">${labelTxt}</text>` : ''}
                 </g>
             `;
         }).join('');
 
-        const preyNodesSvg = (ovw.movingTargetEntities || []).filter(p => p.alive).map(p => `
-            <g style="cursor:pointer;" onclick="window.executeOverworldAction('HUNT_PREY','${p.id}')">
-                <circle cx="${p.x}" cy="${p.y}" r="4.2" fill="${isSov ? '#991b1b' : '#b45309'}" stroke="#fde68a" stroke-width="1" stroke-dasharray="1.5,1"/>
-                <text x="${p.x}" y="${(Number(p.y) + 2.2).toFixed(1)}" text-anchor="middle" font-size="5.5">${p.type === 'APEX_BEAST' ? '🦌' : '📦'}</text>
-                <text x="${p.x}" y="${(Number(p.y) + 8.5).toFixed(1)}" text-anchor="middle" fill="#fde68a" font-size="4.4" font-weight="bold">${isSov ? '🩸PREY' : '⚔️TARGET'}</text>
+        const preyNodesSvg = (ovw.movingTargetEntities || []).filter(p => p.alive && ((ovw.isCoordInLiveSight && ovw.isCoordInLiveSight(p.x, p.y)) || p.stalkedLevel > 0)).map(p => `
+            <g style="cursor:pointer;" onclick="event.stopPropagation(); window.setWaypoint(${p.x}, ${p.y}, { label: '${p.name.replace(/'/g, "\\'")}', instantArrival: false }); window.executeOverworldAction('HUNT_PREY','${p.id}');">
+                <circle cx="${p.x}" cy="${p.y}" r="24" fill="${isSov ? '#991b1b' : '#b45309'}" stroke="#fde68a" stroke-width="4" stroke-dasharray="8,5"/>
+                <text x="${p.x}" y="${Number(p.y) + 10}" text-anchor="middle" font-size="30">${p.type === 'APEX_BEAST' ? '🦌' : '📦'}</text>
+                <text x="${p.x}" y="${Number(p.y) + 46}" text-anchor="middle" fill="#fde68a" font-size="24" font-weight="bold">${isSov ? '🩸PREY' : '⚔️CONVOY'}</text>
             </g>
         `).join('');
 
         const trailPoints = (ovw.movementTrail || []).map(pt => `${pt.x},${pt.y}`).join(' ');
         const trailSvg = (ovw.movementTrail && ovw.movementTrail.length > 1)
-            ? `<polyline points="${trailPoints}" fill="none" stroke="${isSov ? '#ef4444' : '#38bdf8'}" stroke-width="1.6" stroke-dasharray="3,2" opacity="0.85"/>`
+            ? `<polyline points="${trailPoints}" fill="none" stroke="${isSov ? '#ef4444' : '#38bdf8'}" stroke-width="7" stroke-dasharray="16,10" opacity="0.85"/>`
             : '';
 
-        const px = ovw.partyX || 198;
-        const py = ovw.partyY || 82;
+        const px = ovw.partyX || 2260;
+        const py = ovw.partyY || 2180;
+        const curBiome = ovw.getBiomeAt ? ovw.getBiomeAt(px, py) : { label: 'Dense Ironbark Forest', speedMult: 0.78 };
+        const waypointSvg = (ovw.targetX !== null && ovw.targetY !== null)
+            ? `
+                <g pointer-events="none">
+                    <line x1="${px}" y1="${py}" x2="${ovw.targetX}" y2="${ovw.targetY}" stroke="#fde68a" stroke-width="6" stroke-dasharray="14,10"/>
+                    <circle cx="${ovw.targetX}" cy="${ovw.targetY}" r="26" fill="none" stroke="#fde68a" stroke-width="5"/>
+                    <text x="${ovw.targetX}" y="${ovw.targetY - 34}" text-anchor="middle" fill="#fde68a" font-size="28" font-weight="900">🚩 ${ovw.targetLabel || 'WAYPOINT'}</text>
+                </g>
+            `
+            : '';
         const partyTokenSvg = `
             <g pointer-events="none">
-                <circle cx="${px}" cy="${py}" r="8.5" fill="${isSov ? 'rgba(220,38,38,0.28)' : 'rgba(56,189,248,0.25)'}" stroke="${isSov ? '#ef4444' : '#38bdf8'}" stroke-width="1.4"/>
-                <text x="${px}" y="${(Number(py) + 3).toFixed(1)}" text-anchor="middle" font-size="8.5">${isSov ? '🐺' : '🛡️'}</text>
-                <text x="${px}" y="${(Number(py) + 13).toFixed(1)}" text-anchor="middle" fill="${isSov ? '#fca5a5' : '#bae6fd'}" font-size="5.2" font-weight="900">${isSov ? `SOVEREIGN [${ovw.stance}]` : `SQUAD [${ovw.stance}]`}</text>
+                <circle cx="${px}" cy="${py}" r="${ovw.sightRadius || 340}" fill="none" stroke="${isSov ? 'rgba(239,68,68,0.45)' : 'rgba(56,189,248,0.45)'}" stroke-width="5" stroke-dasharray="18,12"/>
+                <circle cx="${px}" cy="${py}" r="42" fill="${isSov ? 'rgba(220,38,38,0.32)' : 'rgba(56,189,248,0.30)'}" stroke="${isSov ? '#ef4444' : '#38bdf8'}" stroke-width="6"/>
+                <text x="${px}" y="${Number(py) + 14}" text-anchor="middle" font-size="42">${isSov ? '🐺' : '🛡️'}</text>
+                <text x="${px}" y="${Number(py) + 68}" text-anchor="middle" fill="${isSov ? '#fca5a5' : '#bae6fd'}" font-size="28" font-weight="900">${isSov ? `SOVEREIGN [${ovw.stance}]` : `SQUAD [${ovw.stance}]`}</text>
             </g>
         `;
 
@@ -1352,10 +1500,10 @@ export const CommanderUI = {
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid ${isSov ? '#7f1d1d' : '#14532d'}; padding-bottom:6px; flex-wrap:wrap; gap:6px;">
                     <div>
                         <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:14px; font-weight:900; letter-spacing:0.04em;">
-                            ${isSov ? '🐺 PREDATOR OVERWORLD MAP // STALK, HUNT, ATTACK &amp; FEED (FULLSCREEN)' : '🧭 MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION (FULLSCREEN)'}
+                            ${isSov ? '🐺 PREDATOR OVERWORLD MAP // 4000x4000 FREE-ROAM TERRAIN (FULLSCREEN)' : '🧭 MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION (4000x4000 FREE-ROAM)'}
                         </div>
                         <div style="font-size:10px; color:#86efac; font-family:'Share Tech Mono',monospace;">
-                            ⛺ SUPPLIES: <b>${ovw.suppliesDaysRemaining ?? 3}/${ovw.maxSuppliesDays ?? 3} DAYS</b> | 📍 POS: (${ovw.partyX}, ${ovw.partyY}) | 🏃 DIST FROM CAMP: <b>${ovw.distanceFromCampHours ?? 0}H (${Number(((ovw.distanceFromCampHours ?? 0) * (0.5 / (CommanderEngine.timeScale || 1))).toFixed(2))}H IRL)</b>
+                            ⛺ SUPPLIES: <b>${ovw.suppliesDaysRemaining ?? 3}/${ovw.maxSuppliesDays ?? 3} DAYS</b> | 📍 POS: (${ovw.partyX}, ${ovw.partyY}) [${curBiome.label} • ${Math.round((curBiome.speedMult || 1) * 100)}% SPD] | 🏃 DIST FROM CAMP: <b>${ovw.distanceFromCampHours ?? 0}H (${Number(((ovw.distanceFromCampHours ?? 0) * (0.5 / (CommanderEngine.timeScale || 1))).toFixed(2))}H IRL)</b>
                         </div>
                     </div>
                     <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
@@ -1366,6 +1514,7 @@ export const CommanderUI = {
                     </div>
                 </div>
                 <div id="overworld-map-pan-zoom-viewport"
+                     onclick="window.handleOverworldMapClick(event)"
                      onwheel="window.handleOverworldWheel(event)"
                      onmousedown="window.handleOverworldPointerDown(event)"
                      onmousemove="window.handleOverworldPointerMove(event)"
@@ -1374,40 +1523,26 @@ export const CommanderUI = {
                      ontouchstart="window.handleOverworldPointerDown(event)"
                      ontouchmove="window.handleOverworldPointerMove(event)"
                      ontouchend="window.handleOverworldPointerUp(event)"
-                     style="flex:1; position:relative; display:flex; align-items:center; justify-content:center; min-height:240px; margin:6px 0; border:2px solid ${isSov ? '#7f1d1d' : '#14532d'}; border-radius:6px; overflow:hidden; cursor:grab; touch-action:none; user-select:none; background:radial-gradient(circle at 50% 50%, rgba(20,83,45,0.38) 0%, rgba(15,23,42,0.95) 58%, rgba(3,5,8,1) 100%);">
-                    <div style="position:absolute; top:8px; right:8px; z-index:20; display:flex; gap:4px; align-items:center; background:rgba(9,13,16,0.9); border:1px solid #475569; border-radius:4px; padding:4px 6px;" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
-                        <span style="font-size:9px; color:#94a3b8; font-family:'Share Tech Mono',monospace;">🔍 ZOOM: <b id="overworld-zoom-badge" style="color:#fde68a;">${Math.round((this.mapZoom || 1) * 100)}%</b></span>
-                        <button class="cmd-btn" style="padding:2px 7px; font-size:10px; font-weight:900;" onclick="window.zoomOverworldMap(0.25)" title="Zoom In">➕</button>
-                        <button class="cmd-btn" style="padding:2px 7px; font-size:10px; font-weight:900;" onclick="window.zoomOverworldMap(-0.25)" title="Zoom Out">➖</button>
-                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px;" onclick="window.panOverworldMap(0, 18)" title="Pan North">⬆</button>
-                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px;" onclick="window.panOverworldMap(0, -18)" title="Pan South">⬇</button>
-                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px;" onclick="window.panOverworldMap(24, 0)" title="Pan West">⬅</button>
-                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px;" onclick="window.panOverworldMap(-24, 0)" title="Pan East">➡</button>
+                     style="flex:1; position:relative; display:flex; align-items:center; justify-content:center; min-height:240px; margin:6px 0; border:2px solid ${isSov ? '#7f1d1d' : '#14532d'}; border-radius:6px; overflow:hidden; cursor:grab; touch-action:none; user-select:none; background:#030508;">
+                    <div style="position:absolute; top:8px; right:8px; z-index:20; display:flex; gap:4px; align-items:center; background:rgba(9,13,16,0.9); border:1px solid #475569; border-radius:4px; padding:4px 6px;" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
+                        <span style="font-size:9px; color:#94a3b8; font-family:'Share Tech Mono',monospace;">🔍 ZOOM: <b id="overworld-zoom-badge" style="color:#fde68a;">${Math.round(z * 100)}%</b></span>
+                        <button class="cmd-btn" style="padding:2px 7px; font-size:10px; font-weight:900;" onclick="window.zoomOverworldMap(0.35)" title="Zoom In">➕</button>
+                        <button class="cmd-btn" style="padding:2px 7px; font-size:10px; font-weight:900;" onclick="window.zoomOverworldMap(-0.35)" title="Zoom Out">➖</button>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px;" onclick="window.panOverworldMap(0, 180)" title="Pan North">⬆</button>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px;" onclick="window.panOverworldMap(0, -180)" title="Pan South">⬇</button>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px;" onclick="window.panOverworldMap(220, 0)" title="Pan West">⬅</button>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px;" onclick="window.panOverworldMap(-220, 0)" title="Pan East">➡</button>
                         <button class="cmd-btn" style="padding:2px 7px; font-size:9px; background:#1e293b; border-color:#38bdf8; color:#bae6fd;" onclick="window.focusOverworldParty()" title="Center on Squad / Sovereign">🎯 Center Squad</button>
-                        <button class="cmd-btn" style="padding:2px 7px; font-size:9px;" onclick="window.resetOverworldMapCamera()" title="Reset Zoom &amp; Pan">🔄 Reset 100%</button>
+                        <button class="cmd-btn" style="padding:2px 7px; font-size:9px;" onclick="window.resetOverworldMapCamera()" title="Full 4000x4000 World Overview">🔄 World Overview</button>
                     </div>
-                    <div style="position:absolute; bottom:6px; left:8px; z-index:15; pointer-events:none; font-size:8.5px; color:#94a3b8; background:rgba(5,7,9,0.75); padding:2px 6px; border-radius:3px;">
-                        ✋ Drag to Pan Map | 🖱️ Scroll / ➕➖ to Zoom | 👆 Tap Node to Select | 👆👆 Double-Tap Node to March
+                    <div style="position:absolute; bottom:6px; left:8px; z-index:15; pointer-events:none; font-size:8.5px; color:#94a3b8; background:rgba(5,7,9,0.82); padding:3px 7px; border-radius:3px;">
+                        👆 Click Anywhere on Terrain to March Squad (Time Advances While Moving) | ✋ Drag to Pan | 🖱️ Scroll / ➕➖ to Zoom
                     </div>
-                    <svg id="overworld-fullscreen-svg" viewBox="0 0 280 128" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; max-height:66vh; display:block;">
-                        <defs>
-                            <filter id="outer-fog-blur-pop" x="-20%" y="-20%" width="140%" height="140%">
-                                <feGaussianBlur stdDeviation="0.9" />
-                            </filter>
-                            <radialGradient id="fog-of-war-shroud-pop" cx="50%" cy="50%" r="50%">
-                                <stop offset="0%" stop-color="#000000" stop-opacity="0" />
-                                <stop offset="52%" stop-color="#0f172a" stop-opacity="0.05" />
-                                <stop offset="68%" stop-color="#1e293b" stop-opacity="0.68" />
-                                <stop offset="100%" stop-color="#020617" stop-opacity="0.92" />
-                            </radialGradient>
-                        </defs>
-                        <g id="overworld-svg-pan-zoom-group" transform="translate(140, 64) scale(${Number((this.mapZoom || 1).toFixed(2))}) translate(${-140 + Number((this.mapPanX || 0).toFixed(1))}, ${-64 + Number((this.mapPanY || 0).toFixed(1))})">
-                            <rect x="-140" y="-64" width="560" height="256" fill="url(#fog-of-war-shroud-pop)" pointer-events="none"/>
-                            <ellipse cx="140" cy="64" rx="112" ry="49" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3"/>
-                            <ellipse cx="140" cy="64" rx="76" ry="33" fill="none" stroke="#22c55e" stroke-width="1.2" stroke-dasharray="3,2"/>
-                            <text x="140" y="28" text-anchor="middle" fill="#86efac" font-size="5.2" font-weight="bold">🌲 INNER FOREST ZONE (TAP ANY NODE TO SELECT OR DOUBLE-TAP TO MARCH)</text>
-                            <text x="140" y="10" text-anchor="middle" fill="#94a3b8" font-size="5.2" font-weight="bold">🌫️ OUTER HORIZON &amp; DUNES (FOG OF WAR — MARCH OR SCOUT TO LIFT)</text>
+                    <canvas id="overworld-terrain-canvas" width="800" height="800" style="position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none;"></canvas>
+                    <svg id="overworld-fullscreen-svg" viewBox="0 0 4000 4000" preserveAspectRatio="xMidYMid meet" style="position:relative; z-index:10; width:100%; height:100%; max-height:66vh; display:block;">
+                        <g id="overworld-svg-pan-zoom-group" transform="translate(2000, 2000) scale(${Number(z.toFixed(2))}) translate(${-2000 + Number((this.mapPanX || 0).toFixed(1))}, ${-2000 + Number((this.mapPanY || 0).toFixed(1))})">
                             ${trailSvg}
+                            ${waypointSvg}
                             ${svgNodes}
                             ${preyNodesSvg}
                             ${partyTokenSvg}
@@ -1420,7 +1555,7 @@ export const CommanderUI = {
                         🎯 <b>SELECTED NODE:</b> <span style="color:#fde68a; font-weight:900;">${selNodeCleared ? `${selNode.name.toUpperCase()} (${selNode.house} | Power: ${selHouse.power}/100 [${selHouse.status}] | Fuel: ${selNode.barrierFuel}u | Chains: ${selNode.chainsIntegrity}%)` : `🌫️ OUTER HORIZON FOG — UNCHARTED SECTOR #${selNode.id}`}</span>
                     </div>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        <button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#14532d; border-color:#22c55e; color:#dcfce7; font-weight:900;" onclick="window.navigateOverworldSquad(${selNode.id})">🧭 March Squad to ${selNode.name} (-1d Supply)</button>
+                        <button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#14532d; border-color:#22c55e; color:#dcfce7; font-weight:900;" onclick="window.setWaypoint(${selCoords.x}, ${selCoords.y}, { nodeId: ${selNode.id}, label: '${selNode.name.replace(/'/g, "\\'")}', instantArrival: false })">🧭 March Squad to ${selNode.name} (-1d Supply)</button>
                         ${!selNodeCleared
                             ? `<button class="cmd-btn" style="padding:5px 10px; font-size:10px; background:#0f172a; border-color:#38bdf8; color:#bae6fd; font-weight:bold;" onclick="window.scoutFogOfWarNode('${selNode.name}')">🌫️🧭 Lift Fog of War (Mist-Recon)</button>`
                             : ''
@@ -1453,6 +1588,7 @@ export const CommanderUI = {
                 </div>
             </div>
         `;
+        this.drawOverworldTerrainCanvas();
     },
 
     renderInquestReader(targetId = 'agt_2') {
