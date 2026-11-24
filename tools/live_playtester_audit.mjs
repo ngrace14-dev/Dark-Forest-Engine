@@ -514,8 +514,8 @@ if ((strAfter - strBefore) !== 1 || !blockedRepeatShift.shiftCapped) {
 // Verify 3-Day Overworld Travel Supplies, Pop-Up Explore Forest Modal & Auto-Return Trek (Distance -> IRL Hours)
 const unlockedExploreRes = window.openExploreForest();
 const explorePopupHtml = document.getElementById('explore-forest-popup-modal')?.innerHTML || '';
-if (!explorePopupHtml.includes('MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION')) {
-    auditReport.bugsFound.push('Expected clicking Explore Forest after upgrading Forward Recon facility to pop up the interactive Explore Forest Overworld Modal.');
+if (!explorePopupHtml.includes('MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION') || !explorePopupHtml.includes('position:fixed; inset:0; z-index:9999;')) {
+    auditReport.bugsFound.push('Expected clicking Explore Forest after upgrading Forward Recon facility to pop up the full-screen interactive Explore Forest Overworld Modal.');
 }
 const navSquadRes = CommanderEngine.ForestOverworldEngine.navigateSquadToNode(4); // Day 1 supply used (2/3 left)
 const navLeg2 = CommanderEngine.ForestOverworldEngine.navigateSquadToNode(8);    // Day 2 supply used (1/3 left)
