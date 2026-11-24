@@ -159,36 +159,125 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
         const fe = rootScope.FacilityEngine;
         const tgUnlocked = Boolean(fe?.facilities?.training_grounds?.unlocked);
         const tgLv = tgUnlocked ? (fe.facilities.training_grounds.level || 1) : 0;
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const currentShiftIdx = Math.floor((day - 1) / 14);
+
+        if (agent.lastDrillShiftIdx !== currentShiftIdx) {
+            agent.lastDrillShiftIdx = currentShiftIdx;
+            agent.shiftTrainedCategories = {};
+        }
+        agent.shiftTrainedCategories ??= {};
+
+        if (agent.trainingLocked && !addToQueue) {
+            return {
+                success: false,
+                locked: true,
+                message: `🔒 [UNIT LOCKED IN TRAINING GROUNDS] ${agent.name} is locked in active training (${agent.operatingStance?.discipline}) until training completes! Pay 50% of the training cost (${Math.floor((agent.trainingCostPaid || 4) / 2)}r) to cancel early.`
+            };
+        }
+
+        if (agent.shiftTrainedCategories[disc] >= 1) {
+            return {
+                success: false,
+                shiftCapped: true,
+                message: `⚠️ [SHIFT CATEGORY CAP: 1 PT / SHIFT] ${agent.name} already gained +1 [${disc}] during Shift #${currentShiftIdx + 1}. Select a different stat category until the next 14-day Shift!`
+            };
+        }
+
+        const trainingCost = 4;
+        if (!agent.trainingLocked && fe && (fe.settlementResources || 0) >= trainingCost) {
+            fe.settlementResources -= trainingCost;
+            agent.trainingCostPaid = (agent.trainingCostPaid || 0) + trainingCost;
+        } else if (!agent.trainingLocked) {
+            agent.trainingCostPaid = trainingCost;
+        }
 
         agent.trainingQueue = Array.isArray(agent.trainingQueue) ? agent.trainingQueue : [];
         if (addToQueue && tgUnlocked && agent.operatingStance?.mode === 'TRAIN' && agent.operatingStance?.discipline) {
-            if (agent.trainingQueue.length < 2 + tgLv) {
+            if (!agent.trainingQueue.includes(disc) && agent.operatingStance.discipline !== disc && !agent.shiftTrainedCategories[disc]) {
                 agent.trainingQueue.push(disc);
+                agent.trainingCostPaid = (agent.trainingCostPaid || 4) + 4;
                 return {
                     success: true,
                     queued: true,
                     queue: agent.trainingQueue,
-                    message: `🏋️📋 [FORWARD RECON TRAINING QUEUE] Queued [${disc}] for ${agent.name} (Active: ${agent.operatingStance.discipline} -> Queue: [${agent.trainingQueue.join(' → ')}]).`
+                    message: `🏋️📋 [FORWARD RECON TRAINING QUEUE] Queued [${disc}] (+1 pt/day) for ${agent.name} (Locked in Training: ${agent.operatingStance.discipline} -> Queue: [${agent.trainingQueue.join(' → ')}]).`
                 };
             }
         }
-        agent.operatingStance = { mode: 'TRAIN', discipline: disc, task: null, daysTrained: (agent.operatingStance?.daysTrained || 0) };
-        const roomLabel = tgUnlocked ? `Forward Recon Training Grounds (Lv.${tgLv} Queue Active)` : `Basic Barracks Drill Yard (Build [Forward Recon Training Grounds] for +35% speed & multi-stat queues)`;
-        return { success: true, queue: agent.trainingQueue, message: `🏋️ ${agent.name} assigned to ${roomLabel}: [DRILL: ${disc}].` };
+        agent.trainingLocked = true;
+        agent.operatingStance = { mode: 'TRAIN', discipline: disc, task: null, daysTrained: (agent.operatingStance?.daysTrained || 0), lockedInTraining: true };
+        const roomLabel = tgUnlocked ? `Forward Recon Training Grounds (Lv.${tgLv} — Unit Locked Until Complete)` : `Barracks Drill Yard (Unit Locked Until Complete)`;
+        return { success: true, locked: true, costPaid: agent.trainingCostPaid, queue: agent.trainingQueue, message: `🏋️🔒 ${agent.name} locked into ${roomLabel}: [DRILL: ${disc} (+1 Stat/Day, Max 1/Category per Shift)].` };
     },
 
     queueAgentTraining(agentId, disciplineList = ['MELEE_ATT', 'SURVIVAL', 'STEALTH']) {
         const agent = this.agents.get(agentId);
         if (!agent || !agent.alive) return { success: false, message: "Agent invalid or deceased." };
-        const list = Array.isArray(disciplineList) ? disciplineList.map(d => String(d).toUpperCase()) : [String(disciplineList).toUpperCase()];
-        const first = list[0] || 'MELEE_ATT';
-        agent.trainingQueue = list.slice(1);
-        agent.operatingStance = { mode: 'TRAIN', discipline: first, task: null, daysTrained: (agent.operatingStance?.daysTrained || 0) };
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const currentShiftIdx = Math.floor((day - 1) / 14);
+        if (agent.lastDrillShiftIdx !== currentShiftIdx) {
+            agent.lastDrillShiftIdx = currentShiftIdx;
+            agent.shiftTrainedCategories = {};
+        }
+        agent.shiftTrainedCategories ??= {};
+
+        const rawList = Array.isArray(disciplineList) ? disciplineList.map(d => String(d).toUpperCase()) : [String(disciplineList).toUpperCase()];
+        const validList = Array.from(new Set(rawList)).filter(d => (agent.shiftTrainedCategories[d] || 0) < 1);
+        if (validList.length === 0) {
+            return { success: false, message: `All requested categories (${rawList.join(', ')}) have already been trained (+1) by ${agent.name} this Shift!` };
+        }
+
+        const totalCost = validList.length * 4;
+        const fe = rootScope.FacilityEngine;
+        if (fe && (fe.settlementResources || 0) >= totalCost) {
+            fe.settlementResources -= totalCost;
+        }
+        agent.trainingCostPaid = totalCost;
+        agent.trainingLocked = true;
+        const first = validList[0];
+        agent.trainingQueue = validList.slice(1);
+        agent.operatingStance = { mode: 'TRAIN', discipline: first, task: null, daysTrained: (agent.operatingStance?.daysTrained || 0), lockedInTraining: true };
         return {
             success: true,
+            locked: true,
+            costPaid: totalCost,
             activeDiscipline: first,
             queue: agent.trainingQueue,
-            message: `🏋️📋 [TRAINING QUEUE LOCKED] ${agent.name} entered Forward Recon Training Queue: Active [${first}] -> Queued [${agent.trainingQueue.join(' → ') || 'None'}].`
+            message: `🏋️🔒 [TRAINING QUEUE LOCKED (-${totalCost}r)] ${agent.name} locked in Forward Recon Training Grounds for ${validList.length} day(s): Active [${first}] -> Queued [${agent.trainingQueue.join(' → ') || 'None'}] (+1 pt/day, 1/category per Shift. Cancel early costs ${Math.floor(totalCost / 2)}r).`
+        };
+    },
+
+    cancelAgentTraining(agentId) {
+        const agent = this.agents.get(agentId);
+        if (!agent || !agent.alive) return { success: false, message: "Agent invalid or deceased." };
+        if (agent.operatingStance?.mode !== 'TRAIN' && !agent.trainingLocked) {
+            return { success: false, message: `${agent.name} is not currently locked in the Training Grounds.` };
+        }
+        const originalCost = Math.max(4, Number(agent.trainingCostPaid) || 4);
+        const cancelFee = Math.max(2, Math.floor(originalCost / 2));
+        const fe = rootScope.FacilityEngine;
+        if (fe && (fe.settlementResources || 0) < cancelFee) {
+            return {
+                success: false,
+                cancelFee,
+                message: `Insufficient Settlement Resources (${fe.settlementResources}/${cancelFee}r) to pay the 50% early training cancellation fee for ${agent.name}!`
+            };
+        }
+        if (fe) fe.settlementResources -= cancelFee;
+        const cancelledDisc = agent.operatingStance?.discipline || 'DRILL';
+        agent.trainingLocked = false;
+        agent.trainingQueue = [];
+        agent.trainingCostPaid = 0;
+        agent.operatingStance = { mode: 'IDLE', discipline: null, task: null, daysTrained: agent.operatingStance?.daysTrained || 0 };
+        const msg = `🔓💰 [TRAINING CANCELLED EARLY (-${cancelFee}r)] Paid half the training cost (${cancelFee}r of ${originalCost}r) to release ${agent.name} early from [${cancelledDisc}] in the Forward Recon Training Grounds.`;
+        rootScope.EventBus?.emit('UI_LOG', msg);
+        return {
+            success: true,
+            cancelFee,
+            originalCost,
+            agent,
+            message: msg
         };
     },
 
@@ -204,11 +293,17 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
     },
 
     tickDailyDrills() {
-        const facMult = rootScope.RoleStateMachine?.computeFacilityMultipliers?.() || { barracksLv: 0, trainingGroundsLv: 0, scriptoriumLv: 1 };
-        const drillMult = 1 + (facMult.barracksLv || 0) * 0.2 + (facMult.trainingGroundsLv || 0) * 0.35;
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const currentShiftIdx = Math.floor((day - 1) / 14);
         this.agents.forEach(agent => {
             if (!agent.alive) return;
             const st = agent.operatingStance;
+            if (agent.lastDrillShiftIdx !== currentShiftIdx) {
+                agent.lastDrillShiftIdx = currentShiftIdx;
+                agent.shiftTrainedCategories = {};
+            }
+            agent.shiftTrainedCategories ??= {};
+
             if (agent.cultivation) {
                 agent.cultivation.currentMasteryPool = Math.min(100, (agent.cultivation.currentMasteryPool || 20) + 6);
                 if (agent.cultivation.foundationFireDays > 0) {
@@ -216,44 +311,56 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
                 }
             }
             if (st.mode === 'TRAIN' && st.discipline) {
-                st.daysTrained = (st.daysTrained || 0) + 1;
                 const d = st.discipline.toUpperCase();
-                const gain = Number((0.25 * drillMult).toFixed(2));
-                if (d === 'LOGISTICS' || d === 'LORE') {
-                    agent.skills.lore = Math.min(30, Number((agent.skills.lore + gain).toFixed(2)));
-                    if (st.daysTrained >= 7 && agent.career.rank !== 'Logistics Bailiff') {
-                        agent.career.rank = 'Logistics Bailiff';
-                        rootScope.EventBus?.emit('UI_LOG', `[ROSTER] ${agent.name} promoted to Logistics Bailiff!`);
+                // Rule: Strictly +1 stat point per day, and max 1 stat point gain per category per 14-day Shift
+                const gain = 1;
+                if ((agent.shiftTrainedCategories[d] || 0) < 1) {
+                    st.daysTrained = (st.daysTrained || 0) + 1;
+                    agent.shiftTrainedCategories[d] = 1;
+                    if (d === 'LOGISTICS' || d === 'LORE') {
+                        agent.skills.lore = Math.min(30, Number((agent.skills.lore + gain).toFixed(2)));
+                        if (st.daysTrained >= 7 && agent.career.rank !== 'Logistics Bailiff') {
+                            agent.career.rank = 'Logistics Bailiff';
+                            rootScope.EventBus?.emit('UI_LOG', `[ROSTER] ${agent.name} promoted to Logistics Bailiff!`);
+                        }
+                    } else if (d === 'MARTIAL' || d === 'MELEE_ATT') {
+                        agent.skills.meleeAtt = Math.min(30, Number((agent.skills.meleeAtt + gain).toFixed(2)));
+                    } else if (d === 'DEFENSE' || d === 'MELEE_DEF') {
+                        agent.skills.meleeDef = Math.min(30, Number((agent.skills.meleeDef + gain).toFixed(2)));
+                        agent.vitals.poise = Math.min(100, agent.vitals.poise + 2);
+                    } else if (d === 'STRENGTH') {
+                        agent.skills.strength = Math.min(30, Number((agent.skills.strength + gain).toFixed(2)));
+                    } else if (d === 'TOUGHNESS') {
+                        agent.skills.toughness = Math.min(30, Number((agent.skills.toughness + gain).toFixed(2)));
+                        agent.vitals.maxHp += 2;
+                        agent.vitals.hp = Math.min(agent.vitals.maxHp, agent.vitals.hp + 2);
+                    } else if (d === 'ATHLETICS') {
+                        agent.skills.athletics = Math.min(30, Number((agent.skills.athletics + gain).toFixed(2)));
+                    } else if (d === 'DODGE') {
+                        agent.skills.dodge = Math.min(30, Number((agent.skills.dodge + gain).toFixed(2)));
+                    } else if (d === 'STEALTH') {
+                        agent.skills.stealth = Math.min(30, Number((agent.skills.stealth + gain).toFixed(2)));
+                    } else if (d === 'SURVIVAL') {
+                        agent.skills.survival = Math.min(30, Number((agent.skills.survival + gain).toFixed(2)));
                     }
-                } else if (d === 'MARTIAL' || d === 'MELEE_ATT') {
-                    agent.skills.meleeAtt = Math.min(30, Number((agent.skills.meleeAtt + gain).toFixed(2)));
-                } else if (d === 'DEFENSE' || d === 'MELEE_DEF') {
-                    agent.skills.meleeDef = Math.min(30, Number((agent.skills.meleeDef + gain).toFixed(2)));
-                    agent.vitals.poise = Math.min(100, agent.vitals.poise + 2);
-                } else if (d === 'STRENGTH') {
-                    agent.skills.strength = Math.min(30, Number((agent.skills.strength + gain).toFixed(2)));
-                } else if (d === 'TOUGHNESS') {
-                    agent.skills.toughness = Math.min(30, Number((agent.skills.toughness + gain).toFixed(2)));
-                    agent.vitals.maxHp += 2;
-                    agent.vitals.hp = Math.min(agent.vitals.maxHp, agent.vitals.hp + 2);
-                } else if (d === 'ATHLETICS') {
-                    agent.skills.athletics = Math.min(30, Number((agent.skills.athletics + gain).toFixed(2)));
-                } else if (d === 'DODGE') {
-                    agent.skills.dodge = Math.min(30, Number((agent.skills.dodge + gain).toFixed(2)));
-                } else if (d === 'STEALTH') {
-                    agent.skills.stealth = Math.min(30, Number((agent.skills.stealth + gain).toFixed(2)));
-                } else if (d === 'SURVIVAL') {
-                    agent.skills.survival = Math.min(30, Number((agent.skills.survival + gain).toFixed(2)));
+                    if (agent.cultivation) {
+                        agent.cultivation.currentMasteryPool = Math.min(100, (agent.cultivation.currentMasteryPool || 25) + 10);
+                    }
                 }
-                if (agent.cultivation) {
-                    agent.cultivation.currentMasteryPool = Math.min(100, (agent.cultivation.currentMasteryPool || 25) + 10);
+
+                // Filter out any queued disciplines already capped this Shift and advance or unlock the unit
+                if (Array.isArray(agent.trainingQueue)) {
+                    agent.trainingQueue = agent.trainingQueue.filter(q => (agent.shiftTrainedCategories[String(q).toUpperCase()] || 0) < 1);
                 }
-                // Advance to next queued discipline in Forward Recon Training Grounds queue
                 if (Array.isArray(agent.trainingQueue) && agent.trainingQueue.length > 0) {
                     const nextDisc = agent.trainingQueue.shift();
-                    if (nextDisc) {
-                        st.discipline = nextDisc;
-                    }
+                    st.discipline = nextDisc;
+                } else {
+                    // Training complete! Release unit lock
+                    agent.trainingLocked = false;
+                    agent.trainingCostPaid = 0;
+                    agent.operatingStance = { mode: 'IDLE', discipline: null, task: null, daysTrained: st.daysTrained || 0 };
+                    rootScope.EventBus?.emit('UI_LOG', `✅🏋️ [TRAINING COMPLETE] ${agent.name} completed their Shift training regimen (+1 ${d}) and is now unlocked for deployment!`);
                 }
             }
             agent.statusEffects = (agent.statusEffects || []).filter(eff => {
@@ -270,6 +377,7 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
         this.agents.forEach(agent => {
             if (!agent.alive) return;
             agent.shiftsSurvived = (agent.shiftsSurvived || 0) + 1;
+            agent.shiftTrainedCategories = {};
             agent.statusEffects ??= [];
             if (barrierHealthy) {
                 agent.statusEffects.push({ id: 'SHIFT_VIGOR', name: 'Shift Vigor', type: 'BUFF', daysRemaining: 14, desc: '+15 Poise' });
@@ -3831,7 +3939,7 @@ const CrisisEngine = rootScope.CrisisEngine || {
         const isSov = (r === 'SOVEREIGN' || r === 'PALE_SOVEREIGN');
         const fac = FacilityEngine.facilities;
         const factCount = RealityEditorVault.facts?.length || 0;
-        const exploreUnlocked = isSov || Boolean(fac.exploration_observatory?.unlocked);
+        const exploreUnlocked = isSov || Boolean(fac.exploration_observatory?.unlocked || fac.training_grounds?.unlocked);
         const dirs = isSov
             ? [
                 [`window.openExploreForest()`, '🐺🌲 EXPLORE FOREST (Predator Hunt, Stalk & Feed Overworld)'],
@@ -3841,8 +3949,8 @@ const CrisisEngine = rootScope.CrisisEngine || {
             : [
                 [`window.viewFacilities()`, '🏗️ Fallout Shelter Facility Grid & Upgrades'],
                 ...(exploreUnlocked
-                    ? [[`window.openExploreForest()`, '🌲🧭 EXPLORE FOREST (Forward Recon Overworld Map)']]
-                    : [[`window.viewFacilities('exploration_observatory')`, '🔒 Build Forward Recon Outpost (Unlocks Explore Forest Map)']]),
+                    ? [[`window.openExploreForest()`, '🌲🧭 EXPLORE FOREST (Open Overworld Pop-Up Map)']]
+                    : [[`window.viewFacilities('exploration_observatory')`, '🔒 Build Forward Recon Facility (Unlocks Explore Forest Map)']]),
                 [`window.viewTruthVault()`, `📜 Truth & Relic Vault (${factCount})`],
                 [`window.viewTelemetry()`, '🏛️ 20 Bedrock Settlements']
             ];
@@ -4240,7 +4348,7 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
             guarded = true;
         }
 
-        const availableAgents = Array.from(AgentRosterManager.agents.values()).filter(a => a.alive && a.operatingStance?.mode !== 'OUT_ON_MISSION');
+        const availableAgents = Array.from(AgentRosterManager.agents.values()).filter(a => a.alive && a.operatingStance?.mode !== 'OUT_ON_MISSION' && !a.trainingLocked);
         const leadAgent = (type === 'UNGUARDED_CARAVAN') ? null : (availableAgents[0] || null);
         if (leadAgent) {
             leadAgent.operatingStance = { mode: 'OUT_ON_MISSION', discipline: null, task: type, daysTrained: 0 };
@@ -4574,9 +4682,17 @@ rootScope.ExpeditionEngine = ExpeditionEngine;
 // ============================================================================
 export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
     partyNodeId: 1,
+    homeNodeId: 1,
+    homeX: 198,
+    homeY: 82,
     partyX: 198,
     partyY: 82,
-    stance: 'MARCH', // MARCH | STALK | HUNT | FORAGE | AMBUSH
+    suppliesDaysRemaining: 3,
+    maxSuppliesDays: 3,
+    distanceFromCampHours: 0,
+    isAutoReturning: false,
+    returnHoursRemaining: 0,
+    stance: 'MARCH', // MARCH | STALK | HUNT | FORAGE | AMBUSH | AUTO_RETURNING
     movementTrail: [],
     movingTargetEntities: [],
     overworldLogs: [],
@@ -4598,22 +4714,38 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         };
     },
 
+    computeReturnHoursFromCamp() {
+        const distPx = Math.hypot((this.partyX || 198) - (this.homeX || 198), (this.partyY || 82) - (this.homeY || 82));
+        return Math.max(1, Math.min(18, Math.ceil(distPx / 18) + Math.max(0, (this.movementTrail?.length || 1) - 1)));
+    },
+
     resetForNewRun() {
         const isSov = CampaignManager.campaignMode === 'SOVEREIGN';
+        const obsLv = rootScope.FacilityEngine?.facilities?.exploration_observatory?.unlocked
+            ? Math.max(0, (rootScope.FacilityEngine.facilities.exploration_observatory.level || 1) - 1)
+            : 0;
+        this.maxSuppliesDays = 3 + obsLv;
+        this.suppliesDaysRemaining = this.maxSuppliesDays;
         this.partyNodeId = isSov ? 2 : 1;
+        this.homeNodeId = this.partyNodeId;
         this.stance = isSov ? 'STALK' : 'MARCH';
         this.huntProgress = 0;
+        this.isAutoReturning = false;
+        this.returnHoursRemaining = 0;
         const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
         const startIdx = settlements.findIndex(s => Number(s.id) === this.partyNodeId);
         const startCoords = this.getSettlementCoords(settlements[Math.max(0, startIdx)], Math.max(1, startIdx), settlements.length || 20);
         this.partyX = startCoords.x;
         this.partyY = startCoords.y;
+        this.homeX = startCoords.x;
+        this.homeY = startCoords.y;
+        this.distanceFromCampHours = 0;
         this.movementTrail = [{ x: this.partyX, y: this.partyY, nodeId: this.partyNodeId, label: settlements[Math.max(0, startIdx)]?.name || 'Oakhaven' }];
         this.spawnMovingTargets();
         this.overworldLogs = [
             isSov
-                ? `🐺 [PREDATOR OVERWORLD ACTIVE] The Pale Sovereign & Bound Huntsman emerged from the frost-fissures near ${settlements[Math.max(0, startIdx)]?.name || 'Gallows Hill'}. Select any forest node or roaming caravan to STALK, HUNT, ATTACK & FEED!`
-                : `🧭 [MOUNT & BLADE FOREST OVERWORLD ACTIVE] Vanguard Squad mustered at ${settlements[Math.max(0, startIdx)]?.name || 'Oakhaven'}. Tap any node on the overview map to navigate your squad across the Dark Forest!`
+                ? `🐺 [PREDATOR OVERWORLD ACTIVE — ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS TRAVEL STAMINA] The Pale Sovereign & Bound Huntsman emerged near ${settlements[Math.max(0, startIdx)]?.name || 'Gallows Hill'}. Select any forest node or roaming caravan to STALK, HUNT, ATTACK & FEED!`
+                : `🧭 [MOUNT & BLADE FOREST OVERWORLD — ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS TRAVEL SUPPLIES] Vanguard Squad mustered at ${settlements[Math.max(0, startIdx)]?.name || 'Oakhaven'}. Each travel leg consumes -1 Day of Supplies; when depleted (0/${this.maxSuppliesDays}d), the squad automatically marches back to camp based on distance!`
         ];
     },
 
@@ -4647,11 +4779,87 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         return { success: true, stance: this.stance, message: msg };
     },
 
+    triggerAutoReturnToCamp(reason = 'Travel supplies depleted (0/3 Days)') {
+        const isSov = CampaignManager.campaignMode === 'SOVEREIGN';
+        const returnHours = this.computeReturnHoursFromCamp();
+        const ts = rootScope.CommanderEngine?.timeScale || 1;
+        const irlHoursPerInGameHour = Number(((12 / 24) / ts).toFixed(2));
+        const irlHoursRequired = Number((returnHours * irlHoursPerInGameHour).toFixed(2));
+        const leadAgt = AgentRosterManager.agents.get('agt_1') || Array.from(AgentRosterManager.agents.values()).find(a => a.alive);
+        const leaderName = leadAgt?.name || (isSov ? 'Korvan the Pale Sovereign' : 'Vanguard Squad');
+        const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
+        const currentNode = settlements.find(s => Number(s.id) === Number(this.partyNodeId)) || settlements[1] || { id: 1, name: 'Oakhaven' };
+        const homeNode = settlements.find(s => Number(s.id) === Number(this.homeNodeId)) || settlements[1] || { id: 1, name: 'Oakhaven' };
+
+        this.isAutoReturning = true;
+        this.returnHoursRemaining = returnHours;
+        this.distanceFromCampHours = returnHours;
+        this.stance = 'AUTO_RETURNING';
+
+        const returnExp = {
+            id: `exp_ovw_return_${Date.now()}`,
+            type: isSov ? 'LAIR_RETURN_TREK' : 'OVERWORLD_AUTO_RETURN',
+            targetName: `${currentNode.name} ➔ ${homeNode.name} Camp`,
+            guarded: true,
+            guardsAssigned: 0,
+            cargoIntegrity: 100,
+            hazardEncounters: 0,
+            leadAgentId: leadAgt?.id || null,
+            leadAgentName: leaderName,
+            startedDay: rootScope.EngineParams?.worldDay || 1,
+            hoursElapsed: returnHours,
+            totalHours: returnHours * 2,
+            returnHoursRemaining: returnHours,
+            salvagedFuelPending: 4,
+            status: 'RETURNING_EARLY',
+            logs: [
+                `[00:00] ⚠️⛺ [SUPPLIES EXHAUSTED — AUTO-RETURN MARCH] ${reason}! ${leaderName} turned back from ${currentNode.name} toward ${homeNode.name} Camp (${returnHours}h travel distance = ${irlHoursRequired} IRL hrs at ${ts}x).`
+            ]
+        };
+        ExpeditionEngine.activeExpeditions.unshift(returnExp);
+
+        this.partyNodeId = this.homeNodeId;
+        this.partyX = this.homeX;
+        this.partyY = this.homeY;
+        const obsLv = rootScope.FacilityEngine?.facilities?.exploration_observatory?.unlocked
+            ? Math.max(0, (rootScope.FacilityEngine.facilities.exploration_observatory.level || 1) - 1)
+            : 0;
+        this.maxSuppliesDays = 3 + obsLv;
+        this.suppliesDaysRemaining = this.maxSuppliesDays;
+        this.movementTrail = [{ x: this.homeX, y: this.homeY, nodeId: this.homeNodeId, label: homeNode.name }];
+
+        const msg = `⚠️🏃 [OUT OF SUPPLIES (0/${this.maxSuppliesDays}D) — AUTO-RETURN MARCH INITIATED] ${leaderName} ran out of rations at ${currentNode.name}! Marching back to ${homeNode.name} Camp (${returnHours}h distance from camp = ${irlHoursRequired} IRL hours at ${ts}x speed) with live hourly wasteland events. Camp supplies restocked to ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} Days for the next sortie!`;
+        this.overworldLogs.unshift(msg);
+        if (this.overworldLogs.length > 25) this.overworldLogs.pop();
+
+        LogDispatchManager.dispatches.unshift({
+            id: `ovw_autoret_${Date.now()}`,
+            day: rootScope.EngineParams?.worldDay || 1,
+            type: 'OVERWORLD AUTO-RETURN LOG',
+            sender: leaderName,
+            title: `Supplies Depleted at ${currentNode.name} — Auto-Return Trek (${returnHours}h / ${irlHoursRequired}h IRL)`,
+            body: msg,
+            read: false
+        });
+        return {
+            success: true,
+            autoReturned: true,
+            returnHours,
+            irlHoursRequired,
+            expedition: returnExp,
+            message: msg
+        };
+    },
+
     navigateSquadToNode(targetNodeId) {
         const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
         const idx = settlements.findIndex(s => Number(s.id) === Number(targetNodeId));
         const target = settlements[idx >= 0 ? idx : 1] || settlements[0];
         if (!target) return { success: false, message: 'Invalid forest destination node.' };
+
+        if ((this.suppliesDaysRemaining ?? 3) <= 0) {
+            return this.triggerAutoReturnToCamp('0 Days of Travel Supplies remaining');
+        }
 
         const coords = this.getSettlementCoords(target, idx >= 0 ? idx : 1, settlements.length || 20);
         this.partyNodeId = Number(target.id);
@@ -4659,6 +4867,11 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         this.partyY = coords.y;
         this.movementTrail.push({ x: this.partyX, y: this.partyY, nodeId: this.partyNodeId, label: target.name });
         if (this.movementTrail.length > 6) this.movementTrail.shift();
+
+        // Diminish travel supplies by 1 day on every exploration march leg (starts at 3 days)
+        this.suppliesDaysRemaining = Math.max(0, (this.suppliesDaysRemaining ?? 3) - 1);
+        this.distanceFromCampHours = this.computeReturnHoursFromCamp();
+        this.isAutoReturning = false;
 
         const wasFogged = !CampaignManager.isSettlementInForestZone(target);
         if (wasFogged) {
@@ -4675,7 +4888,7 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             CampaignManager.state.sovereign.significanceHarvested = (CampaignManager.state.sovereign.significanceHarvested || 0) + stalkGain;
             this.huntProgress = Math.min(100, (this.huntProgress || 0) + 25);
             if (leadAgt?.skills) leadAgt.skills.stealth = Number((leadAgt.skills.stealth + 0.2).toFixed(2));
-            eventNote = `Stalked the shadowed treeline around ${target.name} (${target.house}): +${stalkGain} Historical Weight harvested from stragglers (+0.2 Stealth | Hunt Scent: ${this.huntProgress}%).`;
+            eventNote = `Stalked the shadowed treeline around ${target.name} (${target.house}): +${stalkGain} Historical Weight harvested (+0.2 Stealth | Travel Supplies: ${this.suppliesDaysRemaining}/${this.maxSuppliesDays}d left | Dist from Camp: ${this.distanceFromCampHours}h).`;
         } else {
             const resFind = this.stance === 'FORAGE' ? 6 : 3;
             const fuelFind = 2;
@@ -4683,20 +4896,30 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             const h = CampaignManager.state.house;
             if (h) h.barrierFuelUnits = Math.min(70, (h.barrierFuelUnits || 20) + fuelFind);
             if (leadAgt?.skills) leadAgt.skills.survival = Number((leadAgt.skills.survival + 0.2).toFixed(2));
-            eventNote = `Marched squad column to ${target.name} (${target.house}): Scavenged +${resFind}u Resources & +${fuelFind}u Runic Fuel along the iron chain-markers (+0.2 Survival).`;
+            eventNote = `Marched squad column to ${target.name} (${target.house}): Scavenged +${resFind}u Resources & +${fuelFind}u Runic Fuel (+0.2 Survival | Travel Supplies: ${this.suppliesDaysRemaining}/${this.maxSuppliesDays}d left | Dist from Camp: ${this.distanceFromCampHours}h).`;
         }
 
         const fogNote = wasFogged ? ` 🌫️✨ [FOG OF WAR LIFTED] Outer Horizon telemetry unlocked for ${target.name}!` : '';
-        const msg = `🧭 [OVERWORLD MARCH -> ${target.name.toUpperCase()}] ${leaderName} navigated to ${target.name} (Stance: ${this.stance}). ${eventNote}${fogNote}`;
+        let msg = `🧭 [OVERWORLD MARCH -> ${target.name.toUpperCase()}] ${leaderName} navigated to ${target.name} (Stance: ${this.stance}). ${eventNote}${fogNote}`;
         this.overworldLogs.unshift(msg);
         if (this.overworldLogs.length > 25) this.overworldLogs.pop();
 
         ExpeditionEngine.tickExpeditionHours(1);
+
+        let autoReturnRes = null;
+        if (this.suppliesDaysRemaining <= 0) {
+            autoReturnRes = this.triggerAutoReturnToCamp(`3-Day Travel Supplies exhausted at ${target.name}`);
+            msg += ` | ${autoReturnRes.message}`;
+        }
+
         return {
             success: true,
             partyNodeId: this.partyNodeId,
             partyX: this.partyX,
             partyY: this.partyY,
+            suppliesDaysRemaining: this.suppliesDaysRemaining,
+            distanceFromCampHours: this.distanceFromCampHours,
+            autoReturned: Boolean(autoReturnRes),
             wasFogged,
             message: msg
         };

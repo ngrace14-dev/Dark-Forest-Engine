@@ -493,12 +493,37 @@ CommanderEngine.FacilityEngine.settlementResources += 50;
 CommanderEngine.FacilityEngine.unlockFacility('training_grounds');
 CommanderEngine.FacilityEngine.unlockFacility('exploration_observatory');
 window.queueAgentTrainingPreset('agt_1', 'RECON');
+const agt1LockedCheck = CommanderEngine.AgentRosterManager.agents.get('agt_1');
+if (!agt1LockedCheck?.trainingLocked) {
+    auditReport.bugsFound.push('Expected queueing training in Forward Recon Training Grounds to lock the unit until complete.');
+}
+const cancelEarlyRes = CommanderEngine.AgentRosterManager.cancelAgentTraining('agt_1');
+if (!cancelEarlyRes.success || agt1LockedCheck.trainingLocked) {
+    auditReport.bugsFound.push('Expected cancelAgentTraining to pay 50% cost and release unit lock.');
+}
+// Verify +1 stat/day and 1 stat/category per Shift cap
+const strBefore = agt1LockedCheck.skills.strength;
+CommanderEngine.AgentRosterManager.setTraining('agt_1', 'STRENGTH');
+CommanderEngine.AgentRosterManager.tickDailyDrills();
+const strAfter = agt1LockedCheck.skills.strength;
+const blockedRepeatShift = CommanderEngine.AgentRosterManager.setTraining('agt_1', 'STRENGTH');
+if ((strAfter - strBefore) !== 1 || !blockedRepeatShift.shiftCapped) {
+    auditReport.bugsFound.push(`Expected +1 stat point per day and 1 stat gain per category per Shift cap, got delta=${strAfter - strBefore}, repeat=${JSON.stringify(blockedRepeatShift)}`);
+}
+
+// Verify 3-Day Overworld Travel Supplies, Pop-Up Explore Forest Modal & Auto-Return Trek (Distance -> IRL Hours)
 const unlockedExploreRes = window.openExploreForest();
-const navSquadRes = CommanderEngine.ForestOverworldEngine.navigateSquadToNode(4); // Navigate squad to Blackwood (#4)
+const explorePopupHtml = document.getElementById('explore-forest-popup-modal')?.innerHTML || '';
+if (!explorePopupHtml.includes('MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION')) {
+    auditReport.bugsFound.push('Expected clicking Explore Forest after upgrading Forward Recon facility to pop up the interactive Explore Forest Overworld Modal.');
+}
+const navSquadRes = CommanderEngine.ForestOverworldEngine.navigateSquadToNode(4); // Day 1 supply used (2/3 left)
+const navLeg2 = CommanderEngine.ForestOverworldEngine.navigateSquadToNode(8);    // Day 2 supply used (1/3 left)
+const navLeg3 = CommanderEngine.ForestOverworldEngine.navigateSquadToNode(10);   // Day 3 supply used (0/3 left -> triggers Auto-Return!)
 const interceptRes = CommanderEngine.ForestOverworldEngine.executePredatorOrSquadAction('HUNT_PREY');
 const campRes = CommanderEngine.ForestOverworldEngine.executePredatorOrSquadAction('FEED');
-if (!unlockedExploreRes?.success || !navSquadRes.success || Number(CommanderEngine.ForestOverworldEngine.partyNodeId) !== 4 || !interceptRes.success || !campRes.success) {
-    auditReport.bugsFound.push(`Expected Mount & Blade Forest Overworld squad navigation & convoy interception to succeed after building Forward Recon Outpost, got nav=${JSON.stringify(navSquadRes)}, intercept=${JSON.stringify(interceptRes)}`);
+if (!unlockedExploreRes?.success || !navSquadRes.success || !navLeg2.success || !navLeg3.autoReturned || !interceptRes.success || !campRes.success) {
+    auditReport.bugsFound.push(`Expected 3-day travel supply depletion to auto-return squad with distance-based return trek, got leg3=${JSON.stringify(navLeg3)}`);
 }
 
 // Switch to Pale Sovereign & verify dedicated Predator Overworld (Stalk, Hunt/Pounce & Feed/Gorge)

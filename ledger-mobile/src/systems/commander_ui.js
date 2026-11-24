@@ -632,6 +632,11 @@ export const CommanderUI = {
             this.showBanner(res.message);
             this.render();
         };
+        window.cancelAgentTraining = (agentId) => {
+            const res = CommanderEngine.AgentRosterManager.cancelAgentTraining(agentId);
+            this.showBanner(res.message);
+            this.render();
+        };
         window.toggleMapViewMode = () => this.toggleMapViewMode();
         window.selectMapSettlement = (id) => this.selectMapSettlement(id);
         window.openTacticalEncounter = (id = null) => this.openTacticalEncounterModal(id);
@@ -650,20 +655,27 @@ export const CommanderUI = {
         window.openExploreForest = () => {
             const isSov = CommanderEngine.CampaignManager.campaignMode === 'SOVEREIGN';
             const fe = CommanderEngine.FacilityEngine;
-            if (!isSov && !fe?.facilities?.exploration_observatory?.unlocked) {
-                this.showBanner('🔒 [FACILITY REQUIRED] Construct the [🌲🧭 Forward Recon Outpost & Overworld Map Tower] (14r) in the Fallout Shelter Facility Grid to unlock the Explore Forest Overworld Map!');
+            const exploreUnlocked = isSov || Boolean(fe?.facilities?.exploration_observatory?.unlocked || fe?.facilities?.training_grounds?.unlocked);
+            if (!exploreUnlocked) {
+                this.showBanner('🔒 [FACILITY REQUIRED] Construct or upgrade the [🌲🧭 Forward Recon Outpost] or [🏋️ Forward Recon Training Grounds] in the Fallout Shelter Facility Grid to unlock the Explore Forest Overworld Pop-Up Map!');
                 this.renderFacilitiesReader('exploration_observatory');
                 this.render();
                 return { success: false, gated: true };
             }
+            this.closeFacilityModal();
             this.activeBookTab = 'WARBOARD';
             this.mapViewMode = 'TACTICAL_MAP';
             this.showBanner(isSov
-                ? '🐺🌲 [PREDATOR OVERWORLD MAP] Stalking the Dark Forest as The Pale Sovereign! Tap any node or caravan to STALK, HUNT, ATTACK & FEED!'
-                : '🌲🧭 [EXPLORE FOREST OVERWORLD] Forward Recon Overworld Map active! Tap any parish node to navigate your trained squad across the forest!');
+                ? '🐺🌲 [PREDATOR OVERWORLD POP-UP MAP] Stalking the Dark Forest as The Pale Sovereign! Tap any node or caravan to STALK, HUNT, ATTACK & FEED!'
+                : '🌲🧭 [EXPLORE FOREST OVERWORLD POP-UP] Mount & Blade Squad Overview Map active! Tap any parish node to navigate your trained squad across the forest!');
             this.renderWarBoardReader();
+            this.renderExploreForestModal();
             this.render();
             return { success: true };
+        };
+        window.closeExploreForestModal = () => {
+            const modal = document.getElementById('explore-forest-popup-modal');
+            if (modal) modal.style.display = 'none';
         };
         window.queueAgentTrainingPreset = (agentId, preset = 'RECON') => {
             const presets = {
@@ -684,9 +696,9 @@ export const CommanderUI = {
             const f = CommanderEngine.FacilityEngine?.facilities?.[facId];
             if (!f) return;
             this.closeFacilityModal();
-            if (facId === 'exploration_observatory') {
+            if (facId === 'exploration_observatory' || facId === 'training_grounds') {
                 window.openExploreForest();
-            } else if (facId === 'guard_barracks' || facId === 'training_grounds' || facId === 'armory_market' || facId === 'runic_carving_facility') {
+            } else if (facId === 'guard_barracks' || facId === 'armory_market' || facId === 'runic_carving_facility') {
                 this.switchBookTab('GARRISON');
             } else if (facId === 'war_table') {
                 window.viewWarBoard();
@@ -701,18 +713,21 @@ export const CommanderUI = {
             const res = CommanderEngine.ForestOverworldEngine?.navigateSquadToNode?.(nodeId);
             if (res?.message) this.showBanner(res.message);
             this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
             this.render();
         };
         window.executeOverworldAction = (act, targetId = null) => {
             const res = CommanderEngine.ForestOverworldEngine?.executePredatorOrSquadAction?.(act, targetId);
             if (res?.message) this.showBanner(res.message);
             this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
             this.render();
         };
         window.setOverworldStance = (stance) => {
             const res = CommanderEngine.ForestOverworldEngine?.setStance?.(stance);
             if (res?.message) this.showBanner(res.message);
             this.renderWarBoardReader();
+            this.renderExploreForestModal(false);
             this.render();
         };
         window.interrogateSuspect = (targetId = 'agt_2') => {
@@ -1144,9 +1159,9 @@ export const CommanderUI = {
                             ${partyTokenSvg}
                         </svg>
                         <div class="burden-parchment-card" style="padding:5px 7px;">
-                            <div style="font-family:'Cinzel',serif; font-weight:900; font-size:9px; border-bottom:1px solid #4a3e2e; margin-bottom:2px; display:flex; justify-content:space-between;">
+                            <div style="font-family:'Cinzel',serif; font-weight:900; font-size:9px; border-bottom:1px solid #4a3e2e; margin-bottom:2px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
                                 <span>[${isSov ? 'PREDATOR HUNT &amp; FEEDING TELEMETRY' : 'OVERWORLD SQUAD NAVIGATION LOG'}]</span>
-                                <span>POS: (${ovw.partyX}, ${ovw.partyY})</span>
+                                <span style="color:#5e110b;">⛺ SUPPLIES: ${ovw.suppliesDaysRemaining ?? 3}/${ovw.maxSuppliesDays ?? 3} DAYS | DIST FROM CAMP: ${ovw.distanceFromCampHours ?? 0}H (${Number(((ovw.distanceFromCampHours ?? 0) * (0.5 / (CommanderEngine.timeScale || 1))).toFixed(2))}H IRL)</span>
                             </div>
                             <div style="font-size:8px; color:#1c1610; max-height:38px; overflow-y:auto;">
                                 ${(ovw.overworldLogs || []).slice(0, 2).map(l => `<div style="margin-bottom:2px;">• ${l}</div>`).join('') || auditHtml}
@@ -1157,6 +1172,141 @@ export const CommanderUI = {
                 ${encounterOverlayHtml}
             `;
         }
+    },
+
+    renderExploreForestModal(forceOpen = true) {
+        const modal = typeof document !== 'undefined' ? document.getElementById('explore-forest-popup-modal') : null;
+        if (!modal) return;
+        if (!forceOpen && modal.style.display === 'none') return;
+
+        const board = CommanderEngine.CampaignManager.getWarBoard() || [];
+        const settlements = CommanderEngine.CampaignManager.getBedrockTelemetry({
+            allowTwentyFirst: CommanderEngine.ShadowInfluenceEngine?.isEpitaphRevealed?.() || false
+        }) || [];
+        const ovw = CommanderEngine.ForestOverworldEngine || { partyNodeId: 1, partyX: 198, partyY: 82, stance: 'MARCH', movementTrail: [], movingTargetEntities: [], overworldLogs: [] };
+        const selNode = settlements.find(s => Number(s.id) === Number(this.selectedMapSettlementId)) || settlements[1] || { id: 1, name: 'Oakhaven', house: 'House Oakheart', barrierFuel: 50, chainsIntegrity: 100 };
+        const selHouse = board.find(w => w.name === selNode.house) || { name: selNode.house, power: 65, status: 'PEACE', monopoly: 'Ironwood' };
+        const isSov = CommanderEngine.CampaignManager.campaignMode === 'SOVEREIGN';
+        const selNodeCleared = CommanderEngine.CampaignManager.isSettlementInForestZone?.(selNode) ?? (Number(selNode.id) <= 10);
+
+        const svgNodes = settlements.map((s, i) => {
+            if (i === 0) {
+                return `<g style="cursor:pointer;" onclick="window.navigateOverworldSquad(0)"><rect x="132" y="54" width="16" height="16" fill="#1e1b4b" stroke="#fbbf24" stroke-width="1.8"/><text x="140" y="65" text-anchor="middle" fill="#fde68a" font-size="9">👑</text></g>`;
+            }
+            const isForestInner = Number(s.id) >= 1 && Number(s.id) <= 10 && Number(s.id) !== 7;
+            const isRevealed = CommanderEngine.CampaignManager.isSettlementInForestZone?.(s) ?? isForestInner;
+            const angle = ((i - 1) / Math.max(1, settlements.length - 1)) * Math.PI * 2 - Math.PI / 2;
+            const rx = isForestInner ? 66 : 112;
+            const ry = isForestInner ? 28 : 49;
+            const cx = (140 + rx * Math.cos(angle)).toFixed(1);
+            const cy = (64 + ry * Math.sin(angle)).toFixed(1);
+            const hEntry = board.find(w => w.name === s.house);
+            const isSelected = Number(s.id) === Number(selNode.id);
+            const isPartyHere = Number(s.id) === Number(ovw.partyNodeId);
+            const isHostile = hEntry?.status === 'WAR_PREP' || hEntry?.status === 'SKIRMISH' || s.chainsIntegrity < 50;
+            const fillCol = !isRevealed ? '#334155' : (isPartyHere ? '#a855f7' : (isSelected ? '#38bdf8' : (isHostile ? '#dc2626' : (hEntry?.status === 'ALLIED' ? '#10b981' : '#d97706'))));
+            const labelTxt = isRevealed ? s.name.slice(0, 10) : '🌫️ [FOGGED]';
+            const blurAttr = !isRevealed ? 'opacity="0.55" filter="url(#outer-fog-blur-pop)"' : '';
+            return `
+                <g style="cursor:pointer;" ${blurAttr} onclick="window.navigateOverworldSquad(${s.id})">
+                    <line x1="140" y1="62" x2="${cx}" y2="${cy}" stroke="${isSelected ? '#38bdf8' : '#4a453b'}" stroke-width="${isSelected ? '1.6' : '0.8'}" stroke-dasharray="2,2"/>
+                    <circle cx="${cx}" cy="${cy}" r="${isSelected || isPartyHere ? '6.5' : '4.5'}" fill="${fillCol}" stroke="#090d0e" stroke-width="1.2"/>
+                    <text x="${cx}" y="${(Number(cy) - 7).toFixed(1)}" text-anchor="middle" fill="${isSelected ? '#7dd3fc' : (isRevealed ? '#e2d1b0' : '#94a3b8')}" font-size="${isSelected ? '6.5' : '5.2'}" font-weight="bold">${labelTxt}</text>
+                </g>
+            `;
+        }).join('');
+
+        const preyNodesSvg = (ovw.movingTargetEntities || []).filter(p => p.alive).map(p => `
+            <g style="cursor:pointer;" onclick="window.executeOverworldAction('HUNT_PREY','${p.id}')">
+                <circle cx="${p.x}" cy="${p.y}" r="4.2" fill="${isSov ? '#991b1b' : '#b45309'}" stroke="#fde68a" stroke-width="1" stroke-dasharray="1.5,1"/>
+                <text x="${p.x}" y="${(Number(p.y) + 2.2).toFixed(1)}" text-anchor="middle" font-size="5.5">${p.type === 'APEX_BEAST' ? '🦌' : '📦'}</text>
+                <text x="${p.x}" y="${(Number(p.y) + 8.5).toFixed(1)}" text-anchor="middle" fill="#fde68a" font-size="4.4" font-weight="bold">${isSov ? '🩸PREY' : '⚔️TARGET'}</text>
+            </g>
+        `).join('');
+
+        const trailPoints = (ovw.movementTrail || []).map(pt => `${pt.x},${pt.y}`).join(' ');
+        const trailSvg = (ovw.movementTrail && ovw.movementTrail.length > 1)
+            ? `<polyline points="${trailPoints}" fill="none" stroke="${isSov ? '#ef4444' : '#38bdf8'}" stroke-width="1.6" stroke-dasharray="3,2" opacity="0.85"/>`
+            : '';
+
+        const px = ovw.partyX || 198;
+        const py = ovw.partyY || 82;
+        const partyTokenSvg = `
+            <g pointer-events="none">
+                <circle cx="${px}" cy="${py}" r="8.5" fill="${isSov ? 'rgba(220,38,38,0.28)' : 'rgba(56,189,248,0.25)'}" stroke="${isSov ? '#ef4444' : '#38bdf8'}" stroke-width="1.4"/>
+                <text x="${px}" y="${(Number(py) + 3).toFixed(1)}" text-anchor="middle" font-size="8.5">${isSov ? '🐺' : '🛡️'}</text>
+                <text x="${px}" y="${(Number(py) + 13).toFixed(1)}" text-anchor="middle" fill="${isSov ? '#fca5a5' : '#bae6fd'}" font-size="5.2" font-weight="900">${isSov ? `SOVEREIGN [${ovw.stance}]` : `SQUAD [${ovw.stance}]`}</text>
+            </g>
+        `;
+
+        modal.style.display = 'block';
+        modal.innerHTML = `
+            <div style="border:2px solid ${isSov ? '#ef4444' : '#22c55e'}; background:linear-gradient(180deg,#090d10 0%,#050709 100%); padding:12px; border-radius:6px; box-shadow:0 16px 40px rgba(0,0,0,0.95); margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid ${isSov ? '#7f1d1d' : '#14532d'}; padding-bottom:6px; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                    <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:12.5px; font-weight:900;">
+                        ${isSov ? '🐺 PREDATOR OVERWORLD MAP // STALK, HUNT, ATTACK &amp; FEED' : '🧭 MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION'}
+                    </div>
+                    <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
+                        <button class="cmd-btn" style="padding:3px 8px; font-size:9px; ${ovw.stance === 'MARCH' ? 'background:#14532d; border-color:#4ade80; color:#dcfce7; font-weight:bold;' : ''}" onclick="window.setOverworldStance('MARCH')">${isSov ? '🐺 PROWL' : '🛡️ MARCH'}</button>
+                        <button class="cmd-btn" style="padding:3px 8px; font-size:9px; ${ovw.stance === 'STALK' ? 'background:#2e1065; border-color:#a855f7; color:#e9d5ff; font-weight:bold;' : ''}" onclick="window.setOverworldStance('STALK')">🐾 STALK</button>
+                        <button class="cmd-btn" style="padding:3px 8px; font-size:9px; ${ovw.stance === 'HUNT' ? 'background:#450a0a; border-color:#ef4444; color:#fecaca; font-weight:bold;' : ''}" onclick="window.setOverworldStance('HUNT')">${isSov ? '🩸 HUNT' : '⚔️ RAID'}</button>
+                        <button class="cmd-btn" style="background:#3f1212; border-color:#ef4444; color:#fecaca; padding:3px 10px; font-size:9.5px; font-weight:bold;" onclick="window.closeExploreForestModal()">✖ Close Overworld Map</button>
+                    </div>
+                </div>
+                <svg viewBox="0 0 280 128" style="width:100%; height:180px; display:block; margin:4px auto 8px auto; background:radial-gradient(circle at 50% 50%, rgba(20,83,45,0.32) 0%, rgba(15,23,42,0.94) 56%, rgba(5,7,9,0.98) 100%); border:1.5px solid #2b3234; border-radius:4px;">
+                    <defs>
+                        <filter id="outer-fog-blur-pop" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="0.9" />
+                        </filter>
+                        <radialGradient id="fog-of-war-shroud-pop" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" stop-color="#000000" stop-opacity="0" />
+                            <stop offset="52%" stop-color="#0f172a" stop-opacity="0.05" />
+                            <stop offset="68%" stop-color="#1e293b" stop-opacity="0.68" />
+                            <stop offset="100%" stop-color="#020617" stop-opacity="0.92" />
+                        </radialGradient>
+                    </defs>
+                    <rect x="0" y="0" width="280" height="128" fill="url(#fog-of-war-shroud-pop)" pointer-events="none"/>
+                    <ellipse cx="140" cy="64" rx="112" ry="49" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3"/>
+                    <ellipse cx="140" cy="64" rx="76" ry="33" fill="none" stroke="#22c55e" stroke-width="1.2" stroke-dasharray="3,2"/>
+                    <text x="140" y="28" text-anchor="middle" fill="#86efac" font-size="5.5" font-weight="bold">🌲 INNER FOREST ZONE (TAP ANY NODE TO NAVIGATE SQUAD)</text>
+                    <text x="140" y="10" text-anchor="middle" fill="#94a3b8" font-size="5.5" font-weight="bold">🌫️ OUTER HORIZON &amp; DUNES (FOG OF WAR — MARCH OR SCOUT TO LIFT)</text>
+                    ${trailSvg}
+                    ${svgNodes}
+                    ${preyNodesSvg}
+                    ${partyTokenSvg}
+                </svg>
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+                    <div style="font-size:9.5px; color:#cbd5e1;">
+                        🎯 <b>Active Target Node:</b> <span style="color:#fde68a; font-weight:bold;">${selNodeCleared ? `${selNode.name} (${selNode.house} | Power: ${selHouse.power}/100)` : `🌫️ Uncharted Sector #${selNode.id}`}</span>
+                    </div>
+                    <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                        <button class="cmd-btn" style="padding:4px 8px; font-size:9px; background:#14532d; border-color:#22c55e; color:#dcfce7; font-weight:bold;" onclick="window.navigateOverworldSquad(${selNode.id})">🧭 March Squad to ${selNode.name}</button>
+                        ${isSov
+                            ? `
+                                <button class="cmd-btn" style="padding:4px 8px; font-size:9px; background:#2e1065; border-color:#a855f7; color:#f3e8ff;" onclick="window.executeOverworldAction('STALK')">🐾 Stalk Prey</button>
+                                <button class="cmd-btn" style="padding:4px 8px; font-size:9px; background:#450a0a; border-color:#dc2626; color:#fecaca;" onclick="window.executeOverworldAction('HUNT_PREY')">🩸 Hunt &amp; Pounce</button>
+                                <button class="cmd-btn" style="padding:4px 8px; font-size:9px; background:#3b0764; border-color:#e879f9; color:#fae8ff;" onclick="window.executeOverworldAction('FEED')">🥩 Feed &amp; Gorge</button>
+                            `
+                            : `
+                                <button class="cmd-btn" style="padding:4px 8px; font-size:9px;" onclick="window.executeOverworldAction('STALK')">🏹 Recon Stalk</button>
+                                <button class="cmd-btn" style="padding:4px 8px; font-size:9px;" onclick="window.executeOverworldAction('HUNT_PREY')">⚔️ Intercept Convoy</button>
+                                <button class="cmd-btn" style="padding:4px 8px; font-size:9px;" onclick="window.executeOverworldAction('FEED')">⛺ Camp &amp; Forage</button>
+                            `
+                        }
+                        <button class="cmd-btn" style="padding:4px 8px; font-size:9px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.openTacticalEncounter(${selNode.id})">${isSov ? '🐺 Attack Parish' : '⚔️ Tactical Encounter'}</button>
+                    </div>
+                </div>
+                <div class="burden-parchment-card" style="padding:6px 8px;">
+                    <div style="font-family:'Cinzel',serif; font-weight:900; font-size:9.5px; border-bottom:1px solid #4a3e2e; margin-bottom:3px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
+                        <span>[${isSov ? 'PREDATOR HUNT &amp; FEEDING TELEMETRY' : 'OVERWORLD SQUAD NAVIGATION LOG'}]</span>
+                        <span style="color:#5e110b;">POS: (${ovw.partyX}, ${ovw.partyY}) | ⛺ SUPPLIES: ${ovw.suppliesDaysRemaining ?? 3}/${ovw.maxSuppliesDays ?? 3} DAYS | DIST: ${ovw.distanceFromCampHours ?? 0}H (${Number(((ovw.distanceFromCampHours ?? 0) * (0.5 / (CommanderEngine.timeScale || 1))).toFixed(2))}H IRL)</span>
+                    </div>
+                    <div style="font-size:8.5px; color:#1c1610; max-height:48px; overflow-y:auto;">
+                        ${(ovw.overworldLogs || []).slice(0, 3).map(l => `<div style="margin-bottom:2px;">• ${l}</div>`).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
     },
 
     renderInquestReader(targetId = 'agt_2') {
@@ -1406,6 +1556,9 @@ export const CommanderUI = {
 
                 <!-- FALLOUT SHELTER STYLE POP-UP FACILITY UPGRADE ROOM GRID MODAL -->
                 <div id="fallout-facility-popup-modal" style="display:none;"></div>
+
+                <!-- INTERACTIVE EXPLORE FOREST OVERWORLD POP-UP MODAL -->
+                <div id="explore-forest-popup-modal" style="display:none;"></div>
 
                 <!-- ALWAYS-PROMINENT SQUAD EVENT LOGS & FACTION PULSE LOGS DUAL LIVE MONITOR -->
                 <div id="always-prominent-live-pulse-deck" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
@@ -1661,21 +1814,21 @@ export const CommanderUI = {
 
         const expForestBtn = document.getElementById('btn-dedicated-explore-forest');
         const navForestBtn = document.getElementById('btn-nav-explore-forest');
-        const exploreUnlocked = growth.isSovereign || Boolean(fe?.facilities?.exploration_observatory?.unlocked);
+        const exploreUnlocked = growth.isSovereign || Boolean(fe?.facilities?.exploration_observatory?.unlocked || fe?.facilities?.training_grounds?.unlocked);
         [expForestBtn, navForestBtn].forEach(b => {
             if (!b) return;
             if (growth.isSovereign) {
-                b.innerHTML = '🐺🌲 EXPLORE FOREST: HUNT, STALK, ATTACK &amp; FEED';
+                b.innerHTML = '🐺🌲 EXPLORE FOREST: HUNT, STALK, ATTACK &amp; FEED (POP-UP)';
                 b.style.background = 'linear-gradient(180deg,#7f1d1d,#450a0a)';
                 b.style.borderColor = '#f87171';
                 b.style.color = '#fecaca';
             } else if (exploreUnlocked) {
-                b.innerHTML = '🌲🧭 EXPLORE FOREST: FORWARD RECON OVERWORLD MAP';
+                b.innerHTML = '🌲🧭 EXPLORE FOREST: OPEN OVERWORLD POP-UP MAP';
                 b.style.background = 'linear-gradient(180deg,#14532d,#052e16)';
                 b.style.borderColor = '#4ade80';
                 b.style.color = '#dcfce7';
             } else {
-                b.innerHTML = '🔒 BUILD RECON OUTPOST (UNLOCK EXPLORE FOREST)';
+                b.innerHTML = '🔒 BUILD RECON FACILITY (UNLOCK EXPLORE FOREST)';
                 b.style.background = 'linear-gradient(180deg,#334155,#0f172a)';
                 b.style.borderColor = '#94a3b8';
                 b.style.color = '#cbd5e1';
@@ -2067,14 +2220,23 @@ export const CommanderUI = {
                             ['LORE', 'LOR', a.skills.lore],
                             ['SURVIVAL', 'SRV', a.skills.survival]
                         ];
+                        const shiftTrained = a.shiftTrainedCategories || {};
                         const trainBtnsHtml = trainStats.map(([key, short, val]) => {
                             const isDrilling = activeDrill === key || (activeDrill === 'MARTIAL' && key === 'MELEE_ATT') || (activeDrill === 'LOGISTICS' && key === 'LORE');
-                            const hiStyle = isDrilling ? 'background:#14532d; border-color:#22c55e; color:#dcfce7;' : '';
-                            return `<button class="cmd-btn" style="padding:1px 4px; font-size:8.5px; ${hiStyle}" onclick="window.trainAgentStat('${a.id}','${key}')">🏋️ ${short}:${Number(val).toFixed(1)}</button>`;
+                            const isCappedThisShift = (shiftTrained[key] || 0) >= 1;
+                            const hiStyle = isDrilling
+                                ? 'background:#14532d; border-color:#22c55e; color:#dcfce7;'
+                                : (isCappedThisShift ? 'background:#334155; border-color:#64748b; color:#94a3b8; opacity:0.75;' : '');
+                            const capBadge = isCappedThisShift ? '✓' : '';
+                            return `<button class="cmd-btn" style="padding:1px 4px; font-size:8.5px; ${hiStyle}" title="${isCappedThisShift ? 'Already gained +1 this Shift (Max 1/Category per Shift)' : 'Train +1 Stat Point (1 Day — Locks Unit in Training Grounds)'}" onclick="window.trainAgentStat('${a.id}','${key}')">🏋️ ${short}:${Number(val).toFixed(0)}${capBadge}</button>`;
                         }).join('');
 
                         const queueSummary = Array.isArray(a.trainingQueue) && a.trainingQueue.length > 0
                             ? ` | <b style="color:#0284c7;">[QUEUE: ${a.trainingQueue.join(' ➔ ')}]</b>`
+                            : '';
+                        const cancelFee = Math.max(2, Math.floor((a.trainingCostPaid || 4) / 2));
+                        const cancelTrainingBtn = (a.trainingLocked || activeDrill)
+                            ? `<button class="cmd-btn" style="padding:2px 6px; font-size:9px; background:#3f1212; border-color:#ef4444; color:#fecaca; font-weight:bold;" onclick="window.cancelAgentTraining('${a.id}')">🔓 Cancel Training (-${cancelFee}r / 50% Cost)</button>`
                             : '';
 
                         return `
@@ -2082,9 +2244,10 @@ export const CommanderUI = {
                             <b style="color:#5e110b;">${a.name}</b> <span style="font-size:10px; color:#0e7490; font-weight:bold;">${a.cultivation?.isCultivatedGuardian ? `★ TIER ${cStage} ASCENDANT` : `(Tier ${cStage}/8)`}</span>
                             <span style="color:#463523; font-weight:bold;">(${a.career?.rank || 'Novice'} ${a.career?.id})</span>
                             <div style="font-size:9.5px; color:#1f160e; font-family:'Share Tech Mono',monospace;">HP: ${a.vitals.hp}/${a.vitals.maxHp} | Poise: ${Math.round(a.vitals.poise)} | Runes: ${a.cultivation?.inscriptionsCount || 0}/48 | Purity: ${a.cultivation?.foundationPurity ?? 100}% | Potential: ${a.cultivation?.potentialRemaining ?? 100}% | Lifespan: ${totalLife}y</div>
-                            <div style="font-size:9.5px; color:#3f2e1e;">🗡️ Gear: [${gearSummary}] | Birthright: [${a.birthright?.title || 'None'}] ${activeDrill ? `| <b style="color:#15803d;">[TRAINING: ${activeDrill}]</b>` : ''}${queueSummary}</div>
+                            <div style="font-size:9.5px; color:#3f2e1e;">🗡️ Gear: [${gearSummary}] | Birthright: [${a.birthright?.title || 'None'}] ${activeDrill ? `| <b style="color:#b91c1c;">[🔒 LOCKED IN TRAINING: ${activeDrill} (+1/Day)]</b>` : ''}${queueSummary}</div>
                             <div style="margin-top:3px; display:flex; flex-wrap:wrap; gap:2px;">${trainBtnsHtml}</div>
                             <div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:3px;">
+                                ${cancelTrainingBtn}
                                 <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px; border-color:#a855f7; background:#2e1065; color:#f3e8ff; font-weight:bold;" onclick="window.carveAgentRunes('${a.id}')">${carveBtnLabel}</button>
                                 <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.viewAgentStatSheet('${a.id}')">📋 Sheet</button>
                                 <button class="cmd-btn" style="padding:2px 5px; font-size:9.5px;" onclick="window.equipAgentGear('${a.id}','${nextGearId}')">🗡️ Equip</button>
