@@ -483,6 +483,42 @@ if (!encRound1.success || !warDeckHtml.includes('TACTICAL ENCOUNTER ARENA') || !
     logPlay('TACTICAL DOMINION MAP, FOG OF WAR & ENCOUNTER ARENA', `Verified Outer Fog of War shroud on Sector #15 lifted by Mist-Recon Patrol + Encounter Arena: ${encRound1.message} | ${encRound2.message} | ${encRound3.message}`);
 }
 
+// 5H. Facility-Gated "EXPLORE FOREST", Fallout Shelter Pop-Up Facility Grid, Forward Recon Training Grounds Queue & Pale Sovereign Hunt/Stalk/Attack/Feed
+const gatedExploreRes = window.openExploreForest(); // Before building exploration_observatory -> pops up Fallout Shelter Facility Grid modal!
+const facPopupHtml = document.getElementById('fallout-facility-popup-modal')?.innerHTML || '';
+if (!gatedExploreRes?.gated || !facPopupHtml.includes('FALLOUT SHELTER BASE VAULT // INTERCONNECTED FACILITY ROOM GRID')) {
+    auditReport.bugsFound.push('Expected clicking Explore Forest before building Forward Recon Outpost to gate access and pop up the Fallout Shelter Facility Room Grid modal.');
+}
+CommanderEngine.FacilityEngine.settlementResources += 50;
+CommanderEngine.FacilityEngine.unlockFacility('training_grounds');
+CommanderEngine.FacilityEngine.unlockFacility('exploration_observatory');
+window.queueAgentTrainingPreset('agt_1', 'RECON');
+const unlockedExploreRes = window.openExploreForest();
+const navSquadRes = CommanderEngine.ForestOverworldEngine.navigateSquadToNode(4); // Navigate squad to Blackwood (#4)
+const interceptRes = CommanderEngine.ForestOverworldEngine.executePredatorOrSquadAction('HUNT_PREY');
+const campRes = CommanderEngine.ForestOverworldEngine.executePredatorOrSquadAction('FEED');
+if (!unlockedExploreRes?.success || !navSquadRes.success || Number(CommanderEngine.ForestOverworldEngine.partyNodeId) !== 4 || !interceptRes.success || !campRes.success) {
+    auditReport.bugsFound.push(`Expected Mount & Blade Forest Overworld squad navigation & convoy interception to succeed after building Forward Recon Outpost, got nav=${JSON.stringify(navSquadRes)}, intercept=${JSON.stringify(interceptRes)}`);
+}
+
+// Switch to Pale Sovereign & verify dedicated Predator Overworld (Stalk, Hunt/Pounce & Feed/Gorge)
+CommanderUI.selectRoleAndLaunch('PALE_SOVEREIGN');
+window.openExploreForest();
+const sovStalkRes = CommanderEngine.ForestOverworldEngine.executePredatorOrSquadAction('STALK');
+const sovHuntRes = CommanderEngine.ForestOverworldEngine.executePredatorOrSquadAction('HUNT_PREY');
+const sovFeedRes = CommanderEngine.ForestOverworldEngine.executePredatorOrSquadAction('FEED');
+const sovOverworldHtml = document.getElementById('brutalist-subpage-deck')?.innerHTML || '';
+if (!sovStalkRes.success || !sovHuntRes.success || !sovFeedRes.success || (CommanderEngine.CampaignManager.state.sovereign.significanceHarvested || 0) < 600 || !sovOverworldHtml.includes('PREDATOR OVERWORLD MAP')) {
+    auditReport.bugsFound.push(`Expected Pale Sovereign Overworld Hunt/Stalk/Attack/Feed loop to harvest >=600 Historical Weight and render Predator Overworld Map, got weight=${CommanderEngine.CampaignManager.state.sovereign.significanceHarvested}`);
+} else {
+    logPlay('MOUNT & BLADE FOREST OVERWORLD & PALE SOVEREIGN HUNT/STALK/FEED', `Squad Overworld: ${navSquadRes.message} | ${interceptRes.message}\n   ↳ Pale Sovereign Predator Overworld: ${sovStalkRes.message} | ${sovHuntRes.message} | ${sovFeedRes.message}`);
+}
+
+// 5I. Mirror src/core/commander_engine.js & src/systems/commander_ui.js to ledger-mobile/
+import fs from 'node:fs';
+fs.copyFileSync('./src/core/commander_engine.js', './ledger-mobile/src/core/commander_engine.js');
+fs.copyFileSync('./src/systems/commander_ui.js', './ledger-mobile/src/systems/commander_ui.js');
+
 console.log('--------------------------------------------------------------------------------');
 if (auditReport.bugsFound.length > 0) {
     console.error('LIVE PLAYTESTER AUDIT FOUND ISSUES:', auditReport.bugsFound);

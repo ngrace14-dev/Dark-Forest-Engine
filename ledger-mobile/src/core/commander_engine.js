@@ -152,12 +152,44 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
         return agent;
     },
 
-    setTraining(agentId, discipline) {
+    setTraining(agentId, discipline, addToQueue = false) {
         const agent = this.agents.get(agentId);
         if (!agent || !agent.alive) return { success: false, message: "Agent invalid or deceased." };
         const disc = String(discipline || 'MARTIAL').toUpperCase();
+        const fe = rootScope.FacilityEngine;
+        const tgUnlocked = Boolean(fe?.facilities?.training_grounds?.unlocked);
+        const tgLv = tgUnlocked ? (fe.facilities.training_grounds.level || 1) : 0;
+
+        agent.trainingQueue = Array.isArray(agent.trainingQueue) ? agent.trainingQueue : [];
+        if (addToQueue && tgUnlocked && agent.operatingStance?.mode === 'TRAIN' && agent.operatingStance?.discipline) {
+            if (agent.trainingQueue.length < 2 + tgLv) {
+                agent.trainingQueue.push(disc);
+                return {
+                    success: true,
+                    queued: true,
+                    queue: agent.trainingQueue,
+                    message: `🏋️📋 [FORWARD RECON TRAINING QUEUE] Queued [${disc}] for ${agent.name} (Active: ${agent.operatingStance.discipline} -> Queue: [${agent.trainingQueue.join(' → ')}]).`
+                };
+            }
+        }
         agent.operatingStance = { mode: 'TRAIN', discipline: disc, task: null, daysTrained: (agent.operatingStance?.daysTrained || 0) };
-        return { success: true, message: `🏋️ ${agent.name} assigned to Fallout Shelter Training Room: [DRILL: ${disc}].` };
+        const roomLabel = tgUnlocked ? `Forward Recon Training Grounds (Lv.${tgLv} Queue Active)` : `Basic Barracks Drill Yard (Build [Forward Recon Training Grounds] for +35% speed & multi-stat queues)`;
+        return { success: true, queue: agent.trainingQueue, message: `🏋️ ${agent.name} assigned to ${roomLabel}: [DRILL: ${disc}].` };
+    },
+
+    queueAgentTraining(agentId, disciplineList = ['MELEE_ATT', 'SURVIVAL', 'STEALTH']) {
+        const agent = this.agents.get(agentId);
+        if (!agent || !agent.alive) return { success: false, message: "Agent invalid or deceased." };
+        const list = Array.isArray(disciplineList) ? disciplineList.map(d => String(d).toUpperCase()) : [String(disciplineList).toUpperCase()];
+        const first = list[0] || 'MELEE_ATT';
+        agent.trainingQueue = list.slice(1);
+        agent.operatingStance = { mode: 'TRAIN', discipline: first, task: null, daysTrained: (agent.operatingStance?.daysTrained || 0) };
+        return {
+            success: true,
+            activeDiscipline: first,
+            queue: agent.trainingQueue,
+            message: `🏋️📋 [TRAINING QUEUE LOCKED] ${agent.name} entered Forward Recon Training Queue: Active [${first}] -> Queued [${agent.trainingQueue.join(' → ') || 'None'}].`
+        };
     },
 
     setTask(agentId, taskType, targetId = null) {
@@ -172,8 +204,8 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
     },
 
     tickDailyDrills() {
-        const facMult = rootScope.RoleStateMachine?.computeFacilityMultipliers?.() || { barracksLv: 0, scriptoriumLv: 1 };
-        const drillMult = 1 + (facMult.barracksLv || 0) * 0.2;
+        const facMult = rootScope.RoleStateMachine?.computeFacilityMultipliers?.() || { barracksLv: 0, trainingGroundsLv: 0, scriptoriumLv: 1 };
+        const drillMult = 1 + (facMult.barracksLv || 0) * 0.2 + (facMult.trainingGroundsLv || 0) * 0.35;
         this.agents.forEach(agent => {
             if (!agent.alive) return;
             const st = agent.operatingStance;
@@ -215,6 +247,13 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
                 }
                 if (agent.cultivation) {
                     agent.cultivation.currentMasteryPool = Math.min(100, (agent.cultivation.currentMasteryPool || 25) + 10);
+                }
+                // Advance to next queued discipline in Forward Recon Training Grounds queue
+                if (Array.isArray(agent.trainingQueue) && agent.trainingQueue.length > 0) {
+                    const nextDisc = agent.trainingQueue.shift();
+                    if (nextDisc) {
+                        st.discipline = nextDisc;
+                    }
                 }
             }
             agent.statusEffects = (agent.statusEffects || []).filter(eff => {
@@ -511,11 +550,12 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
         const fe = rootScope.FacilityEngine;
         const sov = rootScope.CampaignManager?.state?.sovereign;
         const barracksLv = fe?.facilities?.guard_barracks?.unlocked ? (fe.facilities.guard_barracks.level || 1) : 0;
-        const maxRoster = isSov ? 8 : (6 + barracksLv * 3);
+        const trainingGroundsLv = fe?.facilities?.training_grounds?.unlocked ? (fe.facilities.training_grounds.level || 1) : 0;
+        const maxRoster = isSov ? 8 : (6 + barracksLv * 3 + trainingGroundsLv * 2);
         const livingCount = Array.from(this.agents.values()).filter(a => a.alive).length;
 
         if (livingCount >= maxRoster) {
-            return { success: false, message: `Garrison capacity reached (${livingCount}/${maxRoster}). Construct or upgrade [Garrison Barracks] to expand capacity!` };
+            return { success: false, message: `Garrison capacity reached (${livingCount}/${maxRoster}). Construct or upgrade [Garrison Barracks] or [Forward Recon Training Grounds] to expand capacity!` };
         }
 
         const unitCost = isSov ? 120 : Math.max(4, 7 - barracksLv);
@@ -548,11 +588,16 @@ const AgentRosterManager = rootScope.AgentRosterManager || {
         const newAgent = this.createAgent(id, `${baseName} #${this.recruitCounter}`, isSov ? 'PREDATOR' : arch);
         newAgent.assignedHouseId = rootScope.CampaignManager?.state?.house?.houseId || mode;
 
-        if (barracksLv > 0) {
-            newAgent.skills.meleeAtt = Number((newAgent.skills.meleeAtt + barracksLv * 0.5).toFixed(1));
-            newAgent.skills.meleeDef = Number((newAgent.skills.meleeDef + barracksLv * 0.5).toFixed(1));
-            newAgent.vitals.maxHp += barracksLv * 8;
+        if (barracksLv > 0 || trainingGroundsLv > 0) {
+            newAgent.skills.meleeAtt = Number((newAgent.skills.meleeAtt + barracksLv * 0.5 + trainingGroundsLv * 0.5).toFixed(1));
+            newAgent.skills.meleeDef = Number((newAgent.skills.meleeDef + barracksLv * 0.5 + trainingGroundsLv * 0.4).toFixed(1));
+            newAgent.skills.survival = Number((newAgent.skills.survival + trainingGroundsLv * 0.5).toFixed(1));
+            newAgent.vitals.maxHp += barracksLv * 8 + trainingGroundsLv * 6;
             newAgent.vitals.hp = newAgent.vitals.maxHp;
+        }
+        if (trainingGroundsLv > 0) {
+            const defaultQueue = arch === 'SCOUT' ? ['STEALTH', 'SURVIVAL', 'DODGE'] : (arch === 'SCRIBE' ? ['LORE', 'SURVIVAL'] : ['MELEE_ATT', 'TOUGHNESS', 'MELEE_DEF']);
+            this.queueAgentTraining(newAgent.id, defaultQueue);
         }
 
         const costLabel = isSov ? `-${unitCost}W Historical Weight` : `-${unitCost}u Resources (+2 Village Guards)`;
@@ -1530,6 +1575,8 @@ export const RoleStateMachine = rootScope.RoleStateMachine || {
         const stillLv = fac.alchemical_still?.unlocked ? (fac.alchemical_still.level || 1) : 0;
         const warTableLv = fac.war_table?.unlocked ? (fac.war_table.level || 1) : 0;
         const armoryMarketLv = fac.armory_market?.unlocked ? (fac.armory_market.level || 1) : 0;
+        const trainingGroundsLv = fac.training_grounds?.unlocked ? (fac.training_grounds.level || 1) : 0;
+        const explorationObsLv = fac.exploration_observatory?.unlocked ? (fac.exploration_observatory.level || 1) : 0;
 
         return {
             scriptoriumLv,
@@ -1538,10 +1585,12 @@ export const RoleStateMachine = rootScope.RoleStateMachine || {
             stillLv,
             warTableLv,
             armoryMarketLv,
+            trainingGroundsLv,
+            explorationObsLv,
             productionMult: Number((1 + stillLv * 0.12 + scriptoriumLv * 0.05).toFixed(2)),
-            tradeMult: Number((1 + scriptoriumLv * 0.10 + barracksLv * 0.08 + armoryMarketLv * 0.10).toFixed(2)),
-            covertMult: Number((1 + inquestLv * 0.15 + warTableLv * 0.10).toFixed(2)),
-            martialMult: Number((1 + barracksLv * 0.15 + warTableLv * 0.12 + armoryMarketLv * 0.08).toFixed(2))
+            tradeMult: Number((1 + scriptoriumLv * 0.10 + barracksLv * 0.08 + armoryMarketLv * 0.10 + explorationObsLv * 0.08).toFixed(2)),
+            covertMult: Number((1 + inquestLv * 0.15 + warTableLv * 0.10 + explorationObsLv * 0.10).toFixed(2)),
+            martialMult: Number((1 + barracksLv * 0.15 + warTableLv * 0.12 + armoryMarketLv * 0.08 + trainingGroundsLv * 0.18).toFixed(2))
         };
     },
 
@@ -1592,7 +1641,7 @@ export const RoleStateMachine = rootScope.RoleStateMachine || {
             };
         }
         const fac = rootScope.FacilityEngine?.facilities || {};
-        const unlockedExtra = ['guard_barracks', 'inquest_chamber', 'alchemical_still', 'war_table', 'armory_market', 'runic_carving_facility', 'crow_loft'].filter(k => fac[k]?.unlocked).length;
+        const unlockedExtra = ['guard_barracks', 'inquest_chamber', 'alchemical_still', 'war_table', 'armory_market', 'runic_carving_facility', 'training_grounds', 'exploration_observatory', 'crow_loft'].filter(k => fac[k]?.unlocked).length;
         const levelUpgrades = Object.values(fac).reduce((acc, f) => acc + (f.unlocked ? Math.max(0, (f.level || 1) - 1) : 0), 0);
         const points = unlockedExtra + levelUpgrades;
 
@@ -2242,6 +2291,7 @@ const CampaignManager = rootScope.CampaignManager || {
         this.resetWarBoard();
         this.scoutedNodes = new Set(['0', '1', '2', '3', '4', '5', '6', '8', '9', '10', 'the capital', 'oakhaven', 'gallows hill', "mire's edge", 'blackwood', 'hollow creek', 'ashen hold', "crow's perch", "widow's web", 'thornbury']);
         RealityEditorVault.resetForNewRun();
+        rootScope.ForestOverworldEngine?.resetForNewRun?.();
         RoleStateMachine.transitionTo('MORNING_BRIEFING');
 
         if (key === 'NOBLE_HOUSE') {
@@ -3781,13 +3831,18 @@ const CrisisEngine = rootScope.CrisisEngine || {
         const isSov = (r === 'SOVEREIGN' || r === 'PALE_SOVEREIGN');
         const fac = FacilityEngine.facilities;
         const factCount = RealityEditorVault.facts?.length || 0;
+        const exploreUnlocked = isSov || Boolean(fac.exploration_observatory?.unlocked);
         const dirs = isSov
             ? [
+                [`window.openExploreForest()`, '🐺🌲 EXPLORE FOREST (Predator Hunt, Stalk & Feed Overworld)'],
                 [`window.viewTruthVault()`, `📜 Harvested Truths & Relics (${factCount})`],
                 [`window.viewTelemetry()`, '🏛️ Survey 20 Bedrock Prey Parishes']
             ]
             : [
-                [`window.viewFacilities()`, '🏗️ Base Upgrades & Facilities'],
+                [`window.viewFacilities()`, '🏗️ Fallout Shelter Facility Grid & Upgrades'],
+                ...(exploreUnlocked
+                    ? [[`window.openExploreForest()`, '🌲🧭 EXPLORE FOREST (Forward Recon Overworld Map)']]
+                    : [[`window.viewFacilities('exploration_observatory')`, '🔒 Build Forward Recon Outpost (Unlocks Explore Forest Map)']]),
                 [`window.viewTruthVault()`, `📜 Truth & Relic Vault (${factCount})`],
                 [`window.viewTelemetry()`, '🏛️ 20 Bedrock Settlements']
             ];
@@ -3932,7 +3987,29 @@ const FacilityEngine = rootScope.FacilityEngine || {
             level: 0,
             unlocked: false,
             cost: 28,
+            feedsInto: 'guard_barracks',
+            sectionTab: 'GARRISON',
             unlocksDesc: 'End-Game Ascension Sanctum (Addendum CA-13): Unlocks Tiers IV–VIII Runic Body-Carving (Fuel-Etched Instruments -> Pre-Fracture Ascension Instruments, 48 Body Sites, up to 4,936y Lifespan; requires Royal Chrono-Seals).'
+        },
+        training_grounds: {
+            id: 'training_grounds',
+            name: '🏋️ Forward Recon & Tactical Training Grounds',
+            level: 0,
+            unlocked: false,
+            cost: 12,
+            feedsInto: 'guard_barracks -> exploration_observatory',
+            sectionTab: 'GARRISON',
+            unlocksDesc: 'Dedicated Troop Training Queue & Forward Recon Yard: Feeds trained recruits from Garrison Barracks into 9-Stat Training Queues (+35% Drill Speed per level) and prepares Vanguard Squads for Forest Overworld deployment.'
+        },
+        exploration_observatory: {
+            id: 'exploration_observatory',
+            name: '🌲🧭 Forward Recon Outpost & Overworld Map Tower',
+            level: 0,
+            unlocked: false,
+            cost: 14,
+            feedsInto: 'war_table',
+            sectionTab: 'WARBOARD',
+            unlocksDesc: 'Unlocks the Mount & Blade–style Forest Overworld Map (EXPLORE FOREST) to navigate trained squads node-to-node across the Dark Forest, intercept convoys, and lift the Outer Horizon Fog of War.'
         }
     },
 
@@ -4493,6 +4570,256 @@ const ExpeditionEngine = rootScope.ExpeditionEngine || {
 rootScope.ExpeditionEngine = ExpeditionEngine;
 
 // ============================================================================
+// 5.85 MOUNT & BLADE STYLE TACTICAL OVERWORLD & PREDATOR HUNTING ENGINE
+// ============================================================================
+export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
+    partyNodeId: 1,
+    partyX: 198,
+    partyY: 82,
+    stance: 'MARCH', // MARCH | STALK | HUNT | FORAGE | AMBUSH
+    movementTrail: [],
+    movingTargetEntities: [],
+    overworldLogs: [],
+    huntProgress: 0,
+
+    getSettlementCoords(settlementObj, idx = 1, total = 20) {
+        const id = Number(settlementObj?.id ?? idx);
+        if (id === 0 || settlementObj?.isCrownSeat) {
+            return { x: 140, y: 64, rZone: 'INNER_FOREST' };
+        }
+        const isForestInner = id >= 1 && id <= 10 && id !== 7;
+        const angle = ((idx - 1) / Math.max(1, total - 1)) * Math.PI * 2 - Math.PI / 2;
+        const rx = isForestInner ? 66 : 112;
+        const ry = isForestInner ? 28 : 49;
+        return {
+            x: Number((140 + rx * Math.cos(angle)).toFixed(1)),
+            y: Number((64 + ry * Math.sin(angle)).toFixed(1)),
+            rZone: isForestInner ? 'INNER_FOREST' : 'OUTER_HORIZON'
+        };
+    },
+
+    resetForNewRun() {
+        const isSov = CampaignManager.campaignMode === 'SOVEREIGN';
+        this.partyNodeId = isSov ? 2 : 1;
+        this.stance = isSov ? 'STALK' : 'MARCH';
+        this.huntProgress = 0;
+        const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
+        const startIdx = settlements.findIndex(s => Number(s.id) === this.partyNodeId);
+        const startCoords = this.getSettlementCoords(settlements[Math.max(0, startIdx)], Math.max(1, startIdx), settlements.length || 20);
+        this.partyX = startCoords.x;
+        this.partyY = startCoords.y;
+        this.movementTrail = [{ x: this.partyX, y: this.partyY, nodeId: this.partyNodeId, label: settlements[Math.max(0, startIdx)]?.name || 'Oakhaven' }];
+        this.spawnMovingTargets();
+        this.overworldLogs = [
+            isSov
+                ? `🐺 [PREDATOR OVERWORLD ACTIVE] The Pale Sovereign & Bound Huntsman emerged from the frost-fissures near ${settlements[Math.max(0, startIdx)]?.name || 'Gallows Hill'}. Select any forest node or roaming caravan to STALK, HUNT, ATTACK & FEED!`
+                : `🧭 [MOUNT & BLADE FOREST OVERWORLD ACTIVE] Vanguard Squad mustered at ${settlements[Math.max(0, startIdx)]?.name || 'Oakhaven'}. Tap any node on the overview map to navigate your squad across the Dark Forest!`
+        ];
+    },
+
+    spawnMovingTargets() {
+        const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
+        const pickCoord = (id) => {
+            const idx = settlements.findIndex(s => Number(s.id) === id);
+            const s = settlements[idx >= 0 ? idx : 1] || settlements[0];
+            return { ...this.getSettlementCoords(s, idx >= 0 ? idx : 1, settlements.length || 20), name: s?.name || 'Oakhaven', house: s?.house || 'House Oakheart', id: s?.id ?? id };
+        };
+        const c1 = pickCoord(1);
+        const c2 = pickCoord(4);
+        const c3 = pickCoord(8);
+        const c4 = pickCoord(10);
+
+        this.movingTargetEntities = [
+            { id: 'prey_caravan_1', name: 'Oakheart Ironwood & Resin Convoy', type: 'NOBLE_CONVOY', faction: 'House Oakheart', nodeId: c1.id, x: Number(((c1.x + 140) / 2).toFixed(1)), y: Number(((c1.y + 64) / 2).toFixed(1)), power: 48, lootFuel: 10, lootRes: 14, lootWeight: 260, alive: true, stalkedLevel: 0 },
+            { id: 'prey_patrol_2', name: 'Blackwood Outrider Scion Patrol', type: 'OUTRIDER_PATROL', faction: 'House Blackwood', nodeId: c2.id, x: Number((c2.x - 10).toFixed(1)), y: Number((c2.y + 6).toFixed(1)), power: 54, lootFuel: 8, lootRes: 12, lootWeight: 320, alive: true, stalkedLevel: 0 },
+            { id: 'prey_beast_3', name: 'Elder Bracken-Stag & Feral Pack', type: 'APEX_BEAST', faction: 'Dark Forest Wilds', nodeId: c3.id, x: Number((c3.x + 8).toFixed(1)), y: Number((c3.y - 5).toFixed(1)), power: 44, lootFuel: 6, lootRes: 16, lootWeight: 220, alive: true, stalkedLevel: 0 },
+            { id: 'prey_caravan_4', name: 'Crown Crucible Tithe Wagon', type: 'TITHE_WAGON', faction: 'House Aethel', nodeId: c4.id, x: Number(((c4.x + 140) / 2).toFixed(1)), y: Number(((c4.y + 64) / 2).toFixed(1)), power: 62, lootFuel: 14, lootRes: 18, lootWeight: 380, alive: true, stalkedLevel: 0 }
+        ];
+    },
+    setStance(newStance = 'MARCH') {
+        this.stance = String(newStance || 'MARCH').toUpperCase();
+        const isSov = CampaignManager.campaignMode === 'SOVEREIGN';
+        const msg = isSov
+            ? `🐺 [PREDATOR STANCE: ${this.stance}] Korvan & the Frost-Heralds shifted into [${this.stance}] posture across the mist trails.`
+            : `🛡️ [SQUAD FORMATION STANCE: ${this.stance}] Vanguard Squad assumed [${this.stance}] order on the overview map.`;
+        this.overworldLogs.unshift(msg);
+        if (this.overworldLogs.length > 25) this.overworldLogs.pop();
+        return { success: true, stance: this.stance, message: msg };
+    },
+
+    navigateSquadToNode(targetNodeId) {
+        const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
+        const idx = settlements.findIndex(s => Number(s.id) === Number(targetNodeId));
+        const target = settlements[idx >= 0 ? idx : 1] || settlements[0];
+        if (!target) return { success: false, message: 'Invalid forest destination node.' };
+
+        const coords = this.getSettlementCoords(target, idx >= 0 ? idx : 1, settlements.length || 20);
+        this.partyNodeId = Number(target.id);
+        this.partyX = coords.x;
+        this.partyY = coords.y;
+        this.movementTrail.push({ x: this.partyX, y: this.partyY, nodeId: this.partyNodeId, label: target.name });
+        if (this.movementTrail.length > 6) this.movementTrail.shift();
+
+        const wasFogged = !CampaignManager.isSettlementInForestZone(target);
+        if (wasFogged) {
+            CampaignManager.revealFogOfWarNode(target.name);
+        }
+
+        const isSov = CampaignManager.campaignMode === 'SOVEREIGN';
+        const leadAgt = AgentRosterManager.agents.get('agt_1') || Array.from(AgentRosterManager.agents.values()).find(a => a.alive);
+        const leaderName = leadAgt?.name || (isSov ? 'Korvan the Pale Sovereign' : 'Vanguard Commander');
+
+        let eventNote = '';
+        if (isSov) {
+            const stalkGain = this.stance === 'STALK' ? 140 : 95;
+            CampaignManager.state.sovereign.significanceHarvested = (CampaignManager.state.sovereign.significanceHarvested || 0) + stalkGain;
+            this.huntProgress = Math.min(100, (this.huntProgress || 0) + 25);
+            if (leadAgt?.skills) leadAgt.skills.stealth = Number((leadAgt.skills.stealth + 0.2).toFixed(2));
+            eventNote = `Stalked the shadowed treeline around ${target.name} (${target.house}): +${stalkGain} Historical Weight harvested from stragglers (+0.2 Stealth | Hunt Scent: ${this.huntProgress}%).`;
+        } else {
+            const resFind = this.stance === 'FORAGE' ? 6 : 3;
+            const fuelFind = 2;
+            FacilityEngine.settlementResources += resFind;
+            const h = CampaignManager.state.house;
+            if (h) h.barrierFuelUnits = Math.min(70, (h.barrierFuelUnits || 20) + fuelFind);
+            if (leadAgt?.skills) leadAgt.skills.survival = Number((leadAgt.skills.survival + 0.2).toFixed(2));
+            eventNote = `Marched squad column to ${target.name} (${target.house}): Scavenged +${resFind}u Resources & +${fuelFind}u Runic Fuel along the iron chain-markers (+0.2 Survival).`;
+        }
+
+        const fogNote = wasFogged ? ` 🌫️✨ [FOG OF WAR LIFTED] Outer Horizon telemetry unlocked for ${target.name}!` : '';
+        const msg = `🧭 [OVERWORLD MARCH -> ${target.name.toUpperCase()}] ${leaderName} navigated to ${target.name} (Stance: ${this.stance}). ${eventNote}${fogNote}`;
+        this.overworldLogs.unshift(msg);
+        if (this.overworldLogs.length > 25) this.overworldLogs.pop();
+
+        ExpeditionEngine.tickExpeditionHours(1);
+        return {
+            success: true,
+            partyNodeId: this.partyNodeId,
+            partyX: this.partyX,
+            partyY: this.partyY,
+            wasFogged,
+            message: msg
+        };
+    },
+    executePredatorOrSquadAction(actionType = 'STALK', targetId = null) {
+        const act = String(actionType || 'STALK').toUpperCase();
+        const isSov = CampaignManager.campaignMode === 'SOVEREIGN';
+        const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
+        const currentSettlement = settlements.find(s => Number(s.id) === Number(this.partyNodeId)) || settlements[1] || { id: 1, name: 'Oakhaven', house: 'House Oakheart', barrierFuel: 50, chainsIntegrity: 100 };
+        const leadAgt = AgentRosterManager.agents.get('agt_1') || Array.from(AgentRosterManager.agents.values()).find(a => a.alive);
+        const sq = RoleStateMachine.computeSquadCapabilityMetrics();
+
+        if (!this.movingTargetEntities || this.movingTargetEntities.length === 0) {
+            this.spawnMovingTargets();
+        }
+        const prey = (targetId && this.movingTargetEntities.find(p => p.id === targetId))
+            || this.movingTargetEntities.find(p => p.alive)
+            || this.movingTargetEntities[0];
+
+        let msg = '';
+        if (act === 'STALK') {
+            this.stance = 'STALK';
+            if (prey) {
+                prey.stalkedLevel = Math.min(100, (prey.stalkedLevel || 0) + 40);
+                this.partyX = Number(((this.partyX + prey.x) / 2).toFixed(1));
+                this.partyY = Number(((this.partyY + prey.y) / 2).toFixed(1));
+            }
+            this.huntProgress = Math.min(100, (this.huntProgress || 0) + 35);
+            if (leadAgt?.skills) leadAgt.skills.stealth = Number((leadAgt.skills.stealth + 0.35).toFixed(2));
+            if (isSov) {
+                const weightGain = 160;
+                CampaignManager.state.sovereign.significanceHarvested = (CampaignManager.state.sovereign.significanceHarvested || 0) + weightGain;
+                msg = `🐾👁️ [PREDATOR STALKING] ${leadAgt?.name || 'The Bound Huntsman'} shadowed [${prey?.name || currentSettlement.name}] through the freezing mist without snapping a twig (+${weightGain} Historical Weight, +0.35 Stealth, Prey Vulnerability: ${prey?.stalkedLevel || 40}%).`;
+            } else {
+                FacilityEngine.settlementResources += 5;
+                msg = `🏹👁️ [SQUAD RECON STALK] ${leadAgt?.name || 'Scout Squad'} tracked [${prey?.name || currentSettlement.name}] from the ridge-line (+5u Recon Supplies, +0.35 Stealth, Ambush Readiness: ${prey?.stalkedLevel || 40}%).`;
+            }
+        } else if (act === 'HUNT_PREY' || act === 'ATTACK_PREY') {
+            this.stance = 'HUNT';
+            if (prey) {
+                this.partyX = prey.x;
+                this.partyY = prey.y;
+                prey.alive = false;
+            }
+            if (leadAgt?.skills) {
+                leadAgt.skills.meleeAtt = Number((leadAgt.skills.meleeAtt + 0.4).toFixed(2));
+                if (leadAgt.cultivation) leadAgt.cultivation.currentMasteryPool = Math.min(100, (leadAgt.cultivation.currentMasteryPool || 25) + 12);
+            }
+            if (isSov) {
+                const bonusMult = 1 + ((prey?.stalkedLevel || 0) / 100) * 0.5;
+                const weightHarvest = Math.round((prey?.lootWeight || 320) * bonusMult);
+                CampaignManager.state.sovereign.significanceHarvested = (CampaignManager.state.sovereign.significanceHarvested || 0) + weightHarvest;
+                CampaignManager.mutateWarBoard(prey?.faction || currentSettlement.house, -5, 'DEFENSIVE', `Patrol slaughtered in the mist by the Pale Sovereign`);
+                msg = `🩸🐺 [PREDATOR POUNCE & SLAUGHTER] ${leadAgt?.name || 'The Pale Sovereign'} lunged from the copper fog and tore through [${prey?.name || 'Border Patrol'}]! Harvested +${weightHarvest} Historical Weight (+0.4 Melee Attack | ${prey?.faction || currentSettlement.house} -5 Power).`;
+            } else {
+                const fuelLoot = prey?.lootFuel || 8;
+                const resLoot = prey?.lootRes || 12;
+                const h = CampaignManager.state.house;
+                if (h) h.barrierFuelUnits = Math.min(70, (h.barrierFuelUnits || 20) + fuelLoot);
+                FacilityEngine.settlementResources += resLoot;
+                CampaignManager.mutateWarBoard(prey?.faction || currentSettlement.house, -4, 'SKIRMISH', `Convoy intercepted by vanguard squad in the forest`);
+                msg = `⚔️🛡️ [SQUAD OVERWORLD INTERCEPTION] ${leadAgt?.name || 'Vanguard Squad'} ambushed [${prey?.name || 'Outrider Column'}] on the forest road! Seized +${fuelLoot}u Barrier Fuel & +${resLoot}u Resources (+0.4 Melee Attack).`;
+            }
+            if (this.movingTargetEntities.every(p => !p.alive)) this.spawnMovingTargets();
+        }
+        if (act === 'FEED' || act === 'DEVOUR') {
+            if (isSov) {
+                const feedWeight = Math.round(360 + sq.avgMartial * 15);
+                const sov = CampaignManager.state.sovereign;
+                sov.significanceHarvested = (sov.significanceHarvested || 0) + feedWeight;
+                AgentRosterManager.agents.forEach(a => {
+                    if (!a.alive) return;
+                    a.vitals.maxHp += 10;
+                    a.vitals.hp = a.vitals.maxHp;
+                    a.vitals.hunger = 100;
+                    a.vitals.poise = 100;
+                    a.skills.strength = Number((a.skills.strength + 0.35).toFixed(2));
+                    a.skills.toughness = Number((a.skills.toughness + 0.35).toFixed(2));
+                });
+                if (sov.significanceHarvested >= 600 && (sov.heraldsMutated || 0) < 5) {
+                    sov.heraldsMutated = Math.min(5, (sov.heraldsMutated || 0) + 1);
+                }
+                CampaignManager.mutateWarBoard(currentSettlement.house, -6, 'DEFENSIVE', `Outer hamlets devoured in a Macabre Feast`);
+                msg = `🥩🩸 [PREDATOR FEEDING & MARROW FEAST] Korvan & the Frost-Heralds gorged upon the fallen at ${currentSettlement.name}! (+${feedWeight} Historical Weight | Pack HP & Hunger restored to 100% +10 Max HP | +0.35 STR/TGH | Heralds Mutated: ${sov.heraldsMutated}/5).`;
+            } else {
+                const resGain = 10;
+                FacilityEngine.settlementResources += resGain;
+                AgentRosterManager.agents.forEach(a => {
+                    if (!a.alive) return;
+                    a.vitals.hp = a.vitals.maxHp;
+                    a.vitals.hunger = 100;
+                    a.vitals.poise = Math.min(100, (a.vitals.poise || 60) + 20);
+                    a.skills.survival = Number((a.skills.survival + 0.3).toFixed(2));
+                });
+                msg = `⛺🍖 [FOREST BIVOUAC & FORAGE] Squad pitched a warded camp near ${currentSettlement.name}, dressed wild game (+${resGain}u Resources), and restored all Squad HP, Hunger & Poise to full (+0.3 Survival)!`;
+            }
+        } else if (act === 'SCOUT_ALL_FOG') {
+            settlements.forEach(s => {
+                if (!s.hiddenGapKeeper && Number(s.id) !== 7) {
+                    CampaignManager.revealFogOfWarNode(s.name);
+                }
+            });
+            msg = `🌫️🧭 [FULL HORIZON RECON] Outriders mapped all outer horizon trail-markers across the 20 Bedrock Settlements!`;
+        }
+
+        this.overworldLogs.unshift(msg);
+        if (this.overworldLogs.length > 25) this.overworldLogs.pop();
+        LogDispatchManager.dispatches.unshift({
+            id: `ovw_${Date.now()}_${Math.random()}`,
+            day: rootScope.EngineParams?.worldDay || 1,
+            type: isSov ? 'PREDATOR HUNT LOG' : 'FOREST OVERWORLD LOG',
+            sender: leadAgt?.name || (isSov ? 'The Pale Sovereign' : 'Vanguard Squad'),
+            title: `${act} at ${currentSettlement.name}`,
+            body: msg,
+            read: false
+        });
+        return { success: true, action: act, partyX: this.partyX, partyY: this.partyY, message: msg };
+    }
+};
+ForestOverworldEngine.resetForNewRun();
+rootScope.ForestOverworldEngine = ForestOverworldEngine;
+
+// ============================================================================
 // 5.9 ROYAL ARCHIVE TUTORIAL ADVISOR (FIRST-CLICK & EMISSARY WALKTHROUGH)
 // ============================================================================
 export const TutorialAdvisor = rootScope.TutorialAdvisor || {
@@ -4789,6 +5116,7 @@ export const CommanderEngine = {
     CrisisEngine,
     FacilityEngine,
     ExpeditionEngine,
+    ForestOverworldEngine,
     NOBLE_HOUSE_PROFILES,
     ROLE_CATALOG,
     SQUAD_ARMORY_CATALOG

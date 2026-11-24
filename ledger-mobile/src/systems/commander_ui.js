@@ -647,6 +647,74 @@ export const CommanderUI = {
             this.renderWarBoardReader();
             this.render();
         };
+        window.openExploreForest = () => {
+            const isSov = CommanderEngine.CampaignManager.campaignMode === 'SOVEREIGN';
+            const fe = CommanderEngine.FacilityEngine;
+            if (!isSov && !fe?.facilities?.exploration_observatory?.unlocked) {
+                this.showBanner('🔒 [FACILITY REQUIRED] Construct the [🌲🧭 Forward Recon Outpost & Overworld Map Tower] (14r) in the Fallout Shelter Facility Grid to unlock the Explore Forest Overworld Map!');
+                this.renderFacilitiesReader('exploration_observatory');
+                this.render();
+                return { success: false, gated: true };
+            }
+            this.activeBookTab = 'WARBOARD';
+            this.mapViewMode = 'TACTICAL_MAP';
+            this.showBanner(isSov
+                ? '🐺🌲 [PREDATOR OVERWORLD MAP] Stalking the Dark Forest as The Pale Sovereign! Tap any node or caravan to STALK, HUNT, ATTACK & FEED!'
+                : '🌲🧭 [EXPLORE FOREST OVERWORLD] Forward Recon Overworld Map active! Tap any parish node to navigate your trained squad across the forest!');
+            this.renderWarBoardReader();
+            this.render();
+            return { success: true };
+        };
+        window.queueAgentTrainingPreset = (agentId, preset = 'RECON') => {
+            const presets = {
+                RECON: ['STEALTH', 'SURVIVAL', 'DODGE'],
+                VANGUARD: ['MELEE_ATT', 'TOUGHNESS', 'MELEE_DEF'],
+                ARCHIVIST: ['LORE', 'SURVIVAL', 'ATHLETICS']
+            };
+            const list = presets[String(preset || 'RECON').toUpperCase()] || presets.RECON;
+            const res = CommanderEngine.AgentRosterManager.queueAgentTraining(agentId, list);
+            this.showBanner(res.message);
+            this.render();
+        };
+        window.closeFacilityModal = () => {
+            const modal = document.getElementById('fallout-facility-popup-modal');
+            if (modal) modal.style.display = 'none';
+        };
+        window.openFacilitySection = (facId) => {
+            const f = CommanderEngine.FacilityEngine?.facilities?.[facId];
+            if (!f) return;
+            this.closeFacilityModal();
+            if (facId === 'exploration_observatory') {
+                window.openExploreForest();
+            } else if (facId === 'guard_barracks' || facId === 'training_grounds' || facId === 'armory_market' || facId === 'runic_carving_facility') {
+                this.switchBookTab('GARRISON');
+            } else if (facId === 'war_table') {
+                window.viewWarBoard();
+            } else if (facId === 'inquest_chamber') {
+                window.viewShadowLedger();
+            } else {
+                this.switchBookTab('COMMAND');
+            }
+        };
+        window.navigateOverworldSquad = (nodeId) => {
+            this.selectedMapSettlementId = Number(nodeId) || 0;
+            const res = CommanderEngine.ForestOverworldEngine?.navigateSquadToNode?.(nodeId);
+            if (res?.message) this.showBanner(res.message);
+            this.renderWarBoardReader();
+            this.render();
+        };
+        window.executeOverworldAction = (act, targetId = null) => {
+            const res = CommanderEngine.ForestOverworldEngine?.executePredatorOrSquadAction?.(act, targetId);
+            if (res?.message) this.showBanner(res.message);
+            this.renderWarBoardReader();
+            this.render();
+        };
+        window.setOverworldStance = (stance) => {
+            const res = CommanderEngine.ForestOverworldEngine?.setStance?.(stance);
+            if (res?.message) this.showBanner(res.message);
+            this.renderWarBoardReader();
+            this.render();
+        };
         window.interrogateSuspect = (targetId = 'agt_2') => {
             CommanderEngine.TutorialAdvisor?.checkAndTrigger?.('INQUEST_BTN');
             this.renderInquestReader(targetId);
@@ -668,6 +736,22 @@ export const CommanderUI = {
             });
             this.render();
             this.renderStoryReader('vet_cornelius');
+        };
+        window.selectArchiveSectionDropdown = (val) => {
+            const v = String(val || 'COMMAND').toUpperCase();
+            if (v === 'FACILITIES') {
+                window.viewFacilities();
+            } else if (v === 'EXPLORE_FOREST') {
+                window.openExploreForest();
+            } else if (v === 'TRUTH') {
+                window.viewTruthVault();
+            } else if (v === 'WARBOARD') {
+                window.viewWarBoard();
+            } else if (v === 'TRAINING_GROUNDS') {
+                this.switchBookTab('GARRISON');
+            } else {
+                this.switchBookTab(v);
+            }
         };
         window.exportSave = () => this.exportLegacySaveFile();
         window.refreshUI = () => this.render();
@@ -717,11 +801,16 @@ export const CommanderUI = {
         this.setReaderContent(text);
     },
 
-    renderFacilitiesReader() {
+    closeFacilityModal() {
+        const modal = typeof document !== 'undefined' ? document.getElementById('fallout-facility-popup-modal') : null;
+        if (modal) modal.style.display = 'none';
+    },
+
+    renderFacilitiesReader(highlightFacId = null) {
         const fe = CommanderEngine.FacilityEngine;
         if (!fe) return;
         let text = "================================================================================\n";
-        text += "🏗️ BASE INFRASTRUCTURE, FACILITY UNLOCKS & VILLAGE GUARD GENERATION\n";
+        text += "🏗️ FALLOUT SHELTER FACILITY GRID, PIPELINE & VILLAGE GUARD GENERATION\n";
         text += "================================================================================\n";
         text += `Settlement Prosperity: ${fe.settlementProsperity}% (Threshold >= 55% to auto-generate guards)\n`;
         text += `Settlement Resources:  ${fe.settlementResources}u | Regenerated Village Guards: ${fe.villageGuardsCurrent}/${fe.villageGuardsMaxThreshold}\n`;
@@ -741,6 +830,76 @@ export const CommanderUI = {
                 .map(f => `<button class="cmd-btn" onclick="window.unlockFacility('${f.id}')">${f.unlocked ? `⬆️ Upgrade ${f.name.split(' ')[1]} (${f.cost}r)` : `🔨 Build ${f.name} (${f.cost}r)`}</button>`)
                 .join('');
         }
+        this.renderFalloutFacilityModal(highlightFacId);
+    },
+
+    renderFalloutFacilityModal(highlightFacId = null) {
+        const fe = CommanderEngine.FacilityEngine;
+        const modal = typeof document !== 'undefined' ? document.getElementById('fallout-facility-popup-modal') : null;
+        if (!fe || !modal) return;
+        const pipelineChain = [
+            ['guard_barracks', '1. BARRACKS (Muster Troops)'],
+            ['training_grounds', '2. TRAINING GROUNDS (9-Stat Queues)'],
+            ['armory_market', '3. ARMORY MARKET (Equip Gear)'],
+            ['runic_carving_facility', '4. RUNIC SCRIPTORIUM (Tiers I–VIII)'],
+            ['exploration_observatory', '5. RECON OUTPOST (Explore Forest Map)'],
+            ['war_table', '6. WAR TABLE (19-House Dominion)']
+        ];
+        const pipelineHtml = pipelineChain.map(([id, label]) => {
+            const fac = fe.facilities[id];
+            const on = fac?.unlocked;
+            return `<span style="padding:2px 6px; border-radius:3px; font-size:8.5px; font-weight:bold; background:${on ? '#14532d' : '#1e293b'}; border:1px solid ${on ? '#4ade80' : '#475569'}; color:${on ? '#dcfce7' : '#94a3b8'};">${on ? '✅' : '🔒'} ${label}</span>`;
+        }).join('<span style="color:#f59e0b; font-weight:bold; font-size:10px;"> ➔ </span>');
+
+        const cardsHtml = Object.values(fe.facilities).map(f => {
+            const isHi = highlightFacId === f.id;
+            const upgCost = f.unlocked ? Math.max(6, Math.round((f.cost || 6) * (1 + f.level * 0.5))) : f.cost;
+            const borderCol = isHi ? '#38bdf8' : (f.unlocked ? '#22c55e' : '#64748b');
+            const bgGrad = f.unlocked
+                ? 'linear-gradient(180deg, rgba(20,83,45,0.35) 0%, rgba(9,13,14,0.95) 100%)'
+                : 'linear-gradient(180deg, rgba(30,41,59,0.5) 0%, rgba(9,13,14,0.95) 100%)';
+            return `
+                <div style="border:2px solid ${borderCol}; background:${bgGrad}; padding:8px; border-radius:5px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:${isHi ? '0 0 14px rgba(56,189,248,0.5)' : 'none'};">
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:3px; margin-bottom:4px;">
+                            <span style="font-family:'Cinzel',serif; font-weight:900; font-size:10px; color:${f.unlocked ? '#86efac' : '#cbd5e1'};">${f.name}</span>
+                            <span style="font-size:8.5px; font-weight:bold; padding:1px 5px; border-radius:3px; background:${f.unlocked ? '#166534' : '#334155'}; color:#fff;">${f.unlocked ? `LV.${f.level}` : 'LOCKED'}</span>
+                        </div>
+                        <div style="font-size:8.5px; color:#cbd5e1; line-height:1.3; margin-bottom:6px;">${f.unlocksDesc}</div>
+                    </div>
+                    <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                        ${f.id !== 'scriptorium'
+                            ? `<button class="cmd-btn" style="flex:1; padding:4px 6px; font-size:9px; background:${f.unlocked ? '#1e3a8a' : '#3b2410'}; border-color:${f.unlocked ? '#60a5fa' : '#f59e0b'}; color:#fff; font-weight:bold;" onclick="window.unlockFacility('${f.id}')">${f.unlocked ? `⬆️ Upgrade Lv.${f.level + 1} (${upgCost}r)` : `🔨 Build Room (${upgCost}r)`}</button>`
+                            : `<span style="font-size:8.5px; color:#86efac; font-weight:bold;">🏛️ Core Command Room Active</span>`
+                        }
+                        ${f.unlocked
+                            ? `<button class="cmd-btn" style="padding:4px 7px; font-size:9px; background:#14532d; border-color:#4ade80; color:#dcfce7; font-weight:bold;" onclick="window.openFacilitySection('${f.id}')">🚪 Enter Section</button>`
+                            : ''
+                        }
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        modal.style.display = 'block';
+        modal.innerHTML = `
+            <div style="border:2px solid #f59e0b; background:linear-gradient(180deg,#111827 0%,#07090e 100%); padding:12px; border-radius:6px; box-shadow:0 16px 40px rgba(0,0,0,0.95); margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #78350f; padding-bottom:6px; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                    <div>
+                        <div style="font-family:'Cinzel',serif; font-weight:900; font-size:13px; color:#fde68a;">🏗️ FALLOUT SHELTER BASE VAULT // INTERCONNECTED FACILITY ROOM GRID</div>
+                        <div style="font-size:9.5px; color:#94a3b8;">Resources: <b style="color:#4ade80;">${fe.settlementResources}u</b> | Prosperity: <b style="color:#38bdf8;">${fe.settlementProsperity}%</b> | Village Guards: <b style="color:#fde68a;">${fe.villageGuardsCurrent}/${fe.villageGuardsMaxThreshold}</b> | Chrono-Seals: <b style="color:#c084fc;">${fe.chronoSeals}💎</b></div>
+                    </div>
+                    <button class="cmd-btn" style="background:#3f1212; border-color:#ef4444; color:#fecaca; padding:4px 10px; font-size:10px; font-weight:bold;" onclick="window.closeFacilityModal()">✖ Close Facility Vault</button>
+                </div>
+                <div style="background:rgba(15,23,42,0.9); border:1px solid #334155; padding:6px 8px; border-radius:4px; margin-bottom:8px; display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
+                    <span style="font-size:9px; font-weight:bold; color:#fbbf24; margin-right:4px;">🔗 FACILITY PIPELINE:</span>
+                    ${pipelineHtml}
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(235px, 1fr)); gap:8px;">
+                    ${cardsHtml}
+                </div>
+            </div>
+        `;
     },
 
     buildEncounterArenaHtml(isSov = false) {
@@ -839,6 +998,7 @@ export const CommanderUI = {
             const settlements = CommanderEngine.CampaignManager.getBedrockTelemetry({
                 allowTwentyFirst: CommanderEngine.ShadowInfluenceEngine?.isEpitaphRevealed?.() || false
             }) || [];
+            const ovw = CommanderEngine.ForestOverworldEngine || { partyNodeId: 1, partyX: 198, partyY: 82, stance: 'MARCH', movementTrail: [], movingTargetEntities: [], overworldLogs: [] };
             const selNode = settlements.find(s => Number(s.id) === Number(this.selectedMapSettlementId)) || settlements[1] || { id: 1, name: 'Oakhaven', house: 'House Oakheart', barrierFuel: 50, chainsIntegrity: 100 };
             const selHouse = board.find(w => w.name === selNode.house) || { name: selNode.house, power: 65, status: 'PEACE', monopoly: 'Ironwood' };
             const isSov = CommanderEngine.CampaignManager.campaignMode === 'SOVEREIGN';
@@ -846,7 +1006,7 @@ export const CommanderUI = {
 
             const svgNodes = settlements.map((s, i) => {
                 if (i === 0) {
-                    return `<g style="cursor:pointer;" onclick="window.selectMapSettlement(0)"><rect x="132" y="54" width="16" height="16" fill="#1e1b4b" stroke="#fbbf24" stroke-width="1.8"/><text x="140" y="65" text-anchor="middle" fill="#fde68a" font-size="9">👑</text></g>`;
+                    return `<g style="cursor:pointer;" onclick="window.navigateOverworldSquad(0)"><rect x="132" y="54" width="16" height="16" fill="#1e1b4b" stroke="#fbbf24" stroke-width="1.8"/><text x="140" y="65" text-anchor="middle" fill="#fde68a" font-size="9">👑</text></g>`;
                 }
                 const isForestInner = Number(s.id) >= 1 && Number(s.id) <= 10 && Number(s.id) !== 7;
                 const isRevealed = CommanderEngine.CampaignManager.isSettlementInForestZone?.(s) ?? isForestInner;
@@ -857,18 +1017,43 @@ export const CommanderUI = {
                 const cy = (64 + ry * Math.sin(angle)).toFixed(1);
                 const hEntry = board.find(w => w.name === s.house);
                 const isSelected = Number(s.id) === Number(selNode.id);
+                const isPartyHere = Number(s.id) === Number(ovw.partyNodeId);
                 const isHostile = hEntry?.status === 'WAR_PREP' || hEntry?.status === 'SKIRMISH' || s.chainsIntegrity < 50;
-                const fillCol = !isRevealed ? '#334155' : (isSelected ? '#38bdf8' : (isHostile ? '#dc2626' : (hEntry?.status === 'ALLIED' ? '#10b981' : '#d97706')));
+                const fillCol = !isRevealed ? '#334155' : (isPartyHere ? '#a855f7' : (isSelected ? '#38bdf8' : (isHostile ? '#dc2626' : (hEntry?.status === 'ALLIED' ? '#10b981' : '#d97706'))));
                 const labelTxt = isRevealed ? s.name.slice(0, 10) : '🌫️ [FOGGED]';
                 const blurAttr = !isRevealed ? 'opacity="0.55" filter="url(#outer-fog-blur)"' : '';
                 return `
-                    <g style="cursor:pointer;" ${blurAttr} onclick="window.selectMapSettlement(${s.id})">
+                    <g style="cursor:pointer;" ${blurAttr} onclick="window.navigateOverworldSquad(${s.id})">
                         <line x1="140" y1="62" x2="${cx}" y2="${cy}" stroke="${isSelected ? '#38bdf8' : '#4a453b'}" stroke-width="${isSelected ? '1.6' : '0.8'}" stroke-dasharray="2,2"/>
-                        <circle cx="${cx}" cy="${cy}" r="${isSelected ? '6.5' : '4.5'}" fill="${fillCol}" stroke="#090d0e" stroke-width="1.2"/>
+                        <circle cx="${cx}" cy="${cy}" r="${isSelected || isPartyHere ? '6.5' : '4.5'}" fill="${fillCol}" stroke="#090d0e" stroke-width="1.2"/>
                         <text x="${cx}" y="${(Number(cy) - 7).toFixed(1)}" text-anchor="middle" fill="${isSelected ? '#7dd3fc' : (isRevealed ? '#e2d1b0' : '#94a3b8')}" font-size="${isSelected ? '6.5' : '5.2'}" font-weight="bold">${labelTxt}</text>
                     </g>
                 `;
             }).join('');
+
+            // Render Mount & Blade Overworld Moving Prey / Convoy Tokens & Player Squad / Predator Token
+            const preyNodesSvg = (ovw.movingTargetEntities || []).filter(p => p.alive).map(p => `
+                <g style="cursor:pointer;" onclick="window.executeOverworldAction('HUNT_PREY','${p.id}')">
+                    <circle cx="${p.x}" cy="${p.y}" r="4.2" fill="${isSov ? '#991b1b' : '#b45309'}" stroke="#fde68a" stroke-width="1" stroke-dasharray="1.5,1"/>
+                    <text x="${p.x}" y="${(Number(p.y) + 2.2).toFixed(1)}" text-anchor="middle" font-size="5.5">${p.type === 'APEX_BEAST' ? '🦌' : '📦'}</text>
+                    <text x="${p.x}" y="${(Number(p.y) + 8.5).toFixed(1)}" text-anchor="middle" fill="#fde68a" font-size="4.4" font-weight="bold">${isSov ? '🩸PREY' : '⚔️TARGET'}</text>
+                </g>
+            `).join('');
+
+            const trailPoints = (ovw.movementTrail || []).map(pt => `${pt.x},${pt.y}`).join(' ');
+            const trailSvg = (ovw.movementTrail && ovw.movementTrail.length > 1)
+                ? `<polyline points="${trailPoints}" fill="none" stroke="${isSov ? '#ef4444' : '#38bdf8'}" stroke-width="1.6" stroke-dasharray="3,2" opacity="0.85"/>`
+                : '';
+
+            const px = ovw.partyX || 198;
+            const py = ovw.partyY || 82;
+            const partyTokenSvg = `
+                <g pointer-events="none">
+                    <circle cx="${px}" cy="${py}" r="8.5" fill="${isSov ? 'rgba(220,38,38,0.28)' : 'rgba(56,189,248,0.25)'}" stroke="${isSov ? '#ef4444' : '#38bdf8'}" stroke-width="1.4"/>
+                    <text x="${px}" y="${(Number(py) + 3).toFixed(1)}" text-anchor="middle" font-size="8.5">${isSov ? '🐺' : '🛡️'}</text>
+                    <text x="${px}" y="${(Number(py) + 13).toFixed(1)}" text-anchor="middle" fill="${isSov ? '#fca5a5' : '#bae6fd'}" font-size="5.2" font-weight="900">${isSov ? `SOVEREIGN [${ovw.stance}]` : `SQUAD [${ovw.stance}]`}</text>
+                </g>
+            `;
 
             const encounterOverlayHtml = this.buildEncounterArenaHtml(isSov);
 
@@ -901,16 +1086,22 @@ export const CommanderUI = {
                                 }
                             </div>
                             <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                                <button class="cmd-btn" style="padding:3px 7px; font-size:8.5px; background:#14532d; border-color:#22c55e; color:#dcfce7;" onclick="window.navigateOverworldSquad(${selNode.id})">🧭 March Squad Here</button>
                                 ${!selNodeCleared
                                     ? `<button class="cmd-btn" style="padding:3px 8px; font-size:9px; background:#0f172a; border-color:#38bdf8; color:#bae6fd;" onclick="window.scoutFogOfWarNode('${selNode.name}')">🌫️🧭 Dispatch Mist-Recon Patrol (Lift Fog of War)</button>`
                                     : `
-                                        <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.openTacticalEncounter(${selNode.id})">${isSov ? '🐺 Hunt &amp; Devour Parish' : '⚔️ Tactical Encounter'}</button>
+                                        <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.openTacticalEncounter(${selNode.id})">${isSov ? '🐺 Attack &amp; Devour Parish' : '⚔️ Tactical Encounter'}</button>
                                         ${isSov
-                                            ? `<button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('SUMMON_HUNTSMAN','${selNode.name}')">🧭 Stalk Node</button>`
+                                            ? `
+                                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px; background:#2e1065; border-color:#a855f7; color:#f3e8ff;" onclick="window.executeOverworldAction('STALK')">🐾 Stalk Prey</button>
+                                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px; background:#450a0a; border-color:#dc2626; color:#fecaca;" onclick="window.executeOverworldAction('HUNT_PREY')">🩸 Hunt &amp; Pounce</button>
+                                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px; background:#3b0764; border-color:#e879f9; color:#fae8ff;" onclick="window.executeOverworldAction('FEED')">🥩 Feed &amp; Gorge</button>
+                                            `
                                             : `
+                                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.executeOverworldAction('STALK')">🏹 Recon Stalk</button>
+                                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.executeOverworldAction('HUNT_PREY')">⚔️ Intercept Convoy</button>
+                                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.executeOverworldAction('FEED')">⛺ Camp &amp; Forage</button>
                                                 <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('GUARDED_CARAVAN','${selNode.name}')">🛡️ Caravan</button>
-                                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('PATROL_MIST','${selNode.name}')">🧭 Patrol</button>
-                                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.sendExpedition('PROXY_RAID','${selNode.name}')">🗡️ Proxy Raid</button>
                                             `
                                         }
                                     `
@@ -919,11 +1110,17 @@ export const CommanderUI = {
                         </div>
                     </div>
                     <div style="border:1px solid #383e40; background:rgba(9,13,14,0.85); padding:8px; display:flex; flex-direction:column; justify-content:space-between;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:11px; font-weight:bold;">TELEMETRY GRID // INNER FOREST ZONE vs. OUTER FOG OF WAR</div>
-                            <span style="font-size:8px; color:#38bdf8;">[${this.mapViewMode}]</span>
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+                            <div style="color:#e2d1b0; font-family:'Cinzel',serif; font-size:10.5px; font-weight:bold;">
+                                ${isSov ? '🐺 PREDATOR OVERWORLD MAP // STALK, HUNT, ATTACK &amp; FEED' : '🧭 MOUNT &amp; BLADE FOREST OVERWORLD // SQUAD NAVIGATION'}
+                            </div>
+                            <div style="display:flex; gap:3px;">
+                                <button class="cmd-btn" style="padding:1px 5px; font-size:8px; ${ovw.stance === 'MARCH' ? 'border-color:#22c55e; color:#86efac;' : ''}" onclick="window.setOverworldStance('MARCH')">${isSov ? '🐺 Prowl' : '🛡️ March'}</button>
+                                <button class="cmd-btn" style="padding:1px 5px; font-size:8px; ${ovw.stance === 'STALK' ? 'border-color:#a855f7; color:#e9d5ff;' : ''}" onclick="window.setOverworldStance('STALK')">🐾 Stalk</button>
+                                <button class="cmd-btn" style="padding:1px 5px; font-size:8px; ${ovw.stance === 'HUNT' ? 'border-color:#ef4444; color:#fecaca;' : ''}" onclick="window.setOverworldStance('HUNT')">${isSov ? '🩸 Hunt' : '⚔️ Raid'}</button>
+                            </div>
                         </div>
-                        <svg viewBox="0 0 280 128" style="width:100%; height:132px; display:block; margin:2px auto; background:radial-gradient(circle at 50% 50%, rgba(20,83,45,0.28) 0%, rgba(15,23,42,0.92) 56%, rgba(5,7,9,0.98) 100%); border:1px solid #2b3234;">
+                        <svg viewBox="0 0 280 128" style="width:100%; height:136px; display:block; margin:2px auto; background:radial-gradient(circle at 50% 50%, rgba(20,83,45,0.28) 0%, rgba(15,23,42,0.92) 56%, rgba(5,7,9,0.98) 100%); border:1px solid #2b3234;">
                             <defs>
                                 <filter id="outer-fog-blur" x="-20%" y="-20%" width="140%" height="140%">
                                     <feGaussianBlur stdDeviation="0.9" />
@@ -939,13 +1136,21 @@ export const CommanderUI = {
                             <rect x="0" y="0" width="280" height="128" fill="url(#fog-of-war-shroud)" pointer-events="none"/>
                             <ellipse cx="140" cy="64" rx="112" ry="49" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3"/>
                             <ellipse cx="140" cy="64" rx="76" ry="33" fill="none" stroke="#22c55e" stroke-width="1.2" stroke-dasharray="3,2"/>
-                            <text x="140" y="28" text-anchor="middle" fill="#86efac" font-size="5.5" font-weight="bold">🌲 INNER FOREST ZONE (CLEARED)</text>
-                            <text x="140" y="10" text-anchor="middle" fill="#94a3b8" font-size="5.5" font-weight="bold">🌫️ OUTER HORIZON &amp; DUNES (FOG OF WAR — REQUIRES RECON)</text>
+                            <text x="140" y="28" text-anchor="middle" fill="#86efac" font-size="5.5" font-weight="bold">🌲 INNER FOREST ZONE (TAP ANY NODE TO NAVIGATE SQUAD)</text>
+                            <text x="140" y="10" text-anchor="middle" fill="#94a3b8" font-size="5.5" font-weight="bold">🌫️ OUTER HORIZON &amp; DUNES (FOG OF WAR — MARCH OR SCOUT TO LIFT)</text>
+                            ${trailSvg}
                             ${svgNodes}
+                            ${preyNodesSvg}
+                            ${partyTokenSvg}
                         </svg>
                         <div class="burden-parchment-card" style="padding:5px 7px;">
-                            <div style="font-family:'Cinzel',serif; font-weight:900; font-size:9.5px; border-bottom:1px solid #4a3e2e; margin-bottom:2px;">[CAUSAL AUDIT TRAIL]</div>
-                            ${auditHtml}
+                            <div style="font-family:'Cinzel',serif; font-weight:900; font-size:9px; border-bottom:1px solid #4a3e2e; margin-bottom:2px; display:flex; justify-content:space-between;">
+                                <span>[${isSov ? 'PREDATOR HUNT &amp; FEEDING TELEMETRY' : 'OVERWORLD SQUAD NAVIGATION LOG'}]</span>
+                                <span>POS: (${ovw.partyX}, ${ovw.partyY})</span>
+                            </div>
+                            <div style="font-size:8px; color:#1c1610; max-height:38px; overflow-y:auto;">
+                                ${(ovw.overworldLogs || []).slice(0, 2).map(l => `<div style="margin-bottom:2px;">• ${l}</div>`).join('') || auditHtml}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1146,29 +1351,49 @@ export const CommanderUI = {
                     </div>
                 </div>
 
-                <!-- ROYAL LEDGER BOOK PAGE TABS & SIMULATION CLOCK BAR -->
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom:6px; padding-bottom:5px; border-bottom:2px solid #4a3e2e;">
-                    <div id="hub-page-nav-tabs" style="display:flex; gap:4px; flex-wrap:wrap;">
+                <!-- ROYAL LEDGER COMPACT SECTION SELECTOR DROPDOWN & SIMULATION CLOCK BAR -->
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px; padding-bottom:5px; border-bottom:2px solid #4a3e2e;">
+                    <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
                         <button id="btn-nav-page1-gate" class="cmd-btn" onclick="if(!window.CommanderUI?.isRunCommitted && window.CandidateOnboarding) window.CandidateOnboarding.start(window.CommanderUI);">PAGE 1: CANDIDATE GATE</button>
                         <button id="btn-nav-page2-roster" class="cmd-btn" onclick="window.openRoleGate()">PAGE 2: DUTY ROSTER</button>
-                        <button id="book-tab-command" class="cmd-btn" style="border-color:#d9822b; color:#fde68a;" onclick="window.switchBookTab('COMMAND')">📖 TAB I: COMMAND &amp; TRIAGE</button>
-                        <button id="book-tab-garrison" class="cmd-btn" onclick="window.switchBookTab('GARRISON')">🛡️ TAB II: GARRISON &amp; MARKET</button>
-                        <button id="book-tab-field" class="cmd-btn" onclick="window.switchBookTab('FIELD')">🧭 TAB III: EXPEDITIONS &amp; LOGS</button>
-                        <button id="nav-tab-page4" class="cmd-btn" onclick="window.viewTruthVault()">📜 TAB IV: TRUTH &amp; RELIC VAULT</button>
-                        <button id="nav-tab-page5" class="cmd-btn" onclick="window.viewWarBoard()">🏰 TAB V: WAR BOARD &amp; TELEMETRY</button>
+                        <label for="archive-section-dropdown" style="font-family:'Cinzel',serif; font-size:9.5px; font-weight:900; color:#fde68a; letter-spacing:0.04em;">📂 ARCHIVE SECTION:</label>
+                        <select id="archive-section-dropdown" onchange="window.selectArchiveSectionDropdown(this.value)" style="background:#141a1d; color:#fde68a; border:1.5px solid #d9822b; border-radius:4px; padding:4px 8px; font-family:'Cinzel',serif; font-size:10px; font-weight:bold; cursor:pointer;">
+                            <option value="COMMAND">📖 Section I: Command &amp; Daily Triage</option>
+                            <option value="FACILITIES">🏗️ Base Vault: Fallout Shelter Facility Grid</option>
+                            <option value="GARRISON">🛡️ Section II: Garrison Barracks, Training Grounds &amp; Armory</option>
+                            <option value="EXPLORE_FOREST">🌲🧭 Forward Recon Outpost: Explore Forest Overworld Map</option>
+                            <option value="FIELD">🧭 Section III: Field Expeditions &amp; Necrology</option>
+                            <option value="TRUTH">📜 Section IV: Truth &amp; Relic Vault (Reality Editor)</option>
+                            <option value="WARBOARD">🏰 Section V: 19-House War Board &amp; Telemetry</option>
+                        </select>
+                        <button class="cmd-btn" style="background:#3b2410; border-color:#f59e0b; color:#fde68a; font-weight:bold; padding:4px 8px; font-size:9.5px;" onclick="window.viewFacilities()">🏗️ Facility Grid</button>
+                        <button id="btn-nav-explore-forest" class="cmd-btn" style="background:linear-gradient(180deg,#14532d,#052e16); border-color:#4ade80; color:#dcfce7; font-weight:900; padding:4px 8px; font-size:9.5px;" onclick="window.openExploreForest()">🌲🧭 EXPLORE FOREST</button>
+                        <!-- Hidden compatibility tab hooks for progressive growth gate & automated telemetry checks -->
+                        <div id="hub-page-nav-tabs" style="display:none;">
+                            <button id="book-tab-command" class="cmd-btn" onclick="window.switchBookTab('COMMAND')">TAB I</button>
+                            <button id="book-tab-garrison" class="cmd-btn" onclick="window.switchBookTab('GARRISON')">TAB II</button>
+                            <button id="book-tab-field" class="cmd-btn" onclick="window.switchBookTab('FIELD')">TAB III</button>
+                            <button id="nav-tab-page4" class="cmd-btn" onclick="window.viewTruthVault()">TAB IV</button>
+                            <button id="nav-tab-page5" class="cmd-btn" onclick="window.viewWarBoard()">TAB V</button>
+                        </div>
                     </div>
                     <div class="ledger-btn-row" style="margin:0;">
                         <button id="btn-autotick-state" class="cmd-btn" onclick="window.toggleAutoTick()">DAY TIMER: TICKING</button>
                         <span id="timescale-bar" style="display:inline-flex; gap:3px;"></span>
-                        <button id="btn-step-field" class="cmd-btn" title="Premium Time Boost: Spend 1 Royal Chrono-Seal to advance +2h on the Day Timer" onclick="window.stepExpeditionHour(2)">⏩ +2H BOOST (1 Seal)</button>
-                        <button id="btn-step-6h" class="cmd-btn" title="Premium Time Boost: Spend 3 Royal Chrono-Seals to advance +6h on the Day Timer" onclick="window.stepExpeditionHour(6)">⏩ +6H BOOST (3 Seals)</button>
-                        <button id="btn-dream-ward" class="cmd-btn" title="Spend 10u Dream Siphon to weave a prescient ward that mitigates the next Crisis catastrophe" onclick="window.triggerDreamIntervention()">🌙 DREAM WARD (-10u)</button>
-                        <button id="btn-chrono-skip" class="cmd-btn" title="Premium Full-Day Skip: Spend 6 Royal Chrono-Seals to fast-forward +1 Full Day (24h)" onclick="window.chronoSkip(1)">⏭️ +1D SKIP (6 Seals)</button>
-                        <button id="btn-chrono-skip-3d" class="cmd-btn" title="Premium Multi-Day Skip: Spend 18 Royal Chrono-Seals to fast-forward +3 Full Days (72h)" onclick="window.chronoSkip(3)">⏭️ +3D SKIP (18 Seals)</button>
-                        <button id="btn-daily-login-shard" class="cmd-btn" style="border-color:#38bdf8; color:#bae6fd;" title="Daily Log-In Reward: Claim Chrono-Seal Fragments (7 Fragments = 1 Full Royal Chrono-Seal)" onclick="window.claimDailyLogin()">📅 DAILY LOG-IN (0/7💎)</button>
-                        <button id="btn-mint-chrono-seal" class="cmd-btn" style="border-color:#f59e0b; color:#fde68a;" title="Royal Procurement Mint: Exchange 10 Settlement Resources for +1 Royal Chrono-Seal" onclick="window.mintChronoSeal(10)">💎 MINT SEAL (10r)</button>
-                        <button class="cmd-btn" onclick="window.toggleHighContrast()">👁️ HIGH-CONTRAST</button>
-                        <button id="btn-export-save" class="cmd-btn" onclick="window.exportSave()">EXPORT SAVE</button>
+                        <details style="display:inline-block; position:relative;">
+                            <summary class="cmd-btn" style="list-style:none; cursor:pointer; border-color:#38bdf8; color:#bae6fd;">⚙️ Chrono-Skip &amp; Tools ▾</summary>
+                            <div style="position:absolute; right:0; top:26px; z-index:90; background:#0b0f12; border:1.5px solid #38bdf8; border-radius:5px; padding:7px; min-width:250px; display:flex; flex-direction:column; gap:4px; box-shadow:0 12px 28px rgba(0,0,0,0.95);">
+                                <button id="btn-step-field" class="cmd-btn" onclick="window.stepExpeditionHour(2)">⏩ +2H BOOST (1 Seal)</button>
+                                <button id="btn-step-6h" class="cmd-btn" onclick="window.stepExpeditionHour(6)">⏩ +6H BOOST (3 Seals)</button>
+                                <button id="btn-dream-ward" class="cmd-btn" onclick="window.triggerDreamIntervention()">🌙 DREAM WARD (-10u)</button>
+                                <button id="btn-chrono-skip" class="cmd-btn" onclick="window.chronoSkip(1)">⏭️ +1D SKIP (6 Seals)</button>
+                                <button id="btn-chrono-skip-3d" class="cmd-btn" onclick="window.chronoSkip(3)">⏭️ +3D SKIP (18 Seals)</button>
+                                <button id="btn-daily-login-shard" class="cmd-btn" style="border-color:#38bdf8; color:#bae6fd;" onclick="window.claimDailyLogin()">📅 DAILY LOG-IN (0/7💎)</button>
+                                <button id="btn-mint-chrono-seal" class="cmd-btn" style="border-color:#f59e0b; color:#fde68a;" onclick="window.mintChronoSeal(10)">💎 MINT SEAL (10r)</button>
+                                <button class="cmd-btn" onclick="window.toggleHighContrast()">👁️ HIGH-CONTRAST</button>
+                                <button id="btn-export-save" class="cmd-btn" onclick="window.exportSave()">💾 EXPORT SAVE</button>
+                            </div>
+                        </details>
                     </div>
                 </div>
 
@@ -1179,12 +1404,33 @@ export const CommanderUI = {
                 <div id="commander-action-banner" style="display:none; background:#1c1610; border-left:3px solid #fbbf24; color:#fde68a; padding:4px 8px; margin-bottom:6px; font-size:10px;"></div>
                 <div id="daily-goal-bar" class="ledger-btn-row" style="margin-bottom:6px;"></div>
 
-                <!-- PROMINENT QUICK-JUMP LAUNCHER BAR FOR NEW SYSTEMS (RUNIC BODY-CARVING, DOMINION MAP & SEAL FORGE) -->
-                <div id="quick-access-feature-bar" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; background:linear-gradient(90deg, rgba(46,16,101,0.55) 0%, rgba(15,23,42,0.85) 50%, rgba(20,83,45,0.45) 100%); border:1.5px solid #a855f7; border-radius:4px; padding:5px 8px; margin-bottom:7px;">
-                    <span style="font-family:'Cinzel',serif; font-size:9.5px; font-weight:900; color:#e9d5ff; letter-spacing:0.05em;">⚡ ROYAL AUDITOR DIRECT ACCESS:</span>
-                    <button class="cmd-btn" style="background:#2e1065; border-color:#c084fc; color:#f3e8ff; font-weight:bold; padding:3px 8px; font-size:9.5px;" onclick="window.switchBookTab('GARRISON')">🪡🛡️ 8-Tier Runic Body-Carving, Stat Training &amp; Armory (Tab II)</button>
-                    <button class="cmd-btn" style="background:#0c4a6e; border-color:#38bdf8; color:#e0f2fe; font-weight:bold; padding:3px 8px; font-size:9.5px;" onclick="window.viewWarBoard()">🗺️🌫️ 20-Settlement Dominion Map, Fog of War &amp; Combat Arena (Tab V)</button>
-                    <button class="cmd-btn" style="background:#3b2410; border-color:#f59e0b; color:#fde68a; font-weight:bold; padding:3px 8px; font-size:9.5px;" onclick="window.viewFacilities()">🏗️ Base Facilities &amp; Runic Scriptorium</button>
+                <!-- FALLOUT SHELTER STYLE POP-UP FACILITY UPGRADE ROOM GRID MODAL -->
+                <div id="fallout-facility-popup-modal" style="display:none;"></div>
+
+                <!-- ALWAYS-PROMINENT SQUAD EVENT LOGS & FACTION PULSE LOGS DUAL LIVE MONITOR -->
+                <div id="always-prominent-live-pulse-deck" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                    <div class="hub-iron-module" style="margin:0; border-color:#22c55e;">
+                        <div class="hub-module-header" style="background:linear-gradient(90deg,rgba(20,83,45,0.45),rgba(9,13,14,0.9));">
+                            <span>🧭 SQUAD EVENT LOGS &amp; OVERWORLD RECON STREAM</span>
+                            <span style="font-size:8.5px; color:#4ade80;">● LIVE SQUAD TELEMETRY</span>
+                        </div>
+                        <div id="expeditions-list" style="max-height:115px; overflow-y:auto; font-size:9.5px;">No squads currently out in the mist.</div>
+                    </div>
+                    <div class="hub-iron-module" style="margin:0; border-color:#d9822b;">
+                        <div class="hub-module-header" style="background:linear-gradient(90deg,rgba(140,79,25,0.45),rgba(9,13,14,0.9));">
+                            <span>⚡ FACTION PULSE LOGS &amp; COURIER DISPATCHES</span>
+                            <span style="font-size:8.5px; color:#fbbf24;">● LIVE FACTION PULSE</span>
+                        </div>
+                        <div id="dispatches-list" style="max-height:115px; overflow-y:auto; font-size:9.5px;">Waiting...</div>
+                    </div>
+                </div>
+
+                <!-- PROMINENT QUICK-JUMP LAUNCHER BAR FOR NEW SYSTEMS (EXPLORE FOREST OVERWORLD, RUNIC BODY-CARVING & SEAL FORGE) -->
+                <div id="quick-access-feature-bar" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; background:linear-gradient(90deg, rgba(20,83,45,0.75) 0%, rgba(15,23,42,0.9) 50%, rgba(46,16,101,0.65) 100%); border:1.5px solid #22c55e; border-radius:4px; padding:5px 8px; margin-bottom:7px;">
+                    <span style="font-family:'Cinzel',serif; font-size:9.5px; font-weight:900; color:#86efac; letter-spacing:0.05em;">🔗 FACILITY SECTIONS:</span>
+                    <button class="cmd-btn" style="background:#3b2410; border-color:#f59e0b; color:#fde68a; font-weight:bold; padding:3px 8px; font-size:9.5px;" onclick="window.viewFacilities()">🏗️ Fallout Shelter Facility Grid</button>
+                    <button class="cmd-btn" style="background:#2e1065; border-color:#c084fc; color:#f3e8ff; font-weight:bold; padding:3px 8px; font-size:9.5px;" onclick="window.switchBookTab('GARRISON')">🛡️🏋️ Barracks &amp; Forward Recon Training Grounds</button>
+                    <button id="btn-dedicated-explore-forest" class="cmd-btn" style="background:linear-gradient(180deg,#14532d,#052e16); border-color:#4ade80; color:#dcfce7; font-weight:900; padding:4px 10px; font-size:10px; box-shadow:0 0 12px rgba(34,197,94,0.35);" onclick="window.openExploreForest()">🌲🧭 EXPLORE FOREST (Forward Recon Overworld Map)</button>
                 </div>
 
                 <!-- BOOK PAGE IV & V: TRUTH VAULT / WAR BOARD VISUAL DECK -->
@@ -1235,23 +1481,12 @@ export const CommanderUI = {
                     </div>
                 </div>
 
-                <!-- BOOK PAGE III: FIELD EXPEDITIONS, COURIER DISPATCHES & NECROLOGY -->
-                <div id="book-page-field" class="ledger-lower-split" style="display:none; margin-top:8px;">
-                    <div>
-                        <div id="module-wrap-expeditions" class="hub-iron-module">
-                            <div class="hub-module-header"><span>FIELD EXPEDITIONS &amp; CARAVAN LOGS (FALLOUT SHELTER MARCH)</span><span style="font-size:9px; color:#d9822b;">MIST TRAILS</span></div>
-                            <div id="expeditions-list" style="max-height:145px; overflow-y:auto; font-size:10px;">No squads currently out in the mist.</div>
-                        </div>
-                        <div class="hub-iron-module">
-                            <div class="hub-module-header"><span>UI_LOG // DYNAMIC COURIER DISPATCHES</span><span style="font-size:9px; color:#d9822b;">LIVE STREAM</span></div>
-                            <div id="dispatches-list" style="max-height:145px; overflow-y:auto; font-size:10px;">Waiting...</div>
-                        </div>
-                    </div>
-                    <div>
-                        <div id="module-wrap-necrology" class="hub-iron-module">
-                            <div class="hub-module-header"><span>CRUCIBLE RECORDS, DEATH CERTIFICATES &amp; FAMILY LINEAGE</span><span style="font-size:9px; color:#d9822b;">DECEASED</span></div>
-                            <div id="story-archive" style="max-height:240px; overflow-y:auto; font-size:10px;">Loading records...</div>
-                        </div>
+                <!-- BOOK PAGE III: NECROLOGY & ARCHIVED EXPEDITION DOSSIERS -->
+                <div id="book-page-field" style="display:none; margin-top:8px;">
+                    <div id="module-wrap-expeditions" style="display:none;"></div>
+                    <div id="module-wrap-necrology" class="hub-iron-module">
+                        <div class="hub-module-header"><span>CRUCIBLE RECORDS, DEATH CERTIFICATES &amp; FAMILY LINEAGE</span><span style="font-size:9px; color:#d9822b;">DECEASED</span></div>
+                        <div id="story-archive" style="max-height:240px; overflow-y:auto; font-size:10px;">Loading records...</div>
                     </div>
                 </div>
 
@@ -1418,10 +1653,39 @@ export const CommanderUI = {
         setDisp('btn-commit-hub-run', showPreRunNav, 'flex');
         setDisp('nav-tab-page4', growth.tier >= 1);
         setDisp('nav-tab-page5', growth.tier >= 1);
+        setDisp('btn-nav-explore-forest', true); // Dedicated Explore Forest button is ALWAYS visible from Day 1!
         setDisp('btn-dream-ward', growth.tier >= 1);
         setDisp('btn-chrono-skip', growth.tier >= 1);
         setDisp('module-wrap-expeditions', true, 'block');
         setDisp('module-wrap-necrology', true, 'block');
+
+        const expForestBtn = document.getElementById('btn-dedicated-explore-forest');
+        const navForestBtn = document.getElementById('btn-nav-explore-forest');
+        const exploreUnlocked = growth.isSovereign || Boolean(fe?.facilities?.exploration_observatory?.unlocked);
+        [expForestBtn, navForestBtn].forEach(b => {
+            if (!b) return;
+            if (growth.isSovereign) {
+                b.innerHTML = '🐺🌲 EXPLORE FOREST: HUNT, STALK, ATTACK &amp; FEED';
+                b.style.background = 'linear-gradient(180deg,#7f1d1d,#450a0a)';
+                b.style.borderColor = '#f87171';
+                b.style.color = '#fecaca';
+            } else if (exploreUnlocked) {
+                b.innerHTML = '🌲🧭 EXPLORE FOREST: FORWARD RECON OVERWORLD MAP';
+                b.style.background = 'linear-gradient(180deg,#14532d,#052e16)';
+                b.style.borderColor = '#4ade80';
+                b.style.color = '#dcfce7';
+            } else {
+                b.innerHTML = '🔒 BUILD RECON OUTPOST (UNLOCK EXPLORE FOREST)';
+                b.style.background = 'linear-gradient(180deg,#334155,#0f172a)';
+                b.style.borderColor = '#94a3b8';
+                b.style.color = '#cbd5e1';
+            }
+        });
+
+        const sectionSelectEl = document.getElementById('archive-section-dropdown');
+        if (sectionSelectEl && document.activeElement !== sectionSelectEl) {
+            sectionSelectEl.value = this.activeBookTab || 'COMMAND';
+        }
 
         // Book-Page Tab Visibility, Live Telemetry Count Badges & Active Tab Highlight
         const curTab = this.activeBookTab || 'COMMAND';
@@ -1447,7 +1711,9 @@ export const CommanderUI = {
             'book-tab-garrison': `🛡️🪡 TAB II: GARRISON, RUNIC CARVING & MARKET (${livingUnitsCount} Units | ${armoryCount} Gear)`,
             'book-tab-field': `🧭 TAB III: EXPEDITIONS & COMBAT LOGS (${activeExpCount} Active)`,
             'nav-tab-page4': `📜 TAB IV: TRUTH & RELIC VAULT (${factDossierCount} Dossiers)`,
-            'nav-tab-page5': `🗺️🏰 TAB V: DOMINION MAP, FOG OF WAR & WAR BOARD (${hostileHouseCount} Hostile)`
+            'nav-tab-page5': growth.isSovereign
+                ? `🐺🌲 TAB V: EXPLORE FOREST (PREDATOR HUNT, STALK & FEED MAP)`
+                : `🌲🗺️ TAB V: EXPLORE FOREST & OVERWORLD MAP (${hostileHouseCount} Hostile)`
         };
 
         [
@@ -1491,12 +1757,18 @@ export const CommanderUI = {
             const politicsGroup = [];
 
             roleDirs.forEach(([fn, label]) => {
-                const btnHtml = `<button class="cmd-btn" onclick="${fn}">${label}</button>`;
+                const isExploreBtn = fn.includes('openExploreForest');
+                const btnStyle = isExploreBtn
+                    ? (growth.isSovereign
+                        ? 'background:linear-gradient(180deg,#7f1d1d,#450a0a); border-color:#f87171; color:#fecaca; font-weight:900;'
+                        : 'background:linear-gradient(180deg,#14532d,#052e16); border-color:#4ade80; color:#dcfce7; font-weight:900;')
+                    : '';
+                const btnHtml = `<button class="cmd-btn" style="${btnStyle}" onclick="${fn}">${label}</button>`;
                 if (growth.isSovereign) {
-                    if (fn.includes('HIBERNATE') || fn.includes('SUMMON_HUNTSMAN') || fn.includes('viewFacilities')) baseGroup.push(btnHtml);
+                    if (isExploreBtn || fn.includes('HIBERNATE') || fn.includes('SUMMON_HUNTSMAN') || fn.includes('viewFacilities')) baseGroup.push(btnHtml);
                     else if (fn.includes('MACABRE_COMMUNION') || fn.includes('viewTruthVault')) fieldGroup.push(btnHtml);
                     else politicsGroup.push(btnHtml);
-                } else if (fn.includes('viewFacilities') || fn.includes('UNGUARDED_CARAVAN') || fn.includes('SMUGGLE_RESIN') || fn.includes('viewTruthVault') || fn.includes('viewTelemetry') || (growth.tier >= 1 && (fn.includes('viewShadowLedger') || fn.includes('interrogateSuspect')))) {
+                } else if (isExploreBtn || fn.includes('viewFacilities') || fn.includes('UNGUARDED_CARAVAN') || fn.includes('SMUGGLE_RESIN') || fn.includes('viewTruthVault') || fn.includes('viewTelemetry') || (growth.tier >= 1 && (fn.includes('viewShadowLedger') || fn.includes('interrogateSuspect')))) {
                     baseGroup.push(btnHtml);
                 } else if (fn.includes('sendExpedition') || fn.includes('HUNT_FERAL_WENDIGO') || fn.includes('REQUISITION_FUEL') || fn.includes('DEVELOP_AUTARKY') || fn.includes('AUDIT_ANOMALY') || fn.includes('SCRUB_MONUMENT')) {
                     fieldGroup.push(btnHtml);
@@ -1650,11 +1922,51 @@ export const CommanderUI = {
             const armoryStock = CommanderEngine.AgentRosterManager.squadArmoryStock || [];
             const catalog = CommanderEngine.SQUAD_ARMORY_CATALOG || {};
             const marketFac = fe?.facilities?.armory_market;
+            const trainingFac = fe?.facilities?.training_grounds;
+            const exploreFac = fe?.facilities?.exploration_observatory;
             const barracksLv = fe?.facilities?.guard_barracks?.unlocked ? (fe.facilities.guard_barracks.level || 1) : 0;
+            const trainingLv = trainingFac?.unlocked ? (trainingFac.level || 1) : 0;
             const isSov = growth.isSovereign;
             const unitCost = isSov ? '120W' : `${Math.max(4, 7 - barracksLv)}r`;
-            const maxCap = isSov ? 8 : (6 + barracksLv * 3);
+            const maxCap = isSov ? 8 : (6 + barracksLv * 3 + trainingLv * 2);
             const agents = Array.from(CommanderEngine.AgentRosterManager.agents.values()).filter(a => a.alive);
+
+            const trainingGroundsSectionHtml = trainingFac?.unlocked
+                ? `
+                    <div style="background:rgba(20,83,45,0.22); border:1.5px solid #22c55e; padding:6px 8px; margin-bottom:6px; font-size:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:4px;">
+                            <b style="color:#15803d;">🏋️📋 SECTION: FORWARD RECON &amp; TACTICAL TRAINING GROUNDS (Lv.${trainingFac.level} — +${trainingFac.level * 35}% Drill Speed)</b>
+                            <span style="font-size:8.5px; color:#166534; font-weight:bold;">Feeds Barracks Recruits ➔ Multi-Stat Queues ➔ Overworld Squads</span>
+                        </div>
+                        <div style="font-size:9px; color:#1f160e; margin-bottom:4px;">Assign a 3-Stage Forward Recon Training Queue to any created troop below, or click individual attribute buttons to drill specific stats:</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                            ${agents.map(a => `
+                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px; background:#14532d; border-color:#4ade80; color:#dcfce7;" onclick="window.queueAgentTrainingPreset('${a.id}','RECON')">🏹 Queue Recon (${a.name.split(' ')[0]}: STL➔SRV➔DDG)</button>
+                                <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px; background:#1e3a8a; border-color:#60a5fa; color:#dbeafe;" onclick="window.queueAgentTrainingPreset('${a.id}','VANGUARD')">🛡️ Queue Vanguard (${a.name.split(' ')[0]}: ATT➔TGH➔DEF)</button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `
+                : `
+                    <div style="background:rgba(42,31,20,0.1); border:1px dashed #15803d; padding:5px 7px; margin-bottom:6px; font-size:9.5px; color:#574532; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+                        <span>🔒 <b>Forward Recon &amp; Tactical Training Grounds (12r):</b> Build to unlock multi-stat Training Queues (+35% drill speed &amp; +2 Roster Cap) that feed Barracks troops into Overworld Recon Squads.</span>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:9px; border-color:#22c55e;" onclick="window.unlockFacility('training_grounds')">🔨 Build Training Grounds (12r)</button>
+                    </div>
+                `;
+
+            const reconOutpostBannerHtml = exploreFac?.unlocked || isSov
+                ? `
+                    <div style="background:rgba(12,74,110,0.2); border:1.5px solid #38bdf8; padding:5px 7px; margin-bottom:6px; font-size:9.5px; color:#0c4a6e; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+                        <span><b>🌲🧭 SECTION: FORWARD RECON OUTPOST &amp; OVERWORLD TOWER ACTIVE:</b> Trained squads ready for Mount &amp; Blade Overworld deployment!</span>
+                        <button class="cmd-btn" style="padding:2px 8px; font-size:9px; background:#14532d; border-color:#4ade80; color:#dcfce7; font-weight:bold;" onclick="window.openExploreForest()">🌲🧭 Launch Explore Forest Overworld Map</button>
+                    </div>
+                `
+                : `
+                    <div style="background:rgba(42,31,20,0.1); border:1px dashed #0284c7; padding:5px 7px; margin-bottom:6px; font-size:9.5px; color:#574532; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+                        <span>🔒 <b>Forward Recon Outpost &amp; Overworld Map Tower (14r):</b> Build to deploy your trained Barracks &amp; Training Grounds troops onto the Mount &amp; Blade Forest Overworld Map!</span>
+                        <button class="cmd-btn" style="padding:2px 6px; font-size:9px; border-color:#38bdf8;" onclick="window.unlockFacility('exploration_observatory')">🔨 Build Forward Recon Outpost (14r)</button>
+                    </div>
+                `;
 
             const recruitHtml = `
                 <div style="background:rgba(20,51,42,0.18); border:1px solid #0e7490; padding:6px; margin-bottom:6px; font-size:10px;">
@@ -1761,12 +2073,16 @@ export const CommanderUI = {
                             return `<button class="cmd-btn" style="padding:1px 4px; font-size:8.5px; ${hiStyle}" onclick="window.trainAgentStat('${a.id}','${key}')">🏋️ ${short}:${Number(val).toFixed(1)}</button>`;
                         }).join('');
 
+                        const queueSummary = Array.isArray(a.trainingQueue) && a.trainingQueue.length > 0
+                            ? ` | <b style="color:#0284c7;">[QUEUE: ${a.trainingQueue.join(' ➔ ')}]</b>`
+                            : '';
+
                         return `
                         <div style="padding: 6px 0; border-bottom: 1px dashed #7c664d;">
                             <b style="color:#5e110b;">${a.name}</b> <span style="font-size:10px; color:#0e7490; font-weight:bold;">${a.cultivation?.isCultivatedGuardian ? `★ TIER ${cStage} ASCENDANT` : `(Tier ${cStage}/8)`}</span>
                             <span style="color:#463523; font-weight:bold;">(${a.career?.rank || 'Novice'} ${a.career?.id})</span>
                             <div style="font-size:9.5px; color:#1f160e; font-family:'Share Tech Mono',monospace;">HP: ${a.vitals.hp}/${a.vitals.maxHp} | Poise: ${Math.round(a.vitals.poise)} | Runes: ${a.cultivation?.inscriptionsCount || 0}/48 | Purity: ${a.cultivation?.foundationPurity ?? 100}% | Potential: ${a.cultivation?.potentialRemaining ?? 100}% | Lifespan: ${totalLife}y</div>
-                            <div style="font-size:9.5px; color:#3f2e1e;">🗡️ Gear: [${gearSummary}] | Birthright: [${a.birthright?.title || 'None'}] ${activeDrill ? `| <b style="color:#15803d;">[TRAINING: ${activeDrill}]</b>` : ''}</div>
+                            <div style="font-size:9.5px; color:#3f2e1e;">🗡️ Gear: [${gearSummary}] | Birthright: [${a.birthright?.title || 'None'}] ${activeDrill ? `| <b style="color:#15803d;">[TRAINING: ${activeDrill}]</b>` : ''}${queueSummary}</div>
                             <div style="margin-top:3px; display:flex; flex-wrap:wrap; gap:2px;">${trainBtnsHtml}</div>
                             <div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:3px;">
                                 <button class="cmd-btn" style="padding:2px 6px; font-size:9.5px; border-color:#a855f7; background:#2e1065; color:#f3e8ff; font-weight:bold;" onclick="window.carveAgentRunes('${a.id}')">${carveBtnLabel}</button>
@@ -1779,7 +2095,7 @@ export const CommanderUI = {
                     }).join('') || '<div style="color:#991b1b;">All garrison agents deceased.</div>'}
                 </div>
             `;
-            rosterDiv.innerHTML = carvingFacilityBanner + agentsHtml + recruitHtml + marketHtml + armoryHtml;
+            rosterDiv.innerHTML = recruitHtml + trainingGroundsSectionHtml + reconOutpostBannerHtml + carvingFacilityBanner + agentsHtml + marketHtml + armoryHtml;
         }
 
         const necDiv = document.getElementById('story-archive');
