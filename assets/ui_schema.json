@@ -1,0 +1,117 @@
+{
+  "$schema": "dark-forest-retro-ui-v2",
+  "archetype": {
+    "name": "90s Isometric RTS x Brutalist Runic-Iron Ledger",
+    "inspirations": ["Stronghold / AoE2 Beveled Resource Bar", "Fallout / OCP Tabbed Terminal Drawer"],
+    "viewportBudget": {
+      "canvasOpenAreaMinPercent": 74,
+      "maxSimultaneousPanels": 2,
+      "mobileBaseWidthPx": 390,
+      "minTouchTargetPx": 48
+    }
+  },
+  "bordersAndTextures": {
+    "bevelFrameStyle": "inset 1px 1px 0px rgba(255,255,255,0.14), inset -2px -2px 0px rgba(0,0,0,0.85), 0 4px 12px rgba(0,0,0,0.75)",
+    "rivetedCornerAccents": true,
+    "parchmentNoiseOpacity": 0.06,
+    "crtScanlineOpacity": 0.04,
+    "borderRadiusPx": 2
+  },
+  "typography": {
+    "displayCrestFont": "'Cinzel', 'Palatino Linotype', Georgia, serif",
+    "retroNumericFont": "'JetBrains Mono', 'Courier New', monospace",
+    "uiBodyFont": "'Inter', system-ui, -apple-system, sans-serif",
+    "tabularNums": true
+  },
+  "skins": {
+    "ORDER_PRESERVATION": {
+      "label": "Crown & OCP Iron-Stone",
+      "surfacePrimary": "#12151a",
+      "surfaceElevated": "#1b2028",
+      "bevelLight": "#475569",
+      "bevelDark": "#090b0e",
+      "accentPrimary": "#38bdf8",
+      "accentResource": "#f59e0b",
+      "accentDanger": "#ef4444",
+      "textPrimary": "#e2e8f0",
+      "textMuted": "#94a3b8"
+    },
+    "SOVEREIGN_HARVEST": {
+      "label": "Pale Sovereign Bone & Crimson",
+      "surfacePrimary": "#160b0d",
+      "surfaceElevated": "#241115",
+      "bevelLight": "#7f1d1d",
+      "bevelDark": "#090405",
+      "accentPrimary": "#dc2626",
+      "accentResource": "#fbbf24",
+      "accentDanger": "#f87171",
+      "textPrimary": "#f8fafc",
+      "textMuted": "#fca5a5"
+    },
+    "WHITE_VOID_SHIFT": {
+      "label": "7-Day White Void Inversion",
+      "surfacePrimary": "rgba(241, 245, 249, 0.94)",
+      "surfaceElevated": "#ffffff",
+      "bevelLight": "#cbd5e1",
+      "bevelDark": "#334155",
+      "accentPrimary": "#0284c7",
+      "accentResource": "#d97706",
+      "accentDanger": "#dc2626",
+      "textPrimary": "#0f172a",
+      "textMuted": "#475569"
+    }
+  },
+  "layoutZones": {
+    "zone1_topResourceRibbon": {
+      "heightPx": 44,
+      "position": "fixed top-0 left-0 right-0",
+      "layout": "4-slot horizontal grid with beveled icon badges and tabular numbers",
+      "orderSlots": [
+        { "id": "barrier_fuel", "icon": "fuel_canister", "label": "FUEL", "criticalThreshold": 20 },
+        { "id": "ironbark_dust", "icon": "timber_ingot", "label": "IRONBARK" },
+        { "id": "militia_available", "icon": "crossed_spears", "label": "ARMS" },
+        { "id": "shift_clock", "icon": "hourglass_rune", "label": "SHIFT" }
+      ],
+      "sovereignSlots": [
+        { "id": "harvest_essence", "icon": "crimson_orb", "label": "ESSENCE" },
+        { "id": "story_density_target", "icon": "crow_eye", "label": "DENSITY" },
+        { "id": "pack_evolution", "icon": "wendigo_antler", "label": "PACK" },
+        { "id": "shift_clock", "icon": "hourglass_rune", "label": "SHIFT" }
+      ]
+    },
+    "zone2_tickerStrip": {
+      "heightPx": 26,
+      "position": "directly below zone1",
+      "behavior": "Single-line scrolling/fading retro event ticker replacing bulky dual monitor boxes; tap to expand Squad & Faction Log drawer"
+    },
+    "zone3_centerViewport": {
+      "behavior": "Unobstructed 3D Isometric Three.js canvas (or active Ledger tab view when drawer is expanded)"
+    },
+    "zone4_bottomCommandDeck": {
+      "collapsedHeightPx": 88,
+      "expandedHeightPercent": 68,
+      "components": {
+        "retroFolderTabs": [
+          { "id": "triage", "shortLabel": "CMD", "fullTitle": "Command & Triage" },
+          { "id": "vault", "shortLabel": "VAULT", "fullTitle": "Base Vault Grid" },
+          { "id": "warboard", "shortLabel": "MAP", "fullTitle": "20-House War Board" },
+          { "id": "truth", "shortLabel": "TRUTH", "fullTitle": "Truth & Relic Editor" },
+          { "id": "logs", "shortLabel": "LOGS", "fullTitle": "Squad & Faction Logs" }
+        ],
+        "tacticalDirectiveBar": {
+          "buttonCount": 4,
+          "buttonSizePx": 60,
+          "style": "Beveled square iron keycaps with top hotkey/rune badge, center icon, and 1-word bottom label",
+          "orderDirectives": ["MOBILIZE", "DISPATCH", "FORTIFY", "ANCHOR"],
+          "sovereignDirectives": ["PROBE", "MARK", "CULTIVATE", "HARVEST"]
+        }
+      }
+    }
+  },
+  "cleanupRules": {
+    "removeRedundantWrappers": true,
+    "collapseNestedAccordionsIntoFolderTabs": true,
+    "replaceLongParagraphsWithStatBadges": true,
+    "enforceSingleScrollContainerPerView": true
+  }
+}

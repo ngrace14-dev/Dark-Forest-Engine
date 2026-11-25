@@ -7,6 +7,7 @@
 const rootScope = typeof window !== 'undefined' ? window : globalThis;
 
 let _loadedTileset = null;
+let _loadedUiSchema = null;
 
 if (typeof process !== 'undefined' && process.versions?.node) {
     try {
@@ -16,6 +17,10 @@ if (typeof process !== 'undefined' && process.versions?.node) {
         const __dirname = path.dirname(fileURLToPath(import.meta.url));
         const jsonPath = path.resolve(__dirname, '../../assets/tileset.json');
         _loadedTileset = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+        const uiPath = path.resolve(__dirname, '../../assets/ui_schema.json');
+        if (fs.existsSync(uiPath)) {
+            _loadedUiSchema = JSON.parse(fs.readFileSync(uiPath, 'utf8'));
+        }
     } catch (e) {
         console.warn('[TilesetBridge] Node fs load warning:', e?.message);
     }
@@ -23,12 +28,19 @@ if (typeof process !== 'undefined' && process.versions?.node) {
     try {
         const res = await fetch('./assets/tileset.json');
         if (res.ok) _loadedTileset = await res.json();
+        const uiRes = await fetch('./assets/ui_schema.json');
+        if (uiRes.ok) _loadedUiSchema = await uiRes.json();
     } catch (e) {
         console.warn('[TilesetBridge] Browser fetch warning:', e?.message);
     }
 }
 
 export const TILESET = _loadedTileset;
+export const UI_SCHEMA = _loadedUiSchema;
+
+export function getUiSkin(skinKey = 'ORDER_PRESERVATION') {
+    return UI_SCHEMA?.skins?.[skinKey] || UI_SCHEMA?.skins?.ORDER_PRESERVATION || null;
+}
 
 const _materialCache = new Map();
 
@@ -119,6 +131,8 @@ export function applyTilesetLightingState(cycleKey = 'normalCycle') {
 
 rootScope.TilesetBridge = {
     TILESET,
+    UI_SCHEMA,
+    getUiSkin,
     getTilesetMaterial,
     getTilesetStructureSpec,
     getTilesetActorSpec,

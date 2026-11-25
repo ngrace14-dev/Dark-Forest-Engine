@@ -29,7 +29,10 @@ export const CommanderUI = {
     isometricSliceState: {
         active: false,
         mode: 'ORDER_PRESERVATION', // 'ORDER_PRESERVATION' | 'SOVEREIGN_HARVEST'
+        skin: 'ORDER_PRESERVATION', // 'ORDER_PRESERVATION' | 'SOVEREIGN_HARVEST' | 'WHITE_VOID_SHIFT'
         phase: 'BRIEFING',           // 'BRIEFING' | 'ACTIVE_SHIFT_COUNTDOWN' | 'WHITE_VOID_CLIMAX' | 'GENERAL_LEDGER_SUMMARY'
+        activeFolderTab: 'triage',   // 'triage' (CMD) | 'vault' (VAULT) | 'warboard' (MAP) | 'truth' (TRUTH) | 'logs' (LOGS)
+        drawerExpanded: false,
         daysUntilShift: 14,
         actionLogs: [],
         heroActorId: null,
@@ -822,6 +825,7 @@ export const CommanderUI = {
         window.openIsometricTacticalSlice = (modeOverride = null) => this.openIsometricTacticalSlice(modeOverride);
         window.executeIsometricSliceAction = (actionKey) => this.executeIsometricSliceAction(actionKey);
         window.closeIsometricTacticalSlice = () => this.closeIsometricTacticalSlice();
+        window.selectRetroFolderTab = (folderId) => this.selectRetroFolderTab(folderId);
         window.handleOverworldWheel = (ev) => {
             if (ev?.preventDefault) ev.preventDefault();
             const delta = (ev?.deltaY || 0) < 0 ? 0.22 : -0.22;
@@ -2070,8 +2074,14 @@ export const CommanderUI = {
                 <!-- ASYMMETRIC 3D ISOMETRIC VILLAGE TD & PALE SOVEREIGN CULTIVATION SLICE MODAL -->
                 <div id="isometric-tactical-slice-modal" style="display:none;"></div>
 
-                <!-- ALWAYS-PROMINENT SQUAD EVENT LOGS & FACTION PULSE LOGS DUAL LIVE MONITOR -->
-                <div id="always-prominent-live-pulse-deck" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                <!-- ZONE 2: 26PX RETRO EVENT TICKER STRIP (COLLAPSES DUAL MONITOR BY DEFAULT; TAP TO EXPAND LOGS TAB) -->
+                <div id="zone2-ticker-strip" onclick="window.selectRetroFolderTab('logs')" style="height:26px; display:flex; align-items:center; justify-content:space-between; padding:0 10px; background:#090b0e; border:1px solid #334155; box-shadow:inset 1px 1px 0px rgba(255,255,255,0.14), inset -2px -2px 0px rgba(0,0,0,0.85); font-family:'JetBrains Mono','Courier New',monospace; font-size:10px; color:#38bdf8; cursor:pointer; overflow:hidden; white-space:nowrap; margin-bottom:6px;">
+                    <span id="zone2-ticker-text" style="overflow:hidden; text-overflow:ellipsis;">📡 [LIVE TICKER] Tap to open Squad &amp; Faction Logs drawer...</span>
+                    <span style="font-size:9px; color:#94a3b8; margin-left:8px;">[LOGS ▾]</span>
+                </div>
+
+                <!-- ALWAYS-PROMINENT SQUAD EVENT LOGS & FACTION PULSE LOGS (COLLAPSED INTO 'LOGS' FOLDER TAB DRAWER) -->
+                <div id="always-prominent-live-pulse-deck" style="display:none; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
                     <div class="hub-iron-module" style="margin:0; border-color:#22c55e;">
                         <div class="hub-module-header" style="background:linear-gradient(90deg,rgba(20,83,45,0.45),rgba(9,13,14,0.9));">
                             <span>🧭 SQUAD EVENT LOGS &amp; OVERWORLD RECON STREAM</span>
@@ -2583,6 +2593,10 @@ export const CommanderUI = {
                     <div style="color:#23180e;">"${x.body}"</div>
                 </div>
             `).join('') || '<div style="color:#574532;">No dispatches yet.</div>';
+            const tickerTextEl = document.getElementById('zone2-ticker-text');
+            if (tickerTextEl && !this.isometricSliceState.active && disps.length > 0) {
+                tickerTextEl.textContent = `📡 [DAY ${disps[0].day} // ${disps[0].type}] ${disps[0].title}: ${disps[0].body}`;
+            }
         }
 
         const rosterDiv = document.getElementById('roster-list');
@@ -2823,7 +2837,10 @@ export const CommanderUI = {
         const st = this.isometricSliceState;
         st.active = true;
         st.mode = resolvedMode;
+        st.skin = resolvedMode;
         st.phase = 'BRIEFING';
+        st.activeFolderTab = 'triage';
+        st.drawerExpanded = false;
         st.daysUntilShift = 14 - ((CommanderEngine.CampaignManager.day || 1) % 14);
         st.actionLogs = [
             resolvedMode === 'SOVEREIGN_HARVEST'
@@ -2865,6 +2882,18 @@ export const CommanderUI = {
         if (st.phase === 'BRIEFING') {
             st.phase = 'ACTIVE_SHIFT_COUNTDOWN';
         }
+
+        const aliasMap = {
+            MOBILIZE: 'MOBILIZE_WALLS',
+            DISPATCH: 'DISPATCH_FUEL_SQUAD',
+            FORTIFY: 'UPGRADE_PERIMETER_WALL',
+            ANCHOR: 'TRIGGER_WHITE_VOID_WAVE',
+            PROBE: 'SPAWN_WENDIGO_PROBE',
+            MARK: 'HUNTSMAN_SCOUT_AND_MARK',
+            CULTIVATE: 'HUNTSMAN_BEATDOWN_SCORN',
+            HARVEST: 'MACABRE_HARVEST_AND_SHATTER'
+        };
+        actionKey = aliasMap[actionKey] || actionKey;
 
         let logEntry = '';
 
@@ -2931,6 +2960,7 @@ export const CommanderUI = {
         } else if (actionKey === 'TRIGGER_WHITE_VOID_WAVE' && scs) {
             const shift = scs.triggerShiftWave();
             st.phase = 'WHITE_VOID_CLIMAX';
+            st.skin = 'WHITE_VOID_SHIFT';
             CommanderEngine.LogDispatchManager?.dispatches?.unshift({
                 id: `shift_${Date.now()}`,
                 day: CommanderEngine.CampaignManager.day || 1,
@@ -2950,6 +2980,38 @@ export const CommanderUI = {
         this.renderIsometricTacticalSliceModal();
         this.render();
         return { ok: true, logEntry, state: { ...st } };
+    },
+
+    selectRetroFolderTab(folderId = 'triage') {
+        const st = this.isometricSliceState;
+        const normalized = String(folderId || 'triage').toLowerCase();
+        if (st.activeFolderTab === normalized && st.drawerExpanded) {
+            st.drawerExpanded = false;
+        } else {
+            st.activeFolderTab = normalized;
+            st.drawerExpanded = true;
+        }
+
+        const tabRouteMap = {
+            triage: () => this.switchBookTab('COMMAND', false),
+            vault: () => this.viewFacilities(),
+            warboard: () => this.viewWarBoard(),
+            truth: () => this.viewTruthVault(),
+            logs: () => {
+                if (typeof document !== 'undefined') {
+                    const pulseDeck = document.getElementById('always-prominent-live-pulse-deck');
+                    if (pulseDeck) {
+                        pulseDeck.style.display = st.drawerExpanded ? 'grid' : 'none';
+                    }
+                }
+            }
+        };
+
+        if (tabRouteMap[normalized]) {
+            tabRouteMap[normalized]();
+        }
+        this.renderIsometricTacticalSliceModal();
+        return { ok: true, activeFolderTab: st.activeFolderTab, drawerExpanded: st.drawerExpanded };
     },
 
     closeIsometricTacticalSlice() {
@@ -2977,54 +3039,128 @@ export const CommanderUI = {
         const scsTel = root.SquadCultivationSystem?.getTelemetry?.() || null;
         const isSov = st.mode === 'SOVEREIGN_HARVEST';
 
-        const frameBg = isSov
-            ? 'linear-gradient(180deg, rgba(45,6,12,0.96), rgba(15,4,8,0.98))'
-            : 'linear-gradient(180deg, rgba(15,23,42,0.96), rgba(9,13,22,0.98))';
-        const borderCol = isSov ? '#dc2626' : '#38bdf8';
-        const titleText = isSov
-            ? '🩸🐺 PALE SOVEREIGN // HUNTSMAN CULTIVATION & HARVEST LOOP'
-            : '🏰🛡️ ORDER PRESERVATION // VILLAGE TD & WOODLAND DISPATCH';
+        const skins = {
+            ORDER_PRESERVATION: {
+                surfacePrimary: '#12151a', surfaceElevated: '#1b2028', bevelLight: '#475569', bevelDark: '#090b0e',
+                accentPrimary: '#38bdf8', accentResource: '#f59e0b', accentDanger: '#ef4444', textPrimary: '#e2e8f0', textMuted: '#94a3b8'
+            },
+            SOVEREIGN_HARVEST: {
+                surfacePrimary: '#160b0d', surfaceElevated: '#241115', bevelLight: '#7f1d1d', bevelDark: '#090405',
+                accentPrimary: '#dc2626', accentResource: '#fbbf24', accentDanger: '#f87171', textPrimary: '#f8fafc', textMuted: '#fca5a5'
+            },
+            WHITE_VOID_SHIFT: {
+                surfacePrimary: 'rgba(241, 245, 249, 0.94)', surfaceElevated: '#ffffff', bevelLight: '#cbd5e1', bevelDark: '#334155',
+                accentPrimary: '#0284c7', accentResource: '#d97706', accentDanger: '#dc2626', textPrimary: '#0f172a', textMuted: '#475569'
+            }
+        };
+        const sk = skins[st.skin] || (isSov ? skins.SOVEREIGN_HARVEST : skins.ORDER_PRESERVATION);
+        const bevelShadow = 'inset 1px 1px 0px rgba(255,255,255,0.14), inset -2px -2px 0px rgba(0,0,0,0.85), 0 4px 12px rgba(0,0,0,0.75)';
 
         const anchorFuel = smTel?.anchorStone?.barrierFuel ?? 80;
-        const chainInt = smTel?.anchorStone?.chainIntegrity ?? 100;
+        const ironbarkDust = smTel?.stockpile?.ironbark_dust ?? 120;
         const mannedSlots = `${smTel?.occupiedMountSlots ?? 0}/${smTel?.totalMountSlots ?? 51}`;
         const lastHarvest = scsTel?.lastHarvestedStats?.compositeScore ?? 47;
+        const sovEssence = CommanderEngine.CampaignManager.sovereignHistoricalWeight || 400;
+        const packCount = (scsTel?.huntsmanState?.evolvedVampires || 0) + (scsTel?.activeProbingPacks || 1);
+        const latestTicker = st.actionLogs[0] || '📡 Live Isometric Tactical Feed Initialized.';
 
-        const directivesHtml = isSov
-            ? `
-                <button class="cmd-btn" style="border-color:#ef4444; background:#3f1212; color:#fecaca;" onclick="window.executeIsometricSliceAction('SPAWN_WENDIGO_PROBE')">🐺 1. Probe Walls (Lesser Wendigo Pack)</button>
-                <button class="cmd-btn" style="border-color:#f59e0b; background:#451a03; color:#fde68a;" onclick="window.executeIsometricSliceAction('HUNTSMAN_SCOUT_AND_MARK')">🎯 2. Huntsman &amp; Orb Scout (Stats &gt; ${lastHarvest})</button>
-                <button class="cmd-btn" style="border-color:#d97706; background:#3b171b; color:#fed7aa;" onclick="window.executeIsometricSliceAction('HUNTSMAN_BEATDOWN_SCORN')">⚔️ 3. Beat to 5% HP &amp; Inflict 24h Scorn</button>
-                <button class="cmd-btn" style="border-color:#dc2626; background:#7f1d1d; color:#fff1f2; font-weight:bold;" onclick="window.executeIsometricSliceAction('MACABRE_HARVEST_AND_SHATTER')">💀 4. Execute Macabre Harvest &amp; Shatter Anchor</button>
-            `
-            : `
-                <button class="cmd-btn" style="border-color:#38bdf8; background:#0c4a6e; color:#e0f2fe;" onclick="window.executeIsometricSliceAction('MOBILIZE_WALLS')">🛡️ 1. Arm Villagers &amp; Mount Walls (${mannedSlots})</button>
-                <button class="cmd-btn" style="border-color:#4ade80; background:#14532d; color:#dcfce7;" onclick="window.executeIsometricSliceAction('DISPATCH_FUEL_SQUAD')">🌲 2. Dispatch Adventurer Squad (Barrier Fuel Run)</button>
-                <button class="cmd-btn" style="border-color:#f59e0b; background:#3b2410; color:#fde68a;" onclick="window.executeIsometricSliceAction('UPGRADE_PERIMETER_WALL')">🔨 3. Upgrade Palisade / Watchtower (Tier +1)</button>
-                <button class="cmd-btn" style="border-color:#e2e8f0; background:#1e293b; color:#f8fafc; font-weight:bold;" onclick="window.executeIsometricSliceAction('TRIGGER_WHITE_VOID_WAVE')">🌩️ 4. Survive 14-Day White Void Climax</button>
-            `;
+        const globalTicker = document.getElementById('zone2-ticker-text');
+        if (globalTicker) globalTicker.textContent = latestTicker;
+
+        const slots = isSov
+            ? [
+                ['🔮', 'ESSENCE', `${sovEssence}W`, false],
+                ['👁️', 'DENSITY', `>${lastHarvest}`, false],
+                ['🦌', 'PACK', `${packCount}U`, false],
+                ['⏳', 'SHIFT', `${st.daysUntilShift}D`, st.daysUntilShift <= 2]
+            ]
+            : [
+                ['🛢️', 'FUEL', `${anchorFuel}u`, anchorFuel < 20],
+                ['🪵', 'IRONBARK', `${ironbarkDust}`, false],
+                ['⚔️', 'ARMS', mannedSlots, false],
+                ['⏳', 'SHIFT', `${st.daysUntilShift}D`, st.daysUntilShift <= 2]
+            ];
+
+        const zone1Html = slots.map(([icon, label, val, isCrit]) => `
+            <div style="display:flex; align-items:center; justify-content:space-between; background:${sk.surfaceElevated}; border:1px solid ${isCrit ? sk.accentDanger : sk.bevelLight}; border-radius:2px; padding:4px 7px; box-shadow:${bevelShadow}; font-variant-numeric:tabular-nums;">
+                <span style="font-size:9px; color:${sk.textMuted}; font-weight:700;">${icon} ${label}</span>
+                <span style="font-family:'JetBrains Mono','Courier New',monospace; font-size:11px; font-weight:900; color:${isCrit ? sk.accentDanger : sk.accentResource};">${val}</span>
+            </div>
+        `).join('');
+
+        const folderTabs = [
+            ['triage', 'CMD', 'Command & Triage'],
+            ['vault', 'VAULT', 'Base Vault Grid'],
+            ['warboard', 'MAP', '20-House War Board'],
+            ['truth', 'TRUTH', 'Truth & Relic Editor'],
+            ['logs', 'LOGS', 'Squad & Faction Logs']
+        ];
+        const folderTabsHtml = folderTabs.map(([id, shortLabel, fullTitle]) => {
+            const isAct = st.activeFolderTab === id && st.drawerExpanded;
+            return `<button type="button" title="${fullTitle}" onclick="window.selectRetroFolderTab('${id}')" style="flex:1; min-height:28px; background:${isAct ? sk.accentPrimary : sk.surfaceElevated}; color:${isAct ? '#090b0e' : sk.textPrimary}; border:1px solid ${sk.bevelLight}; border-radius:2px 2px 0 0; font-family:'Cinzel',serif; font-weight:900; font-size:9.5px; cursor:pointer; box-shadow:${bevelShadow};">${shortLabel}</button>`;
+        }).join('');
+
+        const keycapDefs = isSov
+            ? [
+                ['1', '🐺', 'PROBE', 'PROBE'],
+                ['2', '🎯', 'MARK', 'MARK'],
+                ['3', '⚔️', 'CULTIVATE', 'CULTIVATE'],
+                ['4', '💀', 'HARVEST', 'HARVEST']
+            ]
+            : [
+                ['1', '🛡️', 'MOBILIZE', 'MOBILIZE'],
+                ['2', '🌲', 'DISPATCH', 'DISPATCH'],
+                ['3', '🔨', 'FORTIFY', 'FORTIFY'],
+                ['4', '🌩️', 'ANCHOR', 'ANCHOR']
+            ];
+
+        const keycapsHtml = keycapDefs.map(([hotkey, icon, label, act]) => `
+            <button type="button" onclick="window.executeIsometricSliceAction('${act}')" style="width:60px; height:60px; min-width:48px; min-height:48px; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:4px; background:${sk.surfaceElevated}; color:${sk.textPrimary}; border:1.5px solid ${sk.bevelLight}; border-radius:2px; box-shadow:${bevelShadow}; cursor:pointer;">
+                <span style="align-self:flex-start; font-family:'JetBrains Mono',monospace; font-size:8px; color:${sk.accentPrimary};">[${hotkey}]</span>
+                <span style="font-size:16px; line-height:1;">${icon}</span>
+                <span style="font-family:'Cinzel',serif; font-size:8.5px; font-weight:900; letter-spacing:0.02em;">${label}</span>
+            </button>
+        `).join('');
 
         modal.style.display = 'block';
         modal.innerHTML = `
-            <div style="background:${frameBg}; border:2px solid ${borderCol}; border-radius:6px; padding:10px 12px; margin-bottom:10px; color:#f8fafc;">
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; border-bottom:1px solid ${borderCol}; padding-bottom:6px; margin-bottom:8px;">
-                    <div style="font-family:'Cinzel',serif; font-weight:900; font-size:11.5px; color:${isSov ? '#fca5a5' : '#bae6fd'};">${titleText}</div>
-                    <div style="display:flex; gap:5px;">
-                        <button class="cmd-btn" style="padding:2px 7px; font-size:9px;" onclick="window.executeIsometricSliceAction('SWITCH_MODE_ORDER')">🏰 Order Loop</button>
-                        <button class="cmd-btn" style="padding:2px 7px; font-size:9px; border-color:#ef4444; color:#fecaca;" onclick="window.executeIsometricSliceAction('SWITCH_MODE_SOVEREIGN')">🩸 Sovereign Loop</button>
-                        <button class="cmd-btn" style="padding:2px 7px; font-size:9px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.closeIsometricTacticalSlice()">✖ Return to Ledger</button>
+            <div data-schema="dark-forest-retro-ui-v2" style="background:${sk.surfacePrimary}; border:2px solid ${sk.accentPrimary}; border-radius:2px; box-shadow:${bevelShadow}; color:${sk.textPrimary}; margin-bottom:10px; overflow:hidden;">
+                <!-- ZONE 1: 44PX TOP RESOURCE RIBBON -->
+                <div id="slice-zone1-resource-ribbon" style="height:44px; display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; align-items:center; padding:0 8px; background:${sk.bevelDark}; border-bottom:1px solid ${sk.bevelLight};">
+                    ${zone1Html}
+                </div>
+
+                <!-- ZONE 2: 26PX RETRO EVENT TICKER STRIP -->
+                <div id="slice-zone2-ticker-strip" onclick="window.selectRetroFolderTab('logs')" style="height:26px; display:flex; align-items:center; justify-content:space-between; padding:0 8px; background:${sk.surfaceElevated}; border-bottom:1px solid ${sk.bevelLight}; font-family:'JetBrains Mono','Courier New',monospace; font-size:10px; color:${sk.accentPrimary}; cursor:pointer; white-space:nowrap; overflow:hidden;">
+                    <span style="overflow:hidden; text-overflow:ellipsis;">${latestTicker}</span>
+                    <span style="font-size:8.5px; color:${sk.textMuted}; margin-left:6px;">[TAP FOR LOGS ▾]</span>
+                </div>
+
+                <!-- ZONE 3: CENTER VIEWPORT (74%+ OPEN TACTICAL CANVAS + COLLAPSIBLE DRAWER) -->
+                <div id="slice-zone3-center-viewport" style="padding:8px 10px; min-height:110px; display:flex; flex-direction:column; justify-content:space-between;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                        <span style="font-family:'Cinzel',serif; font-weight:900; font-size:10.5px; color:${sk.accentPrimary};">PHASE: ${st.phase} // SKIN: ${st.skin}</span>
+                        <div style="display:flex; gap:4px;">
+                            <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.executeIsometricSliceAction('SWITCH_MODE_ORDER')">🏰 Order</button>
+                            <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px; border-color:#ef4444; color:#fecaca;" onclick="window.executeIsometricSliceAction('SWITCH_MODE_SOVEREIGN')">🩸 Sovereign</button>
+                            <button class="cmd-btn" style="padding:2px 6px; font-size:8.5px;" onclick="window.closeIsometricTacticalSlice()">✖ Close</button>
+                        </div>
                     </div>
+                    ${st.drawerExpanded && st.activeFolderTab === 'logs' ? `
+                        <div style="margin-top:6px; background:rgba(0,0,0,0.65); border:1px solid ${sk.bevelLight}; padding:6px; max-height:95px; overflow-y:auto; font-family:'JetBrains Mono',monospace; font-size:9px;">
+                            ${st.actionLogs.map(l => `<div style="padding:2px 0; border-bottom:1px dashed rgba(148,163,184,0.2);">${l}</div>`).join('')}
+                        </div>
+                    ` : ''}
                 </div>
-                <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; font-family:'Share Tech Mono',monospace; font-size:10px; background:rgba(0,0,0,0.45); padding:5px 8px; margin-bottom:8px;">
-                    <span>PHASE: <b style="color:#fbbf24;">${st.phase}</b></span>
-                    <span>CAMERA: <b>CLASSIC_ISOMETRIC (FOV 25° | 45° NE)</b></span>
-                    <span>ANCHOR FUEL: <b style="color:#38bdf8;">${anchorFuel}u</b> (CHAINS: ${chainInt}%)</span>
-                    <span>WALL SLOTS: <b>${mannedSlots}</b></span>
-                    <span>LAST HARVEST: <b style="color:#f87171;">${lastHarvest}</b></span>
-                </div>
-                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">${directivesHtml}</div>
-                <div style="background:rgba(0,0,0,0.55); border:1px solid #334155; padding:6px 8px; max-height:110px; overflow-y:auto; font-family:'Share Tech Mono',monospace; font-size:9.5px; color:#e2e8f0;">
-                    ${st.actionLogs.map(l => `<div style="padding:2px 0; border-bottom:1px dashed rgba(148,163,184,0.2);">${l}</div>`).join('')}
+
+                <!-- ZONE 4: BOTTOM COMMAND DECK (5 RETRO FOLDER TABS + 4 BEVELED 60PX RTS KEYCAPS) -->
+                <div id="slice-zone4-bottom-command-deck" style="background:${sk.bevelDark}; border-top:1.5px solid ${sk.bevelLight}; padding:6px 8px;">
+                    <div id="retro-folder-tabs-bar" style="display:flex; gap:4px; margin-bottom:6px;">
+                        ${folderTabsHtml}
+                    </div>
+                    <div id="tactical-directive-keycap-bar" style="display:flex; justify-content:center; gap:10px; align-items:center; min-height:64px;">
+                        ${keycapsHtml}
+                    </div>
                 </div>
             </div>
         `;
