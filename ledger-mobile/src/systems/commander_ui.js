@@ -960,11 +960,17 @@ export const CommanderUI = {
         };
         window.navigateOverworldSquad = (nodeId) => {
             this.selectedMapSettlementId = Number(nodeId) || 0;
-            const res = CommanderEngine.ForestOverworldEngine?.navigateSquadToNode?.(nodeId);
+            const ovw = CommanderEngine.ForestOverworldEngine;
+            const isHeadlessEnv = typeof window === 'undefined' || Boolean(window.isHeadless) || !document?.getElementById('overworld-terrain-canvas');
+            const res = ovw?.navigateSquadToNode?.(nodeId, isHeadlessEnv);
             if (res?.message) this.showBanner(res.message);
-            this.renderWarBoardReader();
-            this.renderExploreForestModal(false);
-            this.render();
+            if (ovw?.isMoving && !isHeadlessEnv) {
+                this.startOverworldMovementLoop();
+            } else {
+                this.renderWarBoardReader();
+                this.renderExploreForestModal(false);
+                this.render();
+            }
         };
         window.executeOverworldAction = (act, targetId = null) => {
             const res = CommanderEngine.ForestOverworldEngine?.executePredatorOrSquadAction?.(act, targetId);
