@@ -4722,12 +4722,14 @@ rootScope.ExpeditionEngine = ExpeditionEngine;
 export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
     worldWidth: 4000,
     worldHeight: 4000,
-    // 500,000 sq. mile circular forest dominion: Area = 500,000 sq mi => Radius = sqrt(500000 / PI) = 398.942 mi, Diameter = 797.885 mi
-    worldAreaSqMiles: 500000,
-    worldRadiusMiles: 398.94,
-    worldDiameterMiles: 797.88,
-    milesPerPixel: 0.19947, // ~0.20 miles per overworld unit across the 4000x4000 space
+    // 10,000,000 sq. mile (20x expanded) macro circular dominion:
+    // Forest + Mountain Ring span r <= 1360px; Outer Dunes (r > 1360px) are inaccessible from the mobile overview.
+    worldAreaSqMiles: 10000000,
+    worldRadiusMiles: 1784.12,
+    worldDiameterMiles: 3568.25,
+    milesPerPixel: 0.89206, // ~0.892 miles per overworld unit (20x expanded scale across the 4000x4000 space)
     baseMarchSpeedMph: 2.8, // Realistic deliberate squad foot-march across hostile forest (2.8 mph base)
+    mountainOuterBoundaryRadiusPx: 1360, // Endless Dunes beyond r=1360px are inaccessible
     partyNodeId: 1,
     homeNodeId: 1,
     homeX: 2260,
@@ -4739,9 +4741,9 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
     targetLabel: null,
     targetNodeId: null,
     isMoving: false,
-    // Deliberately slow macro velocity scaled to 500,000 sq miles (cannot rapidly zip across the continent)
-    baseSpeedPxPerTick: 3.2,
-    sightRadius: 340,
+    // Deliberately slow macro velocity (20x expanded continent scale)
+    baseSpeedPxPerTick: 1.4,
+    sightRadius: 220,
     exploredCellSize: 100,
     exploredCells: new Set(),
     travelAccumulatorPx: 0,
@@ -4781,9 +4783,9 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         15: { x: 1240, y: 960,  rZone: 'OUTER_HORIZON', biome: 'HILLS' },       // Blighted Watch
         16: { x: 860,  y: 1680, rZone: 'OUTER_HORIZON', biome: 'DENSE_FOREST' },// Whisper-Grove
         17: { x: 920,  y: 2540, rZone: 'OUTER_HORIZON', biome: 'RIVER_VALLEY' },// Silt-Harbor
-        18: { x: 1380, y: 3120, rZone: 'OUTER_HORIZON', biome: 'OUTER_DUNES' }, // Salt-Mire
-        19: { x: 2260, y: 3180, rZone: 'OUTER_HORIZON', biome: 'HILLS' },       // World's End Gate (Terminus)
-        20: { x: 3220, y: 3060, rZone: 'OUTER_HORIZON', biome: 'OUTER_DUNES' }  // Drift-Anchor
+        18: { x: 1380, y: 3120, rZone: 'OUTER_HORIZON', biome: 'MOUNTAIN_RING' }, // Cullfield
+        19: { x: 2260, y: 3180, rZone: 'OUTER_HORIZON', biome: 'MOUNTAIN_RING' }, // World's End Gate (Terminus)
+        20: { x: 2920, y: 2920, rZone: 'OUTER_HORIZON', biome: 'MOUNTAIN_RING' }  // Aegis Rest (Outer Ward)
     },
 
     getSettlementCoords(settlementObj, idx = 1, total = 20) {
@@ -4815,9 +4817,6 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         const roadWave = Math.abs(Math.cos(angle * 4));
         if (distCenter < 760 && roadWave > 0.96) {
             return { id: 'ROYAL_ROAD', label: 'Cobbled Runic Causeway', speedMult: 1.35, color: '#5c5346' };
-        }
-        if (distCenter > 1360) {
-            return { id: 'OUTER_DUNES', label: 'Endless Outer Dunes', speedMult: 0.82, color: '#6b5335' };
         }
         if (distCenter > 980) {
             return { id: 'MOUNTAIN_RING', label: 'Mountain Ring & Crags', speedMult: 0.68, color: '#3b424c' };
@@ -4897,10 +4896,11 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         return Math.max(1, Math.min(240, rawHours));
     },
 
-    // Pale Sovereign Lair: 25% deep into the Mountain Ring (Inner Rim = 980px, Outer Rim = 1360px => 980 + 0.25 * 380 = 1075px radius from center)
+    // Pale Sovereign Lair: Cave 25% deep into the Mountain Ring (Inner Rim = 980px, Outer Rim = 1360px => 980 + 0.25 * 380 = 1075px radius from center)
     SOVEREIGN_MOUNTAIN_LAIR: {
         id: 'SOVEREIGN_MOUNTAIN_LAIR',
-        name: 'Frost-Bound Mountain Ring Lair (25% Deep)',
+        name: 'Frost-Bound Mountain Ring Cave Lair (25% Deep)',
+        lairType: 'MOUNTAIN_CAVE',
         x: 2000,
         y: 3075, // Distance = 1075px from (2000,2000) -> strictly 25% into the Mountain Ring [980..1360]
         mountainDepthPercent: 25,
@@ -5065,9 +5065,41 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         };
     },
 
+    checkDuneHorizonBoundary(x, y) {
+        const dist = Math.hypot((Number(x) || 2000) - 2000, (Number(y) || 2000) - 2000);
+        const maxRad = this.mountainOuterBoundaryRadiusPx || 1360;
+        if (dist > maxRad) {
+            const msg = `⛰️🌫️ [MOUNTAIN HORIZON MIRAGE] The mountains run on forever—there is no value in continuing. Turning back.`;
+            this.overworldLogs.unshift(msg);
+            if (this.overworldLogs.length > 25) this.overworldLogs.pop();
+            LogDispatchManager.dispatches.unshift({
+                id: `mountain_mirage_turnback_${Date.now()}`,
+                day: rootScope.EngineParams?.worldDay || 1,
+                type: 'OUTER MOUNTAIN MIRAGE',
+                sender: 'Forward Outrider Vanguard',
+                title: 'The Mountains Run On Forever — Turning Back',
+                body: msg,
+                read: false
+            });
+            return { blocked: true, dist, maxRad, message: msg };
+        }
+        return { blocked: false, dist, maxRad };
+    },
+
     setWaypoint(worldX, worldY, options = {}) {
         const tx = Math.max(80, Math.min(3920, Math.round(Number(worldX) || 2000)));
         const ty = Math.max(80, Math.min(3920, Math.round(Number(worldY) || 2000)));
+        const boundaryCheck = this.checkDuneHorizonBoundary(tx, ty);
+        if (boundaryCheck.blocked) {
+            const returnRes = this.triggerAutoReturnToCamp('The mountains run on forever—there is no value in continuing. Turning back');
+            return {
+                ...returnRes,
+                success: false,
+                blockedByEndlessMountains: true,
+                dunesInaccessible: true,
+                message: boundaryCheck.message
+            };
+        }
         if ((this.suppliesDaysRemaining ?? 3) <= 0) {
             return this.triggerAutoReturnToCamp('0 Days of Travel Supplies remaining');
         }
@@ -5137,8 +5169,13 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             return this.completeWaypointArrival(arrivedNode);
         }
 
-        this.partyX = Number((this.partyX + (dx / dist) * stepPx).toFixed(1));
-        this.partyY = Number((this.partyY + (dy / dist) * stepPx).toFixed(1));
+        const nextX = Number((this.partyX + (dx / dist) * stepPx).toFixed(1));
+        const nextY = Number((this.partyY + (dy / dist) * stepPx).toFixed(1));
+        if (!this.isAutoReturning && this.checkDuneHorizonBoundary(nextX, nextY).blocked) {
+            return this.triggerAutoReturnToCamp('The mountains run on forever—there is no value in continuing. Turning back');
+        }
+        this.partyX = nextX;
+        this.partyY = nextY;
         this.travelAccumulatorPx = (this.travelAccumulatorPx || 0) + stepPx;
         const stepMiles = Number((stepPx * (this.milesPerPixel || 0.19947)).toFixed(2));
         this.totalMilesMarched = Number(((this.totalMilesMarched || 0) + stepMiles).toFixed(1));

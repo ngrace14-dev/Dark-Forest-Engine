@@ -69,7 +69,17 @@ while (ForestOverworldEngine.isMoving && ticksMarched < 5000) {
 if (ticksMarched < 50 || ForestOverworldEngine.partyX !== homeX || ForestOverworldEngine.partyY !== homeY || ForestOverworldEngine.suppliesDaysRemaining < 3) {
     failures.push(`Expected timed return walk to march step-by-step back to (${homeX},${homeY}) and restock supplies upon arrival.`);
 }
-console.log(`[3/3] Timed Return Walk Verified: Squad started return walk at (${returnStartPos.x}, ${returnStartPos.y}) with 0/3 supplies, marched step-by-step across ${ticksMarched} movement ticks to Home Camp (${ForestOverworldEngine.partyX}, ${ForestOverworldEngine.partyY}), and restocked to ${ForestOverworldEngine.suppliesDaysRemaining}/${ForestOverworldEngine.maxSuppliesDays} Days upon arrival.`);
+console.log(`[3/4] Timed Return Walk Verified: Squad started return walk at (${returnStartPos.x}, ${returnStartPos.y}) with 0/3 supplies, marched step-by-step across ${ticksMarched} movement ticks to Home Camp (${ForestOverworldEngine.partyX}, ${ForestOverworldEngine.partyY}), and restocked to ${ForestOverworldEngine.suppliesDaysRemaining}/${ForestOverworldEngine.maxSuppliesDays} Days upon arrival.`);
+
+// 4. Verify 20x Expanded Map Scale & Endless Mountain Turn-Back Boundary (Dunes Inaccessible)
+if (ForestOverworldEngine.worldAreaSqMiles < 5000000 || ForestOverworldEngine.milesPerPixel < 0.5) {
+    failures.push(`Expected 10-30x expanded mobile overview world scale, got area=${ForestOverworldEngine.worldAreaSqMiles}, milesPerPixel=${ForestOverworldEngine.milesPerPixel}`);
+}
+const duneAttemptRes = ForestOverworldEngine.setWaypoint(3750, 3750);
+if (!duneAttemptRes.blockedByEndlessMountains || !duneAttemptRes.dunesInaccessible || !duneAttemptRes.message.toLowerCase().includes('mountains run on forever') || !duneAttemptRes.message.toLowerCase().includes('turning back')) {
+    failures.push(`Expected marching beyond the Mountain Ring into the Dunes to log "The mountains run on forever—there is no value in continuing. Turning back.", got ${JSON.stringify(duneAttemptRes)}`);
+}
+console.log(`[4/4] 20x Expanded World Scale (${ForestOverworldEngine.worldAreaSqMiles.toLocaleString()} sq. mi.) & Inaccessible Dunes Verified:\n  - Attempted Dune Waypoint (3750, 3750) -> "${duneAttemptRes.message}"`);
 
 if (MobileCommanderEngine.ForestOverworldEngine?.SOVEREIGN_MOUNTAIN_LAIR?.mountainDepthPercent !== 25) {
     failures.push('Mobile General Ledger mirror is missing SOVEREIGN_MOUNTAIN_LAIR parity.');
