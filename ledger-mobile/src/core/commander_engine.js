@@ -6388,6 +6388,202 @@ export const OrphicHydrologyBlueprint = rootScope.OrphicHydrologyBlueprint || {
 };
 OrphicHydrologyBlueprint.generateIdealBlueprint();
 rootScope.OrphicHydrologyBlueprint = OrphicHydrologyBlueprint;
+// ============================================================================
+// 5.93 HYDRAULIC PRESSURE REGISTRY & DRAINAGE BASIN GOVERNANCE
+//      (Volumetric Flow, Upstream Siphoning, Tether-Breach Rerouting & Fact Minting)
+// ============================================================================
+export const HydraulicPressureRegistry = rootScope.HydraulicPressureRegistry || {
+    riverNodes: new Map(),
+    drainageDiscrepancies: [],
+    breachRerouteHistory: [],
+
+    RIVER_PARISH_TOPOLOGY: {
+        ORPHIC_RIVER_1: { upstreamHouse: 'House Terminus',    downstreamHouse: 'House Oakheart',  baseFlowCubicM: 420 },
+        ORPHIC_RIVER_2: { upstreamHouse: 'House Ashen',       downstreamHouse: 'House Mire',      baseFlowCubicM: 390 },
+        ORPHIC_RIVER_3: { upstreamHouse: 'House Grim',        downstreamHouse: 'House Hollow',    baseFlowCubicM: 450 },
+        ORPHIC_RIVER_4: { upstreamHouse: 'House Bleak',       downstreamHouse: 'House Shadowfen', baseFlowCubicM: 410 },
+        ORPHIC_RIVER_5: { upstreamHouse: 'House Blightwatch', downstreamHouse: 'House Blackwood', baseFlowCubicM: 380 },
+        ORPHIC_RIVER_6: { upstreamHouse: 'House Gloom',       downstreamHouse: 'House Crow',      baseFlowCubicM: 360 },
+        ORPHIC_RIVER_7: { upstreamHouse: 'House Wraith',      downstreamHouse: 'House Widow',     baseFlowCubicM: 440 },
+        ORPHIC_RIVER_8: { upstreamHouse: 'House Cull',        downstreamHouse: 'House Aethel',    baseFlowCubicM: 510 }
+    },
+
+    initFromBlueprint() {
+        this.riverNodes.clear();
+        const bp = OrphicHydrologyBlueprint.idealBlueprint || OrphicHydrologyBlueprint.generateIdealBlueprint();
+        if (!bp || !Array.isArray(bp.innerRivers)) return this.riverNodes;
+
+        for (const river of bp.innerRivers) {
+            const topo = this.RIVER_PARISH_TOPOLOGY[river.id] || {
+                upstreamHouse: 'House Mire',
+                downstreamHouse: 'House Aethel',
+                baseFlowCubicM: 400
+            };
+            const elevDrop = Math.max(10, river.source.elevationMeters - river.sink.elevationMeters);
+            const horizDist = Math.max(1, Math.hypot(river.source.x - river.sink.x, river.source.y - river.sink.y));
+            const slopeGradient = Number((elevDrop / horizDist).toFixed(3));
+            const maxCapacity = Math.round(topo.baseFlowCubicM * (1 + slopeGradient * 0.45));
+
+            this.riverNodes.set(river.id, {
+                riverId: river.id,
+                name: river.name,
+                upstreamHouse: topo.upstreamHouse,
+                downstreamHouse: topo.downstreamHouse,
+                slopeGradient,
+                baseFlowCubicM: topo.baseFlowCubicM,
+                expectedInflowCubicM: topo.baseFlowCubicM,
+                actualOutflowCubicM: topo.baseFlowCubicM,
+                siphonedCubicM: 0,
+                waterPressureIndex: 25,
+                maxCapacityCubicM: maxCapacity,
+                dammedOrImpounded: false,
+                rerouted: false,
+                waypoints: river.waypoints.map(wp => ({ ...wp }))
+            });
+        }
+        return this.riverNodes;
+    },
+
+    siphonOrImpoundUpstream(riverId = 'ORPHIC_RIVER_2', siphonRatio = 0.35, buildDam = false) {
+        if (this.riverNodes.size === 0) this.initFromBlueprint();
+        const node = this.riverNodes.get(riverId);
+        if (!node) return { success: false, message: `Unknown Orphic river ID: ${riverId}` };
+
+        const ratio = Math.max(0.05, Math.min(0.85, Number(siphonRatio) || 0.35));
+        node.siphonedCubicM = Math.round(node.expectedInflowCubicM * ratio);
+        node.actualOutflowCubicM = Math.max(20, node.expectedInflowCubicM - node.siphonedCubicM);
+        node.dammedOrImpounded = Boolean(buildDam);
+        node.waterPressureIndex = Math.min(100, Math.round(25 + ratio * 75 + (buildDam ? 35 : 0)));
+
+        const day = rootScope.EngineParams?.worldDay || 1;
+        const discrepancy = {
+            id: `hydro_leak_${day}_${this.drainageDiscrepancies.length + 1}`,
+            day,
+            riverId: node.riverId,
+            riverName: node.name,
+            upstreamCulprit: node.upstreamHouse,
+            downstreamVictim: node.downstreamHouse,
+            expectedInflowCubicM: node.expectedInflowCubicM,
+            actualOutflowCubicM: node.actualOutflowCubicM,
+            missingVolumeCubicM: node.siphonedCubicM,
+            waterPressureIndex: node.waterPressureIndex
+        };
+        this.drainageDiscrepancies.unshift(discrepancy);
+
+        CampaignManager.mutateWarBoard(
+            node.downstreamHouse,
+            -4,
+            'SKIRMISH',
+            `Downstream aquifer starved (-${node.siphonedCubicM} m³/s siphoned on ${node.name} by ${node.upstreamHouse})`
+        );
+
+        const fact = RealityEditorVault.discoverFact({
+            title: `Hydrological Sluice Discrepancy on ${node.name}`,
+            source: `Sluice-Gauge Audit (${node.expectedInflowCubicM} m³/s inflow vs. ${node.actualOutflowCubicM} m³/s outflow)`,
+            targetHouse: node.upstreamHouse,
+            valueFuel: 14,
+            valueRes: 18,
+            costPaid: '1 Field Scribe Survey & Sluice Sounding Lead',
+            riskDesc: `Proves ${node.upstreamHouse} is illegally impounding ${node.siphonedCubicM} m³/s of watershed flow from ${node.downstreamHouse}.`
+        });
+
+        let breachResult = null;
+        const h = CampaignManager?.state?.house || {};
+        const chainThreshold = Math.min(85, h.chainsIntegrity || 80);
+        if (node.waterPressureIndex >= chainThreshold) {
+            breachResult = this.triggerCatastrophicHydrologicalBreach(riverId);
+        }
+
+        return {
+            success: true,
+            riverNode: node,
+            discrepancy,
+            factDossier: fact,
+            breachTriggered: Boolean(breachResult),
+            breachResult
+        };
+    },
+    triggerCatastrophicHydrologicalBreach(riverId = 'ORPHIC_RIVER_2') {
+        if (this.riverNodes.size === 0) this.initFromBlueprint();
+        const node = this.riverNodes.get(riverId);
+        if (!node) return null;
+
+        node.rerouted = true;
+        const midIdx = Math.floor(node.waypoints.length / 2);
+        const breachWp = node.waypoints[midIdx] || { x: 2150, y: 1850, elevationMeters: 240 };
+
+        for (let i = midIdx; i < node.waypoints.length - 1; i++) {
+            node.waypoints[i].x += 45;
+            node.waypoints[i].y -= 35;
+            node.waypoints[i].elevationMeters = Number((node.waypoints[i].elevationMeters - 12.5).toFixed(2));
+        }
+
+        const sectorKey = `${breachWp.x},${breachWp.y}`;
+        MaterialRegistry.permuteMaterialProperties('STONE_BASALT', 'hardness', 'RESIN_SIPHON', 'elasticity', sectorKey, `sluice_breach_${riverId}`);
+
+        const h = CampaignManager?.state?.house;
+        if (h) {
+            h.chainsIntegrity = Math.max(15, (h.chainsIntegrity || 100) - 12);
+        }
+        if (rootScope.CivilizationState?.scalars) {
+            rootScope.CivilizationState.scalars.MATERIAL_STRESS = Math.min(0.99, (rootScope.CivilizationState.scalars.MATERIAL_STRESS || 0.2) + 0.08);
+        }
+
+        const record = {
+            id: `hydro_breach_${Date.now()}_${this.breachRerouteHistory.length + 1}`,
+            day: rootScope.EngineParams?.worldDay || 1,
+            riverId: node.riverId,
+            riverName: node.name,
+            breachCoord: { x: breachWp.x, y: breachWp.y },
+            sectorKey,
+            upstreamHouse: node.upstreamHouse,
+            downstreamHouse: node.downstreamHouse,
+            newWaypoints: node.waypoints
+        };
+        this.breachRerouteHistory.unshift(record);
+        rootScope.EventBus?.emit('CATASTROPHIC_HYDROLOGICAL_BREACH', record);
+        return record;
+    },
+
+    auditDrainageLedger() {
+        if (this.riverNodes.size === 0) this.initFromBlueprint();
+        let totalExpected = 0;
+        let totalActual = 0;
+        const activeLeaks = [];
+
+        this.riverNodes.forEach(node => {
+            totalExpected += node.expectedInflowCubicM;
+            totalActual += node.actualOutflowCubicM;
+            if (node.expectedInflowCubicM !== node.actualOutflowCubicM) {
+                activeLeaks.push({
+                    riverId: node.riverId,
+                    upstreamHouse: node.upstreamHouse,
+                    downstreamHouse: node.downstreamHouse,
+                    deficitCubicM: node.expectedInflowCubicM - node.actualOutflowCubicM,
+                    rerouted: node.rerouted
+                });
+            }
+        });
+
+        return {
+            balanced: totalExpected === totalActual,
+            totalExpectedCubicM: totalExpected,
+            totalActualCubicM: totalActual,
+            totalDeficitCubicM: totalExpected - totalActual,
+            activeLeaks
+        };
+    },
+
+    resetForNewRun() {
+        this.drainageDiscrepancies = [];
+        this.breachRerouteHistory = [];
+        this.initFromBlueprint();
+    }
+};
+HydraulicPressureRegistry.initFromBlueprint();
+rootScope.HydraulicPressureRegistry = HydraulicPressureRegistry;
+
+
 
 // ============================================================================
 // 5.94 PHASE 2: THE GEOMETER (THE SYSTEMIC ACTOR) & HOST-ONLY VISIBILITY
@@ -8167,6 +8363,7 @@ export const CommanderEngine = {
     ExpeditionEngine,
     ForestOverworldEngine,
     OrphicHydrologyBlueprint,
+    HydraulicPressureRegistry,
     HostVisibilityController,
     GeometerRegistry,
     MaterialRegistry,
