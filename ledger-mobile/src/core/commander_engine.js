@@ -4897,6 +4897,17 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         return Math.max(1, Math.min(240, rawHours));
     },
 
+    // Pale Sovereign Lair: 25% deep into the Mountain Ring (Inner Rim = 980px, Outer Rim = 1360px => 980 + 0.25 * 380 = 1075px radius from center)
+    SOVEREIGN_MOUNTAIN_LAIR: {
+        id: 'SOVEREIGN_MOUNTAIN_LAIR',
+        name: 'Frost-Bound Mountain Ring Lair (25% Deep)',
+        x: 2000,
+        y: 3075, // Distance = 1075px from (2000,2000) -> strictly 25% into the Mountain Ring [980..1360]
+        mountainDepthPercent: 25,
+        rZone: 'MOUNTAIN_RING',
+        biome: 'MOUNTAIN_RING'
+    },
+
     resetForNewRun() {
         const isSov = CampaignManager.campaignMode === 'SOVEREIGN';
         const obsLv = rootScope.FacilityEngine?.facilities?.exploration_observatory?.unlocked
@@ -4904,12 +4915,14 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             : 0;
         this.maxSuppliesDays = 3 + obsLv;
         this.suppliesDaysRemaining = this.maxSuppliesDays;
-        this.partyNodeId = isSov ? 2 : 1;
+        this.partyNodeId = isSov ? 19 : 1;
         this.homeNodeId = this.partyNodeId;
         this.stance = isSov ? 'STALK' : 'MARCH';
         this.huntProgress = 0;
         this.isAutoReturning = false;
         this.returnHoursRemaining = 0;
+        this.returnStartX = null;
+        this.returnStartY = null;
         this.targetX = null;
         this.targetY = null;
         this.targetLabel = null;
@@ -4922,19 +4935,22 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         this.exploredCells = new Set();
         const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
         const startIdx = settlements.findIndex(s => Number(s.id) === this.partyNodeId);
-        const startCoords = this.getSettlementCoords(settlements[Math.max(0, startIdx)], Math.max(1, startIdx), settlements.length || 20);
+        const startCoords = isSov
+            ? { ...this.SOVEREIGN_MOUNTAIN_LAIR }
+            : this.getSettlementCoords(settlements[Math.max(0, startIdx)], Math.max(1, startIdx), settlements.length || 20);
         this.partyX = startCoords.x;
         this.partyY = startCoords.y;
         this.homeX = startCoords.x;
         this.homeY = startCoords.y;
         this.distanceFromCampHours = 0;
-        this.movementTrail = [{ x: this.partyX, y: this.partyY, nodeId: this.partyNodeId, label: settlements[Math.max(0, startIdx)]?.name || 'Oakhaven' }];
+        const startLabel = isSov ? this.SOVEREIGN_MOUNTAIN_LAIR.name : (settlements[Math.max(0, startIdx)]?.name || 'Oakhaven');
+        this.movementTrail = [{ x: this.partyX, y: this.partyY, nodeId: this.partyNodeId, label: startLabel }];
         this.updateExploredArea(this.partyX, this.partyY, 440);
         this.spawnMovingTargets();
         this.overworldLogs = [
             isSov
-                ? `🐺 [PREDATOR OVERWORLD ACTIVE — 500,000 SQ. MI. DOMINION | ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS STAMINA] The Pale Sovereign & Bound Huntsman emerged near ${settlements[Math.max(0, startIdx)]?.name || 'Gallows Hill'} (${this.partyX}, ${this.partyY}). Click anywhere on the 4000x4000 terrain or select a roaming caravan to STALK, HUNT, ATTACK & FEED!`
-                : `🧭 [500,000 SQ. MI. FOREST OVERWORLD — ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS TRAVEL SUPPLIES] Vanguard Squad mustered at ${settlements[Math.max(0, startIdx)]?.name || 'Oakhaven'} (${this.partyX}, ${this.partyY} | ~${this.baseMarchSpeedMph} mph base march). Click any terrain coordinate to set a deliberate march waypoint, or STALK/SCOUT to zoom into the XCOM × Bannerlord Local Tactical Map with Cyan Squad Blips!`
+                ? `🐺 [PREDATOR OVERWORLD ACTIVE — 25% INTO THE MOUNTAIN RING (${this.partyX}, ${this.partyY}) | ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS STAMINA] The Pale Sovereign & Bound Huntsman emerged from their ${this.SOVEREIGN_MOUNTAIN_LAIR.name}. Descend from the mountain crags into the forest to STALK, HUNT, ATTACK & FEED!`
+                : `🧭 [500,000 SQ. MI. FOREST OVERWORLD — ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} DAYS TRAVEL SUPPLIES] Vanguard Squad mustered at ${startLabel} (${this.partyX}, ${this.partyY} | ~${this.baseMarchSpeedMph} mph base march, ~4–6 IRL hours to nearest village at 1x). Click any terrain coordinate to set a deliberate march waypoint!`
         ];
     },
 
@@ -4970,7 +4986,7 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
 
     triggerAutoReturnToCamp(reason = 'Travel supplies depleted (0/3 Days)') {
         const isSov = CampaignManager.campaignMode === 'SOVEREIGN';
-        const returnHours = this.computeReturnHoursFromCamp();
+        const returnHours = Math.max(4, this.computeReturnHoursFromCamp()); // Minimum several real hours to nearest village
         const ts = rootScope.CommanderEngine?.timeScale || 1;
         const irlHoursPerInGameHour = Number(((12 / 24) / ts).toFixed(2));
         const irlHoursRequired = Number((returnHours * irlHoursPerInGameHour).toFixed(2));
@@ -4978,12 +4994,23 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         const leaderName = leadAgt?.name || (isSov ? 'Korvan the Pale Sovereign' : 'Vanguard Squad');
         const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
         const currentNode = settlements.find(s => Number(s.id) === Number(this.partyNodeId)) || settlements[1] || { id: 1, name: 'Oakhaven' };
-        const homeNode = settlements.find(s => Number(s.id) === Number(this.homeNodeId)) || settlements[1] || { id: 1, name: 'Oakhaven' };
+        const homeNode = isSov
+            ? { id: 19, name: this.SOVEREIGN_MOUNTAIN_LAIR.name }
+            : (settlements.find(s => Number(s.id) === Number(this.homeNodeId)) || settlements[1] || { id: 1, name: 'Oakhaven' });
 
+        // TIMED WALK BACK: Do NOT snap partyX/partyY to homeX/homeY immediately!
+        // Set homeX/homeY as the active march waypoint so the party physically walks back over time.
+        this.returnStartX = this.partyX;
+        this.returnStartY = this.partyY;
         this.isAutoReturning = true;
         this.returnHoursRemaining = returnHours;
         this.distanceFromCampHours = returnHours;
         this.stance = 'AUTO_RETURNING';
+        this.targetX = this.homeX;
+        this.targetY = this.homeY;
+        this.targetNodeId = this.homeNodeId;
+        this.targetLabel = `${homeNode.name} (Return Trek)`;
+        this.isMoving = true;
 
         const returnExp = {
             id: `exp_ovw_return_${Date.now()}`,
@@ -5001,38 +5028,36 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             returnHoursRemaining: returnHours,
             salvagedFuelPending: 4,
             status: 'RETURNING_EARLY',
+            fromCoords: { x: this.returnStartX, y: this.returnStartY },
+            toCoords: { x: this.homeX, y: this.homeY },
             logs: [
-                `[00:00] ⚠️⛺ [SUPPLIES EXHAUSTED — AUTO-RETURN MARCH] ${reason}! ${leaderName} turned back from ${currentNode.name} toward ${homeNode.name} Camp (${returnHours}h travel distance = ${irlHoursRequired} IRL hrs at ${ts}x).`
+                `[00:00] ⚠️⛺ [TIMED RETURN MARCH INITIATED] ${reason}! ${leaderName} turned back from (${this.partyX}, ${this.partyY}) toward ${homeNode.name} (${this.homeX}, ${this.homeY}) — Timed Return Walk: ${returnHours}h in-game (${irlHoursRequired} real-world hours at ${ts}x).`
             ]
         };
         ExpeditionEngine.activeExpeditions.unshift(returnExp);
 
-        this.partyNodeId = this.homeNodeId;
-        this.partyX = this.homeX;
-        this.partyY = this.homeY;
-        const obsLv = rootScope.FacilityEngine?.facilities?.exploration_observatory?.unlocked
-            ? Math.max(0, (rootScope.FacilityEngine.facilities.exploration_observatory.level || 1) - 1)
-            : 0;
-        this.maxSuppliesDays = 3 + obsLv;
-        this.suppliesDaysRemaining = this.maxSuppliesDays;
-        this.movementTrail = [{ x: this.homeX, y: this.homeY, nodeId: this.homeNodeId, label: homeNode.name }];
-
-        const msg = `⚠️🏃 [OUT OF SUPPLIES (0/${this.maxSuppliesDays}D) — AUTO-RETURN MARCH INITIATED] ${leaderName} ran out of rations at ${currentNode.name}! Marching back to ${homeNode.name} Camp (${returnHours}h distance from camp = ${irlHoursRequired} IRL hours at ${ts}x speed) with live hourly wasteland events. Camp supplies restocked to ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} Days for the next sortie!`;
+        const msg = `⚠️🏃 [TIMED RETURN WALK INITIATED (${returnHours}h / ${irlHoursRequired} IRL Hours at ${ts}x)] ${leaderName} depleted supplies at ${currentNode.name} (${this.partyX}, ${this.partyY})! Now marching back across the terrain toward ${homeNode.name} (${this.homeX}, ${this.homeY}). Supplies will restock upon reaching camp!`;
         this.overworldLogs.unshift(msg);
         if (this.overworldLogs.length > 25) this.overworldLogs.pop();
 
         LogDispatchManager.dispatches.unshift({
             id: `ovw_autoret_${Date.now()}`,
             day: rootScope.EngineParams?.worldDay || 1,
-            type: 'OVERWORLD AUTO-RETURN LOG',
+            type: 'OVERWORLD TIMED RETURN WALK',
             sender: leaderName,
-            title: `Supplies Depleted at ${currentNode.name} — Auto-Return Trek (${returnHours}h / ${irlHoursRequired}h IRL)`,
+            title: `Timed Return March to ${homeNode.name} (${returnHours}h / ${irlHoursRequired}h IRL)`,
             body: msg,
             read: false
         });
         return {
             success: true,
             autoReturned: true,
+            isTimedReturnWalk: true,
+            isMoving: true,
+            partyX: this.partyX,
+            partyY: this.partyY,
+            targetX: this.targetX,
+            targetY: this.targetY,
             returnHours,
             irlHoursRequired,
             expedition: returnExp,
@@ -5126,10 +5151,15 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             this.travelAccumulatorPx = Number((this.travelAccumulatorPx % 15).toFixed(2));
             this.movementTrail.push({ x: Math.round(this.partyX), y: Math.round(this.partyY), nodeId: this.partyNodeId, label: biome.label });
             if (this.movementTrail.length > 14) this.movementTrail.shift();
+            if (this.isAutoReturning && this.returnHoursRemaining > 0) {
+                this.returnHoursRemaining = Math.max(0, this.returnHoursRemaining - hoursTicked);
+            }
             ExpeditionEngine.tickExpeditionHours(hoursTicked);
         }
         return {
             moving: true,
+            isAutoReturning: this.isAutoReturning,
+            returnHoursRemaining: this.returnHoursRemaining,
             partyX: this.partyX,
             partyY: this.partyY,
             stepPx,
@@ -5144,13 +5174,17 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
 
     completeWaypointArrival(targetSettlement = null) {
         const settlements = CampaignManager.getBedrockTelemetry({ allowTwentyFirst: ShadowInfluenceEngine.isEpitaphRevealed() }) || [];
+        const isSov = CampaignManager.campaignMode === 'SOVEREIGN';
+        const wasReturningHome = Boolean(this.isAutoReturning);
         const target = targetSettlement
             || (this.targetNodeId !== null ? settlements.find(s => Number(s.id) === Number(this.targetNodeId)) : null);
         if (this.targetX !== null && this.targetY !== null) {
             this.partyX = this.targetX;
             this.partyY = this.targetY;
         }
-        const arrivalLabel = target?.name || this.targetLabel || `Waypoint (${this.partyX}, ${this.partyY})`;
+        const arrivalLabel = wasReturningHome
+            ? (isSov ? this.SOVEREIGN_MOUNTAIN_LAIR.name : (target?.name || 'Home Camp'))
+            : (target?.name || this.targetLabel || `Waypoint (${this.partyX}, ${this.partyY})`);
         if (target) {
             this.partyNodeId = Number(target.id);
         }
@@ -5162,6 +5196,35 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
         this.movementTrail.push({ x: this.partyX, y: this.partyY, nodeId: this.partyNodeId, label: arrivalLabel });
         if (this.movementTrail.length > 10) this.movementTrail.shift();
 
+        // If completing a timed return walk back to camp, restock supplies and reset stance
+        if (wasReturningHome) {
+            const obsLv = rootScope.FacilityEngine?.facilities?.exploration_observatory?.unlocked
+                ? Math.max(0, (rootScope.FacilityEngine.facilities.exploration_observatory.level || 1) - 1)
+                : 0;
+            this.maxSuppliesDays = 3 + obsLv;
+            this.suppliesDaysRemaining = this.maxSuppliesDays;
+            this.isAutoReturning = false;
+            this.returnHoursRemaining = 0;
+            this.distanceFromCampHours = 0;
+            this.distanceFromCampMiles = 0;
+            this.stance = isSov ? 'STALK' : 'MARCH';
+            const homeArrivalMsg = `🏕️✅ [RETURN WALK COMPLETE — ARRIVED AT ${arrivalLabel.toUpperCase()}] Completed timed return trek to (${this.partyX}, ${this.partyY}). Travel supplies restocked to ${this.suppliesDaysRemaining}/${this.maxSuppliesDays} Days!`;
+            this.overworldLogs.unshift(homeArrivalMsg);
+            if (this.overworldLogs.length > 25) this.overworldLogs.pop();
+            return {
+                success: true,
+                moving: false,
+                completedReturnWalk: true,
+                partyNodeId: this.partyNodeId,
+                partyX: this.partyX,
+                partyY: this.partyY,
+                suppliesDaysRemaining: this.suppliesDaysRemaining,
+                distanceFromCampHours: 0,
+                autoReturned: true,
+                message: homeArrivalMsg
+            };
+        }
+
         this.suppliesDaysRemaining = Math.max(0, (this.suppliesDaysRemaining ?? 3) - 1);
         this.distanceFromCampHours = this.computeReturnHoursFromCamp();
         this.isAutoReturning = false;
@@ -5172,7 +5235,6 @@ export const ForestOverworldEngine = rootScope.ForestOverworldEngine || {
             CampaignManager.revealFogOfWarNode(target.name);
         }
 
-        const isSov = CampaignManager.campaignMode === 'SOVEREIGN';
         const leadAgt = AgentRosterManager.agents.get('agt_1') || Array.from(AgentRosterManager.agents.values()).find(a => a.alive);
         const leaderName = leadAgt?.name || (isSov ? 'Korvan the Pale Sovereign' : 'Vanguard Commander');
         const biome = this.getBiomeAt(this.partyX, this.partyY);
