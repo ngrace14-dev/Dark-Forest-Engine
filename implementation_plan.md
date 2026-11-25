@@ -107,3 +107,16 @@ Upgrade the world-generation and systemic simulation engines to treat geological
      - Two-Key Interlocking Rule (`pairedCounterPoemId`) & all 4 Canonical Bible Addendum Poems (Addendum CA-13, Addendum BY Surface Terminus Rumor, Addendum BY Internal Epitaph Slate, Addendum BN Flesh Ledger).
   4. **18,000-Year Semantic Decay Mutation Pipeline & 19-House Tombstone Records:**
      - Apply `Rule 1: Pronoun Drift`, `Rule 2: Metric Fossilization`, and `Rule 3: Medium Corruption` (`IRON_CHANTRY_STONE`, `FLAYED_QUILL_BONE_TALLY`, `VILLAGE_NURSERY_RHYME`), and generate the 19-House Tombstone Records.
+
+### Phase 8: Asymmetric 3D Isometric Village TD & Pale Sovereign Huntsman Cultivation Slice
+- **Files Affected:**
+  - `assets/tileset.json` & `src/core/tileset_bridge.js`
+  - `src/core/camera_profiles.js`, `src/core/state.js`, `src/engine.js`, `src/systems/input.js`, `src/systems/forest_impostors.js`, `src/systems/volumetric_fog.js`
+  - `src/systems/structure_manager.js` & `tools/audit/verify_structure_manager.mjs`
+  - `src/systems/squad_cultivation_system.js` & `tools/audit/verify_squad_cultivation_system.mjs`
+  - `src/systems/commander_ui.js`, `ledger-mobile/src/systems/commander_ui.js` & `tools/audit/verify_isometric_slice_bridge.mjs`
+- **Technical Specification:**
+  1. **Step 1 (Classic Isometric Projection):** Lock Three.js camera to `CLASSIC_ISOMETRIC` (`fov: 25°`, `pitch: Math.PI/4`, `angle: Math.PI/4`, quantized 4m shadow frustum snapping) and tune impostor/fog thresholds for crisp wall and woodland lane readability.
+  2. **Step 2 & 2.5 (`assets/tileset.json` Source of Truth & `StructureManager`):** Derive all grid cells (`2.0m`), footprints, heights, `mountHeightOffset` (`3.8m` Watchtower, `1.6m` Palisade, `1.2m` OCP Post), material palettes, and `normalCycle` vs. `whiteVoidShift` lighting states directly from `assets/tileset.json`.
+  3. **Step 3 (`SquadCultivationSystem`):** Implement Order fuel/relic expeditions (enforcing *Career Integrity* for wall-mounted `villager_militia` vs. woodland `adventurer_dispatch`) and Pale Sovereign probing packs + **The Huntsman & The Orb** cultivation loop (`target.stats > lastHarvestedStats` $\rightarrow$ `HUNTSMAN_MARK` $\rightarrow$ `5% HP` beatdown $\rightarrow$ `HUNTSMAN_SCORN_24H` $\rightarrow$ `MACABRE_HARVEST` Vampire evolution).
+  4. **Step 4 (`CommanderUI` Dual-Loop Wrapper):** Connect `commander_ui.js` (`BRIEFING -> ACTIVE_SHIFT_COUNTDOWN -> WHITE_VOID_CLIMAX -> GENERAL_LEDGER_SUMMARY`) across both `src/` and `ledger-mobile/`.

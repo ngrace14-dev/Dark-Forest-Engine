@@ -11,10 +11,10 @@ class VolumetricFogSystem {
             uFogColor: { value: new THREE.Color(0x0c131a) },
             uSunColor: { value: new THREE.Color(0xdbeafe) },
             uSunDirection: { value: new THREE.Vector3(0.3, 0.6, 0.7).normalize() },
-            uFogDensity: { value: 0.0018 },
+            uFogDensity: { value: 0.0009 }, // Crisp isometric tactical ground clarity
             uHeightFogFloor: { value: -5.0 },
-            uHeightFogFalloff: { value: 0.028 }, // Calibrated for 100m Redwood height piercing
-            uSunScatterIntensity: { value: 0.65 },
+            uHeightFogFalloff: { value: 0.036 }, // Stronger height falloff so overhead isometric view pierces canopy cleanly
+            uSunScatterIntensity: { value: 0.50 },
             uTime: { value: 0 }
         };
         this.initialized = false;

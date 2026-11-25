@@ -1,9 +1,11 @@
 // Ensure Input defaults are securely initialized
 window.Input = window.Input || {};
 window.Input.keys = window.Input.keys || {};
-window.Input.camAngle = window.Input.camAngle || Math.PI; // Start looking at the player's back
-window.Input.camPitch = window.Input.camPitch || 0.4;     // Slight downward angle
-window.Input.camDistance = window.Input.camDistance || 15;// Distance from player
+window.Input.cameraMode = window.Input.cameraMode || 'CLASSIC_ISOMETRIC';
+window.Input.isLockedPerspective = window.Input.isLockedPerspective ?? true;
+window.Input.camAngle = window.Input.camAngle ?? (Math.PI / 4); // Classic Isometric NE diagonal orientation
+window.Input.camPitch = window.Input.camPitch ?? (Math.PI / 4); // Classic Isometric 45-deg elevation
+window.Input.camDistance = window.Input.camDistance || 42;      // Standoff distance for low-FOV isometric view
 window.Input.isDraggingCam = false;
 window.Input.lastMouseX = 0;
 window.Input.lastMouseY = 0;
@@ -63,16 +65,18 @@ document.addEventListener('mousemove', e => {
         const deltaX = e.clientX - window.Input.lastMouseX;
         const deltaY = e.clientY - window.Input.lastMouseY;
 
-                // Integration Test: Pipe to new camera rig if it exists
-        if (window.GameCore?.cameraRig) {
-            window.GameCore.cameraRig.addOrbit(deltaX, -deltaY);
-        } else {
-            // Adjust angle and pitch based on mouse movement (Legacy)
-            window.Input.camAngle += deltaX * 0.01; 
-            window.Input.camPitch += deltaY * 0.01;
-            
-            // Clamp pitch between ground-level (0.1) and top-down (almost PI/2) to prevent camera from flipping upside down
-            window.Input.camPitch = Math.max(0.1, Math.min(Math.PI / 2.1, window.Input.camPitch));
+        if (!window.Input.isLockedPerspective && window.Input.cameraMode !== 'CLASSIC_ISOMETRIC') {
+            // Integration Test: Pipe to new camera rig if it exists
+            if (window.GameCore?.cameraRig) {
+                window.GameCore.cameraRig.addOrbit(deltaX, -deltaY);
+            } else {
+                // Adjust angle and pitch based on mouse movement (Legacy)
+                window.Input.camAngle += deltaX * 0.01; 
+                window.Input.camPitch += deltaY * 0.01;
+                
+                // Clamp pitch between ground-level (0.1) and top-down (almost PI/2) to prevent camera from flipping upside down
+                window.Input.camPitch = Math.max(0.1, Math.min(Math.PI / 2.1, window.Input.camPitch));
+            }
         }
         
         window.Input.lastMouseX = e.clientX; 
@@ -83,10 +87,13 @@ document.addEventListener('mousemove', e => {
 
 document.addEventListener('wheel', e => { 
     // Scroll to zoom in and out
-    if (window.GameCore?.cameraRig) {
+    const isIso = window.Input.isLockedPerspective || window.Input.cameraMode === 'CLASSIC_ISOMETRIC';
+    const minDist = isIso ? 24 : 5;
+    const maxDist = isIso ? 68 : 30;
+    if (window.GameCore?.cameraRig && !isIso) {
         window.GameCore.cameraRig.addZoom(e.deltaY * 0.01);
     } else {
-        window.Input.camDistance = Math.max(5, Math.min(30, window.Input.camDistance + e.deltaY * 0.01)); 
+        window.Input.camDistance = Math.max(minDist, Math.min(maxDist, window.Input.camDistance + e.deltaY * 0.01)); 
     }
 });
 
@@ -112,19 +119,28 @@ function updateCamera() {
         if (window.Input.camShake < 0.01) window.Input.camShake = 0;
     }
 
+    const profile = window.getActiveCameraProfile ? window.getActiveCameraProfile() : null;
+    const isIso = window.Input.isLockedPerspective || window.Input.cameraMode === 'CLASSIC_ISOMETRIC';
+
     const playerPos = window.GameCore.playerObj.visual.position;
     const dist = window.Input.camDistance;
-    const pitch = window.Input.camPitch;
-    const angle = window.Input.camAngle;
+    const pitch = isIso ? (profile?.pitch ?? (Math.PI / 4)) : window.Input.camPitch;
+    const angle = isIso ? (profile?.angle ?? (Math.PI / 4)) : window.Input.camAngle;
+    const targetOffsetY = isIso ? (profile?.targetHeightOffset ?? 1.0) : 1.5;
+
+    if (profile && window.GameCore.camera.fov !== profile.fov && typeof window.GameCore.camera.updateProjectionMatrix === 'function') {
+        window.GameCore.camera.fov = profile.fov;
+        window.GameCore.camera.updateProjectionMatrix();
+    }
 
     // Convert spherical coordinates to cartesian (X, Y, Z) to orbit around the player
     const camX = playerPos.x + dist * Math.sin(angle) * Math.cos(pitch) + shakeX;
-    const camY = playerPos.y + 1.5 + dist * Math.sin(pitch) + shakeY; // 1.5 offset to aim at player's head/shoulders
+    const camY = playerPos.y + targetOffsetY + dist * Math.sin(pitch) + shakeY;
     const camZ = playerPos.z + dist * Math.cos(angle) * Math.cos(pitch) + shakeZ;
 
     // Apply the position and lock the camera's focus onto the player
     window.GameCore.camera.position.set(camX, camY, camZ);
-    window.GameCore.camera.lookAt(playerPos.x, playerPos.y + 1.5, playerPos.z);
+    window.GameCore.camera.lookAt(playerPos.x, playerPos.y + targetOffsetY, playerPos.z);
 }
 
 // Boot the camera loop independently

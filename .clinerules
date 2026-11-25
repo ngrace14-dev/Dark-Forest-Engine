@@ -55,6 +55,7 @@
 - **No Silent Failures:** If a dependency is missing or a build fails, stop and address it. Do not attempt to bypass it silently.
 - **Context Updates:** When you reach a milestone or pivot architecture, you MUST update the `memory-bank/` files to reflect the new reality.
 - **Plan & Act Lifecycle:** Maintain `implementation_plan.md` in the project root with step-by-step technical requirements, affected files, and edge cases before executing in Act Mode.
+- **Asset & Look Source of Truth (`assets/tileset.json`):** All procedural structure meshes, wall-mount slot offsets, actor silhouettes, material palettes, Shift lighting states (`normalCycle` vs `whiteVoidShift`), and status indicators (`HUNTSMAN_MARK`, `HUNTSMAN_SCORN_24H`, `STORY_DENSITY_HIGH`) must read directly from `assets/tileset.json`.
 
 
 

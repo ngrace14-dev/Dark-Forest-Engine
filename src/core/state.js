@@ -258,12 +258,15 @@ window.Input = {
     activeSweep: null, // Tracks if an attack hitbox is currently sweeping
     hitPauseTimer: 0,  // Dragon's Dogma hit-stop micro-freeze
     camShake: 0,       // Intensity of camera shake
-    camAngle: Math.PI / 4, camPitch: Math.PI / 4, camDistance: 15,
+    cameraMode: 'CLASSIC_ISOMETRIC',
+    isLockedPerspective: true,
+    camAngle: Math.PI / 4, camPitch: Math.PI / 4, camDistance: 42,
     isDraggingCam: false, lastMouseX: 0, lastMouseY: 0
 };
 
 window.EngineParams = {
     playMode: true, brushActive: false, selectedPrefab: 'Village Hub', isPlayerHidden: false,
+    cameraMode: 'CLASSIC_ISOMETRIC',
     bloom: 0.35, vignette: 1.1, filterColor: '#2b4461', filterIntensity: 0.65,
     simScale: 1.0, isAccelerated: false, worldDay: 0, worldHour: 0, timeOfDay: 0,
     dayLengthSeconds: 1200, worldSeed: 1337, chunkRadius: 5, cycleLengthDays: 14,

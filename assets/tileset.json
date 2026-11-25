@@ -1,0 +1,174 @@
+{
+  "$schema": "dark-forest-tileset-v1",
+  "artDirection": {
+    "style": "Grimdark Storybook Gothic / Low-Poly Tactile Diorama",
+    "projection": "Classic Isometric (Low-FOV High-Angle)",
+    "gridUnitMeters": 2.0,
+    "lighting": {
+      "normalCycle": {
+        "ambientHex": "#1e2631",
+        "directionalHex": "#c9d6e3",
+        "fogHex": "#0f141a",
+        "fogDensity": 0.018
+      },
+      "whiteVoidShift": {
+        "ambientHex": "#e8edf2",
+        "directionalHex": "#ffffff",
+        "fogHex": "#f4f7fa",
+        "fogDensity": 0.045
+      }
+    },
+    "materials": {
+      "ironbarkWood": { "baseColor": "#2b211b", "roughness": 0.9, "metalness": 0.05 },
+      "runicStone": { "baseColor": "#3c424a", "roughness": 0.85, "metalness": 0.1 },
+      "wroughtIron": { "baseColor": "#181a1d", "roughness": 0.45, "metalness": 0.85 },
+      "obsidianBrutalist": { "baseColor": "#0d0f12", "roughness": 0.25, "metalness": 0.6 },
+      "barrierFuelGlow": { "baseColor": "#38bdf8", "emissive": "#0284c7", "emissiveIntensity": 2.2 },
+      "ashTongueRuneGlow": { "baseColor": "#f59e0b", "emissive": "#d97706", "emissiveIntensity": 1.8 },
+      "huntsmanMarkCrimson": { "baseColor": "#dc2626", "emissive": "#991b1b", "emissiveIntensity": 2.5 },
+      "corruptedFlesh": { "baseColor": "#3b171b", "roughness": 0.75, "metalness": 0.1 }
+    }
+  },
+  "structures": {
+    "anchor_stone_monolith": {
+      "displayName": "Anchor-Stone Monolith",
+      "faction": "ORDER",
+      "footprint": [2, 2],
+      "heightMeters": 6.5,
+      "silhouette": "Tapered obelisk bolted to bedrock with 4 heavy wrought-iron chains and glowing barrier core",
+      "materialPrimary": "runicStone",
+      "materialAccent": "barrierFuelGlow",
+      "wallMountSlots": 0,
+      "isShiftAnchor": true
+    },
+    "palisade_wall": {
+      "displayName": "Ironbark Palisade",
+      "faction": "ORDER",
+      "footprint": [1, 1],
+      "heightMeters": 3.0,
+      "silhouette": "Sharpened lancet-arch timber spikes with rear wooden firing platform",
+      "materialPrimary": "ironbarkWood",
+      "materialAccent": "wroughtIron",
+      "wallMountSlots": 2,
+      "mountHeightOffset": 1.6
+    },
+    "runic_watchtower": {
+      "displayName": "Guardian Watchtower",
+      "faction": "ORDER",
+      "footprint": [1, 1],
+      "heightMeters": 5.5,
+      "silhouette": "Narrow gothic stone belfry with iron brazier and elevated archer/bolt-caster deck",
+      "materialPrimary": "runicStone",
+      "materialAccent": "ashTongueRuneGlow",
+      "wallMountSlots": 2,
+      "mountHeightOffset": 3.8
+    },
+    "barrier_pylon": {
+      "displayName": "Barrier Fuel Pylon",
+      "faction": "ORDER",
+      "footprint": [1, 1],
+      "heightMeters": 3.5,
+      "silhouette": "Tri-legged wrought-iron cage holding a suspended blue Barrier Fuel canister",
+      "materialPrimary": "wroughtIron",
+      "materialAccent": "barrierFuelGlow",
+      "wallMountSlots": 0,
+      "barrierRadiusMeters": 14.0
+    },
+    "ocp_containment_post": {
+      "displayName": "OCP Forward Containment Post",
+      "faction": "ORDER_OCP",
+      "footprint": [2, 1],
+      "heightMeters": 3.2,
+      "silhouette": "Brutalist geometric black-obsidian bunker with floodlight mast and weapon rack",
+      "materialPrimary": "obsidianBrutalist",
+      "materialAccent": "barrierFuelGlow",
+      "wallMountSlots": 3,
+      "mountHeightOffset": 1.2
+    },
+    "scribal_armory": {
+      "displayName": "Scribal Armory & Weapon Rack",
+      "faction": "ORDER",
+      "footprint": [2, 1],
+      "heightMeters": 2.8,
+      "silhouette": "Sloped slate-roof smithy with glowing Ash-Tongue anvil and visible spear/crossbow racks",
+      "materialPrimary": "ironbarkWood",
+      "materialAccent": "ashTongueRuneGlow",
+      "wallMountSlots": 0,
+      "armsVillagersOnAlert": true
+    },
+    "starvation_cairn": {
+      "displayName": "Pale Sovereign Feeding Cairn",
+      "faction": "PALE_SOVEREIGN",
+      "footprint": [1, 1],
+      "heightMeters": 3.8,
+      "silhouette": "Jagged rib-cage bone spire dripping crimson frost, pulsing with starvation aura",
+      "materialPrimary": "corruptedFlesh",
+      "materialAccent": "huntsmanMarkCrimson",
+      "spawnType": "LESSER_WENDIGO"
+    }
+  },
+  "actors": {
+    "jess_nedaf": {
+      "displayName": "Director Jess Nedaf",
+      "role": "ORDER_LEADER",
+      "scale": 1.15,
+      "silhouette": "Trench-coat silhouette with brutalist shoulder pauldrons and glowing blue Compliance Bolt-Caster",
+      "primaryColor": "#1e293b",
+      "accentColor": "#38bdf8"
+    },
+    "the_huntsman": {
+      "displayName": "The Huntsman & The Orb",
+      "role": "SOVEREIGN_CULTIVATOR",
+      "scale": 1.25,
+      "silhouette": "Hunched tattered cloak with hooked cleaver and a hovering pale-gold Orb sphere 1.5m above shoulder",
+      "primaryColor": "#1c1917",
+      "accentColor": "#fbbf24"
+    },
+    "pale_sovereign": {
+      "displayName": "The Pale Sovereign",
+      "role": "SOVEREIGN_LEADER",
+      "scale": 1.5,
+      "silhouette": "Towering antlered ash-white figure trailing shadow ribbons and crimson frost",
+      "primaryColor": "#e2e8f0",
+      "accentColor": "#dc2626"
+    },
+    "villager_militia": {
+      "displayName": "Armed Villager / Wall Guard",
+      "role": "ORDER_UNIT",
+      "scale": 0.95,
+      "silhouette": "Hooded peasant tunic; equips iron spear and shield when alerted to wall slots",
+      "primaryColor": "#475569",
+      "accentColor": "#94a3b8"
+    },
+    "adventurer_dispatch": {
+      "displayName": "Dispatch Adventurer",
+      "role": "ORDER_EXPEDITION",
+      "scale": 1.0,
+      "silhouette": "Cloaked scout with pack-frame and lantern for woodland fuel/relic runs",
+      "primaryColor": "#3f6212",
+      "accentColor": "#f59e0b"
+    },
+    "lesser_wendigo": {
+      "displayName": "Lesser Feral Wendigo",
+      "role": "SOVEREIGN_UNIT",
+      "scale": 1.05,
+      "silhouette": "Gaunt, elongated four-limbed stalker that blends into dark tree trunks until lunging",
+      "primaryColor": "#27272a",
+      "accentColor": "#991b1b"
+    }
+  },
+  "statusVisuals": {
+    "HUNTSMAN_MARK": {
+      "indicator": "Floating crimson Ash-Tongue Bindrune (Pale Verdict) rotating above target head",
+      "colorHex": "#dc2626"
+    },
+    "HUNTSMAN_SCORN_24H": {
+      "indicator": "Jagged dark-amber isolation ring at unit feet; faction nameplate turns hostile to all allies",
+      "colorHex": "#d97706"
+    },
+    "STORY_DENSITY_HIGH": {
+      "indicator": "Golden-white Crow silhouette circling overhead + faint vertical light beam visible to Sovereign",
+      "colorHex": "#fef08a"
+    }
+  }
+}

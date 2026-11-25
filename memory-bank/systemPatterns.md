@@ -22,3 +22,20 @@ The engine tracks 130+ pressures across 5 tiers:
 
 ### Tag-Based Procedural Collision Formula
 `[Tier 1 Metaphysical Anchor] + [Tier 2/3 Environmental Catalyst] + [Tier 4/5 Failing Tactical Target] = Synthesized Payload Tags + Pressure Rebound`
+
+## 4. The Dual-Loop Cycle (Synchronized Strategic Ledger & 3D Isometric Tactical Slice)
+
+### Synchronized Two-Layer Loop
+Both factions operate across the same two synchronized layers:
+1. **Strategic Ledger (`CommanderTerminal` / `commander_ui.js`):** Pre-match briefing (`War Board` / `Story Density Beacons`) and post-match reconciliation (`General Ledger`).
+2. **3D Isometric Tactical Slice (`Three.js` / `StructureManager` / `SquadCultivationSystem`):** Real-time execution under `CameraProfiles.CLASSIC_ISOMETRIC` (`FOV 25°`, `45°` NE projection) during the 14-Day Shift countdown culminating in the **White Void** climax (`whiteVoidShift`), with all structure geometry, wall-mount offsets, material palettes, actor silhouettes, and status indicators bound strictly to `assets/tileset.json`.
+
+### Asymmetric Faction Cycles
+- **Order — "The Preservation Loop" (TD + Expedition):**
+  - *Briefing:* Inspect `barrier_fuel`, `ironbark_dust`, and threat levels.
+  - *Active Shift:* Trigger `MOBILIZE_WALLS` to slot `villager_militia` onto `palisade_wall` / `runic_watchtower` / `ocp_containment_post`; dispatch `adventurer_dispatch` squads for `barrier_fuel` crates & relics; survive the `whiteVoidShift` inside the anchored perimeter.
+  - *Reconciliation:* Log expedition yield, fuel efficiency, and survival fidelity.
+- **Pale Sovereign — "The Harvest Loop" (Stalker + Cultivator):**
+  - *Briefing:* Scan `Story Density` beacons for high-`compositeScore` targets.
+  - *Active Shift:* Apply `HUNTSMAN_MARK` $\rightarrow$ execute surgical beatdown to `5% HP` $\rightarrow$ inflict `HUNTSMAN_SCORN_24H` (allied isolation forcing solo survival & rapid cultivation) $\rightarrow$ execute `MACABRE_HARVEST` once target exceeds previous harvest baseline (`lastHarvestedStats`), evolving `lesser_wendigo` $\rightarrow$ `VAMPIRE` / `BERZERKER` to shatter the `anchor_stone_monolith`.
+  - *Reconciliation:* Log `sovereignHistoricalWeight` growth and raise the minimum harvest baseline for the next cycle.

@@ -15,10 +15,10 @@ class ForestImpostorSystem {
 
         this.uniforms = {
             uTime: { value: 0 },
-            uMinRadius: { value: 480.0 },  // Distance where LOD3 transitions to LOD4 Impostor
-            uMaxRadius: { value: 3500.0 }, // Maximum draw distance (3.5km)
+            uMinRadius: { value: 320.0 },  // Tuned for Classic Isometric LOD transition
+            uMaxRadius: { value: 2400.0 }, // Calibrated draw distance for isometric tactical clarity
             uFogColor: { value: new THREE.Color(0x0c131a) },
-            uFogDensity: { value: 0.0018 }
+            uFogDensity: { value: 0.0009 }
         };
     }
 
@@ -158,11 +158,13 @@ class ForestImpostorSystem {
         };
 
         const step = 28; // Spacing step calibrated for massive crown sizes
-        const maxDistSq = 3500 * 3500;
-        const minDistSq = 480 * 480;
+        const maxR = this.uniforms.uMaxRadius?.value || 2400;
+        const minR = this.uniforms.uMinRadius?.value || 320;
+        const maxDistSq = maxR * maxR;
+        const minDistSq = minR * minR;
 
-        for (let x = -3500; x <= 3500; x += step) {
-            for (let z = -3500; z <= 3500; z += step) {
+        for (let x = -maxR; x <= maxR; x += step) {
+            for (let z = -maxR; z <= maxR; z += step) {
                 if (index >= this.maxImpostors) break;
 
                 const distSq = x * x + z * z;

@@ -26,6 +26,16 @@ export const CommanderUI = {
     _mapStartPanX: 0,
     _mapStartPanY: 0,
     _overworldRafId: null,
+    isometricSliceState: {
+        active: false,
+        mode: 'ORDER_PRESERVATION', // 'ORDER_PRESERVATION' | 'SOVEREIGN_HARVEST'
+        phase: 'BRIEFING',           // 'BRIEFING' | 'ACTIVE_SHIFT_COUNTDOWN' | 'WHITE_VOID_CLIMAX' | 'GENERAL_LEDGER_SUMMARY'
+        daysUntilShift: 14,
+        actionLogs: [],
+        heroActorId: null,
+        scoutActorId: null,
+        militiaActorIds: []
+    },
 
     applyOverworldMapTransform() {
         if (typeof document === 'undefined') return;
@@ -809,6 +819,9 @@ export const CommanderUI = {
         window.panOverworldMap = (dx = 0, dy = 0) => this.panOverworldMap(dx, dy);
         window.resetOverworldMapCamera = () => this.resetOverworldMapCamera();
         window.focusOverworldParty = () => this.focusOverworldParty();
+        window.openIsometricTacticalSlice = (modeOverride = null) => this.openIsometricTacticalSlice(modeOverride);
+        window.executeIsometricSliceAction = (actionKey) => this.executeIsometricSliceAction(actionKey);
+        window.closeIsometricTacticalSlice = () => this.closeIsometricTacticalSlice();
         window.handleOverworldWheel = (ev) => {
             if (ev?.preventDefault) ev.preventDefault();
             const delta = (ev?.deltaY || 0) < 0 ? 0.22 : -0.22;
@@ -2054,6 +2067,9 @@ export const CommanderUI = {
                 <!-- INTERACTIVE EXPLORE FOREST OVERWORLD POP-UP MODAL -->
                 <div id="explore-forest-popup-modal" style="display:none;"></div>
 
+                <!-- ASYMMETRIC 3D ISOMETRIC VILLAGE TD & PALE SOVEREIGN CULTIVATION SLICE MODAL -->
+                <div id="isometric-tactical-slice-modal" style="display:none;"></div>
+
                 <!-- ALWAYS-PROMINENT SQUAD EVENT LOGS & FACTION PULSE LOGS DUAL LIVE MONITOR -->
                 <div id="always-prominent-live-pulse-deck" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
                     <div class="hub-iron-module" style="margin:0; border-color:#22c55e;">
@@ -2078,6 +2094,7 @@ export const CommanderUI = {
                     <button class="cmd-btn" style="background:#3b2410; border-color:#f59e0b; color:#fde68a; font-weight:bold; padding:3px 8px; font-size:9.5px;" onclick="window.viewFacilities()">🏗️ Fallout Shelter Facility Grid</button>
                     <button class="cmd-btn" style="background:#2e1065; border-color:#c084fc; color:#f3e8ff; font-weight:bold; padding:3px 8px; font-size:9.5px;" onclick="window.switchBookTab('GARRISON')">🛡️🏋️ Barracks &amp; Forward Recon Training Grounds</button>
                     <button id="btn-dedicated-explore-forest" class="cmd-btn" style="background:linear-gradient(180deg,#14532d,#052e16); border-color:#4ade80; color:#dcfce7; font-weight:900; padding:4px 10px; font-size:10px; box-shadow:0 0 12px rgba(34,197,94,0.35);" onclick="window.openExploreForest()">🌲🧭 EXPLORE FOREST (Forward Recon Overworld Map)</button>
+                    <button id="btn-launch-isometric-slice" class="cmd-btn" style="background:linear-gradient(180deg,#0c4a6e,#082f49); border-color:#38bdf8; color:#e0f2fe; font-weight:900; padding:4px 10px; font-size:10px; box-shadow:0 0 12px rgba(56,189,248,0.35);" onclick="window.openIsometricTacticalSlice()">🏰🐺 3D ISOMETRIC VILLAGE TD &amp; HUNTSMAN SLICE</button>
                 </div>
 
                 <!-- BOOK PAGE IV & V: TRUTH VAULT / WAR BOARD VISUAL DECK -->
@@ -2782,6 +2799,235 @@ export const CommanderUI = {
                 `).join('') + `<div style="margin-top:6px;"><button class="cmd-btn" onclick="window.sampleDeath()">+ Add Sample Veteran Case File</button></div>`;
             }
         }
+    },
+
+    openIsometricTacticalSlice(modeOverride = null) {
+        const root = typeof window !== 'undefined' ? window : globalThis;
+        const isSovRole = CommanderEngine.CampaignManager.campaignMode === 'SOVEREIGN';
+        const resolvedMode = modeOverride || (isSovRole ? 'SOVEREIGN_HARVEST' : 'ORDER_PRESERVATION');
+
+        if (typeof root.applyCameraProfile === 'function') {
+            root.applyCameraProfile('CLASSIC_ISOMETRIC');
+        }
+
+        const sm = root.StructureManager;
+        const scs = root.SquadCultivationSystem;
+
+        if (sm) {
+            sm.seedDefaultSettlementPerimeter(0, 0);
+            if (resolvedMode === 'SOVEREIGN_HARVEST') {
+                sm.placeStructure('STARVATION_CAIRN', -5, 5, { free: true, tier: 1 });
+            }
+        }
+
+        const st = this.isometricSliceState;
+        st.active = true;
+        st.mode = resolvedMode;
+        st.phase = 'BRIEFING';
+        st.daysUntilShift = 14 - ((CommanderEngine.CampaignManager.day || 1) % 14);
+        st.actionLogs = [
+            resolvedMode === 'SOVEREIGN_HARVEST'
+                ? '🩸 [MORNING BRIEFING // PALE SOVEREIGN] Camera locked to CLASSIC_ISOMETRIC. Probing packs & The Huntsman + Orb standing by.'
+                : '🏰 [MORNING BRIEFING // ORDER PRESERVATION] Camera locked to CLASSIC_ISOMETRIC. Anchor-Stone Monolith & Palisade Walls online.'
+        ];
+
+        if (scs) {
+            scs.actors.clear();
+            scs.dispatchedSquads.clear();
+            scs.probingPacks.clear();
+
+            const jess = scs.spawnActor('jess_nedaf', { martial: 24, survival: 19, storyDensity: 38 });
+            const scout = scs.spawnActor('adventurer_dispatch', { name: 'Outrider Kael', martial: 16, survival: 18, storyDensity: 20 });
+            const m1 = scs.spawnActor('villager_militia', { name: 'Wall-Guard Hal', martial: 10, survival: 9, storyDensity: 6 });
+            const m2 = scs.spawnActor('villager_militia', { name: 'Wall-Guard Vera', martial: 11, survival: 9, storyDensity: 7 });
+            scs.spawnActor('the_huntsman');
+            scs.spawnActor('pale_sovereign');
+
+            st.heroActorId = jess.id;
+            st.scoutActorId = scout.id;
+            st.militiaActorIds = [m1.id, m2.id];
+        }
+
+        this.renderIsometricTacticalSliceModal();
+        return { ok: true, state: { ...st } };
+    },
+
+    executeIsometricSliceAction(actionKey) {
+        const root = typeof window !== 'undefined' ? window : globalThis;
+        const sm = root.StructureManager;
+        const scs = root.SquadCultivationSystem;
+        const st = this.isometricSliceState;
+
+        if (!st.active) {
+            this.openIsometricTacticalSlice();
+        }
+
+        if (st.phase === 'BRIEFING') {
+            st.phase = 'ACTIVE_SHIFT_COUNTDOWN';
+        }
+
+        let logEntry = '';
+
+        if (actionKey === 'SWITCH_MODE_ORDER') {
+            return this.openIsometricTacticalSlice('ORDER_PRESERVATION');
+        } else if (actionKey === 'SWITCH_MODE_SOVEREIGN') {
+            return this.openIsometricTacticalSlice('SOVEREIGN_HARVEST');
+        } else if (actionKey === 'MOBILIZE_WALLS' && sm && scs) {
+            const units = st.militiaActorIds.map(id => scs.actors.get(id)).filter(Boolean);
+            const assigned = sm.mobilizeVillagersToWalls(units);
+            logEntry = `🛡️ [DOCTRINE HIERARCHY] Armed ${assigned.length} Villager Militia from Scribal Armory onto Watchtower & Palisade Wall slots.`;
+        } else if (actionKey === 'DISPATCH_FUEL_SQUAD' && scs) {
+            const disp = scs.dispatchOrderSquad([st.scoutActorId], 'BARRIER_FUEL_RUN', { x: 48, z: 48 });
+            if (disp.ok) {
+                const ret = scs.completeSquadExpedition(disp.squad.id);
+                logEntry = `🌲📦 [EXPEDITION RETURNED] Outrider Kael extracted +${ret.cargoDelivered.barrier_fuel}u Barrier Fuel & +${ret.cargoDelivered.ironbark_dust} Ironbark Dust. Anchor-Stone refueled!`;
+            } else {
+                logEntry = `⚠️ [DISPATCH BLOCKED] ${disp.reason}`;
+            }
+        } else if (actionKey === 'UPGRADE_PERIMETER_WALL' && sm) {
+            const target = Array.from(sm.structures.values()).find(s => !s.isDestroyed && (s.type === 'WALL_SEGMENT' || s.type === 'WATCHTOWER') && s.tier < s.maxTier);
+            if (target) {
+                const upg = sm.upgradeStructure(target.id);
+                logEntry = upg.ok
+                    ? `🔨 [FORTIFICATION UPGRADED] ${target.name} (${target.id}) upgraded to Tier ${target.tier} (${target.mountSlots.length} wall slots, HP ${target.hp}).`
+                    : `⚠️ [UPGRADE FAILED] ${upg.reason}`;
+            }
+        } else if (actionKey === 'SPAWN_WENDIGO_PROBE' && scs) {
+            const pk = scs.spawnProbingWendigoPack(3, { x: -30, z: 30 });
+            const probe = scs.resolvePackProbeOnSettlement(pk.pack.id);
+            logEntry = `🐺🩸 [PROBING PACK] 3 Lesser Feral Wendigos lunged at ${probe.targetStructureId} (Remaining HP: ${probe.structureResult?.remainingHp ?? 'N/A'}).`;
+        } else if (actionKey === 'HUNTSMAN_SCOUT_AND_MARK' && scs) {
+            const scout = scs.scoutHuntsmanTarget();
+            logEntry = scout.ok
+                ? `🎯🔴 [HUNTSMAN'S MARK] The Huntsman & The Orb marked ${scout.target.name} (Score ${scout.compositeScore} > Last Harvest ${scout.baselineRequired}).`
+                : `⚠️ [SCOUTING] ${scout.reason}`;
+        } else if (actionKey === 'HUNTSMAN_BEATDOWN_SCORN' && scs) {
+            const beat = scs.executeHuntsmanCultivationBeatdown(st.heroActorId);
+            logEntry = beat.ok
+                ? `⚔️🟠 [24H HUNTSMAN'S SCORN] ${beat.target.name} beaten to 5% HP (${beat.remainingHp} HP), Growth Rate boosted to ${beat.cultivationGrowthMultiplier}x, and isolated by 24h Scorn!`
+                : `⚠️ [CULTIVATION] ${beat.reason}`;
+        } else if (actionKey === 'MACABRE_HARVEST_AND_SHATTER' && scs && sm) {
+            scs.tickHours(24.0);
+            const harv = scs.executeMacabreHarvest(st.heroActorId);
+            const anchor = sm.getAnchorStone();
+            if (anchor) {
+                sm.applyDamageToStructure(anchor.id, 400, { isPaleSovereign: true, attackerName: 'The Pale Sovereign' });
+            }
+            st.phase = 'GENERAL_LEDGER_SUMMARY';
+            if (harv.ok) {
+                CommanderEngine.CampaignManager.sovereignHistoricalWeight = (CommanderEngine.CampaignManager.sovereignHistoricalWeight || 400) + Math.round(harv.newBaseline.compositeScore);
+                CommanderEngine.LogDispatchManager?.dispatches?.unshift({
+                    id: `harvest_${Date.now()}`,
+                    day: CommanderEngine.CampaignManager.day || 1,
+                    type: 'MACABRE_HARVEST',
+                    sender: 'The Bound Huntsman & The Orb',
+                    title: `Macabre Harvest of ${harv.harvestedTarget.name}`,
+                    body: `Cultivated target harvested at Score ${harv.newBaseline.compositeScore}. Evolved ${harv.evolvedWendigo?.name || 'Wendigo'} into ${harv.evolvedWendigo?.evolutionStage || 'VAMPIRE'}.`
+                });
+                logEntry = `💀🌌 [MACABRE HARVEST COMPLETE] Harvested ${harv.harvestedTarget.name}! New Baseline: ${harv.newBaseline.compositeScore}. Evolved ${harv.evolvedWendigo?.evolutionStage}. Reconciled to General Ledger.`;
+            } else {
+                logEntry = `⚠️ [HARVEST] ${harv.reason}`;
+            }
+        } else if (actionKey === 'TRIGGER_WHITE_VOID_WAVE' && scs) {
+            const shift = scs.triggerShiftWave();
+            st.phase = 'WHITE_VOID_CLIMAX';
+            CommanderEngine.LogDispatchManager?.dispatches?.unshift({
+                id: `shift_${Date.now()}`,
+                day: CommanderEngine.CampaignManager.day || 1,
+                type: 'SHIFT_SURVIVAL',
+                sender: 'Anchor-Stone Telemetry',
+                title: '14-Day White Void Climax Survived',
+                body: `Lighting shifted to ${shift.lightingState}. Anchor-Stone held bedrock chains at ${sm?.getAnchorStone()?.chainIntegrity ?? 100}% integrity.`
+            });
+            st.phase = 'GENERAL_LEDGER_SUMMARY';
+            logEntry = `🌩️⬜ [14-DAY SHIFT // WHITE VOID CLIMAX] Lighting transitioned to whiteVoidShift. Settlement Anchor-Stone survived & recorded to General Ledger!`;
+        }
+
+        if (logEntry) {
+            st.actionLogs.unshift(logEntry);
+        }
+
+        this.renderIsometricTacticalSliceModal();
+        this.render();
+        return { ok: true, logEntry, state: { ...st } };
+    },
+
+    closeIsometricTacticalSlice() {
+        this.isometricSliceState.active = false;
+        if (typeof document !== 'undefined') {
+            const modal = document.getElementById('isometric-tactical-slice-modal');
+            if (modal) modal.style.display = 'none';
+        }
+        return { ok: true, active: false };
+    },
+
+    renderIsometricTacticalSliceModal() {
+        if (typeof document === 'undefined') return;
+        const modal = document.getElementById('isometric-tactical-slice-modal');
+        if (!modal) return;
+
+        const st = this.isometricSliceState;
+        if (!st.active) {
+            modal.style.display = 'none';
+            return;
+        }
+
+        const root = typeof window !== 'undefined' ? window : globalThis;
+        const smTel = root.StructureManager?.getTelemetry?.() || null;
+        const scsTel = root.SquadCultivationSystem?.getTelemetry?.() || null;
+        const isSov = st.mode === 'SOVEREIGN_HARVEST';
+
+        const frameBg = isSov
+            ? 'linear-gradient(180deg, rgba(45,6,12,0.96), rgba(15,4,8,0.98))'
+            : 'linear-gradient(180deg, rgba(15,23,42,0.96), rgba(9,13,22,0.98))';
+        const borderCol = isSov ? '#dc2626' : '#38bdf8';
+        const titleText = isSov
+            ? '🩸🐺 PALE SOVEREIGN // HUNTSMAN CULTIVATION & HARVEST LOOP'
+            : '🏰🛡️ ORDER PRESERVATION // VILLAGE TD & WOODLAND DISPATCH';
+
+        const anchorFuel = smTel?.anchorStone?.barrierFuel ?? 80;
+        const chainInt = smTel?.anchorStone?.chainIntegrity ?? 100;
+        const mannedSlots = `${smTel?.occupiedMountSlots ?? 0}/${smTel?.totalMountSlots ?? 51}`;
+        const lastHarvest = scsTel?.lastHarvestedStats?.compositeScore ?? 47;
+
+        const directivesHtml = isSov
+            ? `
+                <button class="cmd-btn" style="border-color:#ef4444; background:#3f1212; color:#fecaca;" onclick="window.executeIsometricSliceAction('SPAWN_WENDIGO_PROBE')">🐺 1. Probe Walls (Lesser Wendigo Pack)</button>
+                <button class="cmd-btn" style="border-color:#f59e0b; background:#451a03; color:#fde68a;" onclick="window.executeIsometricSliceAction('HUNTSMAN_SCOUT_AND_MARK')">🎯 2. Huntsman &amp; Orb Scout (Stats &gt; ${lastHarvest})</button>
+                <button class="cmd-btn" style="border-color:#d97706; background:#3b171b; color:#fed7aa;" onclick="window.executeIsometricSliceAction('HUNTSMAN_BEATDOWN_SCORN')">⚔️ 3. Beat to 5% HP &amp; Inflict 24h Scorn</button>
+                <button class="cmd-btn" style="border-color:#dc2626; background:#7f1d1d; color:#fff1f2; font-weight:bold;" onclick="window.executeIsometricSliceAction('MACABRE_HARVEST_AND_SHATTER')">💀 4. Execute Macabre Harvest &amp; Shatter Anchor</button>
+            `
+            : `
+                <button class="cmd-btn" style="border-color:#38bdf8; background:#0c4a6e; color:#e0f2fe;" onclick="window.executeIsometricSliceAction('MOBILIZE_WALLS')">🛡️ 1. Arm Villagers &amp; Mount Walls (${mannedSlots})</button>
+                <button class="cmd-btn" style="border-color:#4ade80; background:#14532d; color:#dcfce7;" onclick="window.executeIsometricSliceAction('DISPATCH_FUEL_SQUAD')">🌲 2. Dispatch Adventurer Squad (Barrier Fuel Run)</button>
+                <button class="cmd-btn" style="border-color:#f59e0b; background:#3b2410; color:#fde68a;" onclick="window.executeIsometricSliceAction('UPGRADE_PERIMETER_WALL')">🔨 3. Upgrade Palisade / Watchtower (Tier +1)</button>
+                <button class="cmd-btn" style="border-color:#e2e8f0; background:#1e293b; color:#f8fafc; font-weight:bold;" onclick="window.executeIsometricSliceAction('TRIGGER_WHITE_VOID_WAVE')">🌩️ 4. Survive 14-Day White Void Climax</button>
+            `;
+
+        modal.style.display = 'block';
+        modal.innerHTML = `
+            <div style="background:${frameBg}; border:2px solid ${borderCol}; border-radius:6px; padding:10px 12px; margin-bottom:10px; color:#f8fafc;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; border-bottom:1px solid ${borderCol}; padding-bottom:6px; margin-bottom:8px;">
+                    <div style="font-family:'Cinzel',serif; font-weight:900; font-size:11.5px; color:${isSov ? '#fca5a5' : '#bae6fd'};">${titleText}</div>
+                    <div style="display:flex; gap:5px;">
+                        <button class="cmd-btn" style="padding:2px 7px; font-size:9px;" onclick="window.executeIsometricSliceAction('SWITCH_MODE_ORDER')">🏰 Order Loop</button>
+                        <button class="cmd-btn" style="padding:2px 7px; font-size:9px; border-color:#ef4444; color:#fecaca;" onclick="window.executeIsometricSliceAction('SWITCH_MODE_SOVEREIGN')">🩸 Sovereign Loop</button>
+                        <button class="cmd-btn" style="padding:2px 7px; font-size:9px; background:#3f1212; border-color:#ef4444; color:#fecaca;" onclick="window.closeIsometricTacticalSlice()">✖ Return to Ledger</button>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; font-family:'Share Tech Mono',monospace; font-size:10px; background:rgba(0,0,0,0.45); padding:5px 8px; margin-bottom:8px;">
+                    <span>PHASE: <b style="color:#fbbf24;">${st.phase}</b></span>
+                    <span>CAMERA: <b>CLASSIC_ISOMETRIC (FOV 25° | 45° NE)</b></span>
+                    <span>ANCHOR FUEL: <b style="color:#38bdf8;">${anchorFuel}u</b> (CHAINS: ${chainInt}%)</span>
+                    <span>WALL SLOTS: <b>${mannedSlots}</b></span>
+                    <span>LAST HARVEST: <b style="color:#f87171;">${lastHarvest}</b></span>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">${directivesHtml}</div>
+                <div style="background:rgba(0,0,0,0.55); border:1px solid #334155; padding:6px 8px; max-height:110px; overflow-y:auto; font-family:'Share Tech Mono',monospace; font-size:9.5px; color:#e2e8f0;">
+                    ${st.actionLogs.map(l => `<div style="padding:2px 0; border-bottom:1px dashed rgba(148,163,184,0.2);">${l}</div>`).join('')}
+                </div>
+            </div>
+        `;
     }
 };
 

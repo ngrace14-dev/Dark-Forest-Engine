@@ -19,6 +19,9 @@ import ForestRenderer from './systems/forest_renderer.js';
 import ForestImpostorSystem from './systems/forest_impostors.js';
 import VolumetricFogSystem from './systems/volumetric_fog.js';
 import BlockTerrainSystem from './systems/block_terrain.js';
+import { CameraProfiles, getActiveCameraProfile, applyCameraProfile } from './core/camera_profiles.js';
+import StructureManager from './systems/structure_manager.js';
+import SquadCultivationSystem from './systems/squad_cultivation_system.js';
 
 window.THREE = THREE;
 window.SkeletonUtils = SkeletonUtils;
@@ -180,13 +183,24 @@ function updateLightPool() {
 // SMOOTH CAMERA & SHADOW DRIVER
 // ==========================================
 
-function updateCameraAndShadows(delta) {
+function updateCameraAndShadows(delta, modeOverride = null) {
     if (!window.GameCore?.camera || !window.GameCore?.playerObj?.visual) return;
 
+    const profile = getActiveCameraProfile(modeOverride);
+    const isIsometric = profile.id === 'CLASSIC_ISOMETRIC' || window.Input?.isLockedPerspective;
+
     const playerPos = window.GameCore.playerObj.visual.position;
-    const dist = window.Input?.camDistance || 15;
-    const pitch = window.Input?.camPitch || 0.4;
-    const angle = window.Input?.camAngle || Math.PI;
+    const dist = isIsometric
+        ? Math.max(profile.minDistance || 24, Math.min(profile.maxDistance || 68, window.Input?.camDistance || profile.distance))
+        : (window.Input?.camDistance || profile.distance || 15);
+    const pitch = isIsometric ? profile.pitch : (window.Input?.camPitch || profile.pitch || 0.4);
+    const angle = isIsometric ? profile.angle : (window.Input?.camAngle || profile.angle || Math.PI);
+    const targetOffsetY = profile.targetHeightOffset ?? 1.5;
+
+    if (window.GameCore.camera.fov !== profile.fov && typeof window.GameCore.camera.updateProjectionMatrix === 'function') {
+        window.GameCore.camera.fov = profile.fov;
+        window.GameCore.camera.updateProjectionMatrix();
+    }
 
     let shakeX = 0, shakeY = 0, shakeZ = 0;
     if (window.Input?.camShake > 0) {
@@ -198,20 +212,32 @@ function updateCameraAndShadows(delta) {
     }
 
     const targetX = playerPos.x + dist * Math.sin(angle) * Math.cos(pitch) + shakeX;
-    const targetY = playerPos.y + 1.5 + dist * Math.sin(pitch) + shakeY;
+    const targetY = playerPos.y + targetOffsetY + dist * Math.sin(pitch) + shakeY;
     const targetZ = playerPos.z + dist * Math.cos(angle) * Math.cos(pitch) + shakeZ;
 
     const lerpFactor = Math.min(1.0, (delta || fixedTimeStep) * 16.0);
     _targetCamPos.set(targetX, targetY, targetZ);
     window.GameCore.camera.position.lerp(_targetCamPos, lerpFactor);
 
-    _v1.set(playerPos.x, playerPos.y + 1.5, playerPos.z);
+    _v1.set(playerPos.x, playerPos.y + targetOffsetY, playerPos.z);
     _currentCamTarget.lerp(_v1, lerpFactor);
     window.GameCore.camera.lookAt(_currentCamTarget);
 
     const dirLight = window.RenderPipeline?.dirLight;
     if (dirLight && dirLight.castShadow) {
-        dirLight.target.position.copy(playerPos);
+        if (isIsometric && profile.shadowSunOffset) {
+            // Anchor shadow frustum on quantized grid around focus to prevent shadow-edge shimmering in isometric RTS view
+            const snapX = Math.round(playerPos.x / 4) * 4;
+            const snapZ = Math.round(playerPos.z / 4) * 4;
+            dirLight.target.position.set(snapX, playerPos.y, snapZ);
+            dirLight.position.set(
+                snapX + profile.shadowSunOffset.x,
+                playerPos.y + profile.shadowSunOffset.y,
+                snapZ + profile.shadowSunOffset.z
+            );
+        } else {
+            dirLight.target.position.copy(playerPos);
+        }
         dirLight.target.updateMatrixWorld();
     }
 }
@@ -992,7 +1018,9 @@ function fixedUpdateLogic(delta) {
 
     window.ArenaTestManager?.update?.(delta);
     window.VATManager?.update?.(delta);
-        window.EncounterDirector?.update?.(delta);
+    window.EncounterDirector?.update?.(delta);
+    window.StructureManager?.update?.(delta);
+    window.SquadCultivationSystem?.update?.(delta);
     
         if (window.CrowsEye) {
         window.CrowsEye.update(delta);
